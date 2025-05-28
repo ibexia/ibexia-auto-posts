@@ -24,7 +24,7 @@ def leer_google_sheets():
     if not spreadsheet_id:
         raise Exception("No se encontró la variable de entorno SPREADSHEET_ID")
 
-    range_name = os.getenv('RANGE_NAME', 'A1:A10')  # Solo tickers
+    range_name = os.getenv('RANGE_NAME', 'A1:A100')  # Solo tickers
 
     service = build('sheets', 'v4', credentials=creds)
     sheet = service.spreadsheets()
