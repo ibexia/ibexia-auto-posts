@@ -2,8 +2,9 @@ import os
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import json
+import google.generativeai as genai
 
-def main():
+def leer_google_sheets():
     # Leer credenciales desde variable de entorno (GitHub Secrets)
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
     if not credentials_json:
@@ -32,6 +33,31 @@ def main():
         print('Datos leídos de la hoja:')
         for row in values:
             print(row)
+    
+    return values
+
+def generar_contenido_con_gemini(datos):
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-pro')
+
+    # Crear prompt a partir de los datos de Sheets
+    prompt = "Crea un texto inspirador con base en estos datos:\n"
+    for row in datos:
+        prompt += " - " + ", ".join(row) + "\n"
+
+    response = model.generate_content(prompt)
+
+    print("\n🧠 Contenido generado por Gemini:\n")
+    print(response.text)
+
+def main():
+    datos = leer_google_sheets()
+    if datos:
+        generar_contenido_con_gemini(datos)
 
 if __name__ == '__main__':
     main()
