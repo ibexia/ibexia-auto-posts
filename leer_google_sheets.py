@@ -42,9 +42,6 @@ def generar_contenido_con_gemini(datos):
     if not api_key:
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
-
-    genai.configure(api_key=api_key)
-
 print("\nModelos disponibles:")
 for modelo in genai.list_models():
     print(f"{modelo.name} -> {modelo.supported_generation_methods}")
