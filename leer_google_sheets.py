@@ -54,7 +54,7 @@ def generar_contenido_con_gemini(datos):
     print(prompt)
 
     try:
-        model = genai.GenerativeModel(model_name="models/gemini-pro")  # ¡corregido!
+        model = genai.GenerativeModel("gemini-pro")
         response = model.generate_content(prompt)
         if response and hasattr(response, 'text'):
             print("\n🧠 Contenido generado por Gemini:\n")
