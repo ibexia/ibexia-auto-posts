@@ -36,10 +36,21 @@ def leer_google_sheets():
     
     return values
 
+
 def generar_contenido_con_gemini(datos):
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key:
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
+
+
+    genai.configure(api_key=api_key)
+
+print("\nModelos disponibles:")
+for modelo in genai.list_models():
+    print(f"{modelo.name} -> {modelo.supported_generation_methods}")
+
+# Usa el modelo correcto según lo que imprima arriba
+model = genai.GenerativeModel(model_name="models/gemini-1.0-pro")  # Ajusta si tienes acceso a 1.5
 
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(model_name="models/gemini-pro")  # 🔧 Corrección aquí
