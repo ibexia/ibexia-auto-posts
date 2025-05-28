@@ -91,14 +91,13 @@ def obtener_datos_yfinance(ticker):
 def construir_prompt_formateado(data):
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Redacta en primera persona, con total confianza en tu criterio. 
-Vas a generar un análisis técnico COMPLETO de 1000 palabras sobre la empresa: {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance (yfinance):
+Vas a generar un análisis técnico COMPLETO de aproximadamente 1000 palabras sobre la empresa: {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance:
 
 - Precio actual: {data['PRECIO_ACTUAL']}
 - Volumen: {data['VOLUMEN']}
 - Soporte clave: {data['SOPORTE']}
 - Resistencia clave: {data['RESISTENCIA']}
-- Indicador SMI actual: {data['SMI']} → Esto indica que el valor está **{data['CONDICION_RSI']}**
-- Recomendación basada exclusivamente en el SMI: **{data['RECOMENDACION']}**
+- Recomendación general: {data['RECOMENDACION']}
 - Resultados financieros recientes: {data['INGRESOS']}, {data['EBITDA']}, {data['BENEFICIOS']}
 - Nivel de deuda y flujo de caja: {data['DEUDA']}, {data['FLUJO_CAJA']}
 - Información estratégica: {data['EXPANSION_PLANES']}, {data['ACUERDOS']}
@@ -106,21 +105,26 @@ Vas a generar un análisis técnico COMPLETO de 1000 palabras sobre la empresa: 
 - Comparativa sectorial: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 
-🟨 SECCIÓN 1 – TÍTULO Y INTRODUCCIÓN
-**{data['NOMBRE_EMPRESA']} – Recomendación de {data['RECOMENDACION']}**
+SECCIÓN 1 – TÍTULO Y INTRODUCCIÓN
+{data['NOMBRE_EMPRESA']} – Recomendación: {data['RECOMENDACION']}
 
-**Análisis técnico de {data['NOMBRE_EMPRESA']}. Comentarios a corto y largo plazo e información y avisos sobre los últimos movimientos sobre el precio de sus acciones. Consulta los datos de medias móviles, RSI, MACD, Boolinger.**
-www.ibexia.es
+Análisis técnico de {data['NOMBRE_EMPRESA']}. Comentarios a corto y largo plazo, con información y avisos sobre los últimos movimientos del precio de sus acciones. Consulta datos relevantes de indicadores y medias móviles.
 
-🟨 SECCIÓN 2 – RECOMENDACIÓN GENERAL (mínimo 150 palabras)
-🟨 SECCIÓN 3 – RECOMENDACIÓN A CORTO PLAZO (mínimo 150 palabras)
-🟨 SECCIÓN 4 – PREDICCIÓN A LARGO PLAZO (mínimo 150 palabras)
-🟨 SECCIÓN 5 – INFORMACIÓN ADICIONAL (mínimo 150 palabras)
-🟨 SECCIÓN 6 – RESUMEN (aprox. 100 palabras)
-🟨 SECCIÓN 7 – DESCARGO DE RESPONSABILIDAD
-✅ Usa palabras clave en **negrita** como: **análisis técnico**, **compra**, **venta**, **cómo invertir**, **brokers**,
+SECCIÓN 2 – RECOMENDACIÓN GENERAL (mínimo 150 palabras)
 
-    """
+SECCIÓN 3 – RECOMENDACIÓN A CORTO PLAZO (mínimo 150 palabras)
+
+SECCIÓN 4 – PREDICCIÓN A LARGO PLAZO (mínimo 150 palabras)
+
+SECCIÓN 5 – INFORMACIÓN ADICIONAL (mínimo 150 palabras)
+Incluye aquí información reciente y relevante como noticias del mercado, futuros contratos, movimientos destacados o cualquier dato externo de interés para entender mejor la situación actual de la empresa.
+
+SECCIÓN 6 – RESUMEN (aproximadamente 100 palabras)
+
+SECCIÓN 7 – DESCARGO DE RESPONSABILIDAD
+Este análisis es solo informativo y no constituye una recomendación de inversión. Cada persona debe evaluar sus decisiones de forma independiente.
+
+"""
     return prompt
 
 def calcular_smi(df, k_window=14, d_window=3, smoothing=3):
