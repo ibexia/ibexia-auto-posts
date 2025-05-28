@@ -75,8 +75,7 @@ def obtener_datos_yfinance(ticker):
 
 def construir_prompt_formateado(data):
     prompt = f"""
-Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Redacta en primera persona, con total confianza en tu criterio. Usa un tono directo, persuasivo y magnético, transmitiendo certeza absoluta sobre la evolución del precio. Genera urgencia y emoción, haciendo ver que esta información es una oportunidad única para el lector.
-
+Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Redacta en primera persona, con total confianza en tu criterio. 
 Vas a generar un análisis técnico COMPLETO de 1000 palabras sobre la empresa: {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance (yfinance):
 - Precio actual: {data['PRECIO_ACTUAL']}
 - Volumen: {data['VOLUMEN']}
@@ -104,7 +103,7 @@ www.ibexia.es
 🟨 SECCIÓN 7 – DESCARGO DE RESPONSABILIDAD
 ✅ Usa palabras clave en **negrita** como: **análisis técnico**, **compra**, **venta**, **cómo invertir**, **brokers**, **plataformas de trading**, **acciones con potencial**.
 ✅ Repite el nombre de la empresa al menos 10 veces.
-✅ Usa títulos H1 y H2 con emojis apropiados (📈, 📉, 💼, ⚠️, etc.).
+✅ Usa títulos H1 y H2 
 ✅ No incluyas enlaces externos, salvo www.ibexia.es.
     """
     return prompt
