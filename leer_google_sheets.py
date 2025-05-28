@@ -49,10 +49,19 @@ def generar_contenido_con_gemini(datos):
     for row in datos:
         prompt += " - " + ", ".join(row) + "\n"
 
-    response = model.generate_content(prompt)
+    print("\n📝 Prompt enviado a Gemini:\n")
+    print(prompt)
 
-    print("\n🧠 Contenido generado por Gemini:\n")
-    print(response.text)
+    try:
+        response = model.generate_content(prompt)
+        if response and hasattr(response, 'text'):
+            print("\n🧠 Contenido generado por Gemini:\n")
+            print(response.text)
+        else:
+            print("\n⚠️ No se recibió texto del modelo.")
+    except Exception as e:
+        print("\n❌ Error al generar contenido con Gemini:")
+        print(str(e))
 
 def main():
     datos = leer_google_sheets()
