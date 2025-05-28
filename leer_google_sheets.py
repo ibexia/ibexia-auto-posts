@@ -132,7 +132,7 @@ length_d = 3
 ema_signal_len = 10
 smooth_period = 5
 
-def calculate_smi_tv(df):
+def calcular_smi_tv(df):
     high = df['High']
     low = df['Low']
     close = df['Close']
@@ -149,9 +149,9 @@ def calculate_smi_tv(df):
     smi_raw[avgdiff == 0] = 0.0
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
-    smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
+    # smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()  # opcional
 
-    return smi_smoothed, smi_signal
+    return smi_smoothed
     
 def enviar_email(texto_generado):
     remitente = "xumkox@gmail.com"
