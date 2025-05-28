@@ -1,0 +1,15 @@
+name: Ejecutar script diario
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # Todos los días a las 08:00 AM UTC
+
+jobs:
+  run-python-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v3
+
+      - name: Ejecutar script.py
+        run: python3 script.py
