@@ -1,15 +1,25 @@
-name: Ejecutar script Python  # Nombre del workflow, puedes cambiarlo
+name: Leer Google Sheets y mostrar datos
 
 on:
-  push:
-    branches:
-      - main              # Este workflow se activa cuando haces push en la rama "main"
+  workflow_dispatch: # Trigger manual para probar cuando quieras
 
 jobs:
-  run-python:              # Nombre del trabajo, puedes cambiarlo
-    runs-on: ubuntu-latest # Se ejecuta en un servidor Linux virtual
+  leer_sheets:
+    runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3   # Primero clona tu repositorio para poder usar los archivos
-      - name: Ejecutar script Python
-        run: python3 script.py      # Aquí ejecuta tu archivo script.py
+      - name: Descargar código
+        uses: actions/checkout@v3
+
+      - name: Instalar Python y dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+
+      - name: Ejecutar script para leer Google Sheets
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          RANGE_NAME: 'A1:C10'  # Cambia rango si quieres
+        run: |
+          python leer_google_sheets.py
