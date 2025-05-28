@@ -33,7 +33,7 @@ def leer_google_sheets():
         print('Datos leídos de la hoja:')
         for row in values:
             print(row)
-    
+
     return values
 
 
@@ -42,15 +42,16 @@ def generar_contenido_con_gemini(datos):
     if not api_key:
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
-print("\nModelos disponibles:")
-for modelo in genai.list_models():
-    print(f"{modelo.name} -> {modelo.supported_generation_methods}")
-
-# Usa el modelo correcto según lo que imprima arriba
-model = genai.GenerativeModel(model_name="models/gemini-1.0-pro")  # Ajusta si tienes acceso a 1.5
-
+    # Configurar API key (debe hacerse antes de usar genai)
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name="models/gemini-pro")  # 🔧 Corrección aquí
+
+    # Mostrar modelos disponibles para saber cuál usar
+    print("\nModelos disponibles:")
+    for modelo in genai.list_models():
+        print(f"{modelo.name} -> {modelo.supported_generation_methods}")
+
+    # Usar el modelo correcto (ajusta según lo que veas arriba)
+    model = genai.GenerativeModel(model_name="models/gemini-1.0-pro")
 
     # Crear prompt a partir de los datos de Sheets
     prompt = "Crea un texto inspirador con base en estos datos:\n"
@@ -62,10 +63,12 @@ model = genai.GenerativeModel(model_name="models/gemini-1.0-pro")  # Ajusta si t
     print("\n🧠 Contenido generado por Gemini:\n")
     print(response.text)
 
+
 def main():
     datos = leer_google_sheets()
     if datos:
         generar_contenido_con_gemini(datos)
+
 
 if __name__ == '__main__':
     main()
