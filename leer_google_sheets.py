@@ -51,7 +51,7 @@ def generar_contenido_con_gemini(datos):
         print(f"{modelo.name} -> {modelo.supported_generation_methods}")
 
     # Usar el modelo correcto (ajusta según lo que veas arriba)
-    model = genai.GenerativeModel(model_name="models/gemini-1.0-pro")
+    model = genai.GenerativeModel(model_name="models/gemini-1.5-pro")
 
     # Crear prompt a partir de los datos de Sheets
     prompt = "Crea un texto inspirador con base en estos datos:\n"
