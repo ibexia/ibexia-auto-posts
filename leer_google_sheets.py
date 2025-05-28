@@ -76,7 +76,7 @@ def generar_contenido_con_gemini(datos):
 
     model = genai.GenerativeModel(model_name="models/gemini-2.0-flash-lite")
 
-    prompt = "Crea un texto inspirador con base en estos datos:\n"
+    prompt = "Analiza las siguientes empresas listadas en bolsa a partir de sus *tickers*. Proporciona un resumen de su sector, posición en el mercado y una perspectiva general de inversión:\n"
     for row in datos:
         prompt += " - " + ", ".join(row) + "\n"
 
