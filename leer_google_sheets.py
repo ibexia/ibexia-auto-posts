@@ -154,7 +154,12 @@ def calcular_smi_tv(df):
     smi_raw[avgdiff == 0] = 0.0
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
-    return smi_smoothed
+    
+    # Añadir la columna 'SMI' al DataFrame original
+    df = df.copy()  # Para evitar modificar el original fuera de la función
+    df['SMI'] = smi_smoothed
+    
+    return df
 
     
 def enviar_email(texto_generado):
