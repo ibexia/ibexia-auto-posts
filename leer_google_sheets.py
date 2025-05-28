@@ -42,7 +42,11 @@ def generar_contenido_con_gemini(datos):
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.0-pro')
+    model = genai.GenerativeModel('gemini-pro')
+
+    models = genai.list_models()
+for model in models:
+    print(model.name)
 
     # Crear prompt a partir de los datos de Sheets
     prompt = "Crea un texto inspirador con base en estos datos:\n"
