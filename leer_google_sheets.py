@@ -44,10 +44,6 @@ def generar_contenido_con_gemini(datos):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-pro')
 
-    models = genai.list_models()
-for model in models:
-    print(model.name)
-
     # Crear prompt a partir de los datos de Sheets
     prompt = "Crea un texto inspirador con base en estos datos:\n"
     for row in datos:
