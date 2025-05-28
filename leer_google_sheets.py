@@ -47,7 +47,7 @@ def obtener_datos_yfinance(ticker):
     hist = stock.history(period="30d")  # 30 días para mejor cálculo del SMI
 
     try:
-        hist = calcular_smi(hist)
+        hist = calcular_smi_tv(hist)
         smi_actual = round(hist['SMI'].dropna().iloc[-1], 2)
 
         if smi_actual > 40:
@@ -132,6 +132,11 @@ length_d = 3
 ema_signal_len = 10
 smooth_period = 5
 
+length_k = 14
+length_d = 3
+smooth_period = 3
+ema_signal_len = 3  # aunque no se use aquí, se puede dejar para referencia
+
 def calcular_smi_tv(df):
     high = df['High']
     low = df['Low']
@@ -149,9 +154,8 @@ def calcular_smi_tv(df):
     smi_raw[avgdiff == 0] = 0.0
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
-    # smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()  # opcional
-
     return smi_smoothed
+
     
 def enviar_email(texto_generado):
     remitente = "xumkox@gmail.com"
