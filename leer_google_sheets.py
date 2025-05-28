@@ -127,15 +127,31 @@ Este análisis es solo informativo y no constituye una recomendación de inversi
 """
     return prompt
 
-def calcular_smi(df, k_window=14, d_window=3, smoothing=3):
-    low_min = df['Low'].rolling(window=k_window).min()
-    high_max = df['High'].rolling(window=k_window).max()
-    mid_point = (high_max + low_min) / 2
-    smi = 100 * ((df['Close'] - mid_point) / (high_max - low_min))
+length_k = 10
+length_d = 3
+ema_signal_len = 10
+smooth_period = 5
 
-    smi_smoothed = smi.rolling(window=smoothing).mean()
-    df['SMI'] = smi_smoothed
-    return df
+def calculate_smi_tv(df):
+    high = df['High']
+    low = df['Low']
+    close = df['Close']
+
+    hh = high.rolling(window=length_k).max()
+    ll = low.rolling(window=length_k).min()
+    diff = hh - ll
+    rdiff = close - (hh + ll) / 2
+
+    avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
+    avgdiff = diff.ewm(span=length_d, adjust=False).mean()
+
+    smi_raw = (avgrel / (avgdiff / 2)) * 100
+    smi_raw[avgdiff == 0] = 0.0
+
+    smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
+    smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
+
+    return smi_smoothed, smi_signal
     
 def enviar_email(texto_generado):
     remitente = "xumkox@gmail.com"
