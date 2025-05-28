@@ -159,7 +159,7 @@ def generar_contenido_con_gemini(tickers):
 
 
 def main():
-    tickers = leer_google_sheets()
+    tickers = leer_google_sheets()[1:]  # Esto salta la primera fila (los encabezados)
     if tickers:
         generar_contenido_con_gemini(tickers)
 
