@@ -50,10 +50,10 @@ def obtener_datos_yfinance(ticker):
         hist = calcular_smi(hist)
         smi_actual = round(hist['SMI'].dropna().iloc[-1], 2)
 
-        if smi_actual > 60:
+        if smi_actual > 40:
             recomendacion = "Vender"
             condicion_rsi = "sobrecomprado"
-        elif smi_actual < -60:
+        elif smi_actual < -40:
             recomendacion = "Comprar"
             condicion_rsi = "sobrevendido"
         else:
