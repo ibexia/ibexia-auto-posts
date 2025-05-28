@@ -37,12 +37,13 @@ def leer_google_sheets():
     return values
 
 def generar_contenido_con_gemini(datos):
+    import google.generativeai as genai
+
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key:
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-pro')
 
     # Crear prompt a partir de los datos de Sheets
     prompt = "Crea un texto inspirador con base en estos datos:\n"
@@ -53,6 +54,7 @@ def generar_contenido_con_gemini(datos):
     print(prompt)
 
     try:
+        model = genai.GenerativeModel(model_name="models/gemini-pro")  # ¡corregido!
         response = model.generate_content(prompt)
         if response and hasattr(response, 'text'):
             print("\n🧠 Contenido generado por Gemini:\n")
