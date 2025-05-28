@@ -1,15 +1,15 @@
-name: Ejecutar script diario
+name: Ejecutar script Python  # Nombre del workflow, puedes cambiarlo
 
 on:
-  schedule:
-    - cron: '0 8 * * *'  # Todos los días a las 08:00 AM UTC
+  push:
+    branches:
+      - main              # Este workflow se activa cuando haces push en la rama "main"
 
 jobs:
-  run-python-script:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clonar repositorio
-        uses: actions/checkout@v3
+  run-python:              # Nombre del trabajo, puedes cambiarlo
+    runs-on: ubuntu-latest # Se ejecuta en un servidor Linux virtual
 
-      - name: Ejecutar script.py
-        run: python3 script.py
+    steps:
+      - uses: actions/checkout@v3   # Primero clona tu repositorio para poder usar los archivos
+      - name: Ejecutar script Python
+        run: python3 script.py      # Aquí ejecuta tu archivo script.py
