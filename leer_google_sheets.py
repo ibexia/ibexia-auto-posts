@@ -216,34 +216,33 @@ def main():
 
     day_of_week = datetime.today().weekday()  # Lunes es 0, Martes 1, ..., Domingo 6
     
-    # Solo procesamos de lunes a viernes (0 a 4)
-    if 0 <= day_of_week <= 4:
-        num_tickers_per_day = 10
-        total_tickers_in_sheet = len(all_tickers)
-        
-        # Calcular el índice de inicio directamente basado en el día de la semana.
-        # El operador módulo garantiza que el índice se "envuelva" si el número de tickers
-        # es menor que el total de tickers procesados en una semana (50).
-        start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
-        
-        end_index = start_index + num_tickers_per_day
-        
-        tickers_for_today = []
-        if end_index <= total_tickers_in_sheet:
-            tickers_for_today = all_tickers[start_index:end_index]
-        else:
-            # Si el final del bloque excede el total de tickers,
-            # tomamos lo que queda hasta el final y luego volvemos al principio.
-            tickers_for_today = all_tickers[start_index:] + all_tickers[:end_index - total_tickers_in_sheet]
-
-        if tickers_for_today:
-            print(f"Procesando tickers para el día {datetime.today().strftime('%A')}: {tickers_for_today}")
-            generar_contenido_con_gemini(tickers_for_today)
-        else:
-            print(f"No hay tickers disponibles para el día {datetime.today().strftime('%A')} en el rango calculado. "
-                  f"start_index: {start_index}, end_index: {end_index}, total_tickers: {total_tickers_in_sheet}")
+    # Modificado: Se eliminó la restricción de 0 <= day_of_week <= 4
+    # Ahora se procesa todos los días de la semana (0 a 6)
+    num_tickers_per_day = 10
+    total_tickers_in_sheet = len(all_tickers)
+    
+    # Calcular el índice de inicio directamente basado en el día de la semana (0-6).
+    # El operador módulo garantiza que el índice se "envuelva" para cubrir los 70 tickers.
+    start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
+    
+    end_index = start_index + num_tickers_per_day
+    
+    tickers_for_today = []
+    if end_index <= total_tickers_in_sheet:
+        tickers_for_today = all_tickers[start_index:end_index]
     else:
-        print("Hoy es fin de semana. No se procesarán tickers.")
+        # Si el final del bloque excede el total de tickers,
+        # tomamos lo que queda hasta el final y luego volvemos al principio.
+        tickers_for_today = all_tickers[start_index:] + all_tickers[:end_index - total_tickers_in_sheet]
+
+    if tickers_for_today:
+        print(f"Procesando tickers para el día {datetime.today().strftime('%A')}: {tickers_for_today}")
+        generar_contenido_con_gemini(tickers_for_today)
+    else:
+        print(f"No hay tickers disponibles para el día {datetime.today().strftime('%A')} en el rango calculado. "
+              f"start_index: {start_index}, end_index: {end_index}, total_tickers: {total_tickers_in_sheet}")
+
+# La parte de "Hoy es fin de semana" se elimina ya que ahora se procesa todos los días.
 
 
 if __name__ == '__main__':
