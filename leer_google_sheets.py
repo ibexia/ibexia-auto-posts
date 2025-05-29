@@ -7,7 +7,7 @@ from email.mime.multipart import MIMEMultipart
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import google.generativeai as genai
-from datetime import datetime  # 🔹 añadido para obtener el día de la semana
+import datetime  # <-- nuevo import para saber qué día es
 
 
 def leer_google_sheets():
@@ -128,10 +128,6 @@ Este análisis es solo informativo y no constituye una recomendación de inversi
 """
     return prompt
 
-length_k = 10
-length_d = 3
-ema_signal_len = 10
-smooth_period = 5
 
 length_k = 14
 length_d = 3
@@ -156,8 +152,7 @@ def calcular_smi_tv(df):
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     
-    # Añadir la columna 'SMI' al DataFrame original
-    df = df.copy()  # Para evitar modificar el original fuera de la función
+    df = df.copy()
     df['SMI'] = smi_smoothed
     
     return df
@@ -167,7 +162,7 @@ def enviar_email(texto_generado):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
     asunto = "Contenido generado por Gemini"
-    password = "kdgz lvdo wqvt vfkt"  # Asegúrate de usar contraseña de aplicación segura
+    password = "kdgz lvdo wqvt vfkt"
 
     msg = MIMEMultipart()
     msg['From'] = remitente
@@ -212,16 +207,13 @@ def generar_contenido_con_gemini(tickers):
 
 
 def main():
-    all_tickers = leer_google_sheets()[1:]  # Esto salta la primera fila (los encabezados)
-
-    # 🔽 Seleccionar 10 tickers según el día de la semana
-    weekday = datetime.today().weekday()  # lunes=0, ..., viernes=4
-    start_index = weekday * 10
-    end_index = start_index + 10
-    tickers = all_tickers[start_index:end_index]
-
+    tickers = leer_google_sheets()[1:]  # Saltamos encabezado
     if tickers:
-        generar_contenido_con_gemini(tickers)
+        dia_semana = datetime.datetime.today().weekday()  # 0 = lunes, 6 = domingo
+        inicio = dia_semana * 10
+        fin = inicio + 10
+        tickers_dia = tickers[inicio:fin]
+        generar_contenido_con_gemini(tickers_dia)
 
 
 if __name__ == '__main__':
