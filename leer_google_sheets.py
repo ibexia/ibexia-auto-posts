@@ -200,6 +200,57 @@ def calcular_smi_tv(df):
     
     return df
 
-def enviar_email(texto
-::contentReference[oaicite:59]{index=59}
- 
+def enviar_email(texto_generado):
+    remitente = "xumkox@gmail.com"
+    destinatario = "xumkox@gmail.com"
+    asunto = "Contenido generado por Gemini"
+    password = "kdgz lvdo wqvt vfkt"  # Asegúrate de usar contraseña de aplicación segura
+
+    msg = MIMEMultipart()
+    msg['From'] = remitente
+    msg['To'] = destinatario
+    msg['Subject'] = asunto
+
+    msg.attach(MIMEText(texto_generado, 'plain'))
+
+    try:
+        servidor = smtplib.SMTP('smtp.gmail.com', 587)
+        servidor.starttls()
+        servidor.login(remitente, password)
+        servidor.sendmail(remitente, destinatario, msg.as_string())
+        servidor.quit()
+        print("✅ Correo enviado con éxito.")
+    except Exception as e:
+        print("❌ Error al enviar el correo:", e)
+ def generar_contenido_con_gemini(tickers):
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(model_name="models/gemini-2.0-flash-lite")
+
+    for ticker in tickers:
+        print(f"\n📊 Procesando ticker: {ticker}")
+        data = obtener_datos_yfinance(ticker)
+        if not data:
+            continue
+        prompt = construir_prompt_formateado(data)
+
+        try:
+            response = model.generate_content(prompt)
+            print(f"\n🧠 Contenido generado para {ticker}:\n")
+            print(response.text)
+            enviar_email(response.text)
+        except Exception as e:
+            print(f"❌ Error generando contenido con Gemini: {e}")
+
+
+def main():
+    tickers = leer_google_sheets()[1:]  # Esto salta la primera fila (los encabezados)
+    if tickers:
+        generar_contenido_con_gemini(tickers)
+
+
+if __name__ == '__main__':
+    main()
