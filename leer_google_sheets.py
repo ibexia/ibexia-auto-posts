@@ -25,7 +25,8 @@ def leer_google_sheets():
     if not spreadsheet_id:
         raise Exception("No se encontró la variable de entorno SPREADSHEET_ID")
 
-    range_name = os.getenv('RANGE_NAME', 'A1:A100')  # Solo tickers
+    # Modificado: Se eliminó el límite superior para leer todas las filas en la columna A
+    range_name = os.getenv('RANGE_NAME', 'A:A')
 
     service = build('sheets', 'v4', credentials=creds)
     sheet = service.spreadsheets()
@@ -216,10 +217,20 @@ def main():
     
     # Solo procesamos de lunes a viernes (0 a 4)
     if 0 <= day_of_week <= 4:
-        start_index = day_of_week * 10
-        end_index = start_index + 10
+        # Calcular el índice de inicio basado en el día de la semana y el número total de tickers
+        # Esto permite que el ciclo se repita semanalmente si el número de tickers es mayor a 50
+        num_tickers_per_day = 10
+        total_available_tickers = len(all_tickers)
         
-        tickers_for_today = all_tickers[start_index:end_index]
+        # El índice de inicio se calculará de manera que el ciclo de tickers se repita cada semana
+        start_index = (day_of_week * num_tickers_per_day) % total_available_tickers
+        end_index = start_index + num_tickers_per_day
+        
+        # Ajustar end_index si se excede el final de la lista
+        if end_index > total_available_tickers:
+            tickers_for_today = all_tickers[start_index:] + all_tickers[:end_index - total_available_tickers]
+        else:
+            tickers_for_today = all_tickers[start_index:end_index]
 
         if tickers_for_today:
             generar_contenido_con_gemini(tickers_for_today)
