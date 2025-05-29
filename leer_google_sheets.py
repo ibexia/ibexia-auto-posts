@@ -25,9 +25,7 @@ def leer_google_sheets():
     if not spreadsheet_id:
         raise Exception("No se encontró la variable de entorno SPREADSHEET_ID")
 
-    # Modificado: Se fuerza el rango a 'A:A' para leer toda la columna A
-    # Esto ignora cualquier variable de entorno RANGE_NAME que pueda estar limitada
-    range_name = 'A:A' 
+    range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
 
     service = build('sheets', 'v4', credentials=creds)
     sheet = service.spreadsheets()
@@ -53,15 +51,38 @@ def obtener_datos_yfinance(ticker):
         hist = calcular_smi_tv(hist)
         smi_actual = round(hist['SMI'].dropna().iloc[-1], 2)
 
-        if smi_actual > 40:
-            recomendacion = "Vender"
+        # Lógica de 10 recomendaciones basada en rangos del SMI
+        if smi_actual >= 40:
+            recomendacion = "Vender con Urgencia"
+            condicion_rsi = "extremadamente sobrecomprado"
+        elif 30 <= smi_actual < 40:
+            recomendacion = "Se acerca la hora de vender"
+            condicion_rsi = "fuertemente sobrecomprado"
+        elif 20 <= smi_actual < 30:
+            recomendacion = "Considerar venta parcial"
             condicion_rsi = "sobrecomprado"
-        elif smi_actual < -40:
-            recomendacion = "Comprar"
-            condicion_rsi = "sobrevendido"
-        else:
-            recomendacion = "Mantener"
+        elif 10 <= smi_actual < 20:
+            recomendacion = "Vigilancia de retroceso"
+            condicion_rsi = "ligeramente sobrecomprado"
+        elif -10 < smi_actual < 10:
+            recomendacion = "Mantener (Neutro)"
             condicion_rsi = "neutral"
+        elif -20 <= smi_actual <= -10:
+            recomendacion = "Vigilancia de rebote"
+            condicion_rsi = "ligeramente sobrevendido"
+        elif -30 <= smi_actual < -20:
+            recomendacion = "Considerar compra parcial"
+            condicion_rsi = "sobrevendido"
+        elif -40 <= smi_actual < -30:
+            recomendacion = "Se acerca la hora de comprar"
+            condicion_rsi = "fuertemente sobrevendido"
+        elif smi_actual < -40:
+            recomendacion = "Comprar con Urgencia"
+            condicion_rsi = "extremadamente sobrevendido"
+        else:
+            recomendacion = "Indefinido" # Por si acaso algún valor no cae en los rangos anteriores
+            condicion_rsi = "desconocido"
+
 
         datos = {
             "NOMBRE_EMPRESA": info.get("longName", ticker),
@@ -112,6 +133,7 @@ SECCIÓN 1 – TÍTULO Y INTRODUCCIÓN
 {data['NOMBRE_EMPRESA']} – Recomendación: {data['RECOMENDACION']}
 
 Análisis técnico de {data['NOMBRE_EMPRESA']}. Comentarios a corto y largo plazo, con información y avisos sobre los últimos movimientos del precio de sus acciones. Consulta datos relevantes de indicadores y medias móviles.
+Es crucial que el análisis completo, tanto a corto como a largo plazo, esté **basado exclusivamente en la recomendación detallada obtenida del SMI (Stochastic Momentum Index)**: {data['RECOMENDACION']} (SMI: {data['SMI']}). Tu análisis debe justificar esta recomendación con una perspectiva de mercado coherente y profesional.
 
 SECCIÓN 2 – RECOMENDACIÓN GENERAL (mínimo 150 palabras)
 
@@ -119,12 +141,9 @@ SECCIÓN 3 – RECOMENDACIÓN A CORTO PLAZO (mínimo 150 palabras)
 
 SECCIÓN 4 – PREDICCIÓN A LARGO PLAZO (mínimo 150 palabras)
 
-SECCIÓN 5 – INFORMACIÓN ADICIONAL (mínimo 150 palabras)
-Incluye aquí información reciente y relevante como noticias del mercado, futuros contratos, movimientos destacados o cualquier dato externo de interés para entender mejor la situación actual de la empresa.
+SECCIÓN 5 – RESUMEN (aproximadamente 100 palabras)
 
-SECCIÓN 6 – RESUMEN (aproximadamente 100 palabras)
-
-SECCIÓN 7 – DESCARGO DE RESPONSABILIDAD
+SECCIÓN 6 – DESCARGO DE RESPONSABILIDAD
 Este análisis es solo informativo y no constituye una recomendación de inversión. Cada persona debe evaluar sus decisiones de forma independiente.
 
 """
@@ -216,13 +235,12 @@ def main():
 
     day_of_week = datetime.today().weekday()  # Lunes es 0, Martes 1, ..., Domingo 6
     
-    # Modificado: Se eliminó la restricción de 0 <= day_of_week <= 4
-    # Ahora se procesa todos los días de la semana (0 a 6)
+    # Ya no hay restricción por día de la semana, se procesa todos los días (0 a 6)
     num_tickers_per_day = 10
     total_tickers_in_sheet = len(all_tickers)
     
-    # Calcular el índice de inicio directamente basado en el día de la semana (0-6).
-    # El operador módulo garantiza que el índice se "envuelva" para cubrir los 70 tickers.
+    # Calcular el índice de inicio para el día actual.
+    # El operador módulo garantiza que el ciclo de tickers se repita cada 7 días.
     start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
     
     end_index = start_index + num_tickers_per_day
@@ -241,8 +259,6 @@ def main():
     else:
         print(f"No hay tickers disponibles para el día {datetime.today().strftime('%A')} en el rango calculado. "
               f"start_index: {start_index}, end_index: {end_index}, total_tickers: {total_tickers_in_sheet}")
-
-# La parte de "Hoy es fin de semana" se elimina ya que ahora se procesa todos los días.
 
 
 if __name__ == '__main__':
