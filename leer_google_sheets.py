@@ -222,17 +222,25 @@ def generar_contenido_con_gemini(tickers):
 
 
 def main():
-    tickers = leer_google_sheets()[1:]
+    tickers = leer_google_sheets()
+
     if not tickers:
+        print("❌ No se encontraron tickers en la hoja.")
         return
 
-    day_index = datetime.now().weekday()  # 0 = lunes, ..., 6 = domingo
+    total = len(tickers)
+    day_index = datetime.now().weekday()  # 0 = lunes
     start = day_index * 10
-    end = start + 10
+    end = min(start + 10, total)  # Evita que end se pase del total
+
     tickers_del_dia = tickers[start:end]
 
-    if tickers_del_dia:
-        generar_contenido_con_gemini(tickers_del_dia)
+    if not tickers_del_dia:
+        print(f"❌ No hay tickers asignados para el día {day_index} (Índice {start} a {end}).")
+        return
+
+    print(f"✅ Tickers para hoy ({start} a {end}): {tickers_del_dia}")
+    generar_contenido_con_gemini(tickers_del_dia)
 
 
 if __name__ == '__main__':
