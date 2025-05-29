@@ -7,6 +7,9 @@ from email.mime.multipart import MIMEMultipart
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import google.generativeai as genai
+from datetime import datetime
+import requests
+from bs4 import BeautifulSoup
 
 
 def leer_google_sheets():
@@ -24,19 +27,12 @@ def leer_google_sheets():
     if not spreadsheet_id:
         raise Exception("No se encontró la variable de entorno SPREADSHEET_ID")
 
-    range_name = os.getenv('RANGE_NAME', 'A1:A100')  # Solo tickers
+    range_name = os.getenv('RANGE_NAME', 'A1:A100')
 
     service = build('sheets', 'v4', credentials=creds)
     sheet = service.spreadsheets()
     result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
-
-    if not values:
-        print('No se encontraron datos.')
-    else:
-        print('Datos leídos de la hoja:')
-        for row in values:
-            print(row)
 
     return [row[0] for row in values if row]
 
@@ -44,7 +40,7 @@ def leer_google_sheets():
 def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
-    hist = stock.history(period="30d")  # 30 días para mejor cálculo del SMI
+    hist = stock.history(period="30d")
 
     try:
         hist = calcular_smi_tv(hist)
@@ -79,7 +75,8 @@ def obtener_datos_yfinance(ticker):
             "SENTIMIENTO_ANALISTAS": info.get("recommendationKey", "N/A"),
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
-            "RIESGOS_OPORTUNIDADES": "No disponibles"
+            "RIESGOS_OPORTUNIDADES": "No disponibles",
+            "NOTICIAS_RECIENTES": obtener_noticias_google(info.get("longName", ticker))
         }
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}")
@@ -88,7 +85,30 @@ def obtener_datos_yfinance(ticker):
     return datos
 
 
+def obtener_noticias_google(nombre_empresa):
+    query = nombre_empresa.replace(" ", "+")
+    url = f"https://news.google.com/search?q={query}&hl=es&gl=ES&ceid=ES%3Aes"
+    noticias = []
+
+    try:
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        enlaces = soup.select('a.DY5T1d.RZIKme')
+
+        for i, enlace in enumerate(enlaces[:3]):
+            href = enlace.get('href')
+            if href.startswith('./'):
+                href = 'https://news.google.com' + href[1:]
+            noticias.append(href)
+    except Exception as e:
+        print(f"❌ Error obteniendo noticias para {nombre_empresa}: {e}")
+
+    return noticias
+
+
 def construir_prompt_formateado(data):
+    noticias = "\n".join(f"- {n}" for n in data['NOTICIAS_RECIENTES']) if data['NOTICIAS_RECIENTES'] else "No se encontraron noticias recientes."
+
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Redacta en primera persona, con total confianza en tu criterio. 
 Vas a generar un análisis técnico COMPLETO de aproximadamente 1000 palabras sobre la empresa: {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance:
@@ -117,62 +137,49 @@ SECCIÓN 3 – RECOMENDACIÓN A CORTO PLAZO (mínimo 150 palabras)
 SECCIÓN 4 – PREDICCIÓN A LARGO PLAZO (mínimo 150 palabras)
 
 SECCIÓN 5 – INFORMACIÓN ADICIONAL (mínimo 150 palabras)
-Incluye aquí información reciente y relevante como noticias del mercado, futuros contratos, movimientos destacados o cualquier dato externo de interés para entender mejor la situación actual de la empresa.
+Últimas noticias relevantes sobre la empresa:
+{noticias}
 
 SECCIÓN 6 – RESUMEN (aproximadamente 100 palabras)
 
 SECCIÓN 7 – DESCARGO DE RESPONSABILIDAD
 Este análisis es solo informativo y no constituye una recomendación de inversión. Cada persona debe evaluar sus decisiones de forma independiente.
-
 """
     return prompt
 
-length_k = 10
-length_d = 3
-ema_signal_len = 10
-smooth_period = 5
-
-length_k = 14
-length_d = 3
-smooth_period = 3
-ema_signal_len = 3  # aunque no se use aquí, se puede dejar para referencia
 
 def calcular_smi_tv(df):
     high = df['High']
     low = df['Low']
     close = df['Close']
 
-    hh = high.rolling(window=length_k).max()
-    ll = low.rolling(window=length_k).min()
+    hh = high.rolling(window=14).max()
+    ll = low.rolling(window=14).min()
     diff = hh - ll
     rdiff = close - (hh + ll) / 2
 
-    avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
-    avgdiff = diff.ewm(span=length_d, adjust=False).mean()
+    avgrel = rdiff.ewm(span=3, adjust=False).mean()
+    avgdiff = diff.ewm(span=3, adjust=False).mean()
 
     smi_raw = (avgrel / (avgdiff / 2)) * 100
     smi_raw[avgdiff == 0] = 0.0
 
-    smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
-    
-    # Añadir la columna 'SMI' al DataFrame original
-    df = df.copy()  # Para evitar modificar el original fuera de la función
+    smi_smoothed = smi_raw.rolling(window=3).mean()
+    df = df.copy()
     df['SMI'] = smi_smoothed
-    
     return df
 
-    
+
 def enviar_email(texto_generado):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
     asunto = "Contenido generado por Gemini"
-    password = "kdgz lvdo wqvt vfkt"  # Asegúrate de usar contraseña de aplicación segura
+    password = "kdgz lvdo wqvt vfkt"
 
     msg = MIMEMultipart()
     msg['From'] = remitente
     msg['To'] = destinatario
     msg['Subject'] = asunto
-
     msg.attach(MIMEText(texto_generado, 'plain'))
 
     try:
@@ -194,6 +201,8 @@ def generar_contenido_con_gemini(tickers):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(model_name="models/gemini-2.0-flash-lite")
 
+    contenido_final = ""
+
     for ticker in tickers:
         print(f"\n📊 Procesando ticker: {ticker}")
         data = obtener_datos_yfinance(ticker)
@@ -203,17 +212,27 @@ def generar_contenido_con_gemini(tickers):
 
         try:
             response = model.generate_content(prompt)
-            print(f"\n🧠 Contenido generado para {ticker}:\n")
-            print(response.text)
-            enviar_email(response.text)
+            contenido_final += f"\n\n--- ANÁLISIS PARA {ticker} ---\n\n"
+            contenido_final += response.text
         except Exception as e:
             print(f"❌ Error generando contenido con Gemini: {e}")
 
+    if contenido_final:
+        enviar_email(contenido_final)
+
 
 def main():
-    tickers = leer_google_sheets()[1:]  # Esto salta la primera fila (los encabezados)
-    if tickers:
-        generar_contenido_con_gemini(tickers)
+    tickers = leer_google_sheets()[1:]
+    if not tickers:
+        return
+
+    day_index = datetime.now().weekday()  # 0 = lunes, ..., 6 = domingo
+    start = day_index * 10
+    end = start + 10
+    tickers_del_dia = tickers[start:end]
+
+    if tickers_del_dia:
+        generar_contenido_con_gemini(tickers_del_dia)
 
 
 if __name__ == '__main__':
