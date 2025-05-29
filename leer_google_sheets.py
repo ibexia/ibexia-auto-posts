@@ -7,6 +7,7 @@ from email.mime.multipart import MIMEMultipart
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import google.generativeai as genai
+from datetime import datetime  # 🔹 añadido para obtener el día de la semana
 
 
 def leer_google_sheets():
@@ -161,7 +162,7 @@ def calcular_smi_tv(df):
     
     return df
 
-    
+
 def enviar_email(texto_generado):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
@@ -211,7 +212,14 @@ def generar_contenido_con_gemini(tickers):
 
 
 def main():
-    tickers = leer_google_sheets()[1:]  # Esto salta la primera fila (los encabezados)
+    all_tickers = leer_google_sheets()[1:]  # Esto salta la primera fila (los encabezados)
+
+    # 🔽 Seleccionar 10 tickers según el día de la semana
+    weekday = datetime.today().weekday()  # lunes=0, ..., viernes=4
+    start_index = weekday * 10
+    end_index = start_index + 10
+    tickers = all_tickers[start_index:end_index]
+
     if tickers:
         generar_contenido_con_gemini(tickers)
 
