@@ -26,6 +26,7 @@ def leer_google_sheets():
         raise Exception("No se encontró la variable de entorno SPREADSHEET_ID")
 
     # Modificado: Se eliminó el límite superior para leer todas las filas en la columna A
+    # Esto asegura que se lean todas las 70 filas (o más) de tickers.
     range_name = os.getenv('RANGE_NAME', 'A:A')
 
     service = build('sheets', 'v4', credentials=creds)
@@ -217,25 +218,30 @@ def main():
     
     # Solo procesamos de lunes a viernes (0 a 4)
     if 0 <= day_of_week <= 4:
-        # Calcular el índice de inicio basado en el día de la semana y el número total de tickers
-        # Esto permite que el ciclo se repita semanalmente si el número de tickers es mayor a 50
         num_tickers_per_day = 10
-        total_available_tickers = len(all_tickers)
+        total_tickers_in_sheet = len(all_tickers)
         
-        # El índice de inicio se calculará de manera que el ciclo de tickers se repita cada semana
-        start_index = (day_of_week * num_tickers_per_day) % total_available_tickers
+        # Calcular el índice de inicio directamente basado en el día de la semana.
+        # El operador módulo garantiza que el índice se "envuelva" si el número de tickers
+        # es menor que el total de tickers procesados en una semana (50).
+        start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
+        
         end_index = start_index + num_tickers_per_day
         
-        # Ajustar end_index si se excede el final de la lista
-        if end_index > total_available_tickers:
-            tickers_for_today = all_tickers[start_index:] + all_tickers[:end_index - total_available_tickers]
-        else:
+        tickers_for_today = []
+        if end_index <= total_tickers_in_sheet:
             tickers_for_today = all_tickers[start_index:end_index]
+        else:
+            # Si el final del bloque excede el total de tickers,
+            # tomamos lo que queda hasta el final y luego volvemos al principio.
+            tickers_for_today = all_tickers[start_index:] + all_tickers[:end_index - total_tickers_in_sheet]
 
         if tickers_for_today:
+            print(f"Procesando tickers para el día {datetime.today().strftime('%A')}: {tickers_for_today}")
             generar_contenido_con_gemini(tickers_for_today)
         else:
-            print(f"No hay tickers disponibles para el día {day_of_week} en el rango calculado.")
+            print(f"No hay tickers disponibles para el día {datetime.today().strftime('%A')} en el rango calculado. "
+                  f"start_index: {start_index}, end_index: {end_index}, total_tickers: {total_tickers_in_sheet}")
     else:
         print("Hoy es fin de semana. No se procesarán tickers.")
 
