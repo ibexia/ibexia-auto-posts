@@ -210,6 +210,9 @@ def generar_contenido_con_gemini(tickers):
 def main():
     all_tickers = leer_google_sheets()[1:]  # Esto salta la primera fila (los encabezados)
     
+    # Añade esta línea para depurar:
+    print(f"Número total de tickers leídos (excluyendo encabezado): {len(all_tickers)}")
+
     if not all_tickers:
         print("No hay tickers para procesar.")
         return
@@ -221,9 +224,6 @@ def main():
         num_tickers_per_day = 10
         total_tickers_in_sheet = len(all_tickers)
         
-        # Calcular el índice de inicio directamente basado en el día de la semana.
-        # El operador módulo garantiza que el índice se "envuelva" si el número de tickers
-        # es menor que el total de tickers procesados en una semana (50).
         start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
         
         end_index = start_index + num_tickers_per_day
@@ -232,8 +232,6 @@ def main():
         if end_index <= total_tickers_in_sheet:
             tickers_for_today = all_tickers[start_index:end_index]
         else:
-            # Si el final del bloque excede el total de tickers,
-            # tomamos lo que queda hasta el final y luego volvemos al principio.
             tickers_for_today = all_tickers[start_index:] + all_tickers[:end_index - total_tickers_in_sheet]
 
         if tickers_for_today:
