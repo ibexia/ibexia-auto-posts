@@ -2,6 +2,10 @@ name: Leer Google Sheets y generar contenido con Gemini
 
 on:
   workflow_dispatch: # Trigger manual
+  schedule:
+    # Se ejecuta todos los días a las 04:00 AM UTC (que equivale a las 06:00 AM CEST en verano)
+    # y a las 05:00 AM CET en invierno.
+    - cron: '0 4 * * *' 
 
 jobs:
   leer_y_generar:
@@ -23,7 +27,7 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
-          RANGE_NAME: 'A1:C10'  # Ajusta si lo deseas
+          RANGE_NAME: 'A1:C10' # Ajusta si lo deseas
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python leer_google_sheets.py
