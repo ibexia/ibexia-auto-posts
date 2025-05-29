@@ -7,7 +7,7 @@ from email.mime.multipart import MIMEMultipart
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import google.generativeai as genai
-import datetime  # <-- nuevo import para saber qué día es
+from datetime import datetime
 
 
 def leer_google_sheets():
@@ -128,11 +128,10 @@ Este análisis es solo informativo y no constituye una recomendación de inversi
 """
     return prompt
 
-
 length_k = 14
 length_d = 3
 smooth_period = 3
-ema_signal_len = 3  # aunque no se use aquí, se puede dejar para referencia
+ema_signal_len = 3
 
 def calcular_smi_tv(df):
     high = df['High']
@@ -157,12 +156,12 @@ def calcular_smi_tv(df):
     
     return df
 
-
+    
 def enviar_email(texto_generado):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
     asunto = "Contenido generado por Gemini"
-    password = "kdgz lvdo wqvt vfkt"
+    password = "kdgz lvdo wqvt vfkt"  # Asegúrate de usar contraseña de aplicación segura
 
     msg = MIMEMultipart()
     msg['From'] = remitente
@@ -207,13 +206,27 @@ def generar_contenido_con_gemini(tickers):
 
 
 def main():
-    tickers = leer_google_sheets()[1:]  # Saltamos encabezado
-    if tickers:
-        dia_semana = datetime.datetime.today().weekday()  # 0 = lunes, 6 = domingo
-        inicio = dia_semana * 10
-        fin = inicio + 10
-        tickers_dia = tickers[inicio:fin]
-        generar_contenido_con_gemini(tickers_dia)
+    all_tickers = leer_google_sheets()[1:]  # Esto salta la primera fila (los encabezados)
+    
+    if not all_tickers:
+        print("No hay tickers para procesar.")
+        return
+
+    day_of_week = datetime.today().weekday()  # Lunes es 0, Martes 1, ..., Domingo 6
+    
+    # Solo procesamos de lunes a viernes (0 a 4)
+    if 0 <= day_of_week <= 4:
+        start_index = day_of_week * 10
+        end_index = start_index + 10
+        
+        tickers_for_today = all_tickers[start_index:end_index]
+
+        if tickers_for_today:
+            generar_contenido_con_gemini(tickers_for_today)
+        else:
+            print(f"No hay tickers disponibles para el día {day_of_week} en el rango calculado.")
+    else:
+        print("Hoy es fin de semana. No se procesarán tickers.")
 
 
 if __name__ == '__main__':
