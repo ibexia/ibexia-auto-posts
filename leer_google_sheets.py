@@ -229,19 +229,20 @@ def main():
         return
 
     total = len(tickers)
-    day_index = datetime.now().weekday()  # 0 = lunes
-    start = day_index * 10
-    end = min(start + 10, total)  # Evita que end se pase del total
+    day_index = datetime.now().weekday()  # 0 = lunes, ..., 6 = domingo
 
-    tickers_del_dia = tickers[start:end]
+    # Desplazamiento cíclico por bloques de 10
+    start = (day_index * 10) % total
+    end = start + 10
 
-    if not tickers_del_dia:
-        print(f"❌ No hay tickers asignados para el día {day_index} (Índice {start} a {end}).")
-        return
+    if end <= total:
+        tickers_del_dia = tickers[start:end]
+    else:
+        # Si el rango se pasa del final, tomar del final y continuar desde el inicio
+        tickers_del_dia = tickers[start:] + tickers[:end - total]
 
-    print(f"✅ Tickers para hoy ({start} a {end}): {tickers_del_dia}")
+    print(f"✅ Tickers para hoy ({day_index}): {tickers_del_dia}")
     generar_contenido_con_gemini(tickers_del_dia)
-
 
 if __name__ == '__main__':
     main()
