@@ -2,16 +2,12 @@ import os
 import json
 import smtplib
 import yfinance as yf
-import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import google.generativeai as genai
-from datetime import datetime
 
-# Configuración de NewsAPI
-NEWSAPI_KEY = os.getenv('NEWSAPI_KEY')
 
 def leer_google_sheets():
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
@@ -35,15 +31,15 @@ def leer_google_sheets():
     result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
-    tickers = [row[0] for row in values if row and row[0].strip()]
-    if not tickers:
+    if not values:
         print('No se encontraron datos.')
     else:
         print('Datos leídos de la hoja:')
-        for ticker in tickers:
-            print(ticker)
+        for row in values:
+            print(row)
 
-    return tickers
+    return [row[0] for row in values if row]
+
 
 def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
@@ -91,50 +87,8 @@ def obtener_datos_yfinance(ticker):
 
     return datos
 
-def obtener_noticias_empresa(nombre_empresa):
-    if not NEWSAPI_KEY:
-        print("❌ No se encontró la clave de API de NewsAPI.")
-        return []
 
-    url = ('https://newsapi.org/v2/everything?'
-           f'q={nombre_empresa}&'
-           'sortBy=publishedAt&'
-           'language=es&'
-           'pageSize=3&'
-           f'apiKey={NEWSAPI_KEY}')
-
-    try:
-        response = requests.get(url)
-        data = response.json()
-        if data.get('status') != 'ok':
-            print(f"❌ Error al obtener noticias: {data.get('message')}")
-            return []
-
-        noticias = []
-        for article in data.get('articles', []):
-            titulo = article.get('title')
-            enlace = article.get('url')
-            fecha = article.get('publishedAt')
-            if titulo and enlace and fecha:
-                noticias.append({
-                    'titulo': titulo,
-                    'enlace': enlace,
-                    'fecha': fecha
-                })
-        return noticias
-    except Exception as e:
-        print(f"❌ Excepción al obtener noticias: {e}")
-        return []
-
-def construir_prompt_formateado(data, noticias):
-    seccion5 = "SECCIÓN 5 – NOTICIAS RECIENTES\n"
-    if noticias:
-        for noticia in noticias:
-            fecha = datetime.strptime(noticia['fecha'], "%Y-%m-%dT%H:%M:%SZ").strftime("%d/%m/%Y")
-            seccion5 += f"- {fecha}: {noticia['titulo']} ({noticia['enlace']})\n"
-    else:
-        seccion5 += "No se encontraron noticias recientes relevantes.\n"
-
+def construir_prompt_formateado(data):
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Redacta en primera persona, con total confianza en tu criterio. 
 Vas a generar un análisis técnico COMPLETO de aproximadamente 1000 palabras sobre la empresa: {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance:
@@ -162,14 +116,21 @@ SECCIÓN 3 – RECOMENDACIÓN A CORTO PLAZO (mínimo 150 palabras)
 
 SECCIÓN 4 – PREDICCIÓN A LARGO PLAZO (mínimo 150 palabras)
 
-{seccion5}
+SECCIÓN 5 – INFORMACIÓN ADICIONAL (mínimo 150 palabras)
+Incluye aquí información reciente y relevante como noticias del mercado, futuros contratos, movimientos destacados o cualquier dato externo de interés para entender mejor la situación actual de la empresa.
 
 SECCIÓN 6 – RESUMEN (aproximadamente 100 palabras)
 
 SECCIÓN 7 – DESCARGO DE RESPONSABILIDAD
 Este análisis es solo informativo y no constituye una recomendación de inversión. Cada persona debe evaluar sus decisiones de forma independiente.
+
 """
     return prompt
+
+length_k = 10
+length_d = 3
+ema_signal_len = 10
+smooth_period = 5
 
 length_k = 14
 length_d = 3
@@ -200,6 +161,7 @@ def calcular_smi_tv(df):
     
     return df
 
+    
 def enviar_email(texto_generado):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
@@ -222,7 +184,9 @@ def enviar_email(texto_generado):
         print("✅ Correo enviado con éxito.")
     except Exception as e:
         print("❌ Error al enviar el correo:", e)
- def generar_contenido_con_gemini(tickers):
+
+
+def generar_contenido_con_gemini(tickers):
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key:
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
