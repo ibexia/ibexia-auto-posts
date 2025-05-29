@@ -25,9 +25,9 @@ def leer_google_sheets():
     if not spreadsheet_id:
         raise Exception("No se encontró la variable de entorno SPREADSHEET_ID")
 
-    # Modificado: Se eliminó el límite superior para leer todas las filas en la columna A
-    # Esto asegura que se lean todas las 70 filas (o más) de tickers.
-    range_name = os.getenv('RANGE_NAME', 'A:A')
+    # Modificado: Se fuerza el rango a 'A:A' para leer toda la columna A
+    # Esto ignora cualquier variable de entorno RANGE_NAME que pueda estar limitada
+    range_name = 'A:A' 
 
     service = build('sheets', 'v4', credentials=creds)
     sheet = service.spreadsheets()
@@ -210,9 +210,6 @@ def generar_contenido_con_gemini(tickers):
 def main():
     all_tickers = leer_google_sheets()[1:]  # Esto salta la primera fila (los encabezados)
     
-    # Añade esta línea para depurar:
-    print(f"Número total de tickers leídos (excluyendo encabezado): {len(all_tickers)}")
-
     if not all_tickers:
         print("No hay tickers para procesar.")
         return
@@ -224,6 +221,9 @@ def main():
         num_tickers_per_day = 10
         total_tickers_in_sheet = len(all_tickers)
         
+        # Calcular el índice de inicio directamente basado en el día de la semana.
+        # El operador módulo garantiza que el índice se "envuelva" si el número de tickers
+        # es menor que el total de tickers procesados en una semana (50).
         start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
         
         end_index = start_index + num_tickers_per_day
@@ -232,6 +232,8 @@ def main():
         if end_index <= total_tickers_in_sheet:
             tickers_for_today = all_tickers[start_index:end_index]
         else:
+            # Si el final del bloque excede el total de tickers,
+            # tomamos lo que queda hasta el final y luego volvemos al principio.
             tickers_for_today = all_tickers[start_index:] + all_tickers[:end_index - total_tickers_in_sheet]
 
         if tickers_for_today:
