@@ -158,7 +158,7 @@ def construir_prompt_formateado(data):
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Redacta en primera persona, con total confianza en tu criterio. 
 
-Vas a generar un análisis técnico completo de aproximadamente 1000 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance:
+Vas a generar un análisis técnico completo de aproximadamente 1000 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
 
 - Precio actual: {data['PRECIO_ACTUAL']}
 - Volumen: {data['VOLUMEN']}
@@ -173,21 +173,21 @@ Vas a generar un análisis técnico completo de aproximadamente 1000 palabras so
 - Comparativa sectorial: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 
-Importante: si algún dato no está disponible, no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista.
+Importante: si algún dato no está disponible, no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de las secciones principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
 
 Estructura el texto de la siguiente manera:
 
 SECCIÓN 1 – TÍTULO E INTRODUCCIÓN
-Presentación general de la empresa y de la situación actual del mercado en torno a ella. Describe brevemente el contexto técnico, financiero y estratégico.
+Presentación general de la empresa y de la situación actual del mercado en torno a ella. Describe brevemente el contexto técnico, financiero y estratégico, mencionando cómo la **nota de {data['NOMBRE_EMPRESA']} de {data['NOTA_EMPRESA']}** sitúa a la empresa en el panorama actual.
 
 SECCIÓN 2 – RECOMENDACIÓN GENERAL 
-Expón tu opinión profesional sobre la situación actual de la empresa y sus perspectivas (mínimo 150 palabras). Usa un enfoque técnico y financiero combinado, sin justificar con fuentes externas. Solo tu criterio como analista.
+Expón tu opinión profesional sobre la situación actual de la empresa y sus perspectivas (mínimo 150 palabras). Usa un enfoque técnico y financiero combinado, sin justificar con fuentes externas. Solo tu criterio como analista. La **nota de {data['NOTA_EMPRESA']}** es un factor determinante en mi visión de la empresa.
 
 SECCIÓN 3 – ANÁLISIS A CORTO PLAZO 
-Describe los posibles movimientos del precio en el corto plazo. (mínimo 150 palabras)Incluye consideraciones sobre volumen, soportes y resistencias, y cualquier otro elemento técnico que consideres relevante.
+Describe los posibles movimientos del precio en el corto plazo. (mínimo 150 palabras)Incluye consideraciones sobre volumen, soportes y resistencias, y cualquier otro elemento técnico que consideres relevante. Dada la **nota de {data['NOTA_EMPRESA']}**, anticipo ciertos comportamientos en el precio a corto plazo.
 
 SECCIÓN 4 – PREDICCIÓN A LARGO PLAZO 
-Desarrolla tu visión a futuro para la empresa, (mínimo 150 palabras) incluyendo análisis financiero, posicionamiento estratégico y comportamiento esperado del precio.
+Desarrolla tu visión a futuro para la empresa, (mínimo 150 palabras) incluyendo análisis financiero, posicionamiento estratégico y comportamiento esperado del precio. Mi predicción a largo plazo está fuertemente influenciada por la **nota de {data['NOTA_EMPRESA']}** y su implicación en la salud financiera de la empresa.
 
 SECCIÓN 5 – RESUMEN proximadamente 100 palabras)
 Síntesis final de tu análisis. Reitera tu opinión personal sobre la empresa y su proyección. (a
