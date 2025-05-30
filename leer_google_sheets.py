@@ -29,7 +29,8 @@ def leer_google_sheets():
 
     service = build('sheets', 'v4', credentials=creds)
     sheet = service.spreadsheets()
-    result = sheet.values().get('values', [])
+    # CORRECCIÓN: Pasar los argumentos correctos al método get()
+    result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
     if not values:
@@ -42,10 +43,10 @@ def leer_google_sheets():
     return [row[0] for row in values if row]
 
 
-length_k = 10  # Ajustado a los valores del código (1)
-length_d = 3   # Ajustado a los valores del código (1)
-ema_signal_len = 10 # Ajustado a los valores del código (1)
-smooth_period = 5 # Ajustado a los valores del código (1)
+length_k = 10
+length_d = 3
+ema_signal_len = 10
+smooth_period = 5
 
 def calculate_smi_tv(df):
     high = df['High']
@@ -64,11 +65,11 @@ def calculate_smi_tv(df):
     smi_raw[avgdiff == 0] = 0.0
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
-    smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean() # Aquí se usa ema_signal_len para calcular SMI_signal
+    smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
 
     df = df.copy()
     df['SMI'] = smi_smoothed
-    df['SMI_signal'] = smi_signal # Se añade SMI_signal al DataFrame
+    df['SMI_signal'] = smi_signal
     
     return df
 
@@ -76,8 +77,7 @@ def calculate_smi_tv(df):
 def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
-    # Asegúrate de descargar suficientes datos para los cálculos del SMI
-    hist = stock.history(period="6mo") # Se cambió a 6 meses como en el código (1)
+    hist = stock.history(period="6mo")
 
     if hist.empty:
         print(f"❌ No se pudieron obtener datos históricos para {ticker}")
@@ -85,17 +85,14 @@ def obtener_datos_yfinance(ticker):
 
     try:
         hist = calculate_smi_tv(hist)
-        # Se verifica que 'SMI_signal' existe antes de intentar acceder a él
         if 'SMI_signal' not in hist.columns or hist['SMI_signal'].empty:
             print(f"❌ SMI_signal no disponible para {ticker}")
             return None
 
-        smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2) # Usar SMI_signal para la recomendación
+        smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
 
-        # Calcular la nota de la empresa como en el código (1)
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
-        # Lógica de recomendaciones basada en la NOTA DE LA EMPRESA (0-10)
         if nota_empresa <= 2:
             recomendacion = "Vender"
             condicion_rsi = "muy sobrecomprado"
@@ -105,7 +102,7 @@ def obtener_datos_yfinance(ticker):
         elif 4 < nota_empresa <= 5:
             recomendacion = "Cuidado. Revisar soportes y resistencias"
             condicion_rsi = "muy poca sobrecompra"
-        elif 5 < nota_empresa < 6: # Nota entre 5 y 6 (exclusivos)
+        elif 5 < nota_empresa < 6:
             recomendacion = "Mantener (Neutro)"
             condicion_rsi = "neutral"
         elif 6 <= nota_empresa < 7:
@@ -121,7 +118,7 @@ def obtener_datos_yfinance(ticker):
             recomendacion = "Comprar"
             condicion_rsi = "extremadamente sobrevendido"
         else:
-            recomendacion = "Indefinido" # Por si acaso algún valor no cae en los rangos anteriores
+            recomendacion = "Indefinido"
             condicion_rsi = "desconocido"
 
 
@@ -134,7 +131,7 @@ def obtener_datos_yfinance(ticker):
             "CONDICION_RSI": condicion_rsi,
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
-            "NOTA_EMPRESA": nota_empresa, # Se añade la nota de la empresa
+            "NOTA_EMPRESA": nota_empresa,
             "INGRESOS": info.get("totalRevenue", "N/A"),
             "EBITDA": info.get("ebitda", "N/A"),
             "BENEFICIOS": info.get("grossProfits", "N/A"),
@@ -155,7 +152,6 @@ def obtener_datos_yfinance(ticker):
 
 
 def construir_prompt_formateado(data):
-    # Generar un título corto y relevante para el post
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€)"
 
     prompt = f"""
@@ -197,18 +193,18 @@ En resumen, mi síntesis final de este análisis. [Aquí el modelo ofrecerá un 
 Descargo de responsabilidad: Este análisis es solo informativo y no constituye una recomendación de inversión. Cada persona debe evaluar sus decisiones de forma independiente.
 """
 
-    return prompt, titulo_post # Devuelve también el título del post
+    return prompt, titulo_post
 
 
-def enviar_email(texto_generado, asunto_email): # Ahora acepta asunto como parámetro
+def enviar_email(texto_generado, asunto_email):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt"  # Asegúrate de usar contraseña de aplicación segura
+    password = "kdgz lvdo wqvt vfkt"
 
     msg = MIMEMultipart()
     msg['From'] = remitente
     msg['To'] = destinatario
-    msg['Subject'] = asunto_email # Usa el asunto generado
+    msg['Subject'] = asunto_email
 
     msg.attach(MIMEText(texto_generado, 'plain'))
 
@@ -236,34 +232,30 @@ def generar_contenido_con_gemini(tickers):
         data = obtener_datos_yfinance(ticker)
         if not data:
             continue
-        prompt, titulo_post = construir_prompt_formateado(data) # Ahora recibe el título del post
+        prompt, titulo_post = construir_prompt_formateado(data)
 
         try:
             response = model.generate_content(prompt)
             print(f"\n🧠 Contenido generado para {ticker}:\n")
             print(response.text)
-            # Construir el asunto del email con nombre de empresa y recomendación
             asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} - {data['RECOMENDACION']}"
-            enviar_email(response.text, asunto_email) # Pasa el asunto al enviar_email
+            enviar_email(response.text, asunto_email)
         except Exception as e:
             print(f"❌ Error generando contenido con Gemini: {e}")
 
 
 def main():
-    all_tickers = leer_google_sheets()[1:]  # Esto salta la primera fila (los encabezados)
+    all_tickers = leer_google_sheets()[1:]
     
     if not all_tickers:
         print("No hay tickers para procesar.")
         return
 
-    day_of_week = datetime.today().weekday()  # Lunes es 0, Martes 1, ..., Domingo 6
+    day_of_week = datetime.today().weekday()
     
-    # Ya no hay restricción por día de la semana, se procesa todos los días (0 a 6)
     num_tickers_per_day = 10
     total_tickers_in_sheet = len(all_tickers)
     
-    # Calcular el índice de inicio para el día actual.
-    # El operador módulo garantiza que el ciclo de tickers se repita cada 7 días.
     start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
     
     end_index = start_index + num_tickers_per_day
@@ -272,8 +264,6 @@ def main():
     if end_index <= total_tickers_in_sheet:
         tickers_for_today = all_tickers[start_index:end_index]
     else:
-        # Si el final del bloque excede el total de tickers,
-        # tomamos lo que queda hasta el final y luego volvemos al principio.
         tickers_for_today = all_tickers[start_index:] + all_tickers[:end_index - total_tickers_in_sheet]
 
     if tickers_for_today:
