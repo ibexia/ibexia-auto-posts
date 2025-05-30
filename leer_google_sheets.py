@@ -115,7 +115,8 @@ def obtener_datos_yfinance(ticker):
 def construir_prompt_formateado(data):
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Redacta en primera persona, con total confianza en tu criterio. 
-Vas a generar un análisis técnico COMPLETO de aproximadamente 1000 palabras sobre la empresa: {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance:
+
+Vas a generar un análisis técnico completo de aproximadamente 1000 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance:
 
 - Precio actual: {data['PRECIO_ACTUAL']}
 - Volumen: {data['VOLUMEN']}
@@ -129,24 +130,30 @@ Vas a generar un análisis técnico COMPLETO de aproximadamente 1000 palabras so
 - Comparativa sectorial: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 
-SECCIÓN 1 – TÍTULO Y INTRODUCCIÓN
-{data['NOMBRE_EMPRESA']} – Recomendación: {data['RECOMENDACION']}
+Importante: si algún dato no está disponible, no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista.
 
-Análisis técnico de {data['NOMBRE_EMPRESA']}. Comentarios a corto y largo plazo, con información y avisos sobre los últimos movimientos del precio de sus acciones. Consulta datos relevantes de indicadores y medias móviles.
-Es crucial que el análisis completo, tanto a corto como a largo plazo, esté **basado exclusivamente en la recomendación detallada obtenida del SMI (Stochastic Momentum Index)**: {data['RECOMENDACION']} (SMI: {data['SMI']}). Tu análisis debe justificar esta recomendación con una perspectiva de mercado coherente y profesional.
+Estructura el texto de la siguiente manera:
 
-SECCIÓN 2 – RECOMENDACIÓN GENERAL (mínimo 150 palabras)
+SECCIÓN 1 – TÍTULO E INTRODUCCIÓN
+Presentación general de la empresa y de la situación actual del mercado en torno a ella. Describe brevemente el contexto técnico, financiero y estratégico.
 
-SECCIÓN 3 – RECOMENDACIÓN A CORTO PLAZO (mínimo 150 palabras)
+SECCIÓN 2 – RECOMENDACIÓN GENERAL 
+Expón tu opinión profesional sobre la situación actual de la empresa y sus perspectivas (mínimo 150 palabras). Usa un enfoque técnico y financiero combinado, sin justificar con fuentes externas. Solo tu criterio como analista.
 
-SECCIÓN 4 – PREDICCIÓN A LARGO PLAZO (mínimo 150 palabras)
+SECCIÓN 3 – ANÁLISIS A CORTO PLAZO 
+Describe los posibles movimientos del precio en el corto plazo. (mínimo 150 palabras)Incluye consideraciones sobre volumen, soportes y resistencias, y cualquier otro elemento técnico que consideres relevante.
 
-SECCIÓN 5 – RESUMEN (aproximadamente 100 palabras)
+SECCIÓN 4 – PREDICCIÓN A LARGO PLAZO 
+Desarrolla tu visión a futuro para la empresa, (mínimo 150 palabras) incluyendo análisis financiero, posicionamiento estratégico y comportamiento esperado del precio.
+
+SECCIÓN 5 – RESUMEN proximadamente 100 palabras)
+Síntesis final de tu análisis. Reitera tu opinión personal sobre la empresa y su proyección. (a
 
 SECCIÓN 6 – DESCARGO DE RESPONSABILIDAD
 Este análisis es solo informativo y no constituye una recomendación de inversión. Cada persona debe evaluar sus decisiones de forma independiente.
 
 """
+
     return prompt
 
 length_k = 14
@@ -181,7 +188,7 @@ def calcular_smi_tv(df):
 def enviar_email(texto_generado):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    asunto = "Contenido generado por Gemini"
+    asunto = "Analisis empresas"
     password = "kdgz lvdo wqvt vfkt"  # Asegúrate de usar contraseña de aplicación segura
 
     msg = MIMEMultipart()
