@@ -29,7 +29,7 @@ def leer_google_sheets():
 
     service = build('sheets', 'v4', credentials=creds)
     sheet = service.spreadsheets()
-    result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
+    result = sheet.values().get('values', [])
     values = result.get('values', [])
 
     if not values:
@@ -155,10 +155,15 @@ def obtener_datos_yfinance(ticker):
 
 
 def construir_prompt_formateado(data):
+    # Generar un título corto y relevante para el post
+    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€)"
+
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Redacta en primera persona, con total confianza en tu criterio. 
 
-Vas a generar un análisis técnico completo de aproximadamente 1000 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
+Genera un análisis técnico completo de aproximadamente 1000 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
+
+**Título del Post:** {titulo_post}
 
 - Precio actual: {data['PRECIO_ACTUAL']}
 - Volumen: {data['VOLUMEN']}
@@ -173,42 +178,37 @@ Vas a generar un análisis técnico completo de aproximadamente 1000 palabras so
 - Comparativa sectorial: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 
-Importante: si algún dato no está disponible, no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de las secciones principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
+Importante: si algún dato no está disponible, no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
 
-Estructura el texto de la siguiente manera:
+Estructura el texto de la siguiente manera, sin usar títulos de sección explícitos, sino comenzando cada párrafo con una frase introductoria:
 
-SECCIÓN 1 – TÍTULO E INTRODUCCIÓN
-Presentación general de la empresa y de la situación actual del mercado en torno a ella. Describe brevemente el contexto técnico, financiero y estratégico, mencionando cómo la **nota de {data['NOMBRE_EMPRESA']} de {data['NOTA_EMPRESA']}** sitúa a la empresa en el panorama actual.
+{titulo_post}
 
-SECCIÓN 2 – RECOMENDACIÓN GENERAL 
-Expón tu opinión profesional sobre la situación actual de la empresa y sus perspectivas (mínimo 150 palabras). Usa un enfoque técnico y financiero combinado, sin justificar con fuentes externas. Solo tu criterio como analista. La **nota de {data['NOTA_EMPRESA']}** es un factor determinante en mi visión de la empresa.
+Para comenzar el análisis de **{data['NOMBRE_EMPRESA']}**, quiero dejar clara mi recomendación principal: **{data['RECOMENDACION']}**. Este juicio se fundamenta en un análisis exhaustivo de su situación actual, donde la **nota de {data['NOTA_EMPRESA']}** juega un papel crucial. La empresa se encuentra en un punto estratégico en el mercado, con un precio actual de {data['PRECIO_ACTUAL']}€ y un volumen de {data['VOLUMEN']}.
 
-SECCIÓN 3 – ANÁLISIS A CORTO PLAZO 
-Describe los posibles movimientos del precio en el corto plazo. (mínimo 150 palabras)Incluye consideraciones sobre volumen, soportes y resistencias, y cualquier otro elemento técnico que consideres relevante. Dada la **nota de {data['NOTA_EMPRESA']}**, anticipo ciertos comportamientos en el precio a corto plazo.
+Como recomendación general, mi opinión profesional sobre la situación actual de **{data['NOMBRE_EMPRESA']}** y sus perspectivas es la siguiente: [Aquí el modelo expandirá la recomendación, mínimo 150 palabras, usando un enfoque técnico y financiero combinado. Mencionará la nota de {data['NOTA_EMPRESA']} como factor determinante].
 
-SECCIÓN 4 – PREDICCIÓN A LARGO PLAZO 
-Desarrolla tu visión a futuro para la empresa, (mínimo 150 palabras) incluyendo análisis financiero, posicionamiento estratégico y comportamiento esperado del precio. Mi predicción a largo plazo está fuertemente influenciada por la **nota de {data['NOTA_EMPRESA']}** y su implicación en la salud financiera de la empresa.
+En el análisis a corto plazo, considero los posibles movimientos del precio en el horizonte inmediato. [Aquí el modelo describirá movimientos, volumen, soportes ({data['SOPORTE']}) y resistencias ({data['RESISTENCIA']}), mínimo 150 palabras. Hará referencia a la nota de {data['NOTA_EMPRESA']} si lo considera relevante para el corto plazo].
 
-SECCIÓN 5 – RESUMEN proximadamente 100 palabras)
-Síntesis final de tu análisis. Reitera tu opinión personal sobre la empresa y su proyección. (a
+Respecto a la predicción a largo plazo, mi visión para el futuro de la empresa incluye... [Aquí el modelo desarrollará la visión a futuro, análisis financiero (ingresos: {data['INGRESOS']}, EBITDA: {data['EBITDA']}, beneficios: {data['BENEFICIOS']}, deuda: {data['DEUDA']}, flujo de caja: {data['FLUJO_CAJA']}), posicionamiento estratégico (planes de expansión: {data['EXPANSION_PLANES']}, acuerdos: {data['ACUERDOS']}), y comportamiento esperado del precio, mínimo 150 palabras. Hará referencia a la nota de {data['NOTA_EMPRESA']} como influencia en la salud financiera a largo plazo].
 
-SECCIÓN 6 – DESCARGO DE RESPONSABILIDAD
-Este análisis es solo informativo y no constituye una recomendación de inversión. Cada persona debe evaluar sus decisiones de forma independiente.
+En resumen, mi síntesis final de este análisis. [Aquí el modelo ofrecerá un resumen de aproximadamente 100 palabras, reiterando la opinión personal sobre la empresa y su proyección].
 
+Descargo de responsabilidad: Este análisis es solo informativo y no constituye una recomendación de inversión. Cada persona debe evaluar sus decisiones de forma independiente.
 """
 
-    return prompt
+    return prompt, titulo_post # Devuelve también el título del post
 
-def enviar_email(texto_generado):
+
+def enviar_email(texto_generado, asunto_email): # Ahora acepta asunto como parámetro
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    asunto = "Analisis empresas"
     password = "kdgz lvdo wqvt vfkt"  # Asegúrate de usar contraseña de aplicación segura
 
     msg = MIMEMultipart()
     msg['From'] = remitente
     msg['To'] = destinatario
-    msg['Subject'] = asunto
+    msg['Subject'] = asunto_email # Usa el asunto generado
 
     msg.attach(MIMEText(texto_generado, 'plain'))
 
@@ -236,13 +236,15 @@ def generar_contenido_con_gemini(tickers):
         data = obtener_datos_yfinance(ticker)
         if not data:
             continue
-        prompt = construir_prompt_formateado(data)
+        prompt, titulo_post = construir_prompt_formateado(data) # Ahora recibe el título del post
 
         try:
             response = model.generate_content(prompt)
             print(f"\n🧠 Contenido generado para {ticker}:\n")
             print(response.text)
-            enviar_email(response.text)
+            # Construir el asunto del email con nombre de empresa y recomendación
+            asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} - {data['RECOMENDACION']}"
+            enviar_email(response.text, asunto_email) # Pasa el asunto al enviar_email
         except Exception as e:
             print(f"❌ Error generando contenido con Gemini: {e}")
 
