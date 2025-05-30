@@ -97,29 +97,29 @@ def obtener_datos_yfinance(ticker):
 
         # Lógica de recomendaciones basada en la NOTA DE LA EMPRESA (0-10)
         if nota_empresa <= 2:
-            recomendacion = "Comprar con Urgencia"
-            condicion_rsi = "extremadamente sobrevendido"
+            recomendacion = "Vender"
+            condicion_rsi = "muy sobrecomprado"
         elif 2 < nota_empresa <= 4:
-            recomendacion = "Se acerca la hora de comprar"
-            condicion_rsi = "fuertemente sobrevendido"
+            recomendacion = "Vigilar posible venta"
+            condicion_rsi = "algo sobrecomprado"
         elif 4 < nota_empresa <= 5:
-            recomendacion = "Considerar compra parcial"
-            condicion_rsi = "sobrevendido"
+            recomendacion = "Cuidado. Revisar soportes y resistencias"
+            condicion_rsi = "muy poca sobrecompra"
         elif 5 < nota_empresa < 6: # Nota entre 5 y 6 (exclusivos)
             recomendacion = "Mantener (Neutro)"
             condicion_rsi = "neutral"
         elif 6 <= nota_empresa < 7:
-            recomendacion = "Vigilancia de retroceso"
-            condicion_rsi = "ligeramente sobrecomprado"
+            recomendacion = "Posible compra. Revisar soportes y resistencias"
+            condicion_rsi = "muy poca sobreventa"
         elif 7 <= nota_empresa < 8:
-            recomendacion = "Considerar venta parcial"
-            condicion_rsi = "sobrecomprado"
+            recomendacion = "Considerar posible compra"
+            condicion_rsi = "algo de sobreventa"
         elif 8 <= nota_empresa < 9:
-            recomendacion = "Se acerca la hora de vender"
-            condicion_rsi = "fuertemente sobrecomprado"
+            recomendacion = "Se acerca la hora de comprar"
+            condicion_rsi = "sobreventa"
         elif nota_empresa >= 9:
-            recomendacion = "Vender con Urgencia"
-            condicion_rsi = "extremadamente sobrecomprado"
+            recomendacion = "Comprar"
+            condicion_rsi = "extremadamente sobrevendido"
         else:
             recomendacion = "Indefinido" # Por si acaso algún valor no cae en los rangos anteriores
             condicion_rsi = "desconocido"
