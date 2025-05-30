@@ -42,43 +42,84 @@ def leer_google_sheets():
     return [row[0] for row in values if row]
 
 
+length_k = 10  # Ajustado a los valores del código (1)
+length_d = 3   # Ajustado a los valores del código (1)
+ema_signal_len = 10 # Ajustado a los valores del código (1)
+smooth_period = 5 # Ajustado a los valores del código (1)
+
+def calculate_smi_tv(df):
+    high = df['High']
+    low = df['Low']
+    close = df['Close']
+
+    hh = high.rolling(window=length_k).max()
+    ll = low.rolling(window=length_k).min()
+    diff = hh - ll
+    rdiff = close - (hh + ll) / 2
+
+    avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
+    avgdiff = diff.ewm(span=length_d, adjust=False).mean()
+
+    smi_raw = (avgrel / (avgdiff / 2)) * 100
+    smi_raw[avgdiff == 0] = 0.0
+
+    smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
+    smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean() # Aquí se usa ema_signal_len para calcular SMI_signal
+
+    df = df.copy()
+    df['SMI'] = smi_smoothed
+    df['SMI_signal'] = smi_signal # Se añade SMI_signal al DataFrame
+    
+    return df
+
+
 def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
-    hist = stock.history(period="30d")  # 30 días para mejor cálculo del SMI
+    # Asegúrate de descargar suficientes datos para los cálculos del SMI
+    hist = stock.history(period="6mo") # Se cambió a 6 meses como en el código (1)
+
+    if hist.empty:
+        print(f"❌ No se pudieron obtener datos históricos para {ticker}")
+        return None
 
     try:
-        hist = calcular_smi_tv(hist)
-        smi_actual = round(hist['SMI'].dropna().iloc[-1], 2)
+        hist = calculate_smi_tv(hist)
+        # Se verifica que 'SMI_signal' existe antes de intentar acceder a él
+        if 'SMI_signal' not in hist.columns or hist['SMI_signal'].empty:
+            print(f"❌ SMI_signal no disponible para {ticker}")
+            return None
 
-        # Lógica de 10 recomendaciones basada en rangos del SMI
-        if smi_actual >= 40:
-            recomendacion = "Vender con Urgencia"
-            condicion_rsi = "extremadamente sobrecomprado"
-        elif 30 <= smi_actual < 40:
-            recomendacion = "Se acerca la hora de vender"
-            condicion_rsi = "fuertemente sobrecomprado"
-        elif 20 <= smi_actual < 30:
-            recomendacion = "Considerar venta parcial"
-            condicion_rsi = "sobrecomprado"
-        elif 10 <= smi_actual < 20:
-            recomendacion = "Vigilancia de retroceso"
-            condicion_rsi = "ligeramente sobrecomprado"
-        elif -10 < smi_actual < 10:
-            recomendacion = "Mantener (Neutro)"
-            condicion_rsi = "neutral"
-        elif -20 <= smi_actual <= -10:
-            recomendacion = "Vigilancia de rebote"
-            condicion_rsi = "ligeramente sobrevendido"
-        elif -30 <= smi_actual < -20:
-            recomendacion = "Considerar compra parcial"
-            condicion_rsi = "sobrevendido"
-        elif -40 <= smi_actual < -30:
-            recomendacion = "Se acerca la hora de comprar"
-            condicion_rsi = "fuertemente sobrevendido"
-        elif smi_actual < -40:
+        smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2) # Usar SMI_signal para la recomendación
+
+        # Calcular la nota de la empresa como en el código (1)
+        nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
+
+        # Lógica de recomendaciones basada en la NOTA DE LA EMPRESA (0-10)
+        if nota_empresa <= 2:
             recomendacion = "Comprar con Urgencia"
             condicion_rsi = "extremadamente sobrevendido"
+        elif 2 < nota_empresa <= 4:
+            recomendacion = "Se acerca la hora de comprar"
+            condicion_rsi = "fuertemente sobrevendido"
+        elif 4 < nota_empresa <= 5:
+            recomendacion = "Considerar compra parcial"
+            condicion_rsi = "sobrevendido"
+        elif 5 < nota_empresa < 6: # Nota entre 5 y 6 (exclusivos)
+            recomendacion = "Mantener (Neutro)"
+            condicion_rsi = "neutral"
+        elif 6 <= nota_empresa < 7:
+            recomendacion = "Vigilancia de retroceso"
+            condicion_rsi = "ligeramente sobrecomprado"
+        elif 7 <= nota_empresa < 8:
+            recomendacion = "Considerar venta parcial"
+            condicion_rsi = "sobrecomprado"
+        elif 8 <= nota_empresa < 9:
+            recomendacion = "Se acerca la hora de vender"
+            condicion_rsi = "fuertemente sobrecomprado"
+        elif nota_empresa >= 9:
+            recomendacion = "Vender con Urgencia"
+            condicion_rsi = "extremadamente sobrecomprado"
         else:
             recomendacion = "Indefinido" # Por si acaso algún valor no cae en los rangos anteriores
             condicion_rsi = "desconocido"
@@ -93,6 +134,7 @@ def obtener_datos_yfinance(ticker):
             "CONDICION_RSI": condicion_rsi,
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
+            "NOTA_EMPRESA": nota_empresa, # Se añade la nota de la empresa
             "INGRESOS": info.get("totalRevenue", "N/A"),
             "EBITDA": info.get("ebitda", "N/A"),
             "BENEFICIOS": info.get("grossProfits", "N/A"),
@@ -123,6 +165,7 @@ Vas a generar un análisis técnico completo de aproximadamente 1000 palabras so
 - Soporte clave: {data['SOPORTE']}
 - Resistencia clave: {data['RESISTENCIA']}
 - Recomendación general: {data['RECOMENDACION']}
+- Nota de la empresa (0-10): {data['NOTA_EMPRESA']}
 - Resultados financieros recientes: {data['INGRESOS']}, {data['EBITDA']}, {data['BENEFICIOS']}
 - Nivel de deuda y flujo de caja: {data['DEUDA']}, {data['FLUJO_CAJA']}
 - Información estratégica: {data['EXPANSION_PLANES']}, {data['ACUERDOS']}
@@ -156,35 +199,6 @@ Este análisis es solo informativo y no constituye una recomendación de inversi
 
     return prompt
 
-length_k = 14
-length_d = 3
-smooth_period = 3
-ema_signal_len = 3
-
-def calcular_smi_tv(df):
-    high = df['High']
-    low = df['Low']
-    close = df['Close']
-
-    hh = high.rolling(window=length_k).max()
-    ll = low.rolling(window=length_k).min()
-    diff = hh - ll
-    rdiff = close - (hh + ll) / 2
-
-    avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
-    avgdiff = diff.ewm(span=length_d, adjust=False).mean()
-
-    smi_raw = (avgrel / (avgdiff / 2)) * 100
-    smi_raw[avgdiff == 0] = 0.0
-
-    smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
-    
-    df = df.copy()
-    df['SMI'] = smi_smoothed
-    
-    return df
-
-    
 def enviar_email(texto_generado):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
