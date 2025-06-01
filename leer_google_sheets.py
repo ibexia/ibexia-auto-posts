@@ -75,7 +75,7 @@ def calculate_smi_tv(df):
     
     return df
 
-def find_significant_supports(df, current_price, window=20, tolerance_percent=0.01, max_deviation_percent=0.15):
+def find_significant_supports(df, current_price, window=40, tolerance_percent=0.01, max_deviation_percent=0.15):
     """
     Identifica los 3 soportes más significativos y cercanos al precio actual
     basándose en mínimos locales y agrupaciones de precios.
@@ -126,8 +126,9 @@ def find_significant_supports(df, current_price, window=20, tolerance_percent=0.
     if len(top_3_supports) < 3:
         sorted_lows = sorted([l for l in lows.tolist() if l < current_price], reverse=True)
         for low_val in sorted_lows:
-            if round(low_val, 2) not in top_3_supports:
-                top_3_supports.append(round(low_val, 2))
+            rounded_low_val = round(low_val, 2)
+            if rounded_low_val not in top_3_supports:
+                top_3_supports.append(rounded_low_val)
                 if len(top_3_supports) == 3:
                     break
     
@@ -145,9 +146,7 @@ def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
     
-    # Limitar la ventana de observación para el análisis de soportes
-    # Ajusta 'period' y 'interval' según sea necesario para 20-50 velas diarias
-    # '60d' = 60 días de datos, '1d' = diario
+    # Limitar la ventana de observación para el análisis de soportes (aprox. 1-2 meses de datos diarios)
     hist = stock.history(period="60d", interval="1d") 
 
     if hist.empty:
@@ -203,15 +202,16 @@ def obtener_datos_yfinance(ticker):
         # Calcular el precio objetivo de compra
         precio_objetivo_compra = 0.0
         
+        # Usar el soporte 1 como base, si no existe, usar un porcentaje del precio actual
+        base_precio_obj = soporte_1 if soporte_1 > 0 else current_price * 0.95 
+
         if nota_empresa >= 7:
             # Si la nota es 7 o más, el objetivo de compra es el primer soporte
-            precio_objetivo_compra = soporte_1
+            precio_objetivo_compra = base_precio_obj
         else:
             # Si la nota es menor que 7, el objetivo de compra es por debajo del soporte,
             # escalando en función de qué tan lejos esté la nota de 7.
             # Se asume una caída máxima del 15% por debajo del soporte para una nota de 0
-            # Si soporte_1 es 0 (no se encontró), usar el precio actual como base
-            base_precio_obj = soporte_1 if soporte_1 > 0 else current_price * 0.95 
             drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
             precio_objetivo_compra = base_precio_obj * (1 - drop_percentage_from_base)
             
@@ -254,12 +254,13 @@ def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€)"
 
     prompt = f"""
-Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Redacta en primera persona, con total confianza en tu criterio. 
+Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
+
+Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido.
 
 Genera un análisis técnico completo de aproximadamente 1000 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
 
-**Título del Post:** {titulo_post}
-
+**Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
 - Volumen: {data['VOLUMEN']}
 - Soporte 1: {data['SOPORTE_1']}
@@ -278,21 +279,21 @@ Genera un análisis técnico completo de aproximadamente 1000 palabras sobre la 
 
 Importante: si algún dato no está disponible, no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
 
-Estructura el texto de la siguiente manera, sin usar títulos de sección explícitos, sino comenzando cada párrafo con una frase introductoria:
+---
 
-{titulo_post}
+<h2>Análisis Inicial y Recomendación</h2>
+<p>Para comenzar el análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, quiero dejar clara mi recomendación principal: <strong>{data['RECOMENDACION']}</strong>. Este juicio se fundamenta en un análisis exhaustivo de su situación actual, donde la <strong>nota de {data['NOTA_EMPRESA']}</strong> juega un papel crucial. La empresa se encuentra en un punto estratégico en el mercado, con un precio actual de <strong>{data['PRECIO_ACTUAL']}€</strong> y un <strong>precio objetivo de compra de {data['PRECIO_OBJETIVO_COMPRA']}€</strong>, con un volumen de <strong>{data['VOLUMEN']}</strong>.</p>
+<p>Como recomendación general, mi opinión profesional sobre la situación actual de <strong>{data['NOMBRE_EMPRESA']}</strong> y sus perspectivas es la siguiente: [Aquí el modelo expandirá la recomendación, mínimo 150 palabras, usando un enfoque técnico y financiero combinado. Mencionará la nota de <strong>{data['NOTA_EMPRESA']}</strong> como factor determinante].</p>
 
-Para comenzar el análisis de **{data['NOMBRE_EMPRESA']}**, quiero dejar clara mi recomendación principal: **{data['RECOMENDACION']}**. Este juicio se fundamenta en un análisis exhaustivo de su situación actual, donde la **nota de {data['NOTA_EMPRESA']}** juega un papel crucial. La empresa se encuentra en un punto estratégico en el mercado, con un precio actual de {data['PRECIO_ACTUAL']}€ y un **precio objetivo de compra de {data['PRECIO_OBJETIVO_COMPRA']}€**, con un volumen de {data['VOLUMEN']}.
+<h2>Análisis a Corto Plazo: Soportes y Resistencias</h2>
+<p>En el análisis a corto plazo, considero los posibles movimientos del precio en el horizonte inmediato. [Aquí el modelo describirá movimientos, volumen, los soportes clave son <strong>{data['SOPORTE_1']}€</strong>, <strong>{data['SOPORTE_2']}€</strong> y <strong>{data['SOPORTE_3']}€</strong>, y la resistencia en <strong>{data['RESISTENCIA']}€</strong>, mínimo 150 palabras. Hará referencia a la nota de <strong>{data['NOTA_EMPRESA']}</strong> si lo considera relevante para el corto plazo].</p>
 
-Como recomendación general, mi opinión profesional sobre la situación actual de **{data['NOMBRE_EMPRESA']}** y sus perspectivas es la siguiente: [Aquí el modelo expandirá la recomendación, mínimo 150 palabras, usando un enfoque técnico y financiero combinado. Mencionará la nota de {data['NOTA_EMPRESA']} como factor determinante].
+<h2>Visión a Largo Plazo y Fundamentales</h2>
+<p>Respecto a la predicción a largo plazo, mi visión para el futuro de la empresa incluye... [Aquí el modelo desarrollará la visión a futuro, análisis financiero (ingresos: <strong>{data['INGRESOS']}</strong>, EBITDA: <strong>{data['EBITDA']}</strong>, beneficios: <strong>{data['BENEFICIOS']}</strong>, deuda: <strong>{data['DEUDA']}</strong>, flujo de caja: <strong>{data['FLUJO_CAJA']}</strong>), posicionamiento estratégico (planes de expansión: <strong>{data['EXPANSION_PLANES']}</strong>, acuerdos: <strong>{data['ACUERDOS']}</strong>), y comportamiento esperado del precio, mínimo 150 palabras. Hará referencia a la nota de <strong>{data['NOTA_EMPRESA']}</strong> como influencia en la salud financiera a largo plazo].</p>
 
-En el análisis a corto plazo, considero los posibles movimientos del precio en el horizonte inmediato. [Aquí el modelo describirá movimientos, volumen, soportes (el primer soporte clave es {data['SOPORTE_1']}, seguido por {data['SOPORTE_2']} y {data['SOPORTE_3']}) y resistencias ({data['RESISTENCIA']}), mínimo 150 palabras. Hará referencia a la nota de {data['NOTA_EMPRESA']} si lo considera relevante para el corto plazo].
-
-Respecto a la predicción a largo plazo, mi visión para el futuro de la empresa incluye... [Aquí el modelo desarrollará la visión a futuro, análisis financiero (ingresos: {data['INGRESOS']}, EBITDA: {data['EBITDA']}, beneficios: {data['BENEFICIOS']}, deuda: {data['DEUDA']}, flujo de caja: {data['FLUJO_CAJA']}), posicionamiento estratégico (planes de expansión: {data['EXPANSION_PLANES']}, acuerdos: {data['ACUERDOS']}), y comportamiento esperado del precio, mínimo 150 palabras. Hará referencia a la nota de {data['NOTA_EMPRESA']} como influencia en la salud financiera a largo plazo].
-
-En resumen, mi síntesis final de este análisis. [Aquí el modelo ofrecerá un resumen de aproximadamente 100 palabras, reiterando la opinión personal sobre la empresa y su proyección].
-
-Descargo de responsabilidad: Este análisis es solo informativo y no constituye una recomendación de inversión. Cada persona debe evaluar sus decisiones de forma independiente.
+<h2>Conclusión General y Descargo de Responsabilidad</h2>
+<p>En resumen, mi síntesis final de este análisis. [Aquí el modelo ofrecerá un resumen de aproximadamente 100 palabras, reiterando la opinión personal sobre la empresa y su proyección].</p>
+<p>Descargo de responsabilidad: Este análisis es solo informativo y no constituye una recomendación de inversión. Cada persona debe evaluar sus decisiones de forma independiente.</p>
 """
 
     return prompt, titulo_post
@@ -308,7 +309,8 @@ def enviar_email(texto_generado, asunto_email):
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
 
-    msg.attach(MIMEText(texto_generado, 'plain'))
+    # Cambiado a 'html' para que el cliente de correo interprete el formato
+    msg.attach(MIMEText(texto_generado, 'html')) 
 
     try:
         servidor = smtplib.SMTP('smtp.gmail.com', 587)
@@ -327,7 +329,7 @@ def generar_contenido_con_gemini(tickers):
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
     genai.configure(api_key=api_key)
-    # Usar gemini-1.5-flash-latest si gemini-2.0-flash-lite no está disponible o para un rendimiento superior
+    # Se ha actualizado el modelo a una versión más reciente
     model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest") 
 
     for ticker in tickers:
