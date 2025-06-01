@@ -91,6 +91,7 @@ def obtener_datos_yfinance(ticker):
 
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
 
+        # La nota_empresa se mantiene como antes
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
         if nota_empresa <= 2:
@@ -121,17 +122,35 @@ def obtener_datos_yfinance(ticker):
             recomendacion = "Indefinido"
             condicion_rsi = "desconocido"
 
+        # Calcular el precio objetivo de compra
+        precio_objetivo_compra = 0.0
+        soporte_cercano = round(hist["Low"].min(), 2) # Usamos el soporte existente
+
+        if nota_empresa >= 7:
+            # Si la nota es 7 o más, el objetivo de compra es el soporte más cercano
+            precio_objetivo_compra = soporte_cercano
+        else:
+            # Si la nota es menor que 7, el objetivo de compra es por debajo del soporte,
+            # escalando en función de qué tan lejos esté la nota de 7.
+            # Una nota de 6 apunta ligeramente por debajo del soporte, una nota de 1 apunta significativamente por debajo.
+            # Se asume una caída máxima del 15% por debajo del soporte para una nota de 0.
+            drop_percentage_from_support = (7 - nota_empresa) / 7 * 0.15
+            precio_objetivo_compra = soporte_cercano * (1 - drop_percentage_from_support)
+            
+        precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
+
 
         datos = {
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": round(info.get("currentPrice", 0), 2),
             "VOLUMEN": info.get("volume", 0),
-            "SOPORTE": round(hist["Low"].min(), 2),
+            "SOPORTE": soporte_cercano,
             "RESISTENCIA": round(hist["High"].max(), 2),
             "CONDICION_RSI": condicion_rsi,
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
             "NOTA_EMPRESA": nota_empresa,
+            "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra, # Añadido el precio objetivo de compra
             "INGRESOS": info.get("totalRevenue", "N/A"),
             "EBITDA": info.get("ebitda", "N/A"),
             "BENEFICIOS": info.get("grossProfits", "N/A"),
@@ -167,6 +186,7 @@ Genera un análisis técnico completo de aproximadamente 1000 palabras sobre la 
 - Resistencia clave: {data['RESISTENCIA']}
 - Recomendación general: {data['RECOMENDACION']}
 - Nota de la empresa (0-10): {data['NOTA_EMPRESA']}
+- Precio objetivo de compra: {data['PRECIO_OBJETIVO_COMPRA']}€
 - Resultados financieros recientes: {data['INGRESOS']}, {data['EBITDA']}, {data['BENEFICIOS']}
 - Nivel de deuda y flujo de caja: {data['DEUDA']}, {data['FLUJO_CAJA']}
 - Información estratégica: {data['EXPANSION_PLANES']}, {data['ACUERDOS']}
@@ -180,7 +200,7 @@ Estructura el texto de la siguiente manera, sin usar títulos de sección explí
 
 {titulo_post}
 
-Para comenzar el análisis de **{data['NOMBRE_EMPRESA']}**, quiero dejar clara mi recomendación principal: **{data['RECOMENDACION']}**. Este juicio se fundamenta en un análisis exhaustivo de su situación actual, donde la **nota de {data['NOTA_EMPRESA']}** juega un papel crucial. La empresa se encuentra en un punto estratégico en el mercado, con un precio actual de {data['PRECIO_ACTUAL']}€ y un volumen de {data['VOLUMEN']}.
+Para comenzar el análisis de **{data['NOMBRE_EMPRESA']}**, quiero dejar clara mi recomendación principal: **{data['RECOMENDACION']}**. Este juicio se fundamenta en un análisis exhaustivo de su situación actual, donde la **nota de {data['NOTA_EMPRESA']}** juega un papel crucial. La empresa se encuentra en un punto estratégico en el mercado, con un precio actual de {data['PRECIO_ACTUAL']}€ y un **precio objetivo de compra de {data['PRECIO_OBJETIVO_COMPRA']}€**, con un volumen de {data['VOLUMEN']}.
 
 Como recomendación general, mi opinión profesional sobre la situación actual de **{data['NOMBRE_EMPRESA']}** y sus perspectivas es la siguiente: [Aquí el modelo expandirá la recomendación, mínimo 150 palabras, usando un enfoque técnico y financiero combinado. Mencionará la nota de {data['NOTA_EMPRESA']} como factor determinante].
 
