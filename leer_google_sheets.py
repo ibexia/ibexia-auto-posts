@@ -8,6 +8,8 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import google.generativeai as genai
 from datetime import datetime
+import pandas as pd
+import numpy as np
 
 
 def leer_google_sheets():
@@ -73,11 +75,80 @@ def calculate_smi_tv(df):
     
     return df
 
+def find_significant_supports(df, current_price, window=20, tolerance_percent=0.01, max_deviation_percent=0.15):
+    """
+    Identifica los 3 soportes más significativos y cercanos al precio actual
+    basándose en mínimos locales y agrupaciones de precios.
+    """
+    recent_data = df.tail(window) # Últimas 'window' velas (ej: 20-50 días)
+    lows = recent_data['Low']
+    
+    potential_supports = []
+    
+    # Identificar mínimos locales (puntos de rebote)
+    # Un mínimo local es un punto más bajo que sus vecinos
+    for i in range(1, len(lows) - 1):
+        if lows.iloc[i] < lows.iloc[i-1] and lows.iloc[i] < lows.iloc[i+1]:
+            potential_supports.append(lows.iloc[i])
+
+    if not potential_supports:
+        # Si no hay mínimos locales claros, considera los mínimos de la ventana
+        potential_supports = lows.tolist()
+        
+    # Agrupar soportes cercanos en "zonas"
+    support_zones = {}
+    for support in potential_supports:
+        found_zone = False
+        for zone_level in support_zones.keys():
+            if abs(support - zone_level) / support <= tolerance_percent: # Dentro de la tolerancia
+                support_zones[zone_level].append(support)
+                found_zone = True
+                break
+        if not found_zone:
+            support_zones[support] = [support]
+            
+    # Calcular el valor promedio de cada zona y su "frecuencia" (número de toques)
+    # Filtra los soportes que están por encima del precio actual o demasiado lejos
+    final_supports = []
+    for zone_level, values in support_zones.items():
+        avg_support = np.mean(values)
+        if avg_support < current_price: # Solo soportes por debajo del precio actual
+            if abs(current_price - avg_support) / current_price <= max_deviation_percent:
+                final_supports.append({'level': avg_support, 'frequency': len(values)})
+
+    # Ordenar por cercanía al precio actual y luego por frecuencia (más toques, más relevante)
+    final_supports.sort(key=lambda x: (abs(x['level'] - current_price), -x['frequency']))
+    
+    # Tomar los 3 soportes más cercanos
+    top_3_supports = [round(s['level'], 2) for s in final_supports if s['level'] < current_price][:3]
+    
+    # Asegurarse de que siempre haya al menos 3 soportes (rellenar con valores de la ventana si es necesario)
+    if len(top_3_supports) < 3:
+        sorted_lows = sorted([l for l in lows.tolist() if l < current_price], reverse=True)
+        for low_val in sorted_lows:
+            if round(low_val, 2) not in top_3_supports:
+                top_3_supports.append(round(low_val, 2))
+                if len(top_3_supports) == 3:
+                    break
+    
+    # Si aún no hay 3 soportes, usar el mínimo de la ventana o incluso un valor inferior al actual.
+    while len(top_3_supports) < 3:
+        if len(top_3_supports) > 0:
+            top_3_supports.append(round(top_3_supports[-1] * 0.95, 2)) # Un 5% por debajo del último
+        else:
+            top_3_supports.append(round(current_price * 0.90, 2)) # 10% por debajo del precio actual
+            
+    return top_3_supports
+
 
 def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
-    hist = stock.history(period="6mo")
+    
+    # Limitar la ventana de observación para el análisis de soportes
+    # Ajusta 'period' y 'interval' según sea necesario para 20-50 velas diarias
+    # '60d' = 60 días de datos, '1d' = diario
+    hist = stock.history(period="60d", interval="1d") 
 
     if hist.empty:
         print(f"❌ No se pudieron obtener datos históricos para {ticker}")
@@ -90,6 +161,13 @@ def obtener_datos_yfinance(ticker):
             return None
 
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
+        current_price = round(info.get("currentPrice", 0), 2)
+        
+        # Calcular los soportes usando la nueva lógica
+        soportes = find_significant_supports(hist, current_price)
+        soporte_1 = soportes[0] if len(soportes) > 0 else 0
+        soporte_2 = soportes[1] if len(soportes) > 1 else 0
+        soporte_3 = soportes[2] if len(soportes) > 2 else 0
 
         # La nota_empresa se mantiene como antes
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
@@ -124,33 +202,35 @@ def obtener_datos_yfinance(ticker):
 
         # Calcular el precio objetivo de compra
         precio_objetivo_compra = 0.0
-        soporte_cercano = round(hist["Low"].min(), 2) # Usamos el soporte existente
-
+        
         if nota_empresa >= 7:
-            # Si la nota es 7 o más, el objetivo de compra es el soporte más cercano
-            precio_objetivo_compra = soporte_cercano
+            # Si la nota es 7 o más, el objetivo de compra es el primer soporte
+            precio_objetivo_compra = soporte_1
         else:
             # Si la nota es menor que 7, el objetivo de compra es por debajo del soporte,
             # escalando en función de qué tan lejos esté la nota de 7.
-            # Una nota de 6 apunta ligeramente por debajo del soporte, una nota de 1 apunta significativamente por debajo.
-            # Se asume una caída máxima del 15% por debajo del soporte para una nota de 0.
-            drop_percentage_from_support = (7 - nota_empresa) / 7 * 0.15
-            precio_objetivo_compra = soporte_cercano * (1 - drop_percentage_from_support)
+            # Se asume una caída máxima del 15% por debajo del soporte para una nota de 0
+            # Si soporte_1 es 0 (no se encontró), usar el precio actual como base
+            base_precio_obj = soporte_1 if soporte_1 > 0 else current_price * 0.95 
+            drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
+            precio_objetivo_compra = base_precio_obj * (1 - drop_percentage_from_base)
             
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
 
 
         datos = {
             "NOMBRE_EMPRESA": info.get("longName", ticker),
-            "PRECIO_ACTUAL": round(info.get("currentPrice", 0), 2),
+            "PRECIO_ACTUAL": current_price,
             "VOLUMEN": info.get("volume", 0),
-            "SOPORTE": soporte_cercano,
-            "RESISTENCIA": round(hist["High"].max(), 2),
+            "SOPORTE_1": soporte_1,
+            "SOPORTE_2": soporte_2,
+            "SOPORTE_3": soporte_3,
+            "RESISTENCIA": round(hist["High"].max(), 2), # Resistencia se mantiene como el máximo en la ventana
             "CONDICION_RSI": condicion_rsi,
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
             "NOTA_EMPRESA": nota_empresa,
-            "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra, # Añadido el precio objetivo de compra
+            "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
             "INGRESOS": info.get("totalRevenue", "N/A"),
             "EBITDA": info.get("ebitda", "N/A"),
             "BENEFICIOS": info.get("grossProfits", "N/A"),
@@ -182,7 +262,9 @@ Genera un análisis técnico completo de aproximadamente 1000 palabras sobre la 
 
 - Precio actual: {data['PRECIO_ACTUAL']}
 - Volumen: {data['VOLUMEN']}
-- Soporte clave: {data['SOPORTE']}
+- Soporte 1: {data['SOPORTE_1']}
+- Soporte 2: {data['SOPORTE_2']}
+- Soporte 3: {data['SOPORTE_3']}
 - Resistencia clave: {data['RESISTENCIA']}
 - Recomendación general: {data['RECOMENDACION']}
 - Nota de la empresa (0-10): {data['NOTA_EMPRESA']}
@@ -204,7 +286,7 @@ Para comenzar el análisis de **{data['NOMBRE_EMPRESA']}**, quiero dejar clara m
 
 Como recomendación general, mi opinión profesional sobre la situación actual de **{data['NOMBRE_EMPRESA']}** y sus perspectivas es la siguiente: [Aquí el modelo expandirá la recomendación, mínimo 150 palabras, usando un enfoque técnico y financiero combinado. Mencionará la nota de {data['NOTA_EMPRESA']} como factor determinante].
 
-En el análisis a corto plazo, considero los posibles movimientos del precio en el horizonte inmediato. [Aquí el modelo describirá movimientos, volumen, soportes ({data['SOPORTE']}) y resistencias ({data['RESISTENCIA']}), mínimo 150 palabras. Hará referencia a la nota de {data['NOTA_EMPRESA']} si lo considera relevante para el corto plazo].
+En el análisis a corto plazo, considero los posibles movimientos del precio en el horizonte inmediato. [Aquí el modelo describirá movimientos, volumen, soportes (el primer soporte clave es {data['SOPORTE_1']}, seguido por {data['SOPORTE_2']} y {data['SOPORTE_3']}) y resistencias ({data['RESISTENCIA']}), mínimo 150 palabras. Hará referencia a la nota de {data['NOTA_EMPRESA']} si lo considera relevante para el corto plazo].
 
 Respecto a la predicción a largo plazo, mi visión para el futuro de la empresa incluye... [Aquí el modelo desarrollará la visión a futuro, análisis financiero (ingresos: {data['INGRESOS']}, EBITDA: {data['EBITDA']}, beneficios: {data['BENEFICIOS']}, deuda: {data['DEUDA']}, flujo de caja: {data['FLUJO_CAJA']}), posicionamiento estratégico (planes de expansión: {data['EXPANSION_PLANES']}, acuerdos: {data['ACUERDOS']}), y comportamiento esperado del precio, mínimo 150 palabras. Hará referencia a la nota de {data['NOTA_EMPRESA']} como influencia en la salud financiera a largo plazo].
 
@@ -245,7 +327,8 @@ def generar_contenido_con_gemini(tickers):
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name="models/gemini-2.0-flash-lite")
+    # Usar gemini-1.5-flash-latest si gemini-2.0-flash-lite no está disponible o para un rendimiento superior
+    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest") 
 
     for ticker in tickers:
         print(f"\n📊 Procesando ticker: {ticker}")
