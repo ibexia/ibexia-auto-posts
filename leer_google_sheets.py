@@ -280,6 +280,7 @@ Genera un análisis técnico completo de aproximadamente 1000 palabras sobre la 
 Importante: si algún dato no está disponible, no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
 
 ---
+<h1>{titulo_post}</h1>
 
 <h2>Análisis Inicial y Recomendación</h2>
 <p>Para comenzar el análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, quiero dejar clara mi recomendación principal: <strong>{data['RECOMENDACION']}</strong>. Este juicio se fundamenta en un análisis exhaustivo de su situación actual, donde la <strong>nota de {data['NOTA_EMPRESA']}</strong> juega un papel crucial. La empresa se encuentra en un punto estratégico en el mercado, con un precio actual de <strong>{data['PRECIO_ACTUAL']}€</strong> y un <strong>precio objetivo de compra de {data['PRECIO_OBJETIVO_COMPRA']}€</strong>, con un volumen de <strong>{data['VOLUMEN']}</strong>.</p>
