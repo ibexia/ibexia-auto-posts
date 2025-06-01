@@ -20,7 +20,7 @@ def leer_google_sheets():
     creds_dict = json.loads(credentials_json)
     creds = service_account.Credentials.from_service_account_info(
         creds_dict,
-        scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
+        scopes=['[https://www.googleapis.com/auth/spreadsheets.readonly](https://www.googleapis.com/auth/spreadsheets.readonly)']
     )
 
     spreadsheet_id = os.getenv('SPREADSHEET_ID')
@@ -253,10 +253,12 @@ def obtener_datos_yfinance(ticker):
 def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€)"
 
+    # El prompt ahora incluye el título del post dentro del cuerpo HTML
+    # y las instrucciones para generar HTML sin marcas de código.
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
 
-Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido.
+Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. **NO** incluyas ningún tipo de marca de código (como ```html) al principio o al final de la respuesta, solo el HTML puro.
 
 Genera un análisis técnico completo de aproximadamente 1000 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
 
@@ -280,6 +282,8 @@ Genera un análisis técnico completo de aproximadamente 1000 palabras sobre la 
 Importante: si algún dato no está disponible, no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
 
 ---
+
+<h1>{titulo_post}</h1>
 
 <h2>Análisis Inicial y Recomendación</h2>
 <p>Para comenzar el análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, quiero dejar clara mi recomendación principal: <strong>{data['RECOMENDACION']}</strong>. Este juicio se fundamenta en un análisis exhaustivo de su situación actual, donde la <strong>nota de {data['NOTA_EMPRESA']}</strong> juega un papel crucial. La empresa se encuentra en un punto estratégico en el mercado, con un precio actual de <strong>{data['PRECIO_ACTUAL']}€</strong> y un <strong>precio objetivo de compra de {data['PRECIO_OBJETIVO_COMPRA']}€</strong>, con un volumen de <strong>{data['VOLUMEN']}</strong>.</p>
@@ -341,10 +345,12 @@ def generar_contenido_con_gemini(tickers):
 
         try:
             response = model.generate_content(prompt)
+            # Intentar limpiar cualquier posible marca de código si el modelo la añade
+            clean_text = response.text.replace('```html\n', '').replace('\n```', '')
             print(f"\n🧠 Contenido generado para {ticker}:\n")
-            print(response.text)
+            print(clean_text)
             asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} - {data['RECOMENDACION']}"
-            enviar_email(response.text, asunto_email)
+            enviar_email(clean_text, asunto_email)
         except Exception as e:
             print(f"❌ Error generando contenido con Gemini: {e}")
 
