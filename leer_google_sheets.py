@@ -147,7 +147,7 @@ def obtener_datos_yfinance(ticker):
     info = stock.info
     
     # Limitar la ventana de observación para el análisis de soportes (aprox. 1-2 meses de datos diarios)
-    hist = stock.history(period="60d", interval="1d") 
+    hist = stock.history(period="60d", interval="1d")  
 
     if hist.empty:
         print(f"❌ No se pudieron obtener datos históricos para {ticker}")
@@ -219,6 +219,7 @@ def obtener_datos_yfinance(ticker):
 
 
         datos = {
+            "TICKER": ticker, # Añadimos el ticker a los datos devueltos
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
             "VOLUMEN": info.get("volume", 0),
@@ -257,7 +258,8 @@ def formatear_numero(valor):
         return "No disponible"
         
 def construir_prompt_formateado(data):
-    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€)"
+    # Modificamos el título del post para incluir el ticker
+    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€) {data['TICKER']}"
 
 
     prompt = f"""
@@ -336,7 +338,7 @@ def enviar_email(texto_generado, asunto_email):
     msg['Subject'] = asunto_email
 
     # Cambiado a 'html' para que el cliente de correo interprete el formato
-    msg.attach(MIMEText(texto_generado, 'html')) 
+    msg.attach(MIMEText(texto_generado, 'html'))  
 
     try:
         servidor = smtplib.SMTP('smtp.gmail.com', 587)
@@ -356,7 +358,7 @@ def generar_contenido_con_gemini(tickers):
 
     genai.configure(api_key=api_key)
     # Se ha actualizado el modelo a una versión más reciente
-    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest") 
+    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")  
 
     for ticker in tickers:
         print(f"\n📊 Procesando ticker: {ticker}")
@@ -369,7 +371,7 @@ def generar_contenido_con_gemini(tickers):
             response = model.generate_content(prompt)
             print(f"\n🧠 Contenido generado para {ticker}:\n")
             print(response.text)
-            asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} - {data['RECOMENDACION']}"
+            asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}" # También actualizamos el asunto del email
             enviar_email(response.text, asunto_email)
         except Exception as e:
             print(f"❌ Error generando contenido con Gemini: {e}")
