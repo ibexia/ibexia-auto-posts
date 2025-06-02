@@ -252,6 +252,12 @@ def obtener_datos_yfinance(ticker):
 
 def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€)"
+    def formatear_numero(valor):
+    try:
+        numero = int(valor)
+        return f"{numero:,} €"
+    except (ValueError, TypeError):
+        return "No disponible"
 
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
@@ -301,7 +307,8 @@ Importante: si algún dato no está disponible, no lo menciones ni digas que fal
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 <p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas.</p>
 
-<p>En el último ejercicio, los ingresos declarados fueron de <strong>{int(data['INGRESOS']):,} €</strong>, el EBITDA alcanzó <strong>{int(data['EBITDA']):,} €</strong>, y los beneficios netos se situaron en torno a <strong>{int(data['BENEFICIOS']):,} €</strong>. En cuanto a su posición financiera, la deuda asciende a <strong>{int(data['DEUDA']):,} €</strong>, y el flujo de caja operativo es de <strong>{int(data['FLUJO_CAJA']):,} €</strong>.</p>
+<p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. 
+En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
 
 <p>Desde el punto de vista estratégico, la empresa ha comunicado <strong>{data['EXPANSION_PLANES']}</strong> y ha establecido <strong>{data['ACUERDOS']}</strong>, lo cual puede fortalecer su presencia en nuevos mercados o consolidar su liderazgo en los actuales.</p>
 
