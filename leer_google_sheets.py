@@ -256,9 +256,9 @@ def construir_prompt_formateado(data):
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
 
-Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido.
+Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
 
-Genera un análisis técnico completo de aproximadamente 1000 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
+Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
 
 **Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
@@ -283,18 +283,35 @@ Importante: si algún dato no está disponible, no lo menciones ni digas que fal
 <h1>{titulo_post}</h1>
 
 <h2>Análisis Inicial y Recomendación</h2>
-<p>Para comenzar el análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, quiero dejar clara mi recomendación principal: <strong>{data['RECOMENDACION']}</strong>. Este juicio se fundamenta en un análisis exhaustivo de su situación actual, donde la <strong>nota de {data['NOTA_EMPRESA']}</strong> juega un papel crucial. La empresa se encuentra en un punto estratégico en el mercado, con un precio actual de <strong>{data['PRECIO_ACTUAL']}€</strong> y un <strong>precio objetivo de compra de {data['PRECIO_OBJETIVO_COMPRA']}€</strong>, con un volumen de <strong>{data['VOLUMEN']}</strong>.</p>
-<p>Como recomendación general, mi opinión profesional sobre la situación actual de <strong>{data['NOMBRE_EMPRESA']}</strong> y sus perspectivas es la siguiente: [Aquí el modelo expandirá la recomendación, mínimo 150 palabras, usando un enfoque técnico y financiero combinado. Mencionará la nota de <strong>{data['NOTA_EMPRESA']}</strong> como factor determinante].</p>
+<p>Comienzo el análisis de <strong>{data['NOMBRE_EMPRESA']}</strong> destacando mi recomendación principal: <strong>{data['RECOMENDACION']}</strong>.</p>
+
+<p>La empresa se encuentra en una situación clave. Cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,} €</strong>, mientras que el precio objetivo de compra lo situamos en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong>. El volumen negociado recientemente alcanza las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
+
+<p>Asignamos una <strong>nota de {data['NOTA_EMPRESA']}</strong>. A continuación, detallo una visión más completa de mi evaluación profesional, desarrollada en base a una combinación de indicadores técnicos y fundamentos económicos. [Aquí el modelo expandirá la recomendación en un desarrollo de mínimo 150 palabras, evitando repeticiones y usando párrafos de 2 a 4 líneas. Mencionará la nota como argumento de decisión].</p>
 
 <h2>Análisis a Corto Plazo: Soportes y Resistencias</h2>
-<p>En el análisis a corto plazo, considero los posibles movimientos del precio en el horizonte inmediato. [Aquí el modelo describirá movimientos, volumen, los soportes clave son <strong>{data['SOPORTE_1']}€</strong>, <strong>{data['SOPORTE_2']}€</strong> y <strong>{data['SOPORTE_3']}€</strong>, y la resistencia en <strong>{data['RESISTENCIA']}€</strong>, mínimo 150 palabras. Hará referencia a la nota de <strong>{data['NOTA_EMPRESA']}</strong> si lo considera relevante para el corto plazo].</p>
+<p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar tanto el comportamiento reciente del volumen como las zonas clave de soporte y resistencia.</p>
+
+<p>El primer soporte se sitúa en <strong>{data['SOPORTE_1']:,} €</strong>, lo que representa una distancia del <strong>{((float(data['PRECIO_ACTUAL']) - float(data['SOPORTE_1'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> respecto al precio actual. El segundo soporte está en <strong>{data['SOPORTE_2']:,} €</strong> (<strong>{((float(data['PRECIO_ACTUAL']) - float(data['SOPORTE_2'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> de distancia), y el tercero en <strong>{data['SOPORTE_3']:,} €</strong>, con un margen del <strong>{((float(data['PRECIO_ACTUAL']) - float(data['SOPORTE_3'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong>.</p>
+
+<p>La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión, y su cercanía o lejanía tiene implicaciones operativas claras.</p>
+
+<p>[Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. Puede incluir una observación del volumen como confirmación de la fortaleza de soportes o resistencias, y vincularlo a la nota de la empresa si tiene impacto en este horizonte temporal].</p>
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
-<p>Respecto a la predicción a largo plazo, mi visión para el futuro de la empresa incluye... [Aquí el modelo desarrollará la visión a futuro, análisis financiero (ingresos: <strong>{data['INGRESOS']}</strong>, EBITDA: <strong>{data['EBITDA']}</strong>, beneficios: <strong>{data['BENEFICIOS']}</strong>, deuda: <strong>{data['DEUDA']}</strong>, flujo de caja: <strong>{data['FLUJO_CAJA']}</strong>), posicionamiento estratégico (planes de expansión: <strong>{data['EXPANSION_PLANES']}</strong>, acuerdos: <strong>{data['ACUERDOS']}</strong>), y comportamiento esperado del precio, mínimo 150 palabras. Hará referencia a la nota de <strong>{data['NOTA_EMPRESA']}</strong> como influencia en la salud financiera a largo plazo].</p>
+<p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas.</p>
+
+<p>En el último ejercicio, los ingresos declarados fueron de <strong>{int(data['INGRESOS']):,} €</strong>, el EBITDA alcanzó <strong>{int(data['EBITDA']):,} €</strong>, y los beneficios netos se situaron en torno a <strong>{int(data['BENEFICIOS']):,} €</strong>. En cuanto a su posición financiera, la deuda asciende a <strong>{int(data['DEUDA']):,} €</strong>, y el flujo de caja operativo es de <strong>{int(data['FLUJO_CAJA']):,} €</strong>.</p>
+
+<p>Desde el punto de vista estratégico, la empresa ha comunicado <strong>{data['EXPANSION_PLANES']}</strong> y ha establecido <strong>{data['ACUERDOS']}</strong>, lo cual puede fortalecer su presencia en nuevos mercados o consolidar su liderazgo en los actuales.</p>
+
+<p>[Aquí el modelo debe elaborar una proyección fundamentada (mínimo 150 palabras) con párrafos de máximo 3 líneas. Debe integrar estas cifras con una interpretación crítica, considerando la nota como indicador de solvencia y potencial].</p>
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
-<p>En resumen, mi síntesis final de este análisis. [Aquí el modelo ofrecerá un resumen de aproximadamente 100 palabras, reiterando la opinión personal sobre la empresa y su proyección].</p>
-<p>Descargo de responsabilidad: Este análisis es solo informativo y no constituye una recomendación de inversión. Cada persona debe evaluar sus decisiones de forma independiente.</p>
+<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en datos técnicos, financieros y estratégicos. [Aquí el modelo redactará un resumen fluido de unas 100 palabras, reforzando la opinión general y la coherencia entre recomendación, niveles técnicos y fundamentos].</p>
+
+<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa. No constituye una recomendación de inversión. Se recomienda analizar cada decisión de forma individual, teniendo en cuenta el perfil de riesgo y los objetivos financieros personales.</p>
+
 """
 
     return prompt, titulo_post
