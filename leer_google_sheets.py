@@ -31,7 +31,6 @@ def leer_google_sheets():
 
     service = build('sheets', 'v4', credentials=creds)
     sheet = service.spreadsheets()
-    # CORRECCIÓN: Pasar los argumentos correctos al método get()
     result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
@@ -80,49 +79,40 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     Identifica los 3 soportes más significativos y cercanos al precio actual
     basándose en mínimos locales y agrupaciones de precios.
     """
-    recent_data = df.tail(window) # Últimas 'window' velas (ej: 20-50 días)
+    recent_data = df.tail(window)
     lows = recent_data['Low']
     
     potential_supports = []
     
-    # Identificar mínimos locales (puntos de rebote)
-    # Un mínimo local es un punto más bajo que sus vecinos
     for i in range(1, len(lows) - 1):
         if lows.iloc[i] < lows.iloc[i-1] and lows.iloc[i] < lows.iloc[i+1]:
             potential_supports.append(lows.iloc[i])
 
     if not potential_supports:
-        # Si no hay mínimos locales claros, considera los mínimos de la ventana
         potential_supports = lows.tolist()
         
-    # Agrupar soportes cercanos en "zonas"
     support_zones = {}
     for support in potential_supports:
         found_zone = False
         for zone_level in support_zones.keys():
-            if abs(support - zone_level) / support <= tolerance_percent: # Dentro de la tolerancia
+            if abs(support - zone_level) / support <= tolerance_percent:
                 support_zones[zone_level].append(support)
                 found_zone = True
                 break
         if not found_zone:
             support_zones[support] = [support]
             
-    # Calcular el valor promedio de cada zona y su "frecuencia" (número de toques)
-    # Filtra los soportes que están por encima del precio actual o demasiado lejos
     final_supports = []
     for zone_level, values in support_zones.items():
         avg_support = np.mean(values)
-        if avg_support < current_price: # Solo soportes por debajo del precio actual
+        if avg_support < current_price:
             if abs(current_price - avg_support) / current_price <= max_deviation_percent:
                 final_supports.append({'level': avg_support, 'frequency': len(values)})
 
-    # Ordenar por cercanía al precio actual y luego por frecuencia (más toques, más relevante)
     final_supports.sort(key=lambda x: (abs(x['level'] - current_price), -x['frequency']))
     
-    # Tomar los 3 soportes más cercanos
     top_3_supports = [round(s['level'], 2) for s in final_supports if s['level'] < current_price][:3]
     
-    # Asegurarse de que siempre haya al menos 3 soportes (rellenar con valores de la ventana si es necesario)
     if len(top_3_supports) < 3:
         sorted_lows = sorted([l for l in lows.tolist() if l < current_price], reverse=True)
         for low_val in sorted_lows:
@@ -132,21 +122,43 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
                 if len(top_3_supports) == 3:
                     break
     
-    # Si aún no hay 3 soportes, usar el mínimo de la ventana o incluso un valor inferior al actual.
     while len(top_3_supports) < 3:
         if len(top_3_supports) > 0:
-            top_3_supports.append(round(top_3_supports[-1] * 0.95, 2)) # Un 5% por debajo del último
+            top_3_supports.append(round(top_3_supports[-1] * 0.95, 2))
         else:
-            top_3_supports.append(round(current_price * 0.90, 2)) # 10% por debajo del precio actual
+            top_3_supports.append(round(current_price * 0.90, 2))
             
     return top_3_supports
 
+
+# Nueva función para traducir texto con Gemini
+def traducir_texto_con_gemini(text):
+    if not text or text.strip().lower() in ["n/a", "no disponibles", "no disponible"]:
+        return text
+
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        print("Advertencia: GEMINI_API_KEY no configurada. No se realizará la traducción.")
+        return text # Si no hay API key, devuelve el texto original
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")
+    
+    # Prompt de traducción
+    try:
+        response = model.generate_content(f"Traduce el siguiente texto al español de forma concisa y profesional: \"{text}\"")
+        translated_text = response.text.strip()
+        # Eliminar posibles asteriscos o formato que Gemini pueda añadir
+        translated_text = translated_text.replace("**", "").replace("*", "") 
+        return translated_text
+    except Exception as e:
+        print(f"❌ Error al traducir texto con Gemini: {e}")
+        return text # En caso de error, devuelve el texto original
 
 def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
     
-    # Limitar la ventana de observación para el análisis de soportes (aprox. 1-2 meses de datos diarios)
     hist = stock.history(period="60d", interval="1d")  
 
     if hist.empty:
@@ -162,13 +174,11 @@ def obtener_datos_yfinance(ticker):
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
         current_price = round(info.get("currentPrice", 0), 2)
         
-        # Calcular los soportes usando la nueva lógica
         soportes = find_significant_supports(hist, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
         soporte_2 = soportes[1] if len(soportes) > 1 else 0
         soporte_3 = soportes[2] if len(soportes) > 2 else 0
 
-        # La nota_empresa se mantiene como antes
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
         if nota_empresa <= 2:
@@ -199,34 +209,55 @@ def obtener_datos_yfinance(ticker):
             recomendacion = "Indefinido"
             condicion_rsi = "desconocido"
 
-        # Calcular el precio objetivo de compra
         precio_objetivo_compra = 0.0
         
-        # Usar el soporte 1 como base, si no existe, usar un porcentaje del precio actual
-        base_precio_obj = soporte_1 if soporte_1 > 0 else current_price * 0.95 
+        base_precio_obj = soporte_1 if soporte_1 > 0 else current_price * 0.95
 
         if nota_empresa >= 7:
-            # Si la nota es 7 o más, el objetivo de compra es el primer soporte
             precio_objetivo_compra = base_precio_obj
         else:
-            # Si la nota es menor que 7, el objetivo de compra es por debajo del soporte,
-            # escalando en función de qué tan lejos esté la nota de 7.
-            # Se asume una caída máxima del 15% por debajo del soporte para una nota de 0
             drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
             precio_objetivo_compra = base_precio_obj * (1 - drop_percentage_from_base)
             
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
 
+        # --- Aplicar traducción a los campos relevantes aquí ---
+        expansion_planes_raw = info.get("longBusinessSummary", "N/A")
+        # Asegurarse de que no haya un error si el texto es muy largo para la API
+        expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000]) # Limitar a 5000 caracteres para el prompt
+        if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
+            expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
+
+        acuerdos_raw = info.get("agreements", "No disponibles") # Suponiendo que 'agreements' es un campo real o similar
+        acuerdos_translated = traducir_texto_con_gemini(acuerdos_raw)
+        if acuerdos_translated == "No disponibles" and acuerdos_raw != "No disponibles":
+            acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
+
+        sentimiento_analistas_raw = info.get("recommendationKey", "N/A")
+        sentimiento_analistas_translated = traducir_texto_con_gemini(sentimiento_analistas_raw)
+        if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
+             sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
+
+
+        # Aquí puedes añadir más campos que creas que pueden venir en inglés
+        # Por ejemplo, si category (EMPRESAS_SIMILARES) viniera en inglés:
+        # empresas_similares_raw = info.get("category", "")
+        # empresas_similares_translated = traducir_texto_con_gemini(", ".join(empresas_similares_raw.split(","))) if empresas_similares_raw else "No disponibles"
+        # if empresas_similares_translated == "No disponibles" and empresas_similares_raw != "":
+        #     empresas_similares_translated = "Información de empresas similares no disponible o no traducible."
+
+        # --- Fin de la traducción ---
+
 
         datos = {
-            "TICKER": ticker, # Añadimos el ticker a los datos devueltos
+            "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
             "VOLUMEN": info.get("volume", 0),
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
-            "RESISTENCIA": round(hist["High"].max(), 2), # Resistencia se mantiene como el máximo en la ventana
+            "RESISTENCIA": round(hist["High"].max(), 2),
             "CONDICION_RSI": condicion_rsi,
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
@@ -237,9 +268,9 @@ def obtener_datos_yfinance(ticker):
             "BENEFICIOS": info.get("grossProfits", "N/A"),
             "DEUDA": info.get("totalDebt", "N/A"),
             "FLUJO_CAJA": info.get("freeCashflow", "N/A"),
-            "EXPANSION_PLANES": info.get("longBusinessSummary", "N/A"),
-            "ACUERDOS": "No disponibles",
-            "SENTIMIENTO_ANALISTAS": info.get("recommendationKey", "N/A"),
+            "EXPANSION_PLANES": expansion_planes_translated, # Usamos la versión traducida
+            "ACUERDOS": acuerdos_translated, # Usamos la versión traducida
+            "SENTIMIENTO_ANALISTAS": sentimiento_analistas_translated, # Usamos la versión traducida
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles"
@@ -258,7 +289,6 @@ def formatear_numero(valor):
         return "No disponible"
         
 def construir_prompt_formateado(data):
-    # Modificamos el título del post para incluir el ticker
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€) {data['TICKER']}"
 
 
@@ -330,14 +360,13 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 def enviar_email(texto_generado, asunto_email):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt"
+    password = "kdgz lvdo wqvt vfkt" # Es recomendable usar variables de entorno para esto también
 
     msg = MIMEMultipart()
     msg['From'] = remitente
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
 
-    # Cambiado a 'html' para que el cliente de correo interprete el formato
     msg.attach(MIMEText(texto_generado, 'html'))  
 
     try:
@@ -357,7 +386,6 @@ def generar_contenido_con_gemini(tickers):
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
     genai.configure(api_key=api_key)
-    # Se ha actualizado el modelo a una versión más reciente
     model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")  
 
     for ticker in tickers:
@@ -371,7 +399,7 @@ def generar_contenido_con_gemini(tickers):
             response = model.generate_content(prompt)
             print(f"\n🧠 Contenido generado para {ticker}:\n")
             print(response.text)
-            asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}" # También actualizamos el asunto del email
+            asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
             enviar_email(response.text, asunto_email)
         except Exception as e:
             print(f"❌ Error generando contenido con Gemini: {e}")
