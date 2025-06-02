@@ -249,15 +249,16 @@ def obtener_datos_yfinance(ticker):
 
     return datos
 
-
-def construir_prompt_formateado(data):
-    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€)"
-    def formatear_numero(valor):
+def formatear_numero(valor):
     try:
         numero = int(valor)
         return f"{numero:,} €"
     except (ValueError, TypeError):
         return "No disponible"
+        
+def construir_prompt_formateado(data):
+    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€)"
+
 
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
