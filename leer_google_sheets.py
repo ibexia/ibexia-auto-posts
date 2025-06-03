@@ -10,7 +10,8 @@ import google.generativeai as genai
 from datetime import datetime
 import pandas as pd
 import numpy as np
-
+import time # Importar time para los retrasos
+import re   # Importar re para parsing de errores
 
 def leer_google_sheets():
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
@@ -130,30 +131,44 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
             
     return top_3_supports
 
-
-# Nueva función para traducir texto con Gemini
-def traducir_texto_con_gemini(text):
+def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
     if not text or text.strip().lower() in ["n/a", "no disponibles", "no disponible"]:
         return text
 
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key:
         print("Advertencia: GEMINI_API_KEY no configurada. No se realizará la traducción.")
-        return text # Si no hay API key, devuelve el texto original
+        return text
 
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")
     
-    # Prompt de traducción
-    try:
-        response = model.generate_content(f"Traduce el siguiente texto al español de forma concisa y profesional: \"{text}\"")
-        translated_text = response.text.strip()
-        # Eliminar posibles asteriscos o formato que Gemini pueda añadir
-        translated_text = translated_text.replace("**", "").replace("*", "") 
-        return translated_text
-    except Exception as e:
-        print(f"❌ Error al traducir texto con Gemini: {e}")
-        return text # En caso de error, devuelve el texto original
+    retries = 0
+    delay = initial_delay
+    while retries < max_retries:
+        try:
+            response = model.generate_content(f"Traduce el siguiente texto al español de forma concisa y profesional: \"{text}\"")
+            translated_text = response.text.strip().replace("**", "").replace("*", "")
+            return translated_text
+        except Exception as e:
+            if "429 You exceeded your current quota" in str(e):
+                try:
+                    match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
+                    if match:
+                        server_delay = int(match.group(1))
+                        delay = max(delay, server_delay + 1)
+                except:
+                    pass
+                
+                print(f"❌ Cuota de Gemini excedida al traducir. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
+                time.sleep(delay)
+                retries += 1
+                delay *= 2
+            else:
+                print(f"❌ Error al traducir texto con Gemini (no de cuota): {e}")
+                return text
+    print(f"❌ Falló la traducción después de {max_retries} reintentos.")
+    return text
 
 def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
@@ -223,12 +238,11 @@ def obtener_datos_yfinance(ticker):
 
         # --- Aplicar traducción a los campos relevantes aquí ---
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
-        # Asegurarse de que no haya un error si el texto es muy largo para la API
-        expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000]) # Limitar a 5000 caracteres para el prompt
+        expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000])
         if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
             expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
 
-        acuerdos_raw = info.get("agreements", "No disponibles") # Suponiendo que 'agreements' es un campo real o similar
+        acuerdos_raw = info.get("agreements", "No disponibles") 
         acuerdos_translated = traducir_texto_con_gemini(acuerdos_raw)
         if acuerdos_translated == "No disponibles" and acuerdos_raw != "No disponibles":
             acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
@@ -237,15 +251,7 @@ def obtener_datos_yfinance(ticker):
         sentimiento_analistas_translated = traducir_texto_con_gemini(sentimiento_analistas_raw)
         if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
              sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
-
-
-        # Aquí puedes añadir más campos que creas que pueden venir en inglés
-        # Por ejemplo, si category (EMPRESAS_SIMILARES) viniera en inglés:
-        # empresas_similares_raw = info.get("category", "")
-        # empresas_similares_translated = traducir_texto_con_gemini(", ".join(empresas_similares_raw.split(","))) if empresas_similares_raw else "No disponibles"
-        # if empresas_similares_translated == "No disponibles" and empresas_similares_raw != "":
-        #     empresas_similares_translated = "Información de empresas similares no disponible o no traducible."
-
+        
         # --- Fin de la traducción ---
 
 
@@ -268,9 +274,9 @@ def obtener_datos_yfinance(ticker):
             "BENEFICIOS": info.get("grossProfits", "N/A"),
             "DEUDA": info.get("totalDebt", "N/A"),
             "FLUJO_CAJA": info.get("freeCashflow", "N/A"),
-            "EXPANSION_PLANES": expansion_planes_translated, # Usamos la versión traducida
-            "ACUERDOS": acuerdos_translated, # Usamos la versión traducida
-            "SENTIMIENTO_ANALISTAS": sentimiento_analistas_translated, # Usamos la versión traducida
+            "EXPANSION_PLANES": expansion_planes_translated,
+            "ACUERDOS": acuerdos_translated,
+            "SENTIMIENTO_ANALISTAS": sentimiento_analistas_translated,
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles"
@@ -290,7 +296,6 @@ def formatear_numero(valor):
         
 def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€) {data['TICKER']}"
-
 
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
@@ -360,7 +365,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 def enviar_email(texto_generado, asunto_email):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt" # Es recomendable usar variables de entorno para esto también
+    password = "kdgz lvdo wqvt vfkt" 
 
     msg = MIMEMultipart()
     msg['From'] = remitente
@@ -395,15 +400,42 @@ def generar_contenido_con_gemini(tickers):
             continue
         prompt, titulo_post = construir_prompt_formateado(data)
 
-        try:
-            response = model.generate_content(prompt)
-            print(f"\n🧠 Contenido generado para {ticker}:\n")
-            print(response.text)
-            asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
-            enviar_email(response.text, asunto_email)
-        except Exception as e:
-            print(f"❌ Error generando contenido con Gemini: {e}")
+        max_retries = 3
+        initial_delay = 10 
+        retries = 0
+        delay = initial_delay
 
+        while retries < max_retries:
+            try:
+                response = model.generate_content(prompt)
+                print(f"\n🧠 Contenido generado para {ticker}:\n")
+                print(response.text)
+                asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
+                enviar_email(response.text, asunto_email)
+                break 
+            except Exception as e:
+                if "429 You exceeded your current quota" in str(e):
+                    try:
+                        match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
+                        if match:
+                            server_delay = int(match.group(1))
+                            delay = max(delay, server_delay + 1)
+                    except:
+                        pass
+                    
+                    print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
+                    time.sleep(delay)
+                    retries += 1
+                    delay *= 2
+                else:
+                    print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
+                    break
+        else: 
+            print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
+        
+        # --- PAUSA DE 1 MINUTO DESPUÉS DE CADA TICKER ---
+        print(f"⏳ Esperando 60 segundos antes de procesar el siguiente ticker...")
+        time.sleep(60) # Pausa de 60 segundos entre cada ticker
 
 def main():
     all_tickers = leer_google_sheets()[1:]
@@ -414,7 +446,7 @@ def main():
 
     day_of_week = datetime.today().weekday()
     
-    num_tickers_per_day = 10
+    num_tickers_per_day = 10 # Se mantiene en 10 como solicitado
     total_tickers_in_sheet = len(all_tickers)
     
     start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
