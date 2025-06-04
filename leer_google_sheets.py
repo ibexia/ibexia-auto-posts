@@ -10,8 +10,8 @@ import google.generativeai as genai
 from datetime import datetime
 import pandas as pd
 import numpy as np
-import time # Importar time para los retrasos
-import re   # Importar re para parsing de errores
+import time
+import re
 
 def leer_google_sheets():
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
@@ -174,7 +174,8 @@ def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
     
-    hist = stock.history(period="60d", interval="1d")  
+    # Pedimos un periodo un poco más largo para asegurarnos de tener el día anterior
+    hist = stock.history(period="7d", interval="1d")  
 
     if hist.empty:
         print(f"❌ No se pudieron obtener datos históricos para {ticker}")
@@ -189,6 +190,15 @@ def obtener_datos_yfinance(ticker):
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
         current_price = round(info.get("currentPrice", 0), 2)
         
+        # OBTENER VOLUMEN DEL DÍA ANTERIOR
+        # Asegurarse de que hay al menos 2 filas para el día anterior
+        if len(hist) >= 2:
+            volume_yesterday = int(hist['Volume'].iloc[-2])
+        else:
+            print(f"Advertencia: No hay suficientes datos históricos para obtener el volumen del día anterior para {ticker}. Usando el volumen actual.")
+            volume_yesterday = info.get("volume", 0) # Si no hay datos anteriores, usa el volumen actual
+
+
         soportes = find_significant_supports(hist, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
         soporte_2 = soportes[1] if len(soportes) > 1 else 0
@@ -259,7 +269,7 @@ def obtener_datos_yfinance(ticker):
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
-            "VOLUMEN": info.get("volume", 0),
+            "VOLUMEN": volume_yesterday, # ¡CAMBIO AQUÍ!
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
@@ -306,7 +316,7 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 
 **Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
-- Volumen: {data['VOLUMEN']}
+- Volumen del día anterior: {data['VOLUMEN']}
 - Soporte 1: {data['SOPORTE_1']}
 - Soporte 2: {data['SOPORTE_2']}
 - Soporte 3: {data['SOPORTE_3']}
@@ -329,7 +339,7 @@ Importante: si algún dato no está disponible, no lo menciones ni digas que fal
 <h2>Análisis Inicial y Recomendación</h2>
 <p>Comienzo el análisis de <strong>{data['NOMBRE_EMPRESA']}</strong> destacando mi recomendación principal: <strong>{data['RECOMENDACION']}</strong>.</p>
 
-<p>La empresa se encuentra en una situación clave. Cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,} €</strong>, mientras que el precio objetivo de compra lo situamos en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong>. El volumen negociado recientemente alcanza las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
+<p>La empresa se encuentra en una situación clave. Cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,} €</strong>, mientras que el precio objetivo de compra lo situamos en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong>. El volumen negociado del día anterior alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
 
 <p>Asignamos una <strong>nota de {data['NOTA_EMPRESA']}</strong>. A continuación, detallo una visión más completa de mi evaluación profesional, desarrollada en base a una combinación de indicadores técnicos y fundamentos económicos. [Aquí el modelo expandirá la recomendación en un desarrollo de mínimo 150 palabras, evitando repeticiones y usando párrafos de 2 a 4 líneas. Mencionará la nota como argumento de decisión].</p>
 
