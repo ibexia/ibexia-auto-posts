@@ -189,8 +189,7 @@ def obtener_datos_yfinance(ticker):
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
         current_price = round(info.get("currentPrice", 0), 2)
         
-        # --- MODIFICACIÓN AQUÍ: Obtener el volumen del último día completo del historial ---
-        # Aseguramos que hist no esté vacío antes de intentar acceder a iloc[-1]
+        # --- MODIFICACIÓN: Obtener el volumen del último día completo del historial ---
         current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0 
         # --- FIN MODIFICACIÓN ---
 
@@ -264,7 +263,7 @@ def obtener_datos_yfinance(ticker):
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
-            "VOLUMEN": current_volume, # Ahora se usa el volumen del último día histórico
+            "VOLUMEN": current_volume, 
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
@@ -302,6 +301,29 @@ def formatear_numero(valor):
 def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€) {data['TICKER']}"
 
+    # Pre-procesamiento de soportes para agruparlos si son muy cercanos
+    soportes_unicos = []
+    temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
+    
+    if len(temp_soportes) > 0 and temp_soportes[0] > 0:
+        soportes_unicos.append(temp_soportes[0])
+        for i in range(1, len(temp_soportes)):
+            if temp_soportes[i] > 0 and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005: # Tolerancia del 0.5%
+                soportes_unicos.append(temp_soportes[i])
+    
+    # Construcción del texto de soportes
+    soportes_texto = ""
+    if len(soportes_unicos) == 1:
+        soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,} €</strong>."
+    elif len(soportes_unicos) == 2:
+        soportes_texto = f"dos soportes importantes en <strong>{soportes_unicos[0]:,} €</strong> y <strong>{soportes_unicos[1]:,} €</strong>."
+    elif len(soportes_unicos) >= 3:
+        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{soportes_unicos[0]:,} €</strong>, "
+                          f"el segundo en <strong>{soportes_unicos[1]:,} €</strong>, y el tercero en <strong>{soportes_unicos[2]:,} €</strong>.")
+    else:
+        soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
+
+
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
 
@@ -311,7 +333,7 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 
 **Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
-- Volumen: {data['VOLUMEN']}
+- Volumen del último día completo: {data['VOLUMEN']}
 - Soporte 1: {data['SOPORTE_1']}
 - Soporte 2: {data['SOPORTE_2']}
 - Soporte 3: {data['SOPORTE_3']}
@@ -326,7 +348,7 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 - Comparativa sectorial: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 
-Importante: si algún dato no está disponible, no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
+Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
 
 ---
 <h1>{titulo_post}</h1>
@@ -334,18 +356,16 @@ Importante: si algún dato no está disponible, no lo menciones ni digas que fal
 <h2>Análisis Inicial y Recomendación</h2>
 <p>Comienzo el análisis de <strong>{data['NOMBRE_EMPRESA']}</strong> destacando mi recomendación principal: <strong>{data['RECOMENDACION']}</strong>.</p>
 
-<p>La empresa se encuentra en una situación clave. Cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,} €</strong>, mientras que el precio objetivo de compra lo situamos en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong>. El volumen negociado recientemente alcanza las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
+<p>La empresa se encuentra en una situación clave. Cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,} €</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong>. Si el precio actual es superior al precio objetivo de compra, explica que este último representa el nivel más atractivo para una entrada conservadora, y que el precio actual, aunque por encima, aún puede presentar una oportunidad si se evalúa el riesgo/recompensa. Si es inferior, recalca la oportunidad de compra al estar por debajo del objetivo. El volumen negociado recientemente alcanza las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
 
-<p>Asignamos una <strong>nota de {data['NOTA_EMPRESA']}</strong>. A continuación, detallo una visión más completa de mi evaluación profesional, desarrollada en base a una combinación de indicadores técnicos y fundamentos económicos. [Aquí el modelo expandirá la recomendación en un desarrollo de mínimo 150 palabras, evitando repeticiones y usando párrafos de 2 a 4 líneas. Mencionará la nota como argumento de decisión].</p>
+<p>Asignamos una <strong>nota de {data['NOTA_EMPRESA']}</strong>. Esta puntuación refleja [explica concisamente qué significa esa puntuación en términos de riesgo, potencial de crecimiento, y la solidez general de la compañía, conectándola directamente con la recomendación final. Por ejemplo, una nota alta podría indicar 'solidez y gran potencial', mientras que una nota media podría sugerir 'estabilidad con margen de mejora y un perfil de riesgo equilibrado']. A continuación, detallo una visión más completa de mi evaluación profesional, desarrollada en base a una combinación de indicadores técnicos y fundamentos económicos.</p>
 
 <h2>Análisis a Corto Plazo: Soportes y Resistencias</h2>
-<p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar tanto el comportamiento reciente del volumen como las zonas clave de soporte y resistencia.</p>
+<p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar el comportamiento reciente del volumen y las zonas clave de soporte y resistencia.</p>
 
-<p>El primer soporte se sitúa en <strong>{data['SOPORTE_1']:,} €</strong>, lo que representa una distancia del <strong>{((float(data['PRECIO_ACTUAL']) - float(data['SOPORTE_1'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> respecto al precio actual. El segundo soporte está en <strong>{data['SOPORTE_2']:,} €</strong> (<strong>{((float(data['PRECIO_ACTUAL']) - float(data['SOPORTE_2'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> de distancia), y el tercero en <strong>{data['SOPORTE_3']:,} €</strong>, con un margen del <strong>{((float(data['PRECIO_ACTUAL']) - float(data['SOPORTE_3'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong>.</p>
+<p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión, y su cercanía o lejanía tiene implicaciones operativas claras.</p>
 
-<p>La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión, y su cercanía o lejanía tiene implicaciones operativas claras.</p>
-
-<p>[Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. Puede incluir una observación del volumen como confirmación de la fortaleza de soportes o resistencias, y vincularlo a la nota de la empresa si tiene impacto en este horizonte temporal].</p>
+<p>Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [compara el volumen actual con el volumen promedio reciente (si está disponible implícitamente en los datos que procesa el modelo) o con el volumen histórico en puntos de inflexión. Comenta si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes y resistencias]. Estos niveles técnicos y el patrón de volumen, junto con la nota de <strong>{data['NOTA_EMPRESA']}</strong>, nos proporcionan una guía para la operativa a corto plazo. [Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. Puede incluir una observación del volumen como confirmación de la fortaleza de soportes o resistencias, y vincularlo a la nota de la empresa si tiene impacto en este horizonte temporal].</p>
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 <p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas.</p>
@@ -353,7 +373,7 @@ Importante: si algún dato no está disponible, no lo menciones ni digas que fal
 <p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. 
 En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
 
-<p>Desde el punto de vista estratégico, la empresa ha comunicado <strong>{data['EXPANSION_PLANES']}</strong> y ha establecido <strong>{data['ACUERDOS']}</strong>, lo cual puede fortalecer su presencia en nuevos mercados o consolidar su liderazgo en los actuales.</p>
+<p>[Si 'EXPANSION_PLANES' o 'ACUERDOS' contienen texto relevante y no genérico, sintetízalo y comenta su posible impacto estratégico. Si la información es demasiado breve o indica 'no disponible/no traducible', elabora sobre la importancia general de tales estrategias para el sector de la empresa o para la empresa en sí, sin inventar detalles específicos]. La nota de <strong>{data['NOTA_EMPRESA']}</strong>, considerando este conjunto de indicadores, sugiere [integra estas cifras con una interpretación crítica, considerando la nota como indicador de solvencia y potencial].</p>
 
 <p>[Aquí el modelo debe elaborar una proyección fundamentada (mínimo 150 palabras) con párrafos de máximo 3 líneas. Debe integrar estas cifras con una interpretación crítica, considerando la nota como indicador de solvencia y potencial].</p>
 
@@ -370,7 +390,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 def enviar_email(texto_generado, asunto_email):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt"  # Considera usar variables de entorno para la contraseña
+    password = "kdgz lvdo wqvt vfkt"  # ¡RECORDATORIO! Considera usar variables de entorno para la contraseña por seguridad
 
     msg = MIMEMultipart()
     msg['From'] = remitente
