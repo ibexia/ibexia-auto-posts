@@ -10,8 +10,8 @@ import google.generativeai as genai
 from datetime import datetime
 import pandas as pd
 import numpy as np
-import time # Importar time para los retrasos
-import re   # Importar re para parsing de errores
+import time
+import re
 
 def leer_google_sheets():
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
@@ -189,6 +189,11 @@ def obtener_datos_yfinance(ticker):
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
         current_price = round(info.get("currentPrice", 0), 2)
         
+        # --- MODIFICACIÓN AQUÍ: Obtener el volumen del último día completo del historial ---
+        # Aseguramos que hist no esté vacío antes de intentar acceder a iloc[-1]
+        current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0 
+        # --- FIN MODIFICACIÓN ---
+
         soportes = find_significant_supports(hist, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
         soporte_2 = soportes[1] if len(soportes) > 1 else 0
@@ -242,7 +247,7 @@ def obtener_datos_yfinance(ticker):
         if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
             expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
 
-        acuerdos_raw = info.get("agreements", "No disponibles") 
+        acuerdos_raw = info.get("agreements", "No disponibles")
         acuerdos_translated = traducir_texto_con_gemini(acuerdos_raw)
         if acuerdos_translated == "No disponibles" and acuerdos_raw != "No disponibles":
             acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
@@ -259,7 +264,7 @@ def obtener_datos_yfinance(ticker):
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
-            "VOLUMEN": info.get("volume", 0),
+            "VOLUMEN": current_volume, # Ahora se usa el volumen del último día histórico
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
@@ -365,7 +370,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 def enviar_email(texto_generado, asunto_email):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt" 
+    password = "kdgz lvdo wqvt vfkt"  # Considera usar variables de entorno para la contraseña
 
     msg = MIMEMultipart()
     msg['From'] = remitente
@@ -401,7 +406,7 @@ def generar_contenido_con_gemini(tickers):
         prompt, titulo_post = construir_prompt_formateado(data)
 
         max_retries = 3
-        initial_delay = 10 
+        initial_delay = 10  
         retries = 0
         delay = initial_delay
 
@@ -412,7 +417,7 @@ def generar_contenido_con_gemini(tickers):
                 print(response.text)
                 asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
                 enviar_email(response.text, asunto_email)
-                break 
+                break  
             except Exception as e:
                 if "429 You exceeded your current quota" in str(e):
                     try:
@@ -430,9 +435,9 @@ def generar_contenido_con_gemini(tickers):
                 else:
                     print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
                     break
-        else: 
+        else:  
             print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
-        
+            
         # --- PAUSA DE 1 MINUTO DESPUÉS DE CADA TICKER ---
         print(f"⏳ Esperando 60 segundos antes de procesar el siguiente ticker...")
         time.sleep(60) # Pausa de 60 segundos entre cada ticker
@@ -446,7 +451,7 @@ def main():
 
     day_of_week = datetime.today().weekday()
     
-    num_tickers_per_day = 10 # Se mantiene en 10 como solicitado
+    num_tickers_per_day = 10 
     total_tickers_in_sheet = len(all_tickers)
     
     start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
