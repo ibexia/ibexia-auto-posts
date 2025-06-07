@@ -190,7 +190,7 @@ def obtener_datos_yfinance(ticker):
         current_price = round(info.get("currentPrice", 0), 2)
         
         # --- MODIFICACIÓN: Obtener el volumen del último día completo del historial ---
-        current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0 
+        current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0  
         # --- FIN MODIFICACIÓN ---
 
         soportes = find_significant_supports(hist, current_price)
@@ -263,7 +263,7 @@ def obtener_datos_yfinance(ticker):
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
-            "VOLUMEN": current_volume, 
+            "VOLUMEN": current_volume,  
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
@@ -418,44 +418,49 @@ def generar_contenido_con_gemini(tickers):
 
     for ticker in tickers:
         print(f"\n📊 Procesando ticker: {ticker}")
-        data = obtener_datos_yfinance(ticker)
-        if not data:
-            continue
-        prompt, titulo_post = construir_prompt_formateado(data)
+        try: # <--- Bloque try añadido aquí
+            data = obtener_datos_yfinance(ticker)
+            if not data:
+                continue
+            prompt, titulo_post = construir_prompt_formateado(data)
 
-        max_retries = 3
-        initial_delay = 10  
-        retries = 0
-        delay = initial_delay
+            max_retries = 3
+            initial_delay = 10  
+            retries = 0
+            delay = initial_delay
 
-        while retries < max_retries:
-            try:
-                response = model.generate_content(prompt)
-                print(f"\n🧠 Contenido generado para {ticker}:\n")
-                print(response.text)
-                asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
-                enviar_email(response.text, asunto_email)
-                break  
-            except Exception as e:
-                if "429 You exceeded your current quota" in str(e):
-                    try:
-                        match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
-                        if match:
-                            server_delay = int(match.group(1))
-                            delay = max(delay, server_delay + 1)
-                    except:
-                        pass
-                    
-                    print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
-                    time.sleep(delay)
-                    retries += 1
-                    delay *= 2
-                else:
-                    print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
-                    break
-        else:  
-            print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
-            
+            while retries < max_retries:
+                try:
+                    response = model.generate_content(prompt)
+                    print(f"\n🧠 Contenido generado para {ticker}:\n")
+                    print(response.text)
+                    asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
+                    enviar_email(response.text, asunto_email)
+                    break  
+                except Exception as e:
+                    if "429 You exceeded your current quota" in str(e):
+                        try:
+                            match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
+                            if match:
+                                server_delay = int(match.group(1))
+                                delay = max(delay, server_delay + 1)
+                        except:
+                            pass
+                        
+                        print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
+                        time.sleep(delay)
+                        retries += 1
+                        delay *= 2
+                    else:
+                        print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
+                        break
+            else:  
+                print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
+                
+        except Exception as e: # <--- Bloque except para el ticker individual
+            print(f"❌ Error crítico al procesar el ticker {ticker}: {e}. Saltando a la siguiente empresa.")
+            continue # <--- Continúa con el siguiente ticker
+
         # --- PAUSA DE 1 MINUTO DESPUÉS DE CADA TICKER ---
         print(f"⏳ Esperando 60 segundos antes de procesar el siguiente ticker...")
         time.sleep(60) # Pausa de 60 segundos entre cada ticker
@@ -469,7 +474,7 @@ def main():
 
     day_of_week = datetime.today().weekday()
     
-    num_tickers_per_day = 10 
+    num_tickers_per_day = 10  
     total_tickers_in_sheet = len(all_tickers)
     
     start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
