@@ -31,7 +31,6 @@ def leer_google_sheets():
     range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
 
     service = build('sheets', 'v4', credentials=creds)
-    # CORRECTED LINE: Use service.spreadsheets().values()
     sheet = service.spreadsheets().values() 
     result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
@@ -191,6 +190,7 @@ def obtener_datos_yfinance(ticker):
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
         smi_anterior = round(hist['SMI_signal'].dropna().iloc[-2], 2) # SMI del día anterior
         
+        # Original smi_tendencia logic (will be overwritten for extreme cases)
         smi_tendencia = "subiendo" if smi_actual > smi_anterior else "bajando" if smi_actual < smi_anterior else "estable"
 
         current_price = round(info.get("currentPrice", 0), 2)
@@ -210,49 +210,57 @@ def obtener_datos_yfinance(ticker):
         # --- LÓGICA DE RECOMENDACIÓN CORREGIDA ---
         if nota_empresa <= 2: # SMI muy alto (sobrecompra fuerte: SMI entre 60 y 100)
             condicion_rsi = "muy sobrecomprado"
-            if smi_tendencia == "subiendo":
+            smi_tendencia = "mostrando un agotamiento alcista." # Custom for extreme overbought
+            if smi_actual > smi_anterior:
                 recomendacion = "Sobrecompra extrema. Riesgo inminente de corrección, considerar ventas."
             else: # smi_tendencia == "bajando" o "estable"
                 recomendacion = "Vender / Tomar ganancias. El impulso indica una corrección en curso."
         elif 2 < nota_empresa <= 4: # SMI alto (sobrecompra moderada: SMI entre 30 y 60)
             condicion_rsi = "algo sobrecomprado"
-            if smi_tendencia == "subiendo":
+            smi_tendencia = "con un impulso alcista que podría estar agotándose." # Custom for moderate overbought
+            if smi_actual > smi_anterior:
                 recomendacion = "Atentos a posible sobrecompra. El impulso alcista se está agotando."
             else: # smi_tendencia == "bajando" o "estable"
                 recomendacion = "Vigilar posible venta. El impulso muestra una disminución."
         elif 4 < nota_empresa <= 5: # SMI ligeramente sobrecomprado / entrando en zona neutra (SMI entre 10 y 30)
             condicion_rsi = "muy poca sobrecompra"
-            if smi_tendencia == "subiendo":
+            smi_tendencia = "manteniendo un impulso alcista sólido." # Custom
+            if smi_actual > smi_anterior:
                 recomendacion = "Impulso alcista fuerte. Cuidado con niveles de resistencia."
             else: # smi_tendencia == "bajando" o "estable"
                 recomendacion = "Tendencia de enfriamiento. Cuidado. Revisar soportes y resistencias."
         elif 5 < nota_empresa < 6: # Zona neutra (SMI entre -10 y 10)
             condicion_rsi = "neutral"
-            if smi_tendencia == "subiendo":
+            smi_tendencia = "en una fase de equilibrio." # Custom
+            if smi_actual > smi_anterior:
                 recomendacion = "Mantener (Neutro). El precio gana impulso."
             else: # smi_tendencia == "bajando" o "estable"
                 recomendacion = "Mantener (Neutro). El precio busca equilibrio."
         elif 6 <= nota_empresa < 7: # SMI ligeramente sobrevendido / entrando en zona neutra (SMI entre -30 y -10)
             condicion_rsi = "muy poca sobreventa"
-            if smi_tendencia == "subiendo":
+            smi_tendencia = "mostrando señales de recuperación." # Custom
+            if smi_actual > smi_anterior:
                 recomendacion = "Señal de recuperación. Posible compra con confirmación."
             else: # smi_tendencia == "bajando" o "estable"
                 recomendacion = "El impulso bajista persiste. Considerar cautela."
         elif 7 <= nota_empresa < 8: # SMI bajo (sobreventa moderada: SMI entre -60 y -30)
             condicion_rsi = "algo de sobreventa"
-            if smi_tendencia == "subiendo":
+            smi_tendencia = "en una zona de sobreventa moderada, buscando un rebote." # Custom for moderate oversold
+            if smi_actual > smi_anterior:
                 recomendacion = "Considerar posible compra. El impulso muestra un giro al alza."
             else: # smi_tendencia == "bajando" o "estable"
                 recomendacion = "Sobreventa moderada. Evaluar fortaleza de soportes, el precio podría caer más."
         elif 8 <= nota_empresa < 9: # SMI muy bajo (sobreventa fuerte: SMI entre -100 y -60)
             condicion_rsi = "sobreventa"
-            if smi_tendencia == "subiendo":
+            smi_tendencia = "en una zona de sobreventa fuerte, con potencial de reversión." # Custom for strong oversold
+            if smi_actual > smi_anterior:
                 recomendacion = "Se acerca la hora de comprar. Fuerte señal de rebote."
             else: # smi_tendencia == "bajando" o "estable"
                 recomendacion = "Sobreventa significativa. Esperar confirmación de rebote antes de comprar."
         elif nota_empresa >= 9: # SMI extremadamente bajo (sobreventa extrema: SMI muy por debajo de -60)
             condicion_rsi = "extremadamente sobrevendido"
-            if smi_tendencia == "subiendo":
+            smi_tendencia = "en una sobreventa extrema, lo que sugiere un rebote inminente." # Custom for extreme oversold
+            if smi_actual > smi_anterior:
                 recomendacion = "Comprar. Excelente señal de reversión alcista."
             else: # smi_tendencia == "bajando" o "estable"
                 recomendacion = "Sobreventa extrema. El precio podría seguir cayendo a corto plazo, esperar confirmación de suelo."
@@ -261,9 +269,9 @@ def obtener_datos_yfinance(ticker):
         base_precio_obj = soporte_1 if soporte_1 > 0 else current_price * 0.95
 
         # Ajuste del precio objetivo de compra basado en la nota y la tendencia del SMI
-        if nota_empresa >= 7 and smi_tendencia == "subiendo": # Cuando está sobrevendido Y el SMI sube -> buena señal para comprar
+        if nota_empresa >= 7 and smi_actual > smi_anterior: # Cuando está sobrevendido Y el SMI sube -> buena señal para comprar
             precio_objetivo_compra = base_precio_obj
-        elif nota_empresa >= 7 and smi_tendencia == "bajando": # Cuando está sobrevendido PERO el SMI sigue bajando -> más cautela
+        elif nota_empresa >= 7 and smi_actual < smi_anterior: # Cuando está sobrevendido PERO el SMI sigue bajando -> más cautela
             precio_objetivo_compra = base_precio_obj * 0.98 # Un 2% más abajo
         else: # Para notas más bajas, ajustamos el porcentaje de caída desde la base
             drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
@@ -273,51 +281,32 @@ def obtener_datos_yfinance(ticker):
         
         ### --- INICIO DE LA MODIFICACIÓN PARA CÁLCULO DE DÍAS (SMI NO REVELADO) ---
         dias_para_accion_str = "No estimado"
-        # Usamos SMI_signal para el cálculo interno, pero la salida al prompt no lo nombrará
         smi_diff = hist['SMI_signal'].dropna().diff().iloc[-1] if len(hist['SMI_signal'].dropna()) > 1 else 0
-
-        # Definimos umbrales de "zona de acción" para el SMI de forma genérica
-        # Estos son los niveles que el SMI_signal debería alcanzar para una acción clara
+        
         target_smi_venta_zona = 60 
         target_smi_compra_zona = -60
-        
-        # Umbral para considerar que ya está "en zona"
-        zona_umbral = 5 
+        zona_umbral = 5 # Margen para considerar que ya está "en zona"
 
-        if smi_tendencia == "subiendo":
-            if smi_actual >= target_smi_venta_zona - zona_umbral: # Ya está cerca o en la zona de venta
-                dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobrecompra extrema**, indicando que la presión alcista podría estar agotándose."
-            elif smi_diff > 0.01: # El SMI sube y se acerca a sobrecompra, pero no está en la zona todavía
-                diferencia_a_target = target_smi_venta_zona - smi_actual
-                if diferencia_a_target > 0:
-                    dias_calculados = int(diferencia_a_target / smi_diff)
-                    if dias_calculados <= 1:
-                        dias_para_accion_str = "el precio está consolidando una tendencia alcista y podría estar próximo a un punto de inflexión."
-                    else:
-                        dias_para_accion_str = f"aproximadamente {dias_calculados} días para una potencial zona de toma de beneficios o venta."
-                else: # smi_actual ya pasó el target_smi_venta_zona
-                    dias_para_accion_str = "la empresa ya se encuentra en una **zona de sobrecompra prolongada**, sugiriendo precaución."
-            else: # SMI subiendo pero sin un momentum claro (smi_diff bajo o cero)
-                dias_para_accion_str = "el impulso alcista es constante pero sin una señal clara de cuándo podría alcanzar una zona de acción inminente."
-
-        elif smi_tendencia == "bajando":
-            if smi_actual <= target_smi_compra_zona + zona_umbral: # Ya está cerca o en la zona de compra
-                dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobreventa extrema**, indicando que la presión bajista podría estar agotándose."
-            elif smi_diff < -0.01: # El SMI baja y se acerca a sobreventa, pero no está en la zona todavía
-                diferencia_a_target = smi_actual - target_smi_compra_zona
-                if diferencia_a_target > 0:
-                    dias_calculados = int(diferencia_a_target / abs(smi_diff))
-                    if dias_calculados <= 1:
-                        dias_para_accion_str = "el precio está consolidando una tendencia bajista y podría estar próximo a un punto de inflexión."
-                    else:
-                        dias_para_accion_str = f"aproximadamente {dias_calculados} días para una potencial zona de entrada o compra."
-                else: # smi_actual ya pasó el target_smi_compra_zona
-                    dias_para_accion_str = "la empresa ya se encuentra en una **zona de sobreventa prolongada**, sugiriendo una oportunidad de compra si hay reversión."
-            else: # SMI bajando pero sin un momentum claro (smi_diff bajo o cero)
-                dias_para_accion_str = "el impulso bajista es constante pero sin una señal clara de cuándo podría alcanzar una zona de acción inminente."
-        else: # smi_tendencia == "estable"
-            dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo."
-        
+        if smi_actual >= target_smi_venta_zona - zona_umbral and smi_actual > 0: # Cerca o en sobrecompra
+            dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobrecompra extrema**, indicando que la presión alcista podría estar agotándose y se anticipa una posible corrección o consolidación."
+        elif smi_actual <= target_smi_compra_zona + zona_umbral and smi_actual < 0: # Cerca o en sobreventa
+            dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobreventa extrema**, lo que sugiere que el precio podría estar cerca de un punto de inflexión al alza o un rebote técnico."
+        elif smi_tendencia == "subiendo" and smi_actual < target_smi_venta_zona and smi_diff > 0.01: 
+            diferencia_a_target = target_smi_venta_zona - smi_actual
+            dias_calculados = int(diferencia_a_target / smi_diff) if smi_diff != 0 else 0
+            if dias_calculados >= 2: # Evitar "0 días" o "1 día" literales
+                dias_para_accion_str = f"continuando su impulso alcista, podríamos estar aproximándonos a una potencial zona de toma de beneficios o venta en aproximadamente **{dias_calculados} días**."
+            else:
+                dias_para_accion_str = "el precio está consolidando una tendencia alcista y podría estar próximo a un punto de inflexión para una potencial toma de beneficios o venta."
+        elif smi_tendencia == "bajando" and smi_actual > target_smi_compra_zona and smi_diff < -0.01:
+            diferencia_a_target = smi_actual - target_smi_compra_zona
+            dias_calculados = int(diferencia_a_target / abs(smi_diff)) if smi_diff != 0 else 0
+            if dias_calculados >= 2: # Evitar "0 días" o "1 día" literales
+                dias_para_accion_str = f"continuando su impulso bajista, se estima una potencial zona de entrada o compra en aproximadamente **{dias_calculados} días**."
+            else:
+                dias_para_accion_str = "el precio está consolidando una tendencia bajista y podría estar próximo a un punto de inflexión para una potencial entrada o compra."
+        elif smi_tendencia == "estable" or abs(smi_diff) < 0.01:
+             dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
         ### --- FIN DE LA MODIFICACIÓN PARA CÁLCULO DE DÍAS ---
 
         # --- Aplicar traducción a los campos relevantes aquí ---
@@ -364,7 +353,7 @@ def obtener_datos_yfinance(ticker):
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
-            "SMI_TENDENCIA": smi_tendencia, # Se mantiene para el cálculo, pero no se menciona directamente en el prompt
+            "SMI_TENDENCIA": smi_tendencia, # Se mantiene para el cálculo, pero ahora es más descriptiva
             "DIAS_PARA_ACCION": dias_para_accion_str 
         }
     except Exception as e:
@@ -405,9 +394,6 @@ def construir_prompt_formateado(data):
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
 
-    ### --- INICIO DE LA MODIFICACIÓN DEL PROMPT (AJUSTE Y CORRECCIÓN DE SINTAXIS) ---
-    # Se ha ajustado la forma en que se presenta 'DIAS_PARA_ACCION' en el prompt
-    # para permitir a Gemini más flexibilidad en la redacción.
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
 
@@ -431,7 +417,7 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 - Sentimiento del mercado: {data['SENTIMIENTO_ANALISTAS']}, {data['TENDENCIA_SOCIAL']}
 - Comparativa sectorial: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
-- Mi pronóstico de la tendencia de impulso actual de la empresa es: {data['SMI_TENDENCIA']}.
+- La tendencia de impulso actual de la empresa se caracteriza por: {data['SMI_TENDENCIA']}.
 - Mi estimación para una potencial zona de acción significativa (compra o venta) indica que: {data['DIAS_PARA_ACCION']}.
 
 Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista.
@@ -451,7 +437,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión, y su cercanía o lejanía tiene implicaciones operativas claras.</p>
 
-<p>Un aspecto crucial en el análisis de corto plazo es la dinámica de impulso de la empresa. Mi evaluación profesional indica que la tendencia actual es <strong>{data['SMI_TENDENCIA']}</strong>. {data['DIAS_PARA_ACCION']} Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [compara el volumen actual con el volumen promedio reciente (si está disponible implícitamente en los datos que procesa el modelo) o con el volumen histórico en puntos de inflexión. Comenta si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes y resistencias]. Estos niveles técnicos y el patrón de volumen, junto con la nota técnica de <strong>{data['NOTA_EMPRESA']} sobre 10</strong>, nos proporcionan una guía para la operativa a corto plazo. [Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. La nota técnica debe ser un factor clave aquí].</p>
+<p>Un aspecto crucial en el análisis de corto plazo es la dinámica de impulso de la empresa. Mi evaluación profesional indica que la tendencia actual se caracteriza por: <strong>{data['SMI_TENDENCIA']}</strong>. En este contexto, {data['DIAS_PARA_ACCION']} Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [compara el volumen actual con el volumen promedio reciente (si está disponible implícitamente en los datos que procesa el modelo) o con el volumen histórico en puntos de inflexión. Comenta si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes y resistencias]. Estos niveles técnicos y el patrón de volumen, junto con la nota técnica de <strong>{data['NOTA_EMPRESA']} sobre 10</strong>, nos proporcionan una guía para la operativa a corto plazo. [Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. La nota técnica debe ser un factor clave aquí].</p>
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 <p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas. Para esta sección, la **nota técnica ({data['NOTA_EMPRESA']} sobre 10) NO debe influir en la valoración**. El análisis debe basarse **exclusivamente en los datos financieros y estratégicos** proporcionados y en una evaluación crítica de su solidez y potencial.</p>
@@ -467,7 +453,6 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 <p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa. No constituye una recomendación de inversión. Se recomienda analizar cada decisión de forma individual, teniendo en cuenta el perfil de riesgo y los objetivos financieros personales.</p>
 
 """
-    ### --- FIN DE LA MODIFICACIÓN DEL PROMPT (AJUSTE Y CORRECCIÓN DE SINTAXIS) ---
 
     return prompt, titulo_post
 
