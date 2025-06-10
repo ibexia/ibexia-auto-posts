@@ -31,7 +31,6 @@ def leer_google_sheets():
     range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
 
     service = build('sheets', 'v4', credentials=creds)
-    # CORRECCIÓN: Usar service.spreadsheets() en lugar de service.sheets()
     sheet = service.spreadsheets()
     result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
@@ -199,15 +198,25 @@ def obtener_datos_yfinance(ticker):
 
         current_price = round(info.get("currentPrice", 0), 2)
         
-        # --- MODIFICACIÓN CLAVE PARA EL VOLUMEN ---
-        # Filtra las filas que no sean del día actual para asegurar que cogemos el día ANTERIOR COMPLETO
-        # Convertir el índice a datetime para comparar solo la fecha
-        hist_filtered = hist[hist.index.date < datetime.now().date()]
+        # --- MODIFICACIÓN CLAVE: Obtener el volumen del último día COMPLETO del historial ---
+        today_date = datetime.now().date()
+        
+        # Asegúrate de que el índice de hist sea de tipo datetime
+        hist.index = pd.to_datetime(hist.index)
+        
+        # Filtra las filas cuya fecha sea estrictamente anterior a la fecha actual
+        hist_filtered_for_volume = hist[hist.index.date < today_date]
+        
         current_volume = 0
-        if not hist_filtered.empty:
-            current_volume = hist_filtered['Volume'].iloc[-1]
-        else: # Si no hay días anteriores al actual, intenta con el último disponible
-            current_volume = hist['Volume'].iloc[-1]
+        if not hist_filtered_for_volume.empty:
+            # Si hay datos para días anteriores, toma el volumen del último de esos días
+            current_volume = hist_filtered_for_volume['Volume'].iloc[-1]
+        elif not hist.empty:
+            # Fallback si no se encuentra un día anterior completo.
+            # Esto puede ocurrir si el script se ejecuta en un día sin actividad en días anteriores recientes,
+            # pero el objetivo principal es el volumen a cierre del día anterior.
+            print(f"Advertencia: No se encontró volumen de un día anterior completo para {ticker}. Usando el último volumen disponible.")
+            current_volume = hist['Volume'].iloc[-1] 
         # --- FIN MODIFICACIÓN CLAVE ---
 
         soportes = find_significant_supports(hist, current_price)
