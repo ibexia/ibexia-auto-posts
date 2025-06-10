@@ -196,8 +196,9 @@ def obtener_datos_yfinance(ticker):
 
         current_price = round(info.get("currentPrice", 0), 2)
         
-        # Se mantiene el cálculo del volumen del código original
-        current_volume = info.get("volume", 0) 
+        # --- MODIFICACIÓN CLAVE: Obtener el volumen del último día COMPLETO del historial ---
+        current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0 
+        # --- FIN MODIFICACIÓN CLAVE ---
 
         soportes = find_significant_supports(hist, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
@@ -349,8 +350,8 @@ def obtener_datos_yfinance(ticker):
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
-            "SMI_TENDENCIA": smi_tendencia, # Nuevo campo para la tendencia del SMI
-            "DIAS_PARA_ACCION": dias_para_accion_str # Nuevo campo para el mensaje de días para la acción
+            "SMI_TENDENCIA": smi_tendencia, 
+            "DIAS_PARA_ACCION": dias_para_accion_str 
         }
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}")
