@@ -7,7 +7,7 @@ from email.mime.multipart import MIMEMultipart
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import google.generativeai as genai
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 import time
@@ -31,7 +31,7 @@ def leer_google_sheets():
     range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
 
     service = build('sheets', 'v4', credentials=creds)
-    sheet = service.spreadsheets()
+    sheet = service.sheets()
     result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
@@ -174,7 +174,9 @@ def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
     
-    hist = stock.history(period="90d", interval="1d") # Aumentado a 90 días para un SMI más estable
+    # Se asegura de obtener suficiente historial para tener datos del día anterior.
+    # Periodo más largo para cubrir fines de semana o festivos.
+    hist = stock.history(period="10d", interval="1d") 
 
     if hist.empty:
         print(f"❌ No se pudieron obtener datos históricos para {ticker}")
@@ -196,8 +198,15 @@ def obtener_datos_yfinance(ticker):
 
         current_price = round(info.get("currentPrice", 0), 2)
         
-        # --- MODIFICACIÓN CLAVE: Obtener el volumen del último día COMPLETO del historial ---
-        current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0 
+        # --- MODIFICACIÓN CLAVE PARA EL VOLUMEN ---
+        # Filtra las filas que no sean del día actual para asegurar que cogemos el día ANTERIOR COMPLETO
+        # Convertir el índice a datetime para comparar solo la fecha
+        hist_filtered = hist[hist.index.date < datetime.now().date()]
+        current_volume = 0
+        if not hist_filtered.empty:
+            current_volume = hist_filtered['Volume'].iloc[-1]
+        else: # Si no hay días anteriores al actual, intenta con el último disponible
+            current_volume = hist['Volume'].iloc[-1]
         # --- FIN MODIFICACIÓN CLAVE ---
 
         soportes = find_significant_supports(hist, current_price)
