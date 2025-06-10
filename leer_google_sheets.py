@@ -31,7 +31,7 @@ def leer_google_sheets():
     range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
 
     service = build('sheets', 'v4', credentials=creds)
-    sheet = service.spreadsheets().values() 
+    sheet = service.spreadsheets().values()
     result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
@@ -174,7 +174,7 @@ def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
     
-    hist = stock.history(period="90d", interval="1d")  
+    hist = stock.history(period="90d", interval="1d")
 
     if hist.empty:
         print(f"❌ No se pudieron obtener datos históricos para {ticker}")
@@ -188,14 +188,16 @@ def obtener_datos_yfinance(ticker):
             return None
 
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
-        smi_anterior = round(hist['SMI_signal'].dropna().iloc[-2], 2) # SMI del día anterior
+        smi_anterior = round(hist['SMI_signal'].dropna().iloc[-2], 2)
         
         # Original smi_tendencia logic (will be overwritten for extreme cases)
         smi_tendencia = "subiendo" if smi_actual > smi_anterior else "bajando" if smi_actual < smi_anterior else "estable"
 
         current_price = round(info.get("currentPrice", 0), 2)
         
-        current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0  
+        # --- CORRECCIÓN AQUÍ: VOLVIENDO AL CÁLCULO DE VOLUMEN ORIGINAL ---
+        current_volume = info.get("volume", 0)
+        # ------------------------------------------------------------------
 
         soportes = find_significant_supports(hist, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
@@ -207,109 +209,107 @@ def obtener_datos_yfinance(ticker):
         recomendacion = "Indefinido"
         condicion_rsi = "desconocido" 
         
-        # --- LÓGICA DE RECOMENDACIÓN CORREGIDA ---
+        # --- LÓGICA DE RECOMENDACIÓN Y TENDENCIA DEL SMI MÁS MATIZADA ---
         if nota_empresa <= 2: # SMI muy alto (sobrecompra fuerte: SMI entre 60 y 100)
             condicion_rsi = "muy sobrecomprado"
-            smi_tendencia = "mostrando un agotamiento alcista." # Custom for extreme overbought
+            smi_tendencia = "mostrando un agotamiento alcista."
             if smi_actual > smi_anterior:
                 recomendacion = "Sobrecompra extrema. Riesgo inminente de corrección, considerar ventas."
-            else: # smi_tendencia == "bajando" o "estable"
+            else:
                 recomendacion = "Vender / Tomar ganancias. El impulso indica una corrección en curso."
         elif 2 < nota_empresa <= 4: # SMI alto (sobrecompra moderada: SMI entre 30 y 60)
             condicion_rsi = "algo sobrecomprado"
-            smi_tendencia = "con un impulso alcista que podría estar agotándose." # Custom for moderate overbought
+            smi_tendencia = "con un impulso alcista que podría estar agotándose."
             if smi_actual > smi_anterior:
                 recomendacion = "Atentos a posible sobrecompra. El impulso alcista se está agotando."
-            else: # smi_tendencia == "bajando" o "estable"
+            else:
                 recomendacion = "Vigilar posible venta. El impulso muestra una disminución."
         elif 4 < nota_empresa <= 5: # SMI ligeramente sobrecomprado / entrando en zona neutra (SMI entre 10 y 30)
             condicion_rsi = "muy poca sobrecompra"
-            smi_tendencia = "manteniendo un impulso alcista sólido." # Custom
+            smi_tendencia = "manteniendo un impulso alcista sólido."
             if smi_actual > smi_anterior:
                 recomendacion = "Impulso alcista fuerte. Cuidado con niveles de resistencia."
-            else: # smi_tendencia == "bajando" o "estable"
+            else:
                 recomendacion = "Tendencia de enfriamiento. Cuidado. Revisar soportes y resistencias."
         elif 5 < nota_empresa < 6: # Zona neutra (SMI entre -10 y 10)
             condicion_rsi = "neutral"
-            smi_tendencia = "en una fase de equilibrio." # Custom
+            smi_tendencia = "en una fase de equilibrio."
             if smi_actual > smi_anterior:
                 recomendacion = "Mantener (Neutro). El precio gana impulso."
-            else: # smi_tendencia == "bajando" o "estable"
+            else:
                 recomendacion = "Mantener (Neutro). El precio busca equilibrio."
         elif 6 <= nota_empresa < 7: # SMI ligeramente sobrevendido / entrando en zona neutra (SMI entre -30 y -10)
             condicion_rsi = "muy poca sobreventa"
-            smi_tendencia = "mostrando señales de recuperación." # Custom
+            smi_tendencia = "mostrando señales de recuperación."
             if smi_actual > smi_anterior:
                 recomendacion = "Señal de recuperación. Posible compra con confirmación."
-            else: # smi_tendencia == "bajando" o "estable"
+            else:
                 recomendacion = "El impulso bajista persiste. Considerar cautela."
         elif 7 <= nota_empresa < 8: # SMI bajo (sobreventa moderada: SMI entre -60 y -30)
             condicion_rsi = "algo de sobreventa"
-            smi_tendencia = "en una zona de sobreventa moderada, buscando un rebote." # Custom for moderate oversold
+            smi_tendencia = "en una zona de sobreventa moderada, buscando un rebote."
             if smi_actual > smi_anterior:
                 recomendacion = "Considerar posible compra. El impulso muestra un giro al alza."
-            else: # smi_tendencia == "bajando" o "estable"
+            else:
                 recomendacion = "Sobreventa moderada. Evaluar fortaleza de soportes, el precio podría caer más."
         elif 8 <= nota_empresa < 9: # SMI muy bajo (sobreventa fuerte: SMI entre -100 y -60)
             condicion_rsi = "sobreventa"
-            smi_tendencia = "en una zona de sobreventa fuerte, con potencial de reversión." # Custom for strong oversold
+            smi_tendencia = "en una zona de sobreventa fuerte, con potencial de reversión."
             if smi_actual > smi_anterior:
                 recomendacion = "Se acerca la hora de comprar. Fuerte señal de rebote."
-            else: # smi_tendencia == "bajando" o "estable"
+            else:
                 recomendacion = "Sobreventa significativa. Esperar confirmación de rebote antes de comprar."
         elif nota_empresa >= 9: # SMI extremadamente bajo (sobreventa extrema: SMI muy por debajo de -60)
             condicion_rsi = "extremadamente sobrevendido"
-            smi_tendencia = "en una sobreventa extrema, lo que sugiere un rebote inminente." # Custom for extreme oversold
+            smi_tendencia = "en una sobreventa extrema, lo que sugiere un rebote inminente."
             if smi_actual > smi_anterior:
                 recomendacion = "Comprar. Excelente señal de reversión alcista."
-            else: # smi_tendencia == "bajando" o "estable"
+            else:
                 recomendacion = "Sobreventa extrema. El precio podría seguir cayendo a corto plazo, esperar confirmación de suelo."
 
         precio_objetivo_compra = 0.0
         base_precio_obj = soporte_1 if soporte_1 > 0 else current_price * 0.95
 
-        # Ajuste del precio objetivo de compra basado en la nota y la tendencia del SMI
-        if nota_empresa >= 7 and smi_actual > smi_anterior: # Cuando está sobrevendido Y el SMI sube -> buena señal para comprar
+        if nota_empresa >= 7 and smi_actual > smi_anterior:
             precio_objetivo_compra = base_precio_obj
-        elif nota_empresa >= 7 and smi_actual < smi_anterior: # Cuando está sobrevendido PERO el SMI sigue bajando -> más cautela
-            precio_objetivo_compra = base_precio_obj * 0.98 # Un 2% más abajo
-        else: # Para notas más bajas, ajustamos el porcentaje de caída desde la base
+        elif nota_empresa >= 7 and smi_actual < smi_anterior:
+            precio_objetivo_compra = base_precio_obj * 0.98
+        else:
             drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
             precio_objetivo_compra = base_precio_obj * (1 - drop_percentage_from_base)
             
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
         
-        ### --- INICIO DE LA MODIFICACIÓN PARA CÁLCULO DE DÍAS (SMI NO REVELADO) ---
+        ### --- LÓGICA REFINADA PARA EL MENSAJE DE "DIAS PARA LA ACCION" ---
         dias_para_accion_str = "No estimado"
         smi_diff = hist['SMI_signal'].dropna().diff().iloc[-1] if len(hist['SMI_signal'].dropna()) > 1 else 0
         
-        target_smi_venta_zona = 60 
+        target_smi_venta_zona = 60
         target_smi_compra_zona = -60
-        zona_umbral = 5 # Margen para considerar que ya está "en zona"
+        zona_umbral = 5 
 
-        if smi_actual >= target_smi_venta_zona - zona_umbral and smi_actual > 0: # Cerca o en sobrecompra
+        if smi_actual >= target_smi_venta_zona - zona_umbral and smi_actual > 0:
             dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobrecompra extrema**, indicando que la presión alcista podría estar agotándose y se anticipa una posible corrección o consolidación."
-        elif smi_actual <= target_smi_compra_zona + zona_umbral and smi_actual < 0: # Cerca o en sobreventa
+        elif smi_actual <= target_smi_compra_zona + zona_umbral and smi_actual < 0:
             dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobreventa extrema**, lo que sugiere que el precio podría estar cerca de un punto de inflexión al alza o un rebote técnico."
-        elif smi_tendencia == "subiendo" and smi_actual < target_smi_venta_zona and smi_diff > 0.01: 
+        elif smi_actual > smi_anterior and smi_actual < target_smi_venta_zona and smi_diff > 0.01:
             diferencia_a_target = target_smi_venta_zona - smi_actual
             dias_calculados = int(diferencia_a_target / smi_diff) if smi_diff != 0 else 0
-            if dias_calculados >= 2: # Evitar "0 días" o "1 día" literales
+            if dias_calculados >= 2:
                 dias_para_accion_str = f"continuando su impulso alcista, podríamos estar aproximándonos a una potencial zona de toma de beneficios o venta en aproximadamente **{dias_calculados} días**."
             else:
                 dias_para_accion_str = "el precio está consolidando una tendencia alcista y podría estar próximo a un punto de inflexión para una potencial toma de beneficios o venta."
-        elif smi_tendencia == "bajando" and smi_actual > target_smi_compra_zona and smi_diff < -0.01:
+        elif smi_actual < smi_anterior and smi_actual > target_smi_compra_zona and smi_diff < -0.01:
             diferencia_a_target = smi_actual - target_smi_compra_zona
             dias_calculados = int(diferencia_a_target / abs(smi_diff)) if smi_diff != 0 else 0
-            if dias_calculados >= 2: # Evitar "0 días" o "1 día" literales
+            if dias_calculados >= 2:
                 dias_para_accion_str = f"continuando su impulso bajista, se estima una potencial zona de entrada o compra en aproximadamente **{dias_calculados} días**."
             else:
                 dias_para_accion_str = "el precio está consolidando una tendencia bajista y podría estar próximo a un punto de inflexión para una potencial entrada o compra."
-        elif smi_tendencia == "estable" or abs(smi_diff) < 0.01:
+        else:
              dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
-        ### --- FIN DE LA MODIFICACIÓN PARA CÁLCULO DE DÍAS ---
+        # --------------------------------------------------------------------------------
 
-        # --- Aplicar traducción a los campos relevantes aquí ---
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
         expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000])
         if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
@@ -325,9 +325,6 @@ def obtener_datos_yfinance(ticker):
         if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
              sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
         
-        # --- Fin de la traducción ---
-
-
         datos = {
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
@@ -337,9 +334,9 @@ def obtener_datos_yfinance(ticker):
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
             "RESISTENCIA": round(hist["High"].max(), 2),
-            "CONDICION_RSI": condicion_rsi, # Este dato no se usará directamente en el prompt
+            "CONDICION_RSI": condicion_rsi,
             "RECOMENDACION": recomendacion,
-            "SMI": smi_actual, # Este dato no se usará directamente en el prompt
+            "SMI": smi_actual,
             "NOTA_EMPRESA": nota_empresa,
             "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
             "INGRESOS": info.get("totalRevenue", "N/A"),
@@ -353,7 +350,7 @@ def obtener_datos_yfinance(ticker):
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
-            "SMI_TENDENCIA": smi_tendencia, # Se mantiene para el cálculo, pero ahora es más descriptiva
+            "SMI_TENDENCIA": smi_tendencia,
             "DIAS_PARA_ACCION": dias_para_accion_str 
         }
     except Exception as e:
@@ -372,17 +369,15 @@ def formatear_numero(valor):
 def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€) {data['TICKER']}"
 
-    # Pre-procesamiento de soportes para agruparlos si son muy cercanos
     soportes_unicos = []
     temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
     
     if len(temp_soportes) > 0 and temp_soportes[0] > 0:
         soportes_unicos.append(temp_soportes[0])
         for i in range(1, len(temp_soportes)):
-            if temp_soportes[i] > 0 and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005: # Tolerancia del 0.5%
+            if temp_soportes[i] > 0 and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
                 soportes_unicos.append(temp_soportes[i])
     
-    # Construcción del texto de soportes
     soportes_texto = ""
     if len(soportes_unicos) == 1:
         soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,} €</strong>."
