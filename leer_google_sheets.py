@@ -174,32 +174,54 @@ def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
     
-    hist = stock.history(period="90d", interval="1d")
+    # Se solicita el historial de los últimos 2 días para asegurarnos de tener el volumen de cierre del día anterior
+    hist = stock.history(period="2d", interval="1d")
 
-    if hist.empty:
-        print(f"❌ No se pudieron obtener datos históricos para {ticker}")
+    if hist.empty or len(hist) < 2:
+        print(f"❌ No se pudieron obtener datos históricos suficientes para {ticker} para calcular el volumen del día anterior.")
+        # Intenta obtener de un período más largo si 2d no es suficiente (ej. fines de semana o días festivos)
+        hist = stock.history(period="7d", interval="1d")
+        if hist.empty or len(hist) < 2:
+            print(f"❌ Aún no se pudieron obtener datos históricos suficientes para {ticker} tras reintento.")
+            return None
+
+    # Asegurarse de que el último día completo es el día anterior al actual
+    # Si hoy es lunes, querríamos el volumen del viernes.
+    # El .iloc[-2] nos da la fila del penúltimo día disponible (el día anterior si no estamos en un día bursátil o si es el cierre de hoy).
+    # Necesitamos asegurarnos de que sea el volumen de CIERRE del día anterior, no el de HOY.
+    # La columna 'Volume' de hist corresponde al volumen de ese día.
+    
+    # Para obtener el volumen del día anterior al último día disponible en hist:
+    if len(hist) >= 2:
+        current_volume = hist['Volume'].iloc[-2] # Volumen del día anterior al último dato disponible
+    else:
+        current_volume = 0 # No hay suficientes datos para obtener el volumen del día anterior
+
+
+    # Volvemos a obtener un historial más largo para el cálculo del SMI y soportes/resistencias
+    hist_long = stock.history(period="90d", interval="1d")
+    if hist_long.empty:
+        print(f"❌ No se pudieron obtener datos históricos largos para {ticker}")
         return None
 
     try:
-        hist = calculate_smi_tv(hist)
+        hist_long = calculate_smi_tv(hist_long)
         
-        if 'SMI_signal' not in hist.columns or hist['SMI_signal'].empty or len(hist['SMI_signal'].dropna()) < 2:
+        if 'SMI_signal' not in hist_long.columns or hist_long['SMI_signal'].empty or len(hist_long['SMI_signal'].dropna()) < 2:
             print(f"❌ SMI_signal no disponible o insuficiente para {ticker}")
             return None
 
-        smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
-        smi_anterior = round(hist['SMI_signal'].dropna().iloc[-2], 2)
+        smi_actual = round(hist_long['SMI_signal'].dropna().iloc[-1], 2)
+        smi_anterior = round(hist_long['SMI_signal'].dropna().iloc[-2], 2)
         
-        # Original smi_tendencia logic (will be overwritten for extreme cases)
         smi_tendencia = "subiendo" if smi_actual > smi_anterior else "bajando" if smi_actual < smi_anterior else "estable"
 
         current_price = round(info.get("currentPrice", 0), 2)
         
-        # --- CORRECCIÓN AQUÍ: VOLVIENDO AL CÁLCULO DE VOLUMEN ORIGINAL ---
-        current_volume = info.get("volume", 0)
-        # ------------------------------------------------------------------
+        # El current_volume ya se ha obtenido anteriormente del día anterior
+        # current_volume = current_volume # Ya está asignado correctamente
 
-        soportes = find_significant_supports(hist, current_price)
+        soportes = find_significant_supports(hist_long, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
         soporte_2 = soportes[1] if len(soportes) > 1 else 0
         soporte_3 = soportes[2] if len(soportes) > 2 else 0
@@ -207,9 +229,8 @@ def obtener_datos_yfinance(ticker):
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
         recomendacion = "Indefinido"
-        condicion_rsi = "desconocido" 
+        condicion_rsi = "desconocido"  
         
-        # --- LÓGICA DE RECOMENDACIÓN Y TENDENCIA DEL SMI MÁS MATIZADA ---
         if nota_empresa <= 2: # SMI muy alto (sobrecompra fuerte: SMI entre 60 y 100)
             condicion_rsi = "muy sobrecomprado"
             smi_tendencia = "mostrando un agotamiento alcista."
@@ -282,11 +303,11 @@ def obtener_datos_yfinance(ticker):
         
         ### --- LÓGICA REFINADA PARA EL MENSAJE DE "DIAS PARA LA ACCION" ---
         dias_para_accion_str = "No estimado"
-        smi_diff = hist['SMI_signal'].dropna().diff().iloc[-1] if len(hist['SMI_signal'].dropna()) > 1 else 0
+        smi_diff = hist_long['SMI_signal'].dropna().diff().iloc[-1] if len(hist_long['SMI_signal'].dropna()) > 1 else 0
         
         target_smi_venta_zona = 60
         target_smi_compra_zona = -60
-        zona_umbral = 5 
+        zona_umbral = 5  
 
         if smi_actual >= target_smi_venta_zona - zona_umbral and smi_actual > 0:
             dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobrecompra extrema**, indicando que la presión alcista podría estar agotándose y se anticipa una posible corrección o consolidación."
@@ -333,7 +354,7 @@ def obtener_datos_yfinance(ticker):
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
-            "RESISTENCIA": round(hist["High"].max(), 2),
+            "RESISTENCIA": round(hist_long["High"].max(), 2),
             "CONDICION_RSI": condicion_rsi,
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
@@ -455,7 +476,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 def enviar_email(texto_generado, asunto_email):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt" 
+    password = "kdgz lvdo wqvt vfkt"  
 
     msg = MIMEMultipart()
     msg['From'] = remitente
@@ -485,7 +506,7 @@ def generar_contenido_con_gemini(tickers):
 
     for ticker in tickers:
         print(f"\n📊 Procesando ticker: {ticker}")
-        try: 
+        try:  
             data = obtener_datos_yfinance(ticker)
             if not data:
                 continue
@@ -524,12 +545,12 @@ def generar_contenido_con_gemini(tickers):
             else:  
                 print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
                 
-        except Exception as e: 
+        except Exception as e:  
             print(f"❌ Error crítico al procesar el ticker {ticker}: {e}. Saltando a la siguiente empresa.")
-            continue 
+            continue  
 
         print(f"⏳ Esperando 60 segundos antes de procesar el siguiente ticker...")
-        time.sleep(60) 
+        time.sleep(60)  
 
 def main():
     all_tickers = leer_google_sheets()[1:]
