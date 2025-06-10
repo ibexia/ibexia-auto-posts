@@ -373,7 +373,7 @@ def construir_prompt_formateado(data):
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
 
-    ### --- INICIO DE LA MODIFICACIÓN DEL PROMPT (AJUSTE) ---
+    ### --- INICIO DE LA MODIFICACIÓN DEL PROMPT (AJUSTE Y CORRECCIÓN DE SINTAXIS) ---
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
 
@@ -397,8 +397,8 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 - Sentimiento del mercado: {data['SENTIMIENTO_ANALISTAS']}, {data['TENDENCIA_SOCIAL']}
 - Comparativa sectorial: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
-- La tendencia de impulso actual de la empresa es: {data['SMI_TENDENCIA']}
-- Mi pronóstico de días para un punto de acción significativo (compra o venta): {data['DIAS_PARA_ACCION']}
+- Mi pronóstico de la tendencia de impulso actual de la empresa es: {data['SMI_TENDENCIA']}.
+- Mi estimación de días para un punto de acción significativo (compra o venta) es: {data['DIAS_PARA_ACCION']}.
 
 Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista.
 
@@ -417,7 +417,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión, y su cercanía o lejanía tiene implicaciones operativas claras.</p>
 
-<p>Un aspecto crucial en el análisis de corto plazo es la dinámica de impulso de la empresa. Mi evaluación profesional indica que la tendencia actual es <strong>{data['SMI_TENDENCIA']}</strong>. [Aquí, si 'DIAS_PARA_ACCION' no es "No estimado", Gemini deberá integrar esta información: "Manteniendo esta dirección, mi pronóstico sugiere que podríamos alcanzar una <strong>potencial zona de acción</strong> (sea de compra o venta) en <strong>{data['DIAS_PARA_ACCION']}</strong>. Esto indica que la presión {alcista/bajista, según SMI_TENDENCIA} podría continuar y es prudente monitorear los niveles clave muy de cerca en los próximos días."]. Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [compara el volumen actual con el volumen promedio reciente (si está disponible implícitamente en los datos que procesa el modelo) o con el volumen histórico en puntos de inflexión. Comenta si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes y resistencias]. Estos niveles técnicos y el patrón de volumen, junto con la nota técnica de <strong>{data['NOTA_EMPRESA']} sobre 10</strong>, nos proporcionan una guía para la operativa a corto plazo. [Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. La nota técnica debe ser un factor clave aquí].</p>
+<p>Un aspecto crucial en el análisis de corto plazo es la dinámica de impulso de la empresa. Mi evaluación profesional indica que la tendencia actual es <strong>{data['SMI_TENDENCIA']}</strong>. {f"Manteniendo esta dirección, mi pronóstico sugiere que podríamos alcanzar una <strong>potencial zona de acción</strong> (sea de compra o venta) en <strong>{data['DIAS_PARA_ACCION']}</strong>. Esto indica que la presión {'alcista' if data['SMI_TENDENCIA'] == 'subiendo' else 'bajista'} podría continuar y es prudente monitorear los niveles clave muy de cerca en los próximos días." if data['DIAS_PARA_ACCION'] != 'No estimado' else ''} Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [compara el volumen actual con el volumen promedio reciente (si está disponible implícitamente en los datos que procesa el modelo) o con el volumen histórico en puntos de inflexión. Comenta si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes y resistencias]. Estos niveles técnicos y el patrón de volumen, junto con la nota técnica de <strong>{data['NOTA_EMPRESA']} sobre 10</strong>, nos proporcionan una guía para la operativa a corto plazo. [Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. La nota técnica debe ser un factor clave aquí].</p>
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 <p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas. Para esta sección, la **nota técnica ({data['NOTA_EMPRESA']} sobre 10) NO debe influir en la valoración**. El análisis debe basarse **exclusivamente en los datos financieros y estratégicos** proporcionados y en una evaluación crítica de su solidez y potencial.</p>
@@ -433,7 +433,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 <p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa. No constituye una recomendación de inversión. Se recomienda analizar cada decisión de forma individual, teniendo en cuenta el perfil de riesgo y los objetivos financieros personales.</p>
 
 """
-    ### --- FIN DE LA MODIFICACIÓN DEL PROMPT (AJUSTE) ---
+    ### --- FIN DE LA MODIFICACIÓN DEL PROMPT (AJUSTE Y CORRECCIÓN DE SINTAXIS) ---
 
     return prompt, titulo_post
 
