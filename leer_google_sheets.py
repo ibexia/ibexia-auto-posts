@@ -31,8 +31,8 @@ def leer_google_sheets():
     range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
 
     service = build('sheets', 'v4', credentials=creds)
-    sheet = service.spreadsheets().values()
-    result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
+    sheet = service.spreadsheets()
+    result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
     if not values:
@@ -174,7 +174,7 @@ def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
     
-    hist = stock.history(period="90d", interval="1d")
+    hist = stock.history(period="90d", interval="1d") # Aumentado a 90 días para un SMI más estable
 
     if hist.empty:
         print(f"❌ No se pudieron obtener datos históricos para {ticker}")
@@ -183,21 +183,21 @@ def obtener_datos_yfinance(ticker):
     try:
         hist = calculate_smi_tv(hist)
         
+        # Se asegura que haya suficientes datos para SMI_signal y SMI_anterior
         if 'SMI_signal' not in hist.columns or hist['SMI_signal'].empty or len(hist['SMI_signal'].dropna()) < 2:
             print(f"❌ SMI_signal no disponible o insuficiente para {ticker}")
             return None
 
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
-        smi_anterior = round(hist['SMI_signal'].dropna().iloc[-2], 2)
+        smi_anterior = round(hist['SMI_signal'].dropna().iloc[-2], 2) # Necesario para la tendencia del SMI
         
-        # Original smi_tendencia logic (will be overwritten for extreme cases)
+        # La lógica de smi_tendencia inicial se sobreescribe más abajo para casos extremos
         smi_tendencia = "subiendo" if smi_actual > smi_anterior else "bajando" if smi_actual < smi_anterior else "estable"
 
         current_price = round(info.get("currentPrice", 0), 2)
         
-        # --- CORRECCIÓN AQUÍ: VOLVIENDO AL CÁLCULO DE VOLUMEN ORIGINAL ---
-        current_volume = info.get("volume", 0)
-        # ------------------------------------------------------------------
+        # Se mantiene el cálculo del volumen del código original
+        current_volume = info.get("volume", 0) 
 
         soportes = find_significant_supports(hist, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
@@ -209,7 +209,7 @@ def obtener_datos_yfinance(ticker):
         recomendacion = "Indefinido"
         condicion_rsi = "desconocido" 
         
-        # --- LÓGICA DE RECOMENDACIÓN Y TENDENCIA DEL SMI MÁS MATIZADA ---
+        # Lógica de RECOMENDACIÓN y TENDENCIA del SMI más matizada
         if nota_empresa <= 2: # SMI muy alto (sobrecompra fuerte: SMI entre 60 y 100)
             condicion_rsi = "muy sobrecomprado"
             smi_tendencia = "mostrando un agotamiento alcista."
@@ -270,9 +270,9 @@ def obtener_datos_yfinance(ticker):
         precio_objetivo_compra = 0.0
         base_precio_obj = soporte_1 if soporte_1 > 0 else current_price * 0.95
 
-        if nota_empresa >= 7 and smi_actual > smi_anterior:
+        if nota_empresa >= 7 and smi_actual > smi_anterior: # Agrega la condición de SMI para la dirección
             precio_objetivo_compra = base_precio_obj
-        elif nota_empresa >= 7 and smi_actual < smi_anterior:
+        elif nota_empresa >= 7 and smi_actual < smi_anterior: # Si la nota es buena pero el SMI baja, el objetivo es más bajo
             precio_objetivo_compra = base_precio_obj * 0.98
         else:
             drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
@@ -280,13 +280,13 @@ def obtener_datos_yfinance(ticker):
             
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
         
-        ### --- LÓGICA REFINADA PARA EL MENSAJE DE "DIAS PARA LA ACCION" ---
+        # Lógica REFINADA para el mensaje de "DIAS PARA LA ACCION"
         dias_para_accion_str = "No estimado"
         smi_diff = hist['SMI_signal'].dropna().diff().iloc[-1] if len(hist['SMI_signal'].dropna()) > 1 else 0
         
         target_smi_venta_zona = 60
         target_smi_compra_zona = -60
-        zona_umbral = 5 
+        zona_umbral = 5 # Umbral para considerar que ya se está "en zona"
 
         if smi_actual >= target_smi_venta_zona - zona_umbral and smi_actual > 0:
             dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobrecompra extrema**, indicando que la presión alcista podría estar agotándose y se anticipa una posible corrección o consolidación."
@@ -308,7 +308,6 @@ def obtener_datos_yfinance(ticker):
                 dias_para_accion_str = "el precio está consolidando una tendencia bajista y podría estar próximo a un punto de inflexión para una potencial entrada o compra."
         else:
              dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
-        # --------------------------------------------------------------------------------
 
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
         expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000])
@@ -350,8 +349,8 @@ def obtener_datos_yfinance(ticker):
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
-            "SMI_TENDENCIA": smi_tendencia,
-            "DIAS_PARA_ACCION": dias_para_accion_str 
+            "SMI_TENDENCIA": smi_tendencia, # Nuevo campo para la tendencia del SMI
+            "DIAS_PARA_ACCION": dias_para_accion_str # Nuevo campo para el mensaje de días para la acción
         }
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}")
