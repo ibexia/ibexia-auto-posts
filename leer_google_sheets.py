@@ -272,7 +272,7 @@ def obtener_datos_yfinance(ticker):
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
         
         ### --- INICIO DE LA MODIFICACIÓN PARA CÁLCULO DE DÍAS (SMI NO REVELADO) ---
-        dias_para_accion = "No estimado"
+        dias_para_accion_str = "No estimado"
         # Usamos SMI_signal para el cálculo interno, pero la salida al prompt no lo nombrará
         smi_diff = hist['SMI_signal'].dropna().diff().iloc[-1] if len(hist['SMI_signal'].dropna()) > 1 else 0
 
@@ -280,13 +280,44 @@ def obtener_datos_yfinance(ticker):
         # Estos son los niveles que el SMI_signal debería alcanzar para una acción clara
         target_smi_venta_zona = 60 
         target_smi_compra_zona = -60
+        
+        # Umbral para considerar que ya está "en zona"
+        zona_umbral = 5 
 
-        if smi_tendencia == "subiendo" and smi_actual < target_smi_venta_zona and smi_diff > 0.01: # El SMI sube y se acerca a sobrecompra
-            diferencia_a_target = target_smi_venta_zona - smi_actual
-            dias_para_accion = f"aproximadamente {int(diferencia_a_target / smi_diff)} días para una potencial zona de toma de beneficios o venta"
-        elif smi_tendencia == "bajando" and smi_actual > target_smi_compra_zona and smi_diff < -0.01: # El SMI baja y se acerca a sobreventa
-            diferencia_a_target = smi_actual - target_smi_compra_zona
-            dias_para_accion = f"aproximadamente {int(diferencia_a_target / abs(smi_diff))} días para una potencial zona de entrada o compra"
+        if smi_tendencia == "subiendo":
+            if smi_actual >= target_smi_venta_zona - zona_umbral: # Ya está cerca o en la zona de venta
+                dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobrecompra extrema**, indicando que la presión alcista podría estar agotándose."
+            elif smi_diff > 0.01: # El SMI sube y se acerca a sobrecompra, pero no está en la zona todavía
+                diferencia_a_target = target_smi_venta_zona - smi_actual
+                if diferencia_a_target > 0:
+                    dias_calculados = int(diferencia_a_target / smi_diff)
+                    if dias_calculados <= 1:
+                        dias_para_accion_str = "el precio está consolidando una tendencia alcista y podría estar próximo a un punto de inflexión."
+                    else:
+                        dias_para_accion_str = f"aproximadamente {dias_calculados} días para una potencial zona de toma de beneficios o venta."
+                else: # smi_actual ya pasó el target_smi_venta_zona
+                    dias_para_accion_str = "la empresa ya se encuentra en una **zona de sobrecompra prolongada**, sugiriendo precaución."
+            else: # SMI subiendo pero sin un momentum claro (smi_diff bajo o cero)
+                dias_para_accion_str = "el impulso alcista es constante pero sin una señal clara de cuándo podría alcanzar una zona de acción inminente."
+
+        elif smi_tendencia == "bajando":
+            if smi_actual <= target_smi_compra_zona + zona_umbral: # Ya está cerca o en la zona de compra
+                dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobreventa extrema**, indicando que la presión bajista podría estar agotándose."
+            elif smi_diff < -0.01: # El SMI baja y se acerca a sobreventa, pero no está en la zona todavía
+                diferencia_a_target = smi_actual - target_smi_compra_zona
+                if diferencia_a_target > 0:
+                    dias_calculados = int(diferencia_a_target / abs(smi_diff))
+                    if dias_calculados <= 1:
+                        dias_para_accion_str = "el precio está consolidando una tendencia bajista y podría estar próximo a un punto de inflexión."
+                    else:
+                        dias_para_accion_str = f"aproximadamente {dias_calculados} días para una potencial zona de entrada o compra."
+                else: # smi_actual ya pasó el target_smi_compra_zona
+                    dias_para_accion_str = "la empresa ya se encuentra en una **zona de sobreventa prolongada**, sugiriendo una oportunidad de compra si hay reversión."
+            else: # SMI bajando pero sin un momentum claro (smi_diff bajo o cero)
+                dias_para_accion_str = "el impulso bajista es constante pero sin una señal clara de cuándo podría alcanzar una zona de acción inminente."
+        else: # smi_tendencia == "estable"
+            dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo."
+        
         ### --- FIN DE LA MODIFICACIÓN PARA CÁLCULO DE DÍAS ---
 
         # --- Aplicar traducción a los campos relevantes aquí ---
@@ -334,7 +365,7 @@ def obtener_datos_yfinance(ticker):
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
             "SMI_TENDENCIA": smi_tendencia, # Se mantiene para el cálculo, pero no se menciona directamente en el prompt
-            "DIAS_PARA_ACCION": dias_para_accion 
+            "DIAS_PARA_ACCION": dias_para_accion_str 
         }
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}")
@@ -375,6 +406,8 @@ def construir_prompt_formateado(data):
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
 
     ### --- INICIO DE LA MODIFICACIÓN DEL PROMPT (AJUSTE Y CORRECCIÓN DE SINTAXIS) ---
+    # Se ha ajustado la forma en que se presenta 'DIAS_PARA_ACCION' en el prompt
+    # para permitir a Gemini más flexibilidad en la redacción.
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
 
@@ -399,7 +432,7 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 - Comparativa sectorial: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 - Mi pronóstico de la tendencia de impulso actual de la empresa es: {data['SMI_TENDENCIA']}.
-- Mi estimación de días para un punto de acción significativo (compra o venta) es: {data['DIAS_PARA_ACCION']}.
+- Mi estimación para una potencial zona de acción significativa (compra o venta) indica que: {data['DIAS_PARA_ACCION']}.
 
 Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista.
 
@@ -418,7 +451,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión, y su cercanía o lejanía tiene implicaciones operativas claras.</p>
 
-<p>Un aspecto crucial en el análisis de corto plazo es la dinámica de impulso de la empresa. Mi evaluación profesional indica que la tendencia actual es <strong>{data['SMI_TENDENCIA']}</strong>. {f"Manteniendo esta dirección, mi pronóstico sugiere que podríamos alcanzar una <strong>potencial zona de acción</strong> (sea de compra o venta) en <strong>{data['DIAS_PARA_ACCION']}</strong>. Esto indica que la presión {'alcista' if data['SMI_TENDENCIA'] == 'subiendo' else 'bajista'} podría continuar y es prudente monitorear los niveles clave muy de cerca en los próximos días." if data['DIAS_PARA_ACCION'] != 'No estimado' else ''} Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [compara el volumen actual con el volumen promedio reciente (si está disponible implícitamente en los datos que procesa el modelo) o con el volumen histórico en puntos de inflexión. Comenta si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes y resistencias]. Estos niveles técnicos y el patrón de volumen, junto con la nota técnica de <strong>{data['NOTA_EMPRESA']} sobre 10</strong>, nos proporcionan una guía para la operativa a corto plazo. [Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. La nota técnica debe ser un factor clave aquí].</p>
+<p>Un aspecto crucial en el análisis de corto plazo es la dinámica de impulso de la empresa. Mi evaluación profesional indica que la tendencia actual es <strong>{data['SMI_TENDENCIA']}</strong>. {data['DIAS_PARA_ACCION']} Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [compara el volumen actual con el volumen promedio reciente (si está disponible implícitamente en los datos que procesa el modelo) o con el volumen histórico en puntos de inflexión. Comenta si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes y resistencias]. Estos niveles técnicos y el patrón de volumen, junto con la nota técnica de <strong>{data['NOTA_EMPRESA']} sobre 10</strong>, nos proporcionan una guía para la operativa a corto plazo. [Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. La nota técnica debe ser un factor clave aquí].</p>
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 <p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas. Para esta sección, la **nota técnica ({data['NOTA_EMPRESA']} sobre 10) NO debe influir en la valoración**. El análisis debe basarse **exclusivamente en los datos financieros y estratégicos** proporcionados y en una evaluación crítica de su solidez y potencial.</p>
