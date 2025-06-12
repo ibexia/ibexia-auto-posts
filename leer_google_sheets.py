@@ -211,7 +211,11 @@ def obtener_datos_yfinance(ticker):
         
         smi_tendencia = "subiendo" if smi_actual > smi_anterior else "bajando" if smi_actual < smi_anterior else "estable"
 
-        current_price = round(info.get("currentPrice", 0), 2)
+        # --- CAMBIO AQUÍ: Priorizar regularMarketPrice sobre currentPrice ---
+        # regularMarketPrice suele ser más fiable y menos propenso a ser 0
+        current_price = round(info.get("regularMarketPrice", info.get("currentPrice", 0)), 2)
+        # --- FIN DEL CAMBIO ---
+
         # Si current_price es 0, no podemos calcular soportes significativos basados en porcentajes
         if current_price == 0:
             print(f"Advertencia: El precio actual para {ticker} es 0. Los soportes se establecerán en 0 o un valor mínimo.")
@@ -288,7 +292,7 @@ def obtener_datos_yfinance(ticker):
                 recomendacion = "Sobreventa significativa. Esperar confirmación de rebote antes de comprar."
         elif nota_empresa >= 9: # SMI extremadamente bajo (sobreventa extrema: SMI muy por debajo de -60)
             condicion_rsi = "extremadamente sobrevendido"
-            smi_tendencia = "en una sobreventa extrema, lo que sugiere un rebote inminente."
+            smi_tendencia = "en una una sobreventa extrema, lo que sugiere un rebote inminente."
             if smi_actual > smi_anterior:
                 recomendacion = "Comprar. Excelente señal de reversión alcista."
             else:
@@ -419,11 +423,12 @@ def construir_prompt_formateado(data):
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
 
-    # Corrección para evitar división por cero si data['PRECIO_ACTUAL'] es 0
-    if float(data['PRECIO_ACTUAL']) != 0:
+    # --- CAMBIO AQUÍ: Manejo condicional del cálculo del porcentaje de resistencia ---
+    if float(data['PRECIO_ACTUAL']) > 0:
         resistencia_porcentaje = f"{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%"
     else:
-        resistencia_porcentaje = "no calculable debido al precio actual de 0€"
+        resistencia_porcentaje = "no calculable debido a un precio actual no disponible o de 0€"
+    # --- FIN DEL CAMBIO ---
 
 
     prompt = f"""
