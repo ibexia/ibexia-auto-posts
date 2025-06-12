@@ -203,7 +203,8 @@ def obtener_datos_yfinance(ticker):
         hist_long = stock.history(period="90d", interval="1d")
         # --- CAMBIOS AÑADIDOS AQUÍ PARA ROBUSTEZ ---
         # Verificar si 'hist_long' está vacío o si le faltan columnas críticas
-        if hist_long.empty or not all(col in hist_long.columns for col col in ['Open', 'High', 'Low', 'Close', 'Volume']):
+        if hist_long.empty or not all(col in hist_long.columns for col in ['Open', 'High', 'Low', 'Close', 'Volume']):
+
             print(f"❌ No se pudieron obtener datos históricos largos o faltan columnas ('Open', 'High', 'Low', 'Close') para {ticker}")
             return None
         # ---------------------------------------------
