@@ -35,7 +35,7 @@ def leer_google_sheets():
     range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
 
     service = build('sheets', 'v4', credentials=creds)
-    sheet = service.spreadsheets().values()
+    sheet = service.sheets().values()
     result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
@@ -423,15 +423,37 @@ def formatear_numero(valor):
 def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     """
     Construye el prompt para Gemini con un formato HTML detallado,
-    incorporando nuevos elementos de engagement y llamada a la acción.
+    incorporando nuevos elementos de engagement y llamada a la acción,
+    y ajustando el titular según la nota de la empresa.
     """
-    # --- Nuevos Titulares ---
-    titulo_propuestas = [
-        f"¿<strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> a punto de despegar? Un giro alcista en el radar de los inversores",
-        f"Oportunidad en <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong>: El análisis que te dice cuándo comprar para un rebote"
-    ]
-    # Selecciona una propuesta de título, o puedes usar una lógica más compleja aquí
-    titulo_post = titulo_propuestas[0]
+    # --- Lógica para adaptar el Titular a la Nota de la Empresa (rangos de punto a punto) ---
+    nota = data['NOTA_EMPRESA']
+    nombre_empresa = data['NOMBRE_EMPRESA']
+    ticker = data['TICKER']
+    
+    if 0.0 <= nota < 1.0:
+        titulo_post = f"Alerta Roja en <strong>{nombre_empresa} ({ticker})</strong>: ¿Colapso inminente? Análisis de su debilidad extrema"
+    elif 1.0 <= nota < 2.0:
+        titulo_post = f"Seria preocupación en <strong>{nombre_empresa} ({ticker})</strong>: Debilidad técnica extrema y riesgos latentes"
+    elif 2.0 <= nota < 3.0:
+        titulo_post = f"Cautela máxima con <strong>{nombre_empresa} ({ticker})</strong>: La tendencia bajista se intensifica"
+    elif 3.0 <= nota < 4.0:
+        titulo_post = f"Análisis de <strong>{nombre_empresa} ({ticker})</strong>: Señales de debilidad y la importancia de la paciencia"
+    elif 4.0 <= nota < 5.0:
+        titulo_post = f"<strong>{nombre_empresa} ({ticker})</strong>: En busca de dirección. ¿Consolidación o antesala de un movimiento?"
+    elif 5.0 <= nota < 6.0:
+        titulo_post = f"<strong>{nombre_empresa} ({ticker})</strong> en equilibrio: Un análisis de su fase neutral y oportunidades a largo plazo"
+    elif 6.0 <= nota < 7.0:
+        titulo_post = f"<strong>{nombre_empresa} ({ticker})</strong> despierta: Primeras señales de fortaleza y potencial de rebote"
+    elif 7.0 <= nota < 8.0:
+        titulo_post = f"Impulso en <strong>{nombre_empresa} ({ticker})</strong>: La oportunidad de compra se consolida"
+    elif 8.0 <= nota < 9.0:
+        titulo_post = f"¡Despegue inminente de <strong>{nombre_empresa} ({ticker})</strong>! Análisis de su explosivo potencial alcista"
+    elif 9.0 <= nota <= 10.0:
+        titulo_post = f"La oportunidad de la década en <strong>{nombre_empresa} ({ticker})</strong>: ¿Listo para multiplicar tu inversión?"
+    else: # Fallback por si la nota está fuera de rango inesperadamente
+        titulo_post = f"Análisis completo de <strong>{nombre_empresa} ({ticker})</strong>"
+
 
     # Lógica para soportes
     soportes_unicos = []
@@ -485,6 +507,8 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera un análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio y usando un lenguaje persuasivo y profesional.
 
 Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegúrate de que todo esté escrito en español, independientemente del idioma de donde saques los datos, y que el texto fluya de manera natural y variada. No utilices el formato Markdown (doble asterisco, etc.) en el texto final, solo HTML puro.
+
+**Asegúrate de que todo el post, desde el titular hasta la conclusión, sea coherente y refleje fielmente el sentimiento general indicado por la nota técnica de la empresa.**
 
 Genera un análisis técnico y fundamental detallado de aproximadamente 1200 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}. Amplía cada sección para ofrecer un análisis profundo y evitar repeticiones.
 
