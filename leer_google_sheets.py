@@ -28,7 +28,7 @@ def leer_google_sheets():
         scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
     )
 
-    spreadsheet_id = os.getenv('SPREADSHEET_ID')
+    spreadsheet_id = os.getenv('SPREADSHEED_ID')
     if not spreadsheet_id:
         raise Exception("No se encontró la variable de entorno SPREADSHEET_ID")
 
@@ -537,8 +537,8 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
 
 <p>Un aspecto crucial en el análisis de corto plazo es la dinámica de impulso de la empresa. Mi evaluación profesional indica que la tendencia actual se caracteriza por: <strong>{data['SMI_TENDENCIA']}</strong>. Específicamente, nuestros indicadores técnicos, nos muestran que <strong>{data['NOMBRE_EMPRESA']}</strong> se encuentra en una zona de sobreventa moderada. Esto significa, en términos sencillos, que la acción ha sido 'castigada' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio al alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo. Calculamos que este impulso podría llevarnos a una potencial zona de toma de beneficios o venta {data['DIAS_PARA_ACCION']} Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [Aquí, la IA debe comparar el volumen actual con el volumen promedio reciente o con el volumen histórico en puntos de inflexión. Comentar si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes y resistencias, y cómo esto valida mi perspectiva. Mínimo 150 palabras aquí. Por ejemplo: "Este volumen, aunque [alto/bajo/promedio], es consistente con la fase de [consolidación/acumulación/distribución] que observo, y refuerza la validez de los niveles de soporte detectados. Un incremento del volumen en la ruptura de la resistencia, por ejemplo, sería una señal inequívoca de fuerza para la tendencia alcista que preveo"]. Estos niveles técnicos y el patrón de volumen, junto con la nota técnica de <strong>{data['NOTA_EMPRESA']} sobre 10</strong>, nos proporcionan una guía invaluable para la operativa a corto plazo.</p>
 
-<h2>Visión a Largo Plazo y Fundamentales</h2>
-<p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio, más allá de las fluctuaciones diarias. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas. Para esta sección, la **nota técnica ({data['NOTA_EMPRESA']} sobre 10) NO debe influir en la valoración**. El análisis debe basarse **exclusivamente en los datos financieros y estratégicos** proporcionados y en una evaluación crítica de su solidez y potencial a futuro.</p>
+<h2>Visión Fundamental y Potencial a Largo Plazo</h2>
+<p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio, más allá de las fluctuaciones diarias. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas. El análisis debe basarse **exclusivamente en los datos financieros y estratégicos** proporcionados y en una evaluación crítica de su solidez y potencial a futuro.</p>
 
 <p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. Estas cifras nos dan una primera impresión de la capacidad de generación de valor de la compañía y su eficiencia operativa. En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>. Una sólida posición de flujo de caja es vital para la sostenibilidad y capacidad de la empresa para invertir en crecimiento o afrontar adversidades.</p>
 
@@ -562,6 +562,9 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
     <tr><td style="padding: 8px; border: 1px solid #ddd;">Días para Acción Estimados</td><td style="padding: 8px; border: 1px solid #ddd;">{data['DIAS_PARA_ACCION']}</td></tr>
 </table>
 
+<h2>¿Qué analizaremos mañana? ¡No te lo pierdas!</h2>
+<p>Mañana, pondremos bajo la lupa a {tomorrow_companies_text}. ¿Será el próximo candidato para una oportunidad de compra o venta? ¡Vuelve mañana a la misma hora para descubrirlo y seguir ampliando tu conocimiento de mercado!</p>
+
 <h2>Tu Opinión Importa: ¡Participa!</h2>
 <p>¿Considerarías comprar acciones de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> con este análisis?</p>
 <ul>
@@ -570,9 +573,6 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
     <li>Ya las tengo en cartera.</li>
 </ul>
 <p>¡Déjanos tu voto y tu comentario sobre tu visión de <strong>{data['NOMBRE_EMPRESA']}</strong> en la sección de comentarios! Queremos saber qué piensas y fomentar una comunidad de inversores informada.</p>
-
-<h2>¿Qué analizaremos mañana? ¡No te lo pierdas!</h2>
-<p>Mañana, pondremos bajo la lupa a {tomorrow_companies_text}. ¿Será el próximo candidato para una oportunidad de compra o venta? ¡Vuelve mañana a la misma hora para descubrirlo y seguir ampliando tu conocimiento de mercado!</p>
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
 <p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que [Aquí el modelo redactará un resumen fluido de unas 100 palabras, reforzando la opinión general y la coherencia entre recomendación, niveles técnicos y fundamentos, utilizando un lenguaje más amplio y persuasivo. Por ejemplo: "los fundamentos sólidos, junto con las claras señales técnicas que apuntan a un rebote, configuran una oportunidad atractiva para aquellos inversores con un perfil de riesgo moderado a alto. La confluencia de la sobreventa con un volumen creciente podría ser el catalizador que impulse el precio hacia nuestros objetivos a corto plazo."].</p>
