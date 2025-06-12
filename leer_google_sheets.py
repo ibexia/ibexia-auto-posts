@@ -195,7 +195,7 @@ def obtener_datos_yfinance(ticker):
 
     try:
         # Asegúrate de que las columnas críticas existan antes de calcular SMI
-        required_cols = ['High', 'Low', 'Close']
+        required_cols = ['High', 'Low', 'Close', 'Volume'] # Añadido 'Volume' a las columnas requeridas
         if not all(col in hist.columns for col in required_cols):
             print(f"❌ Datos históricos incompletos para {ticker}. Faltan columnas: {set(required_cols) - set(hist.columns)}")
             return None
@@ -211,10 +211,7 @@ def obtener_datos_yfinance(ticker):
         
         smi_tendencia = "subiendo" if smi_actual > smi_anterior else "bajando" if smi_actual < smi_anterior else "estable"
 
-        # --- CAMBIO AQUÍ: Priorizar regularMarketPrice sobre currentPrice ---
-        # regularMarketPrice suele ser más fiable y menos propenso a ser 0
         current_price = round(info.get("regularMarketPrice", info.get("currentPrice", 0)), 2)
-        # --- FIN DEL CAMBIO ---
 
         # Si current_price es 0, no podemos calcular soportes significativos basados en porcentajes
         if current_price == 0:
@@ -232,8 +229,11 @@ def obtener_datos_yfinance(ticker):
         soporte_2 = max(0.01, soporte_2) if soporte_2 == 0 and current_price != 0 else soporte_2
         soporte_3 = max(0.01, soporte_3) if soporte_3 == 0 and current_price != 0 else soporte_3
 
-
-        current_volume = info.get("volume", 0)
+        # --- CAMBIO EXCLUSIVO AQUÍ: Obtener el volumen del día anterior ---
+        current_volume = 0
+        if len(hist['Volume']) >= 2: # Asegúrate de que haya al menos 2 días de datos para el día anterior
+            current_volume = hist['Volume'].iloc[-2] # El volumen del penúltimo día (día anterior)
+        # --- FIN DEL CAMBIO ---
 
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
@@ -423,12 +423,10 @@ def construir_prompt_formateado(data):
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
 
-    # --- CAMBIO AQUÍ: Manejo condicional del cálculo del porcentaje de resistencia ---
     if float(data['PRECIO_ACTUAL']) > 0:
         resistencia_porcentaje = f"{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%"
     else:
         resistencia_porcentaje = "no calculable debido a un precio actual no disponible o de 0€"
-    # --- FIN DEL CAMBIO ---
 
 
     prompt = f"""
