@@ -32,7 +32,7 @@ def leer_google_sheets():
 
     service = build('sheets', 'v4', credentials=creds)
     sheet = service.spreadsheets().values()
-    result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
+    result = sheet.get(values=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
     if not values:
@@ -65,17 +65,23 @@ def calculate_smi_tv(df):
 
     smi_raw = pd.Series(0.0, index=df.index)
     
-    # Manejo de división por cero y NaN
-    # Originalmente: non_zero_avgdiff = avgdiff[avgdiff != 0]
-    # Se debe asegurar que no haya NaN en avgdiff antes de la comparación, o manejarlos.
-    # Además, la división por cero no es el único problema, si avgdiff es muy pequeño
-    # puede dar resultados erróneos. Se añadió un pequeño epsilon.
-    valid_indices = avgdiff.index[~avgdiff.isna()]
-    non_zero_avgdiff_and_valid = avgdiff.loc[valid_indices][avgdiff.loc[valid_indices].abs() > 1e-9] # Usar un epsilon pequeño
+    # Manejo robusto de la división por cero y valores muy pequeños en avgdiff
+    # Añadimos un pequeño epsilon para evitar divisiones por cero exactas
+    # y nos aseguramos de que avgrel y avgdiff sean Series para operar correctamente.
+    
+    # Identificar índices donde avgdiff no es cero y no es NaN
+    valid_indices = avgdiff.index[avgdiff.notna()]
+    
+    # Filtrar por valores absolutos mayores que un umbral muy pequeño
+    non_zero_avgdiff_and_valid = avgdiff.loc[valid_indices][avgdiff.loc[valid_indices].abs() > 1e-9]
 
     if not non_zero_avgdiff_and_valid.empty:
+        # Realizar la operación solo en los índices válidos
         smi_raw.loc[non_zero_avgdiff_and_valid.index] = (avgrel.loc[non_zero_avgdiff_and_valid.index] / (non_zero_avgdiff_and_valid / 2)) * 100
     
+    # Rellenar cualquier NaN restante en smi_raw (por ejemplo, al inicio de la serie por rolling/ewm)
+    smi_raw = smi_raw.fillna(method='bfill').fillna(method='ffill') # Rellena NaNs hacia atrás y luego hacia adelante
+
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
 
@@ -107,7 +113,7 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
         found_zone = False
         for zone_level in support_zones.keys():
             # Añadir una pequeña tolerancia para evitar división por cero si support es 0 o muy cercano
-            if support != 0 and abs(support - zone_level) / support <= tolerance_percent:
+            if support != 0 and zone_level != 0 and abs(support - zone_level) / support <= tolerance_percent: # Added zone_level != 0
                 support_zones[zone_level].append(support)
                 found_zone = True
                 break
@@ -217,9 +223,21 @@ def obtener_datos_yfinance(ticker):
             print(f"❌ SMI_signal no disponible o insuficiente para {ticker}")
             return None
 
-        smi_actual = round(hist_long['SMI_signal'].dropna().iloc[-1], 2)
-        smi_anterior = round(hist_long['SMI_signal'].dropna().iloc[-2], 2)
+        # Asegúrate de que los valores de SMI_signal no sean NaN o infinitos antes de redondear
+        smi_actual = hist_long['SMI_signal'].dropna().iloc[-1]
+        smi_anterior = hist_long['SMI_signal'].dropna().iloc[-2]
         
+        # Comprobar si los valores son finitos antes de redondear
+        if np.isfinite(smi_actual):
+            smi_actual = round(smi_actual, 2)
+        else:
+            smi_actual = 0.0 # O manejar de otra forma apropiada si SMI es infinito/NaN
+
+        if np.isfinite(smi_anterior):
+            smi_anterior = round(smi_anterior, 2)
+        else:
+            smi_anterior = 0.0
+
         smi_tendencia = "subiendo" if smi_actual > smi_anterior else "bajando" if smi_actual < smi_anterior else "estable"
 
         current_price = round(info.get("currentPrice", 0), 2)
@@ -439,7 +457,7 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 - La tendencia de impulso actual de la empresa se caracteriza por: {data['SMI_TENDENCIA']}.
 - Mi estimación para una potencial zona de acción significativa (compra o venta) indica que: {data['DIAS_PARA_ACCION']}.
 
-Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista.
+Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como un analista.
 
 ---
 <h1>{titulo_post}</h1>
