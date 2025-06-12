@@ -63,8 +63,10 @@ def calculate_smi_tv(df):
     avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
     avgdiff = diff.ewm(span=length_d, adjust=False).mean()
 
-    smi_raw = (avgrel / (avgdiff / 2)) * 100
-    smi_raw[avgdiff == 0] = 0.0
+    # --- CAMBIO AÑADIDO AQUÍ PARA EVITAR DIVISIÓN POR CERO ---
+    # np.where permite asignar 0.0 cuando avgdiff es 0, de lo contrario realiza el cálculo
+    smi_raw = np.where(avgdiff == 0, 0.0, (avgrel / (avgdiff / 2)) * 100)
+    # --------------------------------------------------------
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
@@ -72,7 +74,7 @@ def calculate_smi_tv(df):
     df = df.copy()
     df['SMI'] = smi_smoothed
     df['SMI_signal'] = smi_signal
-    
+
     return df
 
 def find_significant_supports(df, current_price, window=40, tolerance_percent=0.01, max_deviation_percent=0.15):
@@ -82,38 +84,40 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     """
     recent_data = df.tail(window)
     lows = recent_data['Low']
-    
+
     potential_supports = []
-    
+
     for i in range(1, len(lows) - 1):
         if lows.iloc[i] < lows.iloc[i-1] and lows.iloc[i] < lows.iloc[i+1]:
             potential_supports.append(lows.iloc[i])
 
     if not potential_supports:
         potential_supports = lows.tolist()
-        
+
     support_zones = {}
     for support in potential_supports:
         found_zone = False
         for zone_level in support_zones.keys():
-            if abs(support - zone_level) / support <= tolerance_percent:
+            # Cambio: Añadir comprobación para evitar división por cero si support o zone_level es 0
+            if support != 0 and zone_level != 0 and abs(support - zone_level) / support <= tolerance_percent:
                 support_zones[zone_level].append(support)
                 found_zone = True
                 break
         if not found_zone:
             support_zones[support] = [support]
-            
+
     final_supports = []
     for zone_level, values in support_zones.items():
         avg_support = np.mean(values)
         if avg_support < current_price:
-            if abs(current_price - avg_support) / current_price <= max_deviation_percent:
+            # Cambio: Añadir comprobación para evitar división por cero si current_price es 0
+            if current_price != 0 and abs(current_price - avg_support) / current_price <= max_deviation_percent:
                 final_supports.append({'level': avg_support, 'frequency': len(values)})
 
     final_supports.sort(key=lambda x: (abs(x['level'] - current_price), -x['frequency']))
-    
+
     top_3_supports = [round(s['level'], 2) for s in final_supports if s['level'] < current_price][:3]
-    
+
     if len(top_3_supports) < 3:
         sorted_lows = sorted([l for l in lows.tolist() if l < current_price], reverse=True)
         for low_val in sorted_lows:
@@ -122,13 +126,13 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
                 top_3_supports.append(rounded_low_val)
                 if len(top_3_supports) == 3:
                     break
-    
+
     while len(top_3_supports) < 3:
         if len(top_3_supports) > 0:
             top_3_supports.append(round(top_3_supports[-1] * 0.95, 2))
         else:
             top_3_supports.append(round(current_price * 0.90, 2))
-            
+
     return top_3_supports
 
 def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
@@ -142,7 +146,7 @@ def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
 
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")
-    
+
     retries = 0
     delay = initial_delay
     while retries < max_retries:
@@ -159,7 +163,7 @@ def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
                         delay = max(delay, server_delay + 1)
                 except:
                     pass
-                
+
                 print(f"❌ Cuota de Gemini excedida al traducir. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
                 time.sleep(delay)
                 retries += 1
@@ -173,53 +177,57 @@ def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
 def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
-    
-    # Se solicita el historial de los últimos 2 días para asegurarnos de tener el volumen de cierre del día anterior
-    hist = stock.history(period="2d", interval="1d")
 
-    if hist.empty or len(hist) < 2:
-        print(f"❌ No se pudieron obtener datos históricos suficientes para {ticker} para calcular el volumen del día anterior.")
-        # Intenta obtener de un período más largo si 2d no es suficiente (ej. fines de semana o días festivos)
-        hist = stock.history(period="7d", interval="1d")
-        if hist.empty or len(hist) < 2:
-            print(f"❌ Aún no se pudieron obtener datos históricos suficientes para {ticker} tras reintento.")
+    try: # Bloque try-except para toda la función
+        # Se solicita el historial de los últimos 2 días para asegurarnos de tener el volumen de cierre del día anterior
+        hist = stock.history(period="2d", interval="1d")
+
+        # --- CAMBIOS AÑADIDOS AQUÍ PARA ROBUSTEZ ---
+        # Verificar si 'hist' está vacío o si le faltan columnas críticas
+        if hist.empty or not all(col in hist.columns for col in ['Close', 'Volume']):
+            print(f"❌ No se pudieron obtener datos históricos suficientes o faltan columnas ('Close', 'Volume') para {ticker}.")
+            # Intentar obtener de un período más largo si 2d no es suficiente
+            hist = stock.history(period="7d", interval="1d")
+            if hist.empty or not all(col in hist.columns for col in ['Close', 'Volume']):
+                print(f"❌ Aún no se pudieron obtener datos históricos suficientes para {ticker} tras reintento.")
+                return None
+        # ---------------------------------------------
+
+        if len(hist) >= 2:
+            current_volume = hist['Volume'].iloc[-2] # Volumen del día anterior al último dato disponible
+        else:
+            current_volume = 0 # No hay suficientes datos para obtener el volumen del día anterior
+
+
+        # Volvemos a obtener un historial más largo para el cálculo del SMI y soportes/resistencias
+        hist_long = stock.history(period="90d", interval="1d")
+        # --- CAMBIOS AÑADIDOS AQUÍ PARA ROBUSTEZ ---
+        # Verificar si 'hist_long' está vacío o si le faltan columnas críticas
+        if hist_long.empty or not all(col in hist_long.columns for col col in ['Open', 'High', 'Low', 'Close', 'Volume']):
+            print(f"❌ No se pudieron obtener datos históricos largos o faltan columnas ('Open', 'High', 'Low', 'Close') para {ticker}")
             return None
+        # ---------------------------------------------
 
-    # Asegurarse de que el último día completo es el día anterior al actual
-    # Si hoy es lunes, querríamos el volumen del viernes.
-    # El .iloc[-2] nos da la fila del penúltimo día disponible (el día anterior si no estamos en un día bursátil o si es el cierre de hoy).
-    # Necesitamos asegurarnos de que sea el volumen de CIERRE del día anterior, no el de HOY.
-    # La columna 'Volume' de hist corresponde al volumen de ese día.
-    
-    # Para obtener el volumen del día anterior al último día disponible en hist:
-    if len(hist) >= 2:
-        current_volume = hist['Volume'].iloc[-2] # Volumen del día anterior al último dato disponible
-    else:
-        current_volume = 0 # No hay suficientes datos para obtener el volumen del día anterior
-
-
-    # Volvemos a obtener un historial más largo para el cálculo del SMI y soportes/resistencias
-    hist_long = stock.history(period="90d", interval="1d")
-    if hist_long.empty:
-        print(f"❌ No se pudieron obtener datos históricos largos para {ticker}")
-        return None
-
-    try:
         hist_long = calculate_smi_tv(hist_long)
-        
-        if 'SMI_signal' not in hist_long.columns or hist_long['SMI_signal'].empty or len(hist_long['SMI_signal'].dropna()) < 2:
-            print(f"❌ SMI_signal no disponible o insuficiente para {ticker}")
+
+        # --- CAMBIOS AÑADIDOS AQUÍ PARA ROBUSTEZ ---
+        # Verificar si 'SMI_signal' está disponible después del cálculo y tiene datos
+        if 'SMI_signal' not in hist_long.columns or hist_long['SMI_signal'].empty or hist_long['SMI_signal'].dropna().empty:
+            print(f"❌ SMI_signal no disponible o insuficiente para {ticker} después del cálculo.")
             return None
+        # ---------------------------------------------
 
         smi_actual = round(hist_long['SMI_signal'].dropna().iloc[-1], 2)
-        smi_anterior = round(hist_long['SMI_signal'].dropna().iloc[-2], 2)
-        
+        smi_anterior = round(hist_long['SMI_signal'].dropna().iloc[-2], 2) if len(hist_long['SMI_signal'].dropna()) > 1 else smi_actual
+
         smi_tendencia = "subiendo" if smi_actual > smi_anterior else "bajando" if smi_actual < smi_anterior else "estable"
 
         current_price = round(info.get("currentPrice", 0), 2)
-        
-        # El current_volume ya se ha obtenido anteriormente del día anterior
-        # current_volume = current_volume # Ya está asignado correctamente
+        # --- CAMBIO AÑADIDO AQUÍ PARA EVITAR DIVISIÓN POR CERO EN CÁLCULOS FUTUROS ---
+        if current_price == 0:
+            print(f"❌ El precio actual de {ticker} es cero. No se pueden realizar cálculos de porcentaje.")
+            return None # O asigna un valor por defecto si prefieres continuar
+        # --------------------------------------------------------------------------
 
         soportes = find_significant_supports(hist_long, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
@@ -229,8 +237,8 @@ def obtener_datos_yfinance(ticker):
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
         recomendacion = "Indefinido"
-        condicion_rsi = "desconocido"  
-        
+        condicion_rsi = "desconocido"
+
         if nota_empresa <= 2: # SMI muy alto (sobrecompra fuerte: SMI entre 60 y 100)
             condicion_rsi = "muy sobrecomprado"
             smi_tendencia = "mostrando un agotamiento alcista."
@@ -298,16 +306,16 @@ def obtener_datos_yfinance(ticker):
         else:
             drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
             precio_objetivo_compra = base_precio_obj * (1 - drop_percentage_from_base)
-            
+
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
-        
+
         ### --- LÓGICA REFINADA PARA EL MENSAJE DE "DIAS PARA LA ACCION" ---
         dias_para_accion_str = "No estimado"
         smi_diff = hist_long['SMI_signal'].dropna().diff().iloc[-1] if len(hist_long['SMI_signal'].dropna()) > 1 else 0
-        
+
         target_smi_venta_zona = 60
         target_smi_compra_zona = -60
-        zona_umbral = 5  
+        zona_umbral = 5
 
         if smi_actual >= target_smi_venta_zona - zona_umbral and smi_actual > 0:
             dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobrecompra extrema**, indicando que la presión alcista podría estar agotándose y se anticipa una posible corrección o consolidación."
@@ -345,12 +353,12 @@ def obtener_datos_yfinance(ticker):
         sentimiento_analistas_translated = traducir_texto_con_gemini(sentimiento_analistas_raw)
         if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
              sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
-        
+
         datos = {
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
-            "VOLUMEN": current_volume,  
+            "VOLUMEN": current_volume,
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
@@ -372,7 +380,7 @@ def obtener_datos_yfinance(ticker):
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
             "SMI_TENDENCIA": smi_tendencia,
-            "DIAS_PARA_ACCION": dias_para_accion_str 
+            "DIAS_PARA_ACCION": dias_para_accion_str
         }
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}")
@@ -386,19 +394,19 @@ def formatear_numero(valor):
         return f"{numero:,} €"
     except (ValueError, TypeError):
         return "No disponible"
-        
+
 def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€) {data['TICKER']}"
 
     soportes_unicos = []
     temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
-    
+
     if len(temp_soportes) > 0 and temp_soportes[0] > 0:
         soportes_unicos.append(temp_soportes[0])
         for i in range(1, len(temp_soportes)):
             if temp_soportes[i] > 0 and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
                 soportes_unicos.append(temp_soportes[i])
-    
+
     soportes_texto = ""
     if len(soportes_unicos) == 1:
         soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,} €</strong>."
@@ -411,7 +419,7 @@ def construir_prompt_formateado(data):
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
 
     prompt = f"""
-Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
+Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio.
 
 Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
 
@@ -458,7 +466,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 <p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas. Para esta sección, la **nota técnica ({data['NOTA_EMPRESA']} sobre 10) NO debe influir en la valoración**. El análisis debe basarse **exclusivamente en los datos financieros y estratégicos** proporcionados y en una evaluación crítica de su solidez y potencial.</p>
 
-<p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. 
+<p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>.
 En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
 
 <p>[Si 'EXPANSION_PLANES' o 'ACUERDOS' contienen texto relevante y no genérico, sintetízalo y comenta su posible impacto estratégico. Si la información es demasiado breve o indica 'no disponible/no traducible', elabora sobre la importancia general de tales estrategias para el sector de la empresa o para la empresa en sí, sin inventar detalles específicos]. [Aquí el modelo debe elaborar una proyección fundamentada (mínimo 150 palabras) con párrafos de máximo 3 líneas. Debe integrar estas cifras con una interpretación crítica de la solvencia, rentabilidad, crecimiento y las perspectivas estratégicas de la empresa, y **mojarse** con una valoración clara sobre su potencial a largo plazo basada *únicamente* en estos fundamentales].</p>
@@ -476,14 +484,14 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 def enviar_email(texto_generado, asunto_email):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt"  
+    password = "kdgz lvdo wqvt vfkt"
 
     msg = MIMEMultipart()
     msg['From'] = remitente
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
 
-    msg.attach(MIMEText(texto_generado, 'html'))  
+    msg.attach(MIMEText(texto_generado, 'html'))
 
     try:
         servidor = smtplib.SMTP('smtp.gmail.com', 587)
@@ -502,18 +510,18 @@ def generar_contenido_con_gemini(tickers):
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")  
+    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")
 
     for ticker in tickers:
         print(f"\n📊 Procesando ticker: {ticker}")
-        try:  
+        try:
             data = obtener_datos_yfinance(ticker)
             if not data:
                 continue
             prompt, titulo_post = construir_prompt_formateado(data)
 
             max_retries = 3
-            initial_delay = 10  
+            initial_delay = 10
             retries = 0
             delay = initial_delay
 
@@ -524,7 +532,7 @@ def generar_contenido_con_gemini(tickers):
                     print(response.text)
                     asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
                     enviar_email(response.text, asunto_email)
-                    break  
+                    break
                 except Exception as e:
                     if "429 You exceeded your current quota" in str(e):
                         try:
@@ -534,7 +542,7 @@ def generar_contenido_con_gemini(tickers):
                                 delay = max(delay, server_delay + 1)
                         except:
                             pass
-                        
+
                         print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
                         time.sleep(delay)
                         retries += 1
@@ -542,32 +550,32 @@ def generar_contenido_con_gemini(tickers):
                     else:
                         print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
                         break
-            else:  
+            else:
                 print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
-                
-        except Exception as e:  
+
+        except Exception as e:
             print(f"❌ Error crítico al procesar el ticker {ticker}: {e}. Saltando a la siguiente empresa.")
-            continue  
+            continue
 
         print(f"⏳ Esperando 60 segundos antes de procesar el siguiente ticker...")
-        time.sleep(60)  
+        time.sleep(60)
 
 def main():
     all_tickers = leer_google_sheets()[1:]
-    
+
     if not all_tickers:
         print("No hay tickers para procesar.")
         return
 
     day_of_week = datetime.today().weekday()
-    
-    num_tickers_per_day = 10  
+
+    num_tickers_per_day = 10
     total_tickers_in_sheet = len(all_tickers)
-    
+
     start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
-    
+
     end_index = start_index + num_tickers_per_day
-    
+
     tickers_for_today = []
     if end_index <= total_tickers_in_sheet:
         tickers_for_today = all_tickers[start_index:end_index]
