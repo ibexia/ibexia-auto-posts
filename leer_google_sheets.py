@@ -32,7 +32,9 @@ def leer_google_sheets():
 
     service = build('sheets', 'v4', credentials=creds)
     sheet = service.spreadsheets().values()
-    result = sheet.get(values=spreadsheet_id, range=range_name).execute()
+    # Modificación aquí: 'values' no es un argumento esperado para sheet.get().
+    # Los argumentos deben ser 'spreadsheetId' y 'range'.
+    result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
     if not values:
@@ -65,22 +67,14 @@ def calculate_smi_tv(df):
 
     smi_raw = pd.Series(0.0, index=df.index)
     
-    # Manejo robusto de la división por cero y valores muy pequeños en avgdiff
-    # Añadimos un pequeño epsilon para evitar divisiones por cero exactas
-    # y nos aseguramos de que avgrel y avgdiff sean Series para operar correctamente.
-    
-    # Identificar índices donde avgdiff no es cero y no es NaN
     valid_indices = avgdiff.index[avgdiff.notna()]
     
-    # Filtrar por valores absolutos mayores que un umbral muy pequeño
     non_zero_avgdiff_and_valid = avgdiff.loc[valid_indices][avgdiff.loc[valid_indices].abs() > 1e-9]
 
     if not non_zero_avgdiff_and_valid.empty:
-        # Realizar la operación solo en los índices válidos
         smi_raw.loc[non_zero_avgdiff_and_valid.index] = (avgrel.loc[non_zero_avgdiff_and_valid.index] / (non_zero_avgdiff_and_valid / 2)) * 100
     
-    # Rellenar cualquier NaN restante en smi_raw (por ejemplo, al inicio de la serie por rolling/ewm)
-    smi_raw = smi_raw.fillna(method='bfill').fillna(method='ffill') # Rellena NaNs hacia atrás y luego hacia adelante
+    smi_raw = smi_raw.fillna(method='bfill').fillna(method='ffill')
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
@@ -92,10 +86,6 @@ def calculate_smi_tv(df):
     return df
 
 def find_significant_supports(df, current_price, window=40, tolerance_percent=0.01, max_deviation_percent=0.15):
-    """
-    Identifica los 3 soportes más significativos y cercanos al precio actual
-    basándose en mínimos locales y agrupaciones de precios.
-    """
     recent_data = df.tail(window)
     lows = recent_data['Low']
     
@@ -112,8 +102,7 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for support in potential_supports:
         found_zone = False
         for zone_level in support_zones.keys():
-            # Añadir una pequeña tolerancia para evitar división por cero si support es 0 o muy cercano
-            if support != 0 and zone_level != 0 and abs(support - zone_level) / support <= tolerance_percent: # Added zone_level != 0
+            if support != 0 and zone_level != 0 and abs(support - zone_level) / support <= tolerance_percent:
                 support_zones[zone_level].append(support)
                 found_zone = True
                 break
@@ -124,7 +113,6 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for zone_level, values in support_zones.items():
         avg_support = np.mean(values)
         if avg_support < current_price:
-            # Añadir una pequeña tolerancia para evitar división por cero si current_price es 0 o muy cercano
             if current_price != 0 and abs(current_price - avg_support) / current_price <= max_deviation_percent:
                 final_supports.append({'level': avg_support, 'frequency': len(values)})
 
@@ -223,15 +211,13 @@ def obtener_datos_yfinance(ticker):
             print(f"❌ SMI_signal no disponible o insuficiente para {ticker}")
             return None
 
-        # Asegúrate de que los valores de SMI_signal no sean NaN o infinitos antes de redondear
         smi_actual = hist_long['SMI_signal'].dropna().iloc[-1]
         smi_anterior = hist_long['SMI_signal'].dropna().iloc[-2]
         
-        # Comprobar si los valores son finitos antes de redondear
         if np.isfinite(smi_actual):
             smi_actual = round(smi_actual, 2)
         else:
-            smi_actual = 0.0 # O manejar de otra forma apropiada si SMI es infinito/NaN
+            smi_actual = 0.0
 
         if np.isfinite(smi_anterior):
             smi_anterior = round(smi_anterior, 2)
@@ -252,56 +238,56 @@ def obtener_datos_yfinance(ticker):
         recomendacion = "Indefinido"
         condicion_rsi = "desconocido"  
         
-        if nota_empresa <= 2: # SMI muy alto (sobrecompra fuerte: SMI entre 60 y 100)
+        if nota_empresa <= 2:
             condicion_rsi = "muy sobrecomprado"
             smi_tendencia = "mostrando un agotamiento alcista."
             if smi_actual > smi_anterior:
                 recomendacion = "Sobrecompra extrema. Riesgo inminente de corrección, considerar ventas."
             else:
                 recomendacion = "Vender / Tomar ganancias. El impulso indica una corrección en curso."
-        elif 2 < nota_empresa <= 4: # SMI alto (sobrecompra moderada: SMI entre 30 y 60)
+        elif 2 < nota_empresa <= 4:
             condicion_rsi = "algo sobrecomprado"
             smi_tendencia = "con un impulso alcista que podría estar agotándose."
             if smi_actual > smi_anterior:
                 recomendacion = "Atentos a posible sobrecompra. El impulso alcista se está agotando."
             else:
                 recomendacion = "Vigilar posible venta. El impulso muestra una disminución."
-        elif 4 < nota_empresa <= 5: # SMI ligeramente sobrecomprado / entrando en zona neutra (SMI entre 10 y 30)
+        elif 4 < nota_empresa <= 5:
             condicion_rsi = "muy poca sobrecompra"
             smi_tendencia = "manteniendo un impulso alcista sólido."
             if smi_actual > smi_anterior:
                 recomendacion = "Impulso alcista fuerte. Cuidado con niveles de resistencia."
             else:
                 recomendacion = "Tendencia de enfriamiento. Cuidado. Revisar soportes y resistencias."
-        elif 5 < nota_empresa < 6: # Zona neutra (SMI entre -10 y 10)
+        elif 5 < nota_empresa < 6:
             condicion_rsi = "neutral"
             smi_tendencia = "en una fase de equilibrio."
             if smi_actual > smi_anterior:
                 recomendacion = "Mantener (Neutro). El precio gana impulso."
             else:
                 recomendacion = "Mantener (Neutro). El precio busca equilibrio."
-        elif 6 <= nota_empresa < 7: # SMI ligeramente sobrevendido / entrando en zona neutra (SMI entre -30 y -10)
+        elif 6 <= nota_empresa < 7:
             condicion_rsi = "muy poca sobreventa"
             smi_tendencia = "mostrando señales de recuperación."
             if smi_actual > smi_anterior:
                 recomendacion = "Señal de recuperación. Posible compra con confirmación."
             else:
                 recomendacion = "El impulso bajista persiste. Considerar cautela."
-        elif 7 <= nota_empresa < 8: # SMI bajo (sobreventa moderada: SMI entre -60 y -30)
+        elif 7 <= nota_empresa < 8:
             condicion_rsi = "algo de sobreventa"
             smi_tendencia = "en una zona de sobreventa moderada, buscando un rebote."
             if smi_actual > smi_anterior:
                 recomendacion = "Considerar posible compra. El impulso muestra un giro al alza."
             else:
                 recomendacion = "Sobreventa moderada. Evaluar fortaleza de soportes, el precio podría caer más."
-        elif 8 <= nota_empresa < 9: # SMI muy bajo (sobreventa fuerte: SMI entre -100 y -60)
+        elif 8 <= nota_empresa < 9:
             condicion_rsi = "sobreventa"
             smi_tendencia = "en una zona de sobreventa fuerte, con potencial de reversión."
             if smi_actual > smi_anterior:
                 recomendacion = "Se acerca la hora de comprar. Fuerte señal de rebote."
             else:
                 recomendacion = "Sobreventa significativa. Esperar confirmación de rebote antes de comprar."
-        elif nota_empresa >= 9: # SMI extremadamente bajo (sobreventa extrema: SMI muy por debajo de -60)
+        elif nota_empresa >= 9:
             condicion_rsi = "extremadamente sobrevendido"
             smi_tendencia = "en una sobreventa extrema, lo que sugiere un rebote inminente."
             if smi_actual > smi_anterior:
@@ -322,7 +308,6 @@ def obtener_datos_yfinance(ticker):
             
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
         
-        ### --- LÓGICA REFINADA PARA EL MENSAJE DE "DIAS PARA LA ACCION" ---
         dias_para_accion_str = "No estimado"
         smi_diff = hist_long['SMI_signal'].dropna().diff().iloc[-1] if len(hist_long['SMI_signal'].dropna()) > 1 else 0
         
@@ -350,7 +335,6 @@ def obtener_datos_yfinance(ticker):
                 dias_para_accion_str = "el precio está consolidando una tendencia bajista y podría estar próximo a un punto de inflexión para una potencial entrada o compra."
         else:
              dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
-        # --------------------------------------------------------------------------------
 
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
         expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000])
