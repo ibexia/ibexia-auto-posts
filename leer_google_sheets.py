@@ -51,81 +51,25 @@ ema_signal_len = 10
 smooth_period = 5
 
 def calculate_smi_tv(df):
-    # Ensure all required columns exist and are numeric
-    for col in ['High', 'Low', 'Close']:
-        if col not in df.columns:
-            print(f"Advertencia: Columna '{col}' no encontrada en el DataFrame.")
-            df['SMI'] = np.nan
-            df['SMI_signal'] = np.nan
-            return df
-        # Attempt to convert to numeric, coercing errors to NaN
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-    
-    # Drop rows with NaN in critical columns at the start of calculation
-    df_cleaned = df.dropna(subset=['High', 'Low', 'Close']).copy()
-
-    if df_cleaned.empty:
-        print("Advertencia: DataFrame vacío después de limpiar NaNs. No se puede calcular SMI.")
-        df['SMI'] = np.nan
-        df['SMI_signal'] = np.nan
-        return df
-
-    high = df_cleaned['High']
-    low = df_cleaned['Low']
-    close = df_cleaned['Close']
-
-    # Ensure enough data for rolling windows, plus a buffer for initial NaNs
-    min_required_data = max(length_k, length_d, ema_signal_len, smooth_period) + 2 
-    if len(df_cleaned) < min_required_data:
-        print(f"Advertencia: No hay suficientes datos ({len(df_cleaned)}) para calcular SMI. Se requieren al menos {min_required_data}.")
-        df['SMI'] = np.nan
-        df['SMI_signal'] = np.nan
-        return df
+    high = df['High']
+    low = df['Low']
+    close = df['Close']
 
     hh = high.rolling(window=length_k).max()
     ll = low.rolling(window=length_k).min()
-    
     diff = hh - ll
     rdiff = close - (hh + ll) / 2
 
     avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
     avgdiff = diff.ewm(span=length_d, adjust=False).mean()
 
-    # Initialize smi_raw with NaNs for all original DataFrame indices
-    smi_raw = pd.Series(np.nan, index=df.index)
+    smi_raw = (avgrel / (avgdiff / 2)) * 100
+    smi_raw[avgdiff == 0] = 0.0
 
-    # Calculate SMI for non-NaN avgrel and avgdiff, and where avgdiff is not zero
-    # Use .loc to assign values back to the original index
-    valid_indices = avgrel.notna() & avgdiff.notna() & (avgdiff.abs() > 1e-9)
-    if valid_indices.any():
-        smi_raw.loc[df_cleaned.index[valid_indices]] = (avgrel.loc[df_cleaned.index[valid_indices]] / (avgdiff.loc[df_cleaned.index[valid_indices]] / 2)) * 100
-    
-    # Handle infinite values that might still creep in due to very small denominators
-    smi_raw.replace([np.inf, -np.inf], np.nan, inplace=True)
-
-    # Fill remaining NaNs using interpolation, then bfill/ffill for edges
-    # Apply interpolation and fill on the subset that had valid calculations
-    smi_raw_filled = smi_raw.interpolate(method='linear', limit_direction='both')
-    smi_raw_filled = smi_raw_filled.fillna(method='bfill').fillna(method='ffill')
-
-    # If smi_raw_filled is still all NaN, it means SMI could not be meaningfully calculated
-    if smi_raw_filled.isna().all():
-        print("Advertencia: SMI_raw es completamente NaN después de la interpolación. No se puede calcular SMI.")
-        df['SMI'] = np.nan
-        df['SMI_signal'] = np.nan
-        return df
-
-    # Further calculations, ensuring they are not performed on all NaNs
-    smi_smoothed = smi_raw_filled.rolling(window=smooth_period).mean()
+    smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
 
-    # Final check for SMI_signal after all calculations
-    if smi_signal.isna().all():
-        print("Advertencia: SMI_signal es completamente NaN después de suavizar. No se puede obtener un SMI válido.")
-        df['SMI'] = np.nan
-        df['SMI_signal'] = np.nan
-        return df
-
+    df = df.copy()
     df['SMI'] = smi_smoothed
     df['SMI_signal'] = smi_signal
     
@@ -152,7 +96,7 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for support in potential_supports:
         found_zone = False
         for zone_level in support_zones.keys():
-            if support != 0 and zone_level != 0 and abs(support - zone_level) / support <= tolerance_percent:
+            if abs(support - zone_level) / support <= tolerance_percent:
                 support_zones[zone_level].append(support)
                 found_zone = True
                 break
@@ -163,7 +107,7 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for zone_level, values in support_zones.items():
         avg_support = np.mean(values)
         if avg_support < current_price:
-            if current_price != 0 and abs(current_price - avg_support) / current_price <= max_deviation_percent:
+            if abs(current_price - avg_support) / current_price <= max_deviation_percent:
                 final_supports.append({'level': avg_support, 'frequency': len(values)})
 
     final_supports.sort(key=lambda x: (abs(x['level'] - current_price), -x['frequency']))
@@ -230,55 +174,32 @@ def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
     
-    hist = stock.history(period="2d", interval="1d")
+    hist = stock.history(period="90d", interval="1d")
 
-    if hist.empty or len(hist) < 2:
-        print(f"❌ No se pudieron obtener datos históricos suficientes para {ticker} para calcular el volumen del día anterior.")
-        hist = stock.history(period="7d", interval="1d")
-        if hist.empty or len(hist) < 2:
-            print(f"❌ Aún no se pudieron obtener datos históricos suficientes para {ticker} tras reintento.")
-            return None
-
-    if len(hist) >= 2:
-        current_volume = hist['Volume'].iloc[-2]
-    else:
-        current_volume = 0 
-
-    hist_long = stock.history(period="90d", interval="1d")
-    if hist_long.empty:
-        print(f"❌ No se pudieron obtener datos históricos largos para {ticker}")
+    if hist.empty:
+        print(f"❌ No se pudieron obtener datos históricos para {ticker}")
         return None
-    
-    if hist_long.empty or not all(col in hist_long.columns for col in ['High', 'Low', 'Close']):
-        print(f"❌ Datos históricos incompletos o vacíos para {ticker} para el cálculo del SMI.")
-        return None
-
 
     try:
-        hist_long = calculate_smi_tv(hist_long)
+        hist = calculate_smi_tv(hist)
         
-        if 'SMI_signal' not in hist_long.columns or hist_long['SMI_signal'].empty or len(hist_long['SMI_signal'].dropna()) < 2:
+        if 'SMI_signal' not in hist.columns or hist['SMI_signal'].empty or len(hist['SMI_signal'].dropna()) < 2:
             print(f"❌ SMI_signal no disponible o insuficiente para {ticker}")
             return None
 
-        smi_actual = hist_long['SMI_signal'].dropna().iloc[-1]
-        smi_anterior = hist_long['SMI_signal'].dropna().iloc[-2]
+        smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
+        smi_anterior = round(hist['SMI_signal'].dropna().iloc[-2], 2)
         
-        if np.isfinite(smi_actual):
-            smi_actual = round(smi_actual, 2)
-        else:
-            smi_actual = 0.0
-
-        if np.isfinite(smi_anterior):
-            smi_anterior = round(smi_anterior, 2)
-        else:
-            smi_anterior = 0.0
-
+        # Original smi_tendencia logic (will be overwritten for extreme cases)
         smi_tendencia = "subiendo" if smi_actual > smi_anterior else "bajando" if smi_actual < smi_anterior else "estable"
 
         current_price = round(info.get("currentPrice", 0), 2)
         
-        soportes = find_significant_supports(hist_long, current_price)
+        # --- CORRECCIÓN AQUÍ: VOLVIENDO AL CÁLCULO DE VOLUMEN ORIGINAL ---
+        current_volume = info.get("volume", 0)
+        # ------------------------------------------------------------------
+
+        soportes = find_significant_supports(hist, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
         soporte_2 = soportes[1] if len(soportes) > 1 else 0
         soporte_3 = soportes[2] if len(soportes) > 2 else 0
@@ -286,58 +207,59 @@ def obtener_datos_yfinance(ticker):
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
         recomendacion = "Indefinido"
-        condicion_rsi = "desconocido"  
+        condicion_rsi = "desconocido" 
         
-        if nota_empresa <= 2:
+        # --- LÓGICA DE RECOMENDACIÓN Y TENDENCIA DEL SMI MÁS MATIZADA ---
+        if nota_empresa <= 2: # SMI muy alto (sobrecompra fuerte: SMI entre 60 y 100)
             condicion_rsi = "muy sobrecomprado"
             smi_tendencia = "mostrando un agotamiento alcista."
             if smi_actual > smi_anterior:
                 recomendacion = "Sobrecompra extrema. Riesgo inminente de corrección, considerar ventas."
             else:
                 recomendacion = "Vender / Tomar ganancias. El impulso indica una corrección en curso."
-        elif 2 < nota_empresa <= 4:
+        elif 2 < nota_empresa <= 4: # SMI alto (sobrecompra moderada: SMI entre 30 y 60)
             condicion_rsi = "algo sobrecomprado"
             smi_tendencia = "con un impulso alcista que podría estar agotándose."
             if smi_actual > smi_anterior:
                 recomendacion = "Atentos a posible sobrecompra. El impulso alcista se está agotando."
             else:
                 recomendacion = "Vigilar posible venta. El impulso muestra una disminución."
-        elif 4 < nota_empresa <= 5:
+        elif 4 < nota_empresa <= 5: # SMI ligeramente sobrecomprado / entrando en zona neutra (SMI entre 10 y 30)
             condicion_rsi = "muy poca sobrecompra"
             smi_tendencia = "manteniendo un impulso alcista sólido."
             if smi_actual > smi_anterior:
                 recomendacion = "Impulso alcista fuerte. Cuidado con niveles de resistencia."
             else:
                 recomendacion = "Tendencia de enfriamiento. Cuidado. Revisar soportes y resistencias."
-        elif 5 < nota_empresa < 6:
+        elif 5 < nota_empresa < 6: # Zona neutra (SMI entre -10 y 10)
             condicion_rsi = "neutral"
             smi_tendencia = "en una fase de equilibrio."
             if smi_actual > smi_anterior:
                 recomendacion = "Mantener (Neutro). El precio gana impulso."
             else:
                 recomendacion = "Mantener (Neutro). El precio busca equilibrio."
-        elif 6 <= nota_empresa < 7:
+        elif 6 <= nota_empresa < 7: # SMI ligeramente sobrevendido / entrando en zona neutra (SMI entre -30 y -10)
             condicion_rsi = "muy poca sobreventa"
             smi_tendencia = "mostrando señales de recuperación."
             if smi_actual > smi_anterior:
                 recomendacion = "Señal de recuperación. Posible compra con confirmación."
             else:
                 recomendacion = "El impulso bajista persiste. Considerar cautela."
-        elif 7 <= nota_empresa < 8:
+        elif 7 <= nota_empresa < 8: # SMI bajo (sobreventa moderada: SMI entre -60 y -30)
             condicion_rsi = "algo de sobreventa"
             smi_tendencia = "en una zona de sobreventa moderada, buscando un rebote."
             if smi_actual > smi_anterior:
                 recomendacion = "Considerar posible compra. El impulso muestra un giro al alza."
             else:
                 recomendacion = "Sobreventa moderada. Evaluar fortaleza de soportes, el precio podría caer más."
-        elif 8 <= nota_empresa < 9:
+        elif 8 <= nota_empresa < 9: # SMI muy bajo (sobreventa fuerte: SMI entre -100 y -60)
             condicion_rsi = "sobreventa"
             smi_tendencia = "en una zona de sobreventa fuerte, con potencial de reversión."
             if smi_actual > smi_anterior:
                 recomendacion = "Se acerca la hora de comprar. Fuerte señal de rebote."
             else:
                 recomendacion = "Sobreventa significativa. Esperar confirmación de rebote antes de comprar."
-        elif nota_empresa >= 9:
+        elif nota_empresa >= 9: # SMI extremadamente bajo (sobreventa extrema: SMI muy por debajo de -60)
             condicion_rsi = "extremadamente sobrevendido"
             smi_tendencia = "en una sobreventa extrema, lo que sugiere un rebote inminente."
             if smi_actual > smi_anterior:
@@ -358,12 +280,13 @@ def obtener_datos_yfinance(ticker):
             
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
         
+        ### --- LÓGICA REFINADA PARA EL MENSAJE DE "DIAS PARA LA ACCION" ---
         dias_para_accion_str = "No estimado"
-        smi_diff = hist_long['SMI_signal'].dropna().diff().iloc[-1] if len(hist_long['SMI_signal'].dropna()) > 1 else 0
+        smi_diff = hist['SMI_signal'].dropna().diff().iloc[-1] if len(hist['SMI_signal'].dropna()) > 1 else 0
         
         target_smi_venta_zona = 60
         target_smi_compra_zona = -60
-        zona_umbral = 5  
+        zona_umbral = 5 
 
         if smi_actual >= target_smi_venta_zona - zona_umbral and smi_actual > 0:
             dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobrecompra extrema**, indicando que la presión alcista podría estar agotándose y se anticipa una posible corrección o consolidación."
@@ -385,6 +308,7 @@ def obtener_datos_yfinance(ticker):
                 dias_para_accion_str = "el precio está consolidando una tendencia bajista y podría estar próximo a un punto de inflexión para una potencial entrada o compra."
         else:
              dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
+        # --------------------------------------------------------------------------------
 
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
         expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000])
@@ -409,7 +333,7 @@ def obtener_datos_yfinance(ticker):
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
-            "RESISTENCIA": round(hist_long["High"].max(), 2),
+            "RESISTENCIA": round(hist["High"].max(), 2),
             "CONDICION_RSI": condicion_rsi,
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
@@ -451,7 +375,7 @@ def construir_prompt_formateado(data):
     if len(temp_soportes) > 0 and temp_soportes[0] > 0:
         soportes_unicos.append(temp_soportes[0])
         for i in range(1, len(temp_soportes)):
-            if temp_soportes[i] > 0 and soportes_unicos and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
+            if temp_soportes[i] > 0 and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
                 soportes_unicos.append(temp_soportes[i])
     
     soportes_texto = ""
@@ -465,7 +389,7 @@ def construir_prompt_formateado(data):
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
 
-    prompt = f'''
+    prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
 
 Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
@@ -491,7 +415,7 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 - La tendencia de impulso actual de la empresa se caracteriza por: {data['SMI_TENDENCIA']}.
 - Mi estimación para una potencial zona de acción significativa (compra o venta) indica que: {data['DIAS_PARA_ACCION']}.
 
-Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como un analista.
+Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista.
 
 ---
 <h1>{titulo_post}</h1>
@@ -523,7 +447,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 
 <p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa. No constituye una recomendación de inversión. Se recomienda analizar cada decisión de forma individual, teniendo en cuenta el perfil de riesgo y los objetivos financieros personales.</p>
 
-'''
+"""
 
     return prompt, titulo_post
 
@@ -531,7 +455,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 def enviar_email(texto_generado, asunto_email):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt"  
+    password = "kdgz lvdo wqvt vfkt" 
 
     msg = MIMEMultipart()
     msg['From'] = remitente
@@ -561,7 +485,7 @@ def generar_contenido_con_gemini(tickers):
 
     for ticker in tickers:
         print(f"\n📊 Procesando ticker: {ticker}")
-        try:  
+        try: 
             data = obtener_datos_yfinance(ticker)
             if not data:
                 continue
@@ -600,12 +524,12 @@ def generar_contenido_con_gemini(tickers):
             else:  
                 print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
                 
-        except Exception as e:  
+        except Exception as e: 
             print(f"❌ Error crítico al procesar el ticker {ticker}: {e}. Saltando a la siguiente empresa.")
-            continue  
+            continue 
 
         print(f"⏳ Esperando 60 segundos antes de procesar el siguiente ticker...")
-        time.sleep(60)  
+        time.sleep(60) 
 
 def main():
     all_tickers = leer_google_sheets()[1:]
