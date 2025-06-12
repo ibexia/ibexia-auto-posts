@@ -245,10 +245,11 @@ def obtener_datos_yfinance(ticker):
         soporte_2 = max(0.01, soporte_2) if soporte_2 == 0 and current_price != 0 else soporte_2
         soporte_3 = max(0.01, soporte_3) if soporte_3 == 0 and current_price != 0 else soporte_3
 
-        # Obtener el volumen del día anterior
+        # --- CAMBIO AÑADIDO Y MANTENIDO: Obtener el volumen del día anterior ---
         current_volume = 0
         if len(hist['Volume']) >= 2: # Asegúrate de que haya al menos 2 días de datos para el día anterior
             current_volume = hist['Volume'].iloc[-2] # El volumen del penúltimo día (día anterior)
+        # --- FIN DEL CAMBIO MANTENIDO ---
 
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
@@ -417,10 +418,10 @@ def formatear_numero(valor):
     except (ValueError, TypeError):
         return "No disponible"
         
-def construir_prompt_formateado(data, next_tickers_list=None):
+def construir_prompt_formateado(data):
     """
     Construye el prompt HTML formateado para la API de Gemini
-    a partir de los datos obtenidos y la lista de próximos tickers.
+    a partir de los datos obtenidos.
     """
     soportes_unicos = []
     temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
@@ -450,32 +451,20 @@ def construir_prompt_formateado(data, next_tickers_list=None):
 
     # Derive values for the strategy section dynamically
     entry_point_1_val = max(0.01, data['SOPORTE_1'])
-    # entry_point_2 is typically the second support, or a slightly lower point from the first for tiered entry
-    entry_point_2_val = max(0.01, data['SOPORTE_2'] if data['SOPORTE_2'] > 0 else data['SOPORTE_1'] * 0.98) # Use S2 if available, else a bit below S1
-    stop_loss_val = max(0.01, data['SOPORTE_3'] * 0.98 if data['SOPORTE_3'] > 0 else data['SOPORTE_2'] * 0.98 if data['SOPORTE_2'] > 0 else data['SOPORTE_1'] * 0.98) # Slightly below the lowest relevant support
-    take_profit_val = data['RESISTENCIA'] # At the resistance
+    entry_point_2_val = max(0.01, data['SOPORTE_2'] if data['SOPORTE_2'] > 0 else data['SOPORTE_1'] * 0.98) 
+    stop_loss_val = max(0.01, data['SOPORTE_3'] * 0.98 if data['SOPORTE_3'] > 0 else data['SOPORTE_2'] * 0.98 if data['SOPORTE_2'] > 0 else data['SOPORTE_1'] * 0.98) 
+    take_profit_val = data['RESISTENCIA'] 
 
     # Ensure entry_point_1_val is greater than or equal to entry_point_2_val for logical consistency
     if entry_point_1_val < entry_point_2_val:
-        entry_point_1_val, entry_point_2_val = entry_point_2_val, entry_point_1_val # Swap them
+        entry_point_1_val, entry_point_2_val = entry_point_2_val, entry_point_1_val 
 
     # If the two entry points are too close, make the second one slightly lower
     if abs(entry_point_1_val - entry_point_2_val) / max(0.01, entry_point_1_val) < 0.005:
-        if entry_point_2_val > 0.01: # Ensure not to make it zero or negative
+        if entry_point_2_val > 0.01: 
             entry_point_2_val = max(0.01, entry_point_1_val * 0.99)
-        else: # If entry_point_2_val is already very small, set it to a default offset from entry_point_1_val
-            entry_point_2_val = max(0.01, entry_point_1_val - 0.1) # Arbitrary small offset for distinctness
-
-
-    # Logic for next_day_company_placeholder - Now gets up to 10 next tickers
-    next_day_company_dynamic = "otra empresa relevante o un sector en tendencia"
-    if next_tickers_list and len(next_tickers_list) > 0:
-        next_companies_to_show = next_tickers_list[:10] # Take up to the next 10
-        if len(next_companies_to_show) == 1:
-            next_day_company_dynamic = next_companies_to_show[0]
-        elif len(next_companies_to_show) > 1:
-            # Join with comma and 'y' for the last one
-            next_day_company_dynamic = f"{', '.join(next_companies_to_show[:-1])} y {next_companies_to_show[-1]}"
+        else: 
+            entry_point_2_val = max(0.01, entry_point_1_val - 0.1) 
 
 
     prompt = f"""
@@ -575,7 +564,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 
 ---
 <h2>¿Qué analizaremos mañana? ¡No te lo pierdas!</h2>
-<p>Mañana, pondremos bajo la lupa a <strong>{next_day_company_dynamic}</strong>. ¿Será el próximo candidato para una oportunidad de compra o venta? ¡Vuelve mañana a la misma hora para descubrirlo y seguir ampliando tu conocimiento del mercado!</p>
+<p>Mañana, pondremos bajo la lupa a <strong>[Crea aquí el nombre de otra empresa relevante o un sector en tendencia que la IA pueda sugerir para un futuro análisis]</strong>. ¿Será el próximo candidato para una oportunidad de compra o venta? ¡Vuelve mañana a la misma hora para descubrirlo y seguir ampliando tu conocimiento del mercado!</p>
 
 ---
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
@@ -630,19 +619,16 @@ def generar_contenido_con_gemini(tickers_list):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")  
 
-    for i, ticker in enumerate(tickers_list):
+    for ticker in tickers_list:
         print(f"\n📊 Procesando ticker: {ticker}")
         try:  
             data = obtener_datos_yfinance(ticker)
             if not data:
                 continue
 
-            # Obtener los próximos 10 tickers de la lista
-            next_tickers_for_prompt = []
-            if i + 1 < len(tickers_list):
-                next_tickers_for_prompt = tickers_list[i+1 : i+11] # Toma hasta 10 elementos siguientes
-
-            prompt, asunto_email = construir_prompt_formateado(data, next_tickers_for_prompt)
+            # El prompt se construye sin lógica de "próximos tickers" aquí,
+            # dejando la sugerencia a Gemini.
+            prompt, asunto_email = construir_prompt_formateado(data)
 
             max_retries = 3
             initial_delay = 10  
@@ -680,17 +666,14 @@ def generar_contenido_con_gemini(tickers_list):
 
 
 if __name__ == '__main__':
-    # Descomenta la línea de abajo para leer tickers de Google Sheets en producción.
+    # Esta línea lee los tickers de Google Sheets.
     # Asegúrate de que las variables de entorno GOOGLE_APPLICATION_CREDENTIALS y SPREADSHEET_ID estén configuradas.
-    # tickers_from_sheet = leer_google_sheets() 
+    tickers_from_sheet = leer_google_sheets() 
     
-    # Para pruebas, usa una lista de tickers de ejemplo. Elimínala o coméntala para producción.
-    # He añadido más tickers para que puedas ver el efecto de las 10 siguientes empresas.
-    tickers_from_sheet = [
-        "MSFT", "GOOGL", "AAPL", "AMZN", "TSLA", "NVDA", "META", "NFLX", "ADBE", "PYPL",
-        "CRM", "INTC", "CSCO", "CMCSA", "PEP", "KO", "DIS", "BA", "MCD", "NKE",
-        "V", "MA", "JPM", "BAC", "WFC", "XOM", "CVX", "SPG", "PLD", "EQIX"
-    ]
+    # NO se usará una lista de tickers de ejemplo para producción.
+    # Si deseas probar con un ticker fijo, puedes descomentar la siguiente línea
+    # y comentar la línea de leer_google_sheets()
+    # tickers_from_sheet = ["MSFT"] 
     
     if tickers_from_sheet:
         generar_contenido_con_gemini(tickers_from_sheet)
