@@ -63,8 +63,11 @@ def calculate_smi_tv(df):
     avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
     avgdiff = diff.ewm(span=length_d, adjust=False).mean()
 
-    smi_raw = (avgrel / (avgdiff / 2)) * 100
-    smi_raw[avgdiff == 0] = 0.0
+    # Manejo de división por cero para avgdiff
+    smi_raw = pd.Series(0.0, index=df.index) # Inicializa con ceros para manejar casos donde avgdiff es 0
+    non_zero_avgdiff_mask = avgdiff != 0
+    smi_raw[non_zero_avgdiff_mask] = (avgrel[non_zero_avgdiff_mask] / (avgdiff[non_zero_avgdiff_mask] / 2)) * 100
+    # No es necesario smi_raw[avgdiff == 0] = 0.0 si ya se inicializa a 0.0 y se calcula solo para no-ceros.
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
@@ -87,16 +90,20 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     
     for i in range(1, len(lows) - 1):
         if lows.iloc[i] < lows.iloc[i-1] and lows.iloc[i] < lows.iloc[i+1]:
-            potential_supports.append(lows.iloc[i])
+            # Asegúrate de que el soporte no sea cero antes de añadirlo
+            if lows.iloc[i] > 0:
+                potential_supports.append(lows.iloc[i])
 
     if not potential_supports:
-        potential_supports = lows.tolist()
+        # Filtrar lows que son cero o negativos si se usan como soportes por defecto
+        potential_supports = [l for l in lows.tolist() if l > 0]
         
     support_zones = {}
     for support in potential_supports:
         found_zone = False
         for zone_level in support_zones.keys():
-            if abs(support - zone_level) / support <= tolerance_percent:
+            # Evitar división por cero si zone_level es 0
+            if zone_level != 0 and abs(support - zone_level) / zone_level <= tolerance_percent:
                 support_zones[zone_level].append(support)
                 found_zone = True
                 break
@@ -107,7 +114,8 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for zone_level, values in support_zones.items():
         avg_support = np.mean(values)
         if avg_support < current_price:
-            if abs(current_price - avg_support) / current_price <= max_deviation_percent:
+            # Evitar división por cero si current_price es 0
+            if current_price != 0 and abs(current_price - avg_support) / current_price <= max_deviation_percent:
                 final_supports.append({'level': avg_support, 'frequency': len(values)})
 
     final_supports.sort(key=lambda x: (abs(x['level'] - current_price), -x['frequency']))
@@ -115,7 +123,8 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     top_3_supports = [round(s['level'], 2) for s in final_supports if s['level'] < current_price][:3]
     
     if len(top_3_supports) < 3:
-        sorted_lows = sorted([l for l in lows.tolist() if l < current_price], reverse=True)
+        # Filtrar lows que son cero o negativos
+        sorted_lows = sorted([l for l in lows.tolist() if l < current_price and l > 0], reverse=True)
         for low_val in sorted_lows:
             rounded_low_val = round(low_val, 2)
             if rounded_low_val not in top_3_supports:
@@ -125,9 +134,13 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     
     while len(top_3_supports) < 3:
         if len(top_3_supports) > 0:
-            top_3_supports.append(round(top_3_supports[-1] * 0.95, 2))
+            # Asegura que el cálculo no genere un soporte cero o negativo si el último es muy pequeño
+            next_support = round(top_3_supports[-1] * 0.95, 2)
+            top_3_supports.append(max(0.01, next_support)) # Asegura un mínimo de 0.01
         else:
-            top_3_supports.append(round(current_price * 0.90, 2))
+            # Asegura que el cálculo no genere un soporte cero o negativo si current_price es muy pequeño
+            default_support = round(current_price * 0.90, 2)
+            top_3_supports.append(max(0.01, default_support)) # Asegura un mínimo de 0.01
             
     return top_3_supports
 
@@ -181,6 +194,12 @@ def obtener_datos_yfinance(ticker):
         return None
 
     try:
+        # Asegúrate de que las columnas críticas existan antes de calcular SMI
+        required_cols = ['High', 'Low', 'Close']
+        if not all(col in hist.columns for col in required_cols):
+            print(f"❌ Datos históricos incompletos para {ticker}. Faltan columnas: {set(required_cols) - set(hist.columns)}")
+            return None
+
         hist = calculate_smi_tv(hist)
         
         if 'SMI_signal' not in hist.columns or hist['SMI_signal'].empty or len(hist['SMI_signal'].dropna()) < 2:
@@ -190,24 +209,32 @@ def obtener_datos_yfinance(ticker):
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
         smi_anterior = round(hist['SMI_signal'].dropna().iloc[-2], 2)
         
-        # Original smi_tendencia logic (will be overwritten for extreme cases)
         smi_tendencia = "subiendo" if smi_actual > smi_anterior else "bajando" if smi_actual < smi_anterior else "estable"
 
         current_price = round(info.get("currentPrice", 0), 2)
+        # Si current_price es 0, no podemos calcular soportes significativos basados en porcentajes
+        if current_price == 0:
+            print(f"Advertencia: El precio actual para {ticker} es 0. Los soportes se establecerán en 0 o un valor mínimo.")
+            soportes = [0.00, 0.00, 0.00] # O un valor mínimo para evitar errores
+        else:
+            soportes = find_significant_supports(hist, current_price)
         
-        # --- CORRECCIÓN AQUÍ: VOLVIENDO AL CÁLCULO DE VOLUMEN ORIGINAL ---
-        current_volume = info.get("volume", 0)
-        # ------------------------------------------------------------------
-
-        soportes = find_significant_supports(hist, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
         soporte_2 = soportes[1] if len(soportes) > 1 else 0
         soporte_3 = soportes[2] if len(soportes) > 2 else 0
 
+        # CORRECCIÓN: Asegúrate de que los soportes no sean 0 si se van a usar en comparaciones
+        soporte_1 = max(0.01, soporte_1) if soporte_1 == 0 and current_price != 0 else soporte_1
+        soporte_2 = max(0.01, soporte_2) if soporte_2 == 0 and current_price != 0 else soporte_2
+        soporte_3 = max(0.01, soporte_3) if soporte_3 == 0 and current_price != 0 else soporte_3
+
+
+        current_volume = info.get("volume", 0)
+
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
         recomendacion = "Indefinido"
-        condicion_rsi = "desconocido" 
+        condicion_rsi = "desconocido"
         
         # --- LÓGICA DE RECOMENDACIÓN Y TENDENCIA DEL SMI MÁS MATIZADA ---
         if nota_empresa <= 2: # SMI muy alto (sobrecompra fuerte: SMI entre 60 y 100)
@@ -268,6 +295,7 @@ def obtener_datos_yfinance(ticker):
                 recomendacion = "Sobreventa extrema. El precio podría seguir cayendo a corto plazo, esperar confirmación de suelo."
 
         precio_objetivo_compra = 0.0
+        # Asegúrate de que base_precio_obj no sea 0 si se va a usar en una división, aunque aquí es multiplicando
         base_precio_obj = soporte_1 if soporte_1 > 0 else current_price * 0.95
 
         if nota_empresa >= 7 and smi_actual > smi_anterior:
@@ -279,19 +307,20 @@ def obtener_datos_yfinance(ticker):
             precio_objetivo_compra = base_precio_obj * (1 - drop_percentage_from_base)
             
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
-        
+            
         ### --- LÓGICA REFINADA PARA EL MENSAJE DE "DIAS PARA LA ACCION" ---
         dias_para_accion_str = "No estimado"
         smi_diff = hist['SMI_signal'].dropna().diff().iloc[-1] if len(hist['SMI_signal'].dropna()) > 1 else 0
         
         target_smi_venta_zona = 60
         target_smi_compra_zona = -60
-        zona_umbral = 5 
+        zona_umbral = 5  
 
         if smi_actual >= target_smi_venta_zona - zona_umbral and smi_actual > 0:
             dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobrecompra extrema**, indicando que la presión alcista podría estar agotándose y se anticipa una posible corrección o consolidación."
         elif smi_actual <= target_smi_compra_zona + zona_umbral and smi_actual < 0:
             dias_para_accion_str = "la empresa ya se encuentra en una **zona de potencial sobreventa extrema**, lo que sugiere que el precio podría estar cerca de un punto de inflexión al alza o un rebote técnico."
+        # Asegúrate de smi_diff no sea 0 para estas divisiones
         elif smi_actual > smi_anterior and smi_actual < target_smi_venta_zona and smi_diff > 0.01:
             diferencia_a_target = target_smi_venta_zona - smi_actual
             dias_calculados = int(diferencia_a_target / smi_diff) if smi_diff != 0 else 0
@@ -307,7 +336,7 @@ def obtener_datos_yfinance(ticker):
             else:
                 dias_para_accion_str = "el precio está consolidando una tendencia bajista y podría estar próximo a un punto de inflexión para una potencial entrada o compra."
         else:
-             dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
+            dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
         # --------------------------------------------------------------------------------
 
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
@@ -323,8 +352,8 @@ def obtener_datos_yfinance(ticker):
         sentimiento_analistas_raw = info.get("recommendationKey", "N/A")
         sentimiento_analistas_translated = traducir_texto_con_gemini(sentimiento_analistas_raw)
         if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
-             sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
-        
+            sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
+            
         datos = {
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
@@ -351,7 +380,7 @@ def obtener_datos_yfinance(ticker):
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
             "SMI_TENDENCIA": smi_tendencia,
-            "DIAS_PARA_ACCION": dias_para_accion_str 
+            "DIAS_PARA_ACCION": dias_para_accion_str
         }
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}")
@@ -372,12 +401,13 @@ def construir_prompt_formateado(data):
     soportes_unicos = []
     temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
     
-    if len(temp_soportes) > 0 and temp_soportes[0] > 0:
+    # Filtra los soportes que son 0 para no incluirlos en el texto a menos que sea necesario
+    if len(temp_soportes) > 0 and temp_soportes[0] > 0.01: # Considera 0.01 como umbral mínimo para ser un soporte real
         soportes_unicos.append(temp_soportes[0])
         for i in range(1, len(temp_soportes)):
-            if temp_soportes[i] > 0 and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
+            if temp_soportes[i] > 0.01 and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
                 soportes_unicos.append(temp_soportes[i])
-    
+            
     soportes_texto = ""
     if len(soportes_unicos) == 1:
         soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,} €</strong>."
@@ -455,7 +485,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 def enviar_email(texto_generado, asunto_email):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt" 
+    password = "kdgz lvdo wqvt vfkt"  
 
     msg = MIMEMultipart()
     msg['From'] = remitente
@@ -485,7 +515,7 @@ def generar_contenido_con_gemini(tickers):
 
     for ticker in tickers:
         print(f"\n📊 Procesando ticker: {ticker}")
-        try: 
+        try:  
             data = obtener_datos_yfinance(ticker)
             if not data:
                 continue
@@ -524,12 +554,12 @@ def generar_contenido_con_gemini(tickers):
             else:  
                 print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
                 
-        except Exception as e: 
+        except Exception as e:  
             print(f"❌ Error crítico al procesar el ticker {ticker}: {e}. Saltando a la siguiente empresa.")
-            continue 
+            continue  
 
         print(f"⏳ Esperando 60 segundos antes de procesar el siguiente ticker...")
-        time.sleep(60) 
+        time.sleep(60)  
 
 def main():
     all_tickers = leer_google_sheets()[1:]
