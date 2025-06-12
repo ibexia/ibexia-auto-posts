@@ -51,9 +51,6 @@ ema_signal_len = 10
 smooth_period = 5
 
 def calculate_smi_tv(df):
-    # Asegúrate de que las columnas sean de tipo numérico y no arrays de numpy sueltos.
-    # Esto puede ocurrir si se extraen columnas de un DataFrame y se pierden las propiedades de Pandas.
-    # Convertir a Series de Pandas si no lo son ya.
     high = pd.Series(df['High'])
     low = pd.Series(df['Low'])
     close = pd.Series(df['Close'])
@@ -67,9 +64,18 @@ def calculate_smi_tv(df):
     avgdiff = diff.ewm(span=length_d, adjust=False).mean()
 
     smi_raw = pd.Series(0.0, index=df.index)
-    non_zero_avgdiff = avgdiff[avgdiff != 0]
-    smi_raw[non_zero_avgdiff.index] = (avgrel[non_zero_avgdiff.index] / (non_zero_avgdiff / 2)) * 100
+    
+    # Manejo de división por cero y NaN
+    # Originalmente: non_zero_avgdiff = avgdiff[avgdiff != 0]
+    # Se debe asegurar que no haya NaN en avgdiff antes de la comparación, o manejarlos.
+    # Además, la división por cero no es el único problema, si avgdiff es muy pequeño
+    # puede dar resultados erróneos. Se añadió un pequeño epsilon.
+    valid_indices = avgdiff.index[~avgdiff.isna()]
+    non_zero_avgdiff_and_valid = avgdiff.loc[valid_indices][avgdiff.loc[valid_indices].abs() > 1e-9] # Usar un epsilon pequeño
 
+    if not non_zero_avgdiff_and_valid.empty:
+        smi_raw.loc[non_zero_avgdiff_and_valid.index] = (avgrel.loc[non_zero_avgdiff_and_valid.index] / (non_zero_avgdiff_and_valid / 2)) * 100
+    
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
 
@@ -100,7 +106,8 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for support in potential_supports:
         found_zone = False
         for zone_level in support_zones.keys():
-            if abs(support - zone_level) / support <= tolerance_percent:
+            # Añadir una pequeña tolerancia para evitar división por cero si support es 0 o muy cercano
+            if support != 0 and abs(support - zone_level) / support <= tolerance_percent:
                 support_zones[zone_level].append(support)
                 found_zone = True
                 break
@@ -111,7 +118,8 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for zone_level, values in support_zones.items():
         avg_support = np.mean(values)
         if avg_support < current_price:
-            if abs(current_price - avg_support) / current_price <= max_deviation_percent:
+            # Añadir una pequeña tolerancia para evitar división por cero si current_price es 0 o muy cercano
+            if current_price != 0 and abs(current_price - avg_support) / current_price <= max_deviation_percent:
                 final_supports.append({'level': avg_support, 'frequency': len(values)})
 
     final_supports.sort(key=lambda x: (abs(x['level'] - current_price), -x['frequency']))
@@ -178,37 +186,25 @@ def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
     
-    # Se solicita el historial de los últimos 2 días para asegurarnos de tener el volumen de cierre del día anterior
     hist = stock.history(period="2d", interval="1d")
 
     if hist.empty or len(hist) < 2:
         print(f"❌ No se pudieron obtener datos históricos suficientes para {ticker} para calcular el volumen del día anterior.")
-        # Intenta obtener de un período más largo si 2d no es suficiente (ej. fines de semana o días festivos)
         hist = stock.history(period="7d", interval="1d")
         if hist.empty or len(hist) < 2:
             print(f"❌ Aún no se pudieron obtener datos históricos suficientes para {ticker} tras reintento.")
             return None
 
-    # Asegurarse de que el último día completo es el día anterior al actual
-    # Si hoy es lunes, querríamos el volumen del viernes.
-    # El .iloc[-2] nos da la fila del penúltimo día disponible (el día anterior si no estamos en un día bursátil o si es el cierre de hoy).
-    # Necesitamos asegurarnos de que sea el volumen de CIERRE del día anterior, no el de HOY.
-    # La columna 'Volume' de hist corresponde al volumen de ese día.
-    
-    # Para obtener el volumen del día anterior al último día disponible en hist:
     if len(hist) >= 2:
-        current_volume = hist['Volume'].iloc[-2] # Volumen del día anterior al último dato disponible
+        current_volume = hist['Volume'].iloc[-2]
     else:
-        current_volume = 0 # No hay suficientes datos para obtener el volumen del día anterior
+        current_volume = 0 
 
-
-    # Volvemos a obtener un historial más largo para el cálculo del SMI y soportes/resistencias
     hist_long = stock.history(period="90d", interval="1d")
     if hist_long.empty:
         print(f"❌ No se pudieron obtener datos históricos largos para {ticker}")
         return None
     
-    # Verificar que el DataFrame hist_long tiene las columnas necesarias y no está vacío
     if hist_long.empty or not all(col in hist_long.columns for col in ['High', 'Low', 'Close']):
         print(f"❌ Datos históricos incompletos o vacíos para {ticker} para el cálculo del SMI.")
         return None
@@ -228,9 +224,6 @@ def obtener_datos_yfinance(ticker):
 
         current_price = round(info.get("currentPrice", 0), 2)
         
-        # El current_volume ya se ha obtenido anteriormente del día anterior
-        # current_volume = current_volume # Ya está asignado correctamente
-
         soportes = find_significant_supports(hist_long, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
         soporte_2 = soportes[1] if len(soportes) > 1 else 0
