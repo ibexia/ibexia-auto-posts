@@ -31,7 +31,6 @@ def leer_google_sheets():
     range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
 
     service = build('sheets', 'v4', credentials=creds)
-    # CORRECTED: Reverted to the correct way to access values()
     sheet = service.spreadsheets().values()
     result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
@@ -70,23 +69,22 @@ def calculate_smi_tv(df):
     diff = hh - ll
     rdiff = close - (hh + ll) / 2
 
-    # Calculate EWMA. Handle potential NaNs in input to ewm by dropping them for calculation.
-    # The result will have NaNs at the beginning if input had them.
     avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
     avgdiff = diff.ewm(span=length_d, adjust=False).mean()
 
     smi_raw = pd.Series(np.nan, index=df.index)
 
-    # Combine conditions for valid indices to avoid division by zero or NaN issues
-    # Ensure avgdiff is not NaN, and its absolute value is above a very small threshold
-    valid_indices = avgdiff.index[
-        avgdiff.notna() & avgrel.notna() & (avgdiff.abs() > 1e-9)
-    ]
-
-    if not valid_indices.empty:
-        # Perform calculation only for valid indices
-        smi_raw.loc[valid_indices] = (avgrel.loc[valid_indices] / (avgdiff.loc[valid_indices] / 2)) * 100
+    # Use np.divide to handle division by zero more gracefully
+    # Set the condition for division: avgdiff must not be NaN and its absolute value must be greater than 1e-9
+    divisor = avgdiff / 2
     
+    # This is the crucial part: Perform division only where divisor is not too small/zero.
+    # Otherwise, assign NaN.
+    smi_raw = np.divide(avgrel, divisor, out=np.full_like(avgrel, np.nan), where=(divisor.abs() > 1e-9)) * 100
+    
+    # Ensure smi_raw aligns with the original DataFrame's index
+    smi_raw = pd.Series(smi_raw, index=df.index)
+
     # Fill remaining NaNs using interpolation for smoother transitions, then bfill/ffill for edges
     smi_raw = smi_raw.interpolate(method='linear', limit_direction='both').fillna(method='bfill').fillna(method='ffill')
 
