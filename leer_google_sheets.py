@@ -58,7 +58,7 @@ def calculate_smi_tv(df):
     # Ensure enough data for rolling windows, plus 2 for diff and then EMA
     min_required_data = max(length_k, length_d, ema_signal_len, smooth_period) + 2 # Add buffer for initial NaNs from rolling/ewm
     if len(df) < min_required_data:
-        print(f"Advertencia: No hay suficientes datos ({len(df)}) para calcular SMI. Se requieren al menos {min_required_data}.")
+        print(f"Advertencia: No hay suficientes datos ({len(df)}) para calcular SMI para este período. Se requieren al menos {min_required_data}.")
         df['SMI'] = np.nan
         df['SMI_signal'] = np.nan
         return df
@@ -69,20 +69,25 @@ def calculate_smi_tv(df):
     diff = hh - ll
     rdiff = close - (hh + ll) / 2
 
+    # Calculate EWMA.
     avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
     avgdiff = diff.ewm(span=length_d, adjust=False).mean()
 
     smi_raw = pd.Series(np.nan, index=df.index)
 
-    # Use np.divide to handle division by zero more gracefully
-    # Set the condition for division: avgdiff must not be NaN and its absolute value must be greater than 1e-9
-    divisor = avgdiff / 2
+    # --- ENHANCED DIVISION BY ZERO HANDLING ---
+    # Create a boolean mask where avgdiff is problematic (NaN or very close to zero)
+    problematic_avgdiff_mask = avgdiff.isna() | (avgdiff.abs() < 1e-9)
+
+    # Use np.where to conditionally calculate smi_raw
+    # If problematic_avgdiff_mask is True, smi_raw is NaN. Otherwise, perform the division.
+    smi_raw = np.where(
+        problematic_avgdiff_mask,
+        np.nan,
+        (avgrel / (avgdiff / 2)) * 100
+    )
     
-    # This is the crucial part: Perform division only where divisor is not too small/zero.
-    # Otherwise, assign NaN.
-    smi_raw = np.divide(avgrel, divisor, out=np.full_like(avgrel, np.nan), where=(divisor.abs() > 1e-9)) * 100
-    
-    # Ensure smi_raw aligns with the original DataFrame's index
+    # Ensure smi_raw is a pandas Series with the correct index
     smi_raw = pd.Series(smi_raw, index=df.index)
 
     # Fill remaining NaNs using interpolation for smoother transitions, then bfill/ffill for edges
@@ -494,129 +499,4 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 <p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas. Para esta sección, la **nota técnica ({data['NOTA_EMPRESA']} sobre 10) NO debe influir en la valoración**. El análisis debe basarse **exclusivamente en los datos financieros y estratégicos** proporcionados y en una evaluación crítica de su solidez y potencial.</p>
 
-<p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. 
-En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
-
-<p>[Si 'EXPANSION_PLANES' o 'ACUERDOS' contienen texto relevante y no genérico, sintetízalo y comenta su posible impacto estratégico. Si la información es demasiado breve o indica 'no disponible/no traducible', elabora sobre la importancia general de tales estrategias para el sector de la empresa o para la empresa en sí, sin inventar detalles específicos]. [Aquí el modelo debe elaborar una proyección fundamentada (mínimo 150 palabras) con párrafos de máximo 3 líneas. Debe integrar estas cifras con una interpretación crítica de la solvencia, rentabilidad, crecimiento y las perspectivas estratégicas de la empresa, y **mojarse** con una valoración clara sobre su potencial a largo plazo basada *únicamente* en estos fundamentales].</p>
-
-<h2>Conclusión General y Descargo de Responsabilidad</h2>
-<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en datos técnicos, financieros y estratégicos. [Aquí el modelo redactará un resumen fluido de unas 100 palabras, reforzando la opinión general y la coherencia entre recomendación, niveles técnicos y fundamentos].</p>
-
-<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa. No constituye una recomendación de inversión. Se recomienda analizar cada decisión de forma individual, teniendo en cuenta el perfil de riesgo y los objetivos financieros personales.</p>
-
-"""
-
-    return prompt, titulo_post
-
-
-def enviar_email(texto_generado, asunto_email):
-    remitente = "xumkox@gmail.com"
-    destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt"  
-
-    msg = MIMEMultipart()
-    msg['From'] = remitente
-    msg['To'] = destinatario
-    msg['Subject'] = asunto_email
-
-    msg.attach(MIMEText(texto_generado, 'html'))  
-
-    try:
-        servidor = smtplib.SMTP('smtp.gmail.com', 587)
-        servidor.starttls()
-        servidor.login(remitente, password)
-        servidor.sendmail(remitente, destinatario, msg.as_string())
-        servidor.quit()
-        print("✅ Correo enviado con éxito.")
-    except Exception as e:
-        print("❌ Error al enviar el correo:", e)
-
-
-def generar_contenido_con_gemini(tickers):
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key:
-        raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")  
-
-    for ticker in tickers:
-        print(f"\n📊 Procesando ticker: {ticker}")
-        try:  
-            data = obtener_datos_yfinance(ticker)
-            if not data:
-                continue
-            prompt, titulo_post = construir_prompt_formateado(data)
-
-            max_retries = 3
-            initial_delay = 10  
-            retries = 0
-            delay = initial_delay
-
-            while retries < max_retries:
-                try:
-                    response = model.generate_content(prompt)
-                    print(f"\n🧠 Contenido generado para {ticker}:\n")
-                    print(response.text)
-                    asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
-                    enviar_email(response.text, asunto_email)
-                    break  
-                except Exception as e:
-                    if "429 You exceeded your current quota" in str(e):
-                        try:
-                            match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
-                            if match:
-                                server_delay = int(match.group(1))
-                                delay = max(delay, server_delay + 1)
-                        except:
-                            pass
-                        
-                        print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
-                        time.sleep(delay)
-                        retries += 1
-                        delay *= 2
-                    else:
-                        print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
-                        break
-            else:  
-                print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
-                
-        except Exception as e:  
-            print(f"❌ Error crítico al procesar el ticker {ticker}: {e}. Saltando a la siguiente empresa.")
-            continue  
-
-        print(f"⏳ Esperando 60 segundos antes de procesar el siguiente ticker...")
-        time.sleep(60)  
-
-def main():
-    all_tickers = leer_google_sheets()[1:]
-    
-    if not all_tickers:
-        print("No hay tickers para procesar.")
-        return
-
-    day_of_week = datetime.today().weekday()
-    
-    num_tickers_per_day = 10  
-    total_tickers_in_sheet = len(all_tickers)
-    
-    start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
-    
-    end_index = start_index + num_tickers_per_day
-    
-    tickers_for_today = []
-    if end_index <= total_tickers_in_sheet:
-        tickers_for_today = all_tickers[start_index:end_index]
-    else:
-        tickers_for_today = all_tickers[start_index:] + all_tickers[:end_index - total_tickers_in_sheet]
-
-    if tickers_for_today:
-        print(f"Procesando tickers para el día {datetime.today().strftime('%A')}: {tickers_for_today}")
-        generar_contenido_con_gemini(tickers_for_today)
-    else:
-        print(f"No hay tickers disponibles para el día {datetime.today().strftime('%A')} en el rango calculado. "
-              f"start_index: {start_index}, end_index: {end_index}, total_tickers: {total_tickers_in_sheet}")
-
-
-if __name__ == '__main__':
-    main()
+<p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}
