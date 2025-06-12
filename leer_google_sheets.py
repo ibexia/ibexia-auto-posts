@@ -51,9 +51,12 @@ ema_signal_len = 10
 smooth_period = 5
 
 def calculate_smi_tv(df):
-    high = df['High']
-    low = df['Low']
-    close = df['Close']
+    # Asegúrate de que las columnas sean de tipo numérico y no arrays de numpy sueltos.
+    # Esto puede ocurrir si se extraen columnas de un DataFrame y se pierden las propiedades de Pandas.
+    # Convertir a Series de Pandas si no lo son ya.
+    high = pd.Series(df['High'])
+    low = pd.Series(df['Low'])
+    close = pd.Series(df['Close'])
 
     hh = high.rolling(window=length_k).max()
     ll = low.rolling(window=length_k).min()
@@ -63,8 +66,9 @@ def calculate_smi_tv(df):
     avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
     avgdiff = diff.ewm(span=length_d, adjust=False).mean()
 
-    # Prevenir división por cero: si avgdiff es cero, smi_raw debe ser cero
-    smi_raw = np.where(avgdiff == 0, 0.0, (avgrel / (avgdiff / 2)) * 100)
+    smi_raw = pd.Series(0.0, index=df.index)
+    non_zero_avgdiff = avgdiff[avgdiff != 0]
+    smi_raw[non_zero_avgdiff.index] = (avgrel[non_zero_avgdiff.index] / (non_zero_avgdiff / 2)) * 100
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
@@ -96,7 +100,7 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for support in potential_supports:
         found_zone = False
         for zone_level in support_zones.keys():
-            if support != 0 and abs(support - zone_level) / support <= tolerance_percent: # Añadida comprobación para evitar división por cero
+            if abs(support - zone_level) / support <= tolerance_percent:
                 support_zones[zone_level].append(support)
                 found_zone = True
                 break
@@ -107,7 +111,7 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for zone_level, values in support_zones.items():
         avg_support = np.mean(values)
         if avg_support < current_price:
-            if current_price != 0 and abs(current_price - avg_support) / current_price <= max_deviation_percent: # Añadida comprobación para evitar división por cero
+            if abs(current_price - avg_support) / current_price <= max_deviation_percent:
                 final_supports.append({'level': avg_support, 'frequency': len(values)})
 
     final_supports.sort(key=lambda x: (abs(x['level'] - current_price), -x['frequency']))
@@ -203,6 +207,12 @@ def obtener_datos_yfinance(ticker):
     if hist_long.empty:
         print(f"❌ No se pudieron obtener datos históricos largos para {ticker}")
         return None
+    
+    # Verificar que el DataFrame hist_long tiene las columnas necesarias y no está vacío
+    if hist_long.empty or not all(col in hist_long.columns for col in ['High', 'Low', 'Close']):
+        print(f"❌ Datos históricos incompletos o vacíos para {ticker} para el cálculo del SMI.")
+        return None
+
 
     try:
         hist_long = calculate_smi_tv(hist_long)
