@@ -31,7 +31,8 @@ def leer_google_sheets():
     range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
 
     service = build('sheets', 'v4', credentials=creds)
-    sheet = service.sheets().values() # Corrected here: .sheets() is needed before .values()
+    # CORRECTED: Reverted to the correct way to access values()
+    sheet = service.spreadsheets().values()
     result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
