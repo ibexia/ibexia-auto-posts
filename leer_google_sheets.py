@@ -31,8 +31,7 @@ def leer_google_sheets():
     range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
 
     service = build('sheets', 'v4', credentials=creds)
-    sheet = service.spreadsheets().values()
-    # CORRECTED: Changed 'values' to 'spreadsheetId'
+    sheet = service.sheets().values() # Corrected here: .sheets() is needed before .values()
     result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
@@ -56,26 +55,29 @@ def calculate_smi_tv(df):
     low = pd.Series(df['Low'])
     close = pd.Series(df['Close'])
 
-    # Ensure enough data for rolling windows
-    if len(df) < max(length_k, length_d, ema_signal_len, smooth_period):
-        # Not enough data to calculate SMI, return original df with SMI columns as NaN
+    # Ensure enough data for rolling windows, plus 2 for diff and then EMA
+    min_required_data = max(length_k, length_d, ema_signal_len, smooth_period) + 2 # Add buffer for initial NaNs from rolling/ewm
+    if len(df) < min_required_data:
+        print(f"Advertencia: No hay suficientes datos ({len(df)}) para calcular SMI. Se requieren al menos {min_required_data}.")
         df['SMI'] = np.nan
         df['SMI_signal'] = np.nan
         return df
 
     hh = high.rolling(window=length_k).max()
     ll = low.rolling(window=length_k).min()
+    
     diff = hh - ll
     rdiff = close - (hh + ll) / 2
 
-    # Calculate EWMA. These will naturally have NaNs at the beginning.
+    # Calculate EWMA. Handle potential NaNs in input to ewm by dropping them for calculation.
+    # The result will have NaNs at the beginning if input had them.
     avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
     avgdiff = diff.ewm(span=length_d, adjust=False).mean()
 
-    smi_raw = pd.Series(np.nan, index=df.index) # Initialize with NaN
+    smi_raw = pd.Series(np.nan, index=df.index)
 
-    # Identify valid indices where avgdiff is not NaN and is not close to zero
-    # We also check avgrel, though avgdiff is the primary divisor concern.
+    # Combine conditions for valid indices to avoid division by zero or NaN issues
+    # Ensure avgdiff is not NaN, and its absolute value is above a very small threshold
     valid_indices = avgdiff.index[
         avgdiff.notna() & avgrel.notna() & (avgdiff.abs() > 1e-9)
     ]
@@ -84,17 +86,26 @@ def calculate_smi_tv(df):
         # Perform calculation only for valid indices
         smi_raw.loc[valid_indices] = (avgrel.loc[valid_indices] / (avgdiff.loc[valid_indices] / 2)) * 100
     
-    # Fill remaining NaNs. Using interpolation can be better than bfill/ffill for time series.
-    smi_raw = smi_raw.interpolate(method='linear').fillna(method='bfill').fillna(method='ffill')
+    # Fill remaining NaNs using interpolation for smoother transitions, then bfill/ffill for edges
+    smi_raw = smi_raw.interpolate(method='linear', limit_direction='both').fillna(method='bfill').fillna(method='ffill')
 
-    # Ensure smi_raw is not all NaN or inf if there was no valid data
+    # If smi_raw is still all NaN or contains infs after filling, it means SMI could not be meaningfully calculated
     if smi_raw.isna().all() or np.isinf(smi_raw).all():
+        print("Advertencia: SMI_raw es completamente NaN o inf después de la interpolación. No se puede calcular SMI.")
         df['SMI'] = np.nan
         df['SMI_signal'] = np.nan
         return df
 
+    # Further calculations, ensuring they are not performed on all NaNs
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
+
+    # Final check for SMI_signal after all calculations
+    if smi_signal.isna().all():
+        print("Advertencia: SMI_signal es completamente NaN después de suavizar. No se puede obtener un SMI válido.")
+        df['SMI'] = np.nan
+        df['SMI_signal'] = np.nan
+        return df
 
     df = df.copy()
     df['SMI'] = smi_smoothed
@@ -123,7 +134,6 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for support in potential_supports:
         found_zone = False
         for zone_level in support_zones.keys():
-            # Añadir una pequeña tolerancia para evitar división por cero si support es 0 o muy cercano
             if support != 0 and zone_level != 0 and abs(support - zone_level) / support <= tolerance_percent:
                 support_zones[zone_level].append(support)
                 found_zone = True
@@ -135,7 +145,6 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for zone_level, values in support_zones.items():
         avg_support = np.mean(values)
         if avg_support < current_price:
-            # Añadir una pequeña tolerancia para evitar división por cero si current_price es 0 o muy cercano
             if current_price != 0 and abs(current_price - avg_support) / current_price <= max_deviation_percent:
                 final_supports.append({'level': avg_support, 'frequency': len(values)})
 
@@ -203,36 +212,35 @@ def obtener_datos_yfinance(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
     
-    # Try to get 2 days of history, if not enough, try 7 days
     hist = stock.history(period="2d", interval="1d")
+
     if hist.empty or len(hist) < 2:
-        print(f"❌ No se pudieron obtener datos históricos suficientes para {ticker} para calcular el volumen del día anterior, intentando 7 días.")
+        print(f"❌ No se pudieron obtener datos históricos suficientes para {ticker} para calcular el volumen del día anterior.")
         hist = stock.history(period="7d", interval="1d")
         if hist.empty or len(hist) < 2:
-            print(f"❌ Aún no se pudieron obtener datos históricos suficientes para {ticker} tras reintento con 7 días.")
+            print(f"❌ Aún no se pudieron obtener datos históricos suficientes para {ticker} tras reintento.")
             return None
 
-    # Get the volume of the second to last day (yesterday's full volume)
-    current_volume = hist['Volume'].iloc[-2] if len(hist) >= 2 else 0 
+    if len(hist) >= 2:
+        current_volume = hist['Volume'].iloc[-2]
+    else:
+        current_volume = 0 
 
-    # Get longer history for SMI and support/resistance calculations
     hist_long = stock.history(period="90d", interval="1d")
     if hist_long.empty:
-        print(f"❌ No se pudieron obtener datos históricos largos para {ticker} para el cálculo de indicadores.")
+        print(f"❌ No se pudieron obtener datos históricos largos para {ticker}")
         return None
     
-    if not all(col in hist_long.columns for col in ['High', 'Low', 'Close']):
-        print(f"❌ Datos históricos incompletos o vacíos para {ticker} para el cálculo del SMI y soportes.")
+    if hist_long.empty or not all(col in hist_long.columns for col in ['High', 'Low', 'Close']):
+        print(f"❌ Datos históricos incompletos o vacíos para {ticker} para el cálculo del SMI.")
         return None
+
 
     try:
         hist_long = calculate_smi_tv(hist_long)
         
-        # Check if SMI_signal was successfully calculated and has enough data points
         if 'SMI_signal' not in hist_long.columns or hist_long['SMI_signal'].empty or len(hist_long['SMI_signal'].dropna()) < 2:
-            print(f"❌ SMI_signal no disponible o insuficiente para {ticker} después del cálculo.")
-            # If SMI calculation failed, we can still proceed with other data if desired
-            # or return None to skip this ticker. For now, we return None.
+            print(f"❌ SMI_signal no disponible o insuficiente para {ticker}")
             return None
 
         smi_actual = hist_long['SMI_signal'].dropna().iloc[-1]
@@ -425,7 +433,7 @@ def construir_prompt_formateado(data):
     if len(temp_soportes) > 0 and temp_soportes[0] > 0:
         soportes_unicos.append(temp_soportes[0])
         for i in range(1, len(temp_soportes)):
-            if temp_soportes[i] > 0 and soportes_unicos and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005: # Added check for soportes_unicos
+            if temp_soportes[i] > 0 and soportes_unicos and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
                 soportes_unicos.append(temp_soportes[i])
     
     soportes_texto = ""
