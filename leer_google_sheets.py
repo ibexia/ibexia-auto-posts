@@ -433,27 +433,27 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     ticker = data['TICKER']
     
     if 0.0 <= nota < 1.0:
-        titulo_post = f"Alerta Roja en <strong>{nombre_empresa} ({ticker})</strong>: ¿Colapso inminente? Análisis de su debilidad extrema"
+        titulo_post = f"Alerta Roja en <strong>{nombre_empresa} #{ticker} </strong>: ¿Colapso inminente? Análisis de su debilidad extrema"
     elif 1.0 <= nota < 2.0:
-        titulo_post = f"Seria preocupación en <strong>{nombre_empresa} ({ticker})</strong>: Debilidad técnica extrema y riesgos latentes"
+        titulo_post = f"Seria preocupación en <strong>{nombre_empresa} #{ticker} </strong>: Debilidad técnica extrema y riesgos latentes"
     elif 2.0 <= nota < 3.0:
-        titulo_post = f"Cautela máxima con <strong>{nombre_empresa} ({ticker})</strong>: La tendencia bajista se intensifica"
+        titulo_post = f"Cautela máxima con <strong>{nombre_empresa} #{ticker} </strong>: La tendencia bajista se intensifica"
     elif 3.0 <= nota < 4.0:
-        titulo_post = f"Análisis de <strong>{nombre_empresa} ({ticker})</strong>: Señales de debilidad y la importancia de la paciencia"
+        titulo_post = f"Análisis de <strong>{nombre_empresa} #{ticker} </strong>: Señales de debilidad y la importancia de la paciencia"
     elif 4.0 <= nota < 5.0:
-        titulo_post = f"<strong>{nombre_empresa} ({ticker})</strong>: En busca de dirección. ¿Consolidación o antesala de un movimiento?"
+        titulo_post = f"<strong>{nombre_empresa} #{ticker} </strong>: En busca de dirección. ¿Consolidación o antesala de un movimiento?"
     elif 5.0 <= nota < 6.0:
-        titulo_post = f"<strong>{nombre_empresa} ({ticker})</strong> en equilibrio: Un análisis de su fase neutral y oportunidades a largo plazo"
+        titulo_post = f"<strong>{nombre_empresa} #{ticker} </strong> en equilibrio: Un análisis de su fase neutral y oportunidades a largo plazo"
     elif 6.0 <= nota < 7.0:
-        titulo_post = f"<strong>{nombre_empresa} ({ticker})</strong> despierta: Primeras señales de fortaleza y potencial de rebote"
+        titulo_post = f"<strong>{nombre_empresa} #{ticker} </strong> despierta: Primeras señales de fortaleza y potencial de rebote"
     elif 7.0 <= nota < 8.0:
-        titulo_post = f"Impulso en <strong>{nombre_empresa} ({ticker})</strong>: La oportunidad de compra se consolida"
+        titulo_post = f"Impulso en <strong>{nombre_empresa} #{ticker} </strong>: La oportunidad de compra se consolida"
     elif 8.0 <= nota < 9.0:
-        titulo_post = f"¡Despegue inminente de <strong>{nombre_empresa} ({ticker})</strong>! Análisis de su explosivo potencial alcista"
+        titulo_post = f"¡Despegue inminente de <strong>{nombre_empresa} #{ticker} </strong>! Análisis de su explosivo potencial alcista"
     elif 9.0 <= nota <= 10.0:
-        titulo_post = f"La oportunidad de la década en <strong>{nombre_empresa} ({ticker})</strong>: ¿Listo para multiplicar tu inversión?"
+        titulo_post = f"La oportunidad de la década en <strong>{nombre_empresa} #{ticker} </strong>: ¿Listo para multiplicar tu inversión?"
     else: # Fallback por si la nota está fuera de rango inesperadamente
-        titulo_post = f"Análisis completo de <strong>{nombre_empresa} ({ticker})</strong>"
+        titulo_post = f"Análisis completo de <strong>{nombre_empresa} #{ticker} </strong>"
 
 
     # Lógica para soportes
