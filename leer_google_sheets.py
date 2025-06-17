@@ -499,7 +499,7 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
         tickers_for_tomorrow = all_tickers[start_index_next_day:] + all_tickers[:end_index_next_day - total_tickers_in_sheet]
 
     if tickers_for_tomorrow:
-        tomorrow_companies_text = ", ".join([f"<strong>{t.replace('.', '.<wbr>')}</strong>" for t in tickers_for_tomorrow])
+        tomorrow_companies_text = ", ".join([f"<strong>{t}</strong>" for t in tickers_for_tomorrow])
     else:
         tomorrow_companies_text = "otras empresas clave del mercado."
 
