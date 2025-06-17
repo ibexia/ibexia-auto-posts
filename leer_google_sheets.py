@@ -576,7 +576,7 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
     <tr><td style="padding: 8px; border: 1px solid #ddd;">Recomendación</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['RECOMENDACION']}</strong></td></tr>
     <tr><td style="padding: 8px; border: 1px solid #ddd;">Nota Técnica (0-10)</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['NOTA_EMPRESA']}</strong></td></tr>
     <tr><td style="padding: 8px; border: 1px solid #ddd;">Precio Objetivo Compra</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong></td></tr>
-    <tr><td style="padding: 8px; border: 1px solid #ddd;">Tendencia SMI</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['SMI_TENDENCIA']}</strong></td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;">Tendencia</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['SMI_TENDENCIA']}</strong></td></tr>
     <tr><td style="padding: 8px; border: 1px solid #ddd;">Días para Acción Estimados</td><td style="padding: 8px; border: 1px solid #ddd;">{data['DIAS_PARA_ACCION']}</td></tr>
 </table>
 
