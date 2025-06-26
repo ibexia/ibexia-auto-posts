@@ -348,9 +348,7 @@ def obtener_datos_yfinance(ticker):
             "BENEFICIOS": info.get("grossProfits", "N/A"),
             "DEUDA": info.get("totalDebt", "N/A"),
             "FLUJO_CAJA": info.get("freeCashflow", "N/A"),
-            "EXPANSION_PLANES": expansion_planes_translated,
-            "ACUERDOS": acuerdos_translated,
-            "SENTIMIENTO_ANALISTAS": sentimiento_analistas_translated,
+         
             "TENDENCIA_SOCIAL": "No disponible", # Placeholder, ya que no se extrae de yfinance
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles", # Placeholder
@@ -488,9 +486,7 @@ Genera un análisis técnico y fundamental detallado de aproximadamente 1200 pal
 - Beneficios: {formatear_numero(data['BENEFICIOS'])}
 - Deuda: {formatear_numero(data['DEUDA'])}
 - Flujo de caja: {formatear_numero(data['FLUJO_CAJA'])}
-- Planes de expansión: {data['EXPANSION_PLANES']}
-- Acuerdos: {data['ACUERDOS']}
-- Sentimiento de analistas: {data['SENTIMIENTO_ANALISTAS']}
+
 - Tendencia social: {data['TENDENCIA_SOCIAL']}
 - Empresas similares: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
