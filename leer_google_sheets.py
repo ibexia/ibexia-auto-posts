@@ -13,44 +13,6 @@ import numpy as np
 import time
 import re
 
-def leer_google_sheets():
-    """
-    Lee los tickers de Google Sheets desde la columna A.
-    Requiere las variables de entorno GOOGLE_APPLICATION_CREDENTIALS y SPREADSHEET_ID.
-    """
-    credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-    if not credentials_json:
-        raise Exception("No se encontró la variable de entorno GOOGLE_APPLICATION_CREDENTIALS")
-
-    creds_dict = json.loads(credentials_json)
-    creds = service_account.Credentials.from_service_account_info(
-        creds_dict,
-        scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
-    )
-
-    spreadsheet_id = os.getenv('SPREADSHEET_ID') # ¡CORREGIDO: antes SPREADSHEED_ID!
-    if not spreadsheet_id:
-        raise Exception("No se encontró la variable de entorno SPREADSHEET_ID")
-
-    range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
-
-    service = build('sheets', 'v4', credentials=creds)
-    # CORREGIDO: Usar service.spreadsheets().values() en lugar de service.sheets().values()
-    sheet = service.spreadsheets().values() 
-    result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
-    values = result.get('values', [])
-
-    if not values:
-        print('No se encontraron datos en la hoja de cálculo.')
-    else:
-        print('Datos leídos de la hoja:')
-        for row in values:
-            print(row)
-
-    # Retorna solo el primer elemento de cada fila que no esté vacía
-    return [row[0] for row in values if row]
-
-
 # Parámetros para el cálculo del SMI (Stochastic Momentum Index)
 length_k = 10
 length_d = 3
@@ -189,7 +151,7 @@ def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
                 except:
                     pass # En caso de que no se pueda extraer el retraso del servidor
                 
-                print(f"❌ Cuota de Gemini excedida al traducir. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
+                print(f"❌ Cuota de Gemini excedida al traducir. Reintentando en {retries + 1}/{max_retries})")
                 time.sleep(delay)
                 retries += 1
                 delay *= 2
@@ -259,60 +221,60 @@ def obtener_datos_yfinance(ticker):
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
         recomendacion = "Indefinido"
-        condicion_rsi = "desconocido"
+        condicion_smi = "desconocido" # Renombrado de condicion_rsi a condicion_smi
         
         # Lógica de recomendación y tendencia del SMI más matizada
         if nota_empresa <= 2: # SMI muy alto (sobrecompra fuerte)
-            condicion_rsi = "muy sobrecomprado"
+            condicion_smi = "muy sobrecomprado"
             smi_tendencia = "mostrando un agotamiento alcista."
             if smi_actual > smi_anterior:
                 recomendacion = "Sobrecompra extrema. Riesgo inminente de corrección, considerar ventas."
             else:
                 recomendacion = "Vender / Tomar ganancias. El impulso indica una corrección en curso."
         elif 2 < nota_empresa <= 4: # SMI alto (sobrecompra moderada)
-            condicion_rsi = "algo sobrecomprado"
+            condicion_smi = "algo sobrecomprado"
             smi_tendencia = "con un impulso alcista que podría estar agotándose."
             if smi_actual > smi_anterior:
                 recomendacion = "Atentos a posible sobrecompra. El impulso alcista se está agotando."
             else:
                 recomendacion = "Vigilar posible venta. El impulso muestra una disminución."
         elif 4 < nota_empresa <= 5: # SMI ligeramente sobrecomprado / entrando en zona neutra
-            condicion_rsi = "muy poca sobrecompra"
+            condicion_smi = "muy poca sobrecompra"
             smi_tendencia = "manteniendo un impulso alcista sólido."
             if smi_actual > smi_anterior:
                 recomendacion = "Impulso alcista fuerte. Cuidado con niveles de resistencia."
             else:
                 recomendacion = "Tendencia de enfriamiento. Cuidado. Revisar soportes y resistencias."
         elif 5 < nota_empresa < 6: # Zona neutra
-            condicion_rsi = "neutral"
+            condicion_smi = "neutral"
             smi_tendencia = "en una fase de equilibrio."
             if smi_actual > smi_anterior:
                 recomendacion = "Mantener (Neutro). El precio gana impulso."
             else:
                 recomendacion = "Mantener (Neutro). El precio busca equilibrio."
         elif 6 <= nota_empresa < 7: # SMI ligeramente sobrevendido / entrando en zona neutra
-            condicion_rsi = "muy poca sobreventa"
+            condicion_smi = "muy poca sobreventa"
             smi_tendencia = "mostrando señales de recuperación."
             if smi_actual > smi_anterior:
                 recomendacion = "Señal de recuperación. Posible compra con confirmación."
             else:
                 recomendacion = "El impulso bajista persiste. Considerar cautela."
         elif 7 <= nota_empresa < 8: # SMI bajo (sobreventa moderada)
-            condicion_rsi = "algo de sobreventa"
+            condicion_smi = "algo de sobreventa"
             smi_tendencia = "en una zona de sobreventa moderada, buscando un rebote."
             if smi_actual > smi_anterior:
                 recomendacion = "Considerar posible compra. El impulso muestra un giro al alza."
             else:
                 recomendacion = "Sobreventa moderada. Evaluar fortaleza de soportes, el precio podría caer más."
         elif 8 <= nota_empresa < 9: # SMI muy bajo (sobreventa fuerte)
-            condicion_rsi = "sobreventa"
+            condicion_smi = "sobreventa"
             smi_tendencia = "en una zona de sobreventa fuerte, con potencial de reversión."
             if smi_actual > smi_anterior:
                 recomendacion = "Se acerca la hora de comprar. Fuerte señal de rebote."
             else:
                 recomendacion = "Sobreventa significativa. Esperar confirmación de rebote antes de comprar."
         elif nota_empresa >= 9: # SMI extremadamente bajo (sobreventa extrema)
-            condicion_rsi = "extremadamente sobrevendido"
+            condicion_smi = "extremadamente sobrevendido"
             smi_tendencia = "en una una sobreventa extrema, lo que sugiere un rebote inminente."
             if smi_actual > smi_anterior:
                 recomendacion = "Comprar. Excelente señal de reversión alcista."
@@ -388,7 +350,7 @@ def obtener_datos_yfinance(ticker):
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
             "RESISTENCIA": round(hist["High"].max(), 2),
-            "CONDICION_RSI": condicion_rsi,
+            "CONDICION_SMI": condicion_smi, # Renombrado
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
             "NOTA_EMPRESA": nota_empresa,
@@ -421,7 +383,7 @@ def formatear_numero(valor):
     except (ValueError, TypeError):
         return "No disponible"
         
-def construir_prompt_formateado(data, all_tickers, current_day_of_week):
+def construir_prompt_formateado(data):
     """
     Construye el prompt para Gemini con un formato HTML detallado,
     incorporando nuevos elementos de engagement y llamada a la acción,
@@ -484,24 +446,8 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     else:
         resistencia_porcentaje = "no calculable debido a un precio actual no disponible o de 0€"
 
-    # --- Lógica para el Call to Action del día siguiente ---
-    num_tickers_per_day = 10
-    total_tickers_in_sheet = len(all_tickers)
-    next_day_of_week = (current_day_of_week + 1) % 7
-
-    start_index_next_day = (next_day_of_week * num_tickers_per_day) % total_tickers_in_sheet
-    end_index_next_day = start_index_next_day + num_tickers_per_day
-    
-    tickers_for_tomorrow = []
-    if end_index_next_day <= total_tickers_in_sheet:
-        tickers_for_tomorrow = all_tickers[start_index_next_day:end_index_next_day]
-    else:
-        tickers_for_tomorrow = all_tickers[start_index_next_day:] + all_tickers[:end_index_next_day - total_tickers_in_sheet]
-
-    if tickers_for_tomorrow:
-        tomorrow_companies_text = ", ".join([f"<strong>{t}</strong>" for t in tickers_for_tomorrow])
-    else:
-        tomorrow_companies_text = "otras empresas clave del mercado."
+    # --- Lógica para el Call to Action del día siguiente (modificado para ser genérico) ---
+    tomorrow_companies_text = "otras empresas clave del mercado como **TEF.MC**, **SAN.MC** o **BBVA.MC**."
 
     # --- Construcción del prompt completo ---
     prompt = f"""
@@ -583,7 +529,7 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
 <p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que [Aquí el modelo redactará un resumen fluido de unas 100 palabras, reforzando la opinión general y la coherencia entre recomendación, niveles técnicos y fundamentos, utilizando un lenguaje más amplio y persuasivo. Por ejemplo: "los fundamentos sólidos, junto con las claras señales técnicas que apuntan a un rebote, configuran una oportunidad atractiva para aquellos inversores con un perfil de riesgo moderado a alto. La confluencia de la sobreventa con un volumen creciente podría ser el catalizador que impulse el precio hacia nuestros objetivos a corto plazo."].</p>
 
-<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. La inversión en mercados financieros conlleva riesgos, incluyendo la pérdida total del capital invertido. Se recomienda encarecidamente a cada inversor realizar su propia investigación exhaustiva (due diligence), consultar con un asesor financiero cualificado y analizar cada decisión de forma individual, teniendo en cuenta su perfil de riesgo personal, sus objetivos financieros y su situación económica antes de tomar cualquier decisión de inversión. El rendimiento pasado no es indicativo de resultados futuros.</p>
+<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. La inversión en mercados financieros conlleva riesgos, incluyendo la pérdida total del capital invertida. Se recomienda encarecidamente a cada inversor realizar su propia investigación exhaustiva (due diligence), consultar con un asesor financiero cualificado y analizar cada decisión de forma individual, teniendo en cuenta su perfil de riesgo personal, sus objetivos financieros y su situación económica antes de tomar cualquier decisión de inversión. El rendimiento pasado no es indicativo de resultados futuros.</p>
 
 <h2>¿Qué analizaremos mañana? ¡No te lo pierdas!</h2>
 <p>Mañana, pondremos bajo la lupa a {tomorrow_companies_text}. ¿Será el próximo candidato para una oportunidad de compra o venta? ¡Vuelve mañana a la misma hora para descubrirlo y seguir ampliando tu conocimiento de mercado!</p>
@@ -633,9 +579,9 @@ def enviar_email(texto_generado, asunto_email):
         print(f"Detalle del error: {e}")
 
 
-def generar_contenido_con_gemini(tickers, all_tickers, day_of_week):
+def generar_contenido_con_gemini(ticker):
     """
-    Genera contenido para cada ticker usando Gemini y lo envía por correo electrónico.
+    Genera contenido para un único ticker usando Gemini y lo envía por correo electrónico.
     Maneja reintentos para la generación de contenido.
     """
     api_key = os.getenv('GEMINI_API_KEY')
@@ -645,95 +591,61 @@ def generar_contenido_con_gemini(tickers, all_tickers, day_of_week):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")  
 
-    for ticker in tickers:
-        print(f"\n📊 Procesando ticker: {ticker}")
-        try:  
-            data = obtener_datos_yfinance(ticker)
-            if not data:
-                continue
-            
-            # Pasa all_tickers y el día de la semana actual a construir_prompt_formateado
-            # para que pueda calcular los tickers del día siguiente.
-            prompt, titulo_post = construir_prompt_formateado(data, all_tickers, day_of_week)
+    print(f"\n📊 Procesando ticker: {ticker}")
+    try:  
+        data = obtener_datos_yfinance(ticker)
+        if not data:
+            return # Salir si no se pueden obtener datos para el ticker
 
-            max_retries = 3
-            initial_delay = 10  
-            retries = 0
-            delay = initial_delay
+        # Ya no se pasan all_tickers ni day_of_week
+        prompt, titulo_post = construir_prompt_formateado(data)
 
-            while retries < max_retries:
-                try:
-                    response = model.generate_content(prompt)
-                    print(f"\n🧠 Contenido generado para {ticker}:\n")
-                    # Para depuración, puedes imprimir solo una parte o un resumen
-                    # print(response.text[:500] + "...") 
-                    # Considera no imprimir todo el HTML para prompts muy largos
-                    
-                    asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
-                    enviar_email(response.text, asunto_email)
-                    break  # Sale del bucle de reintentos si tiene éxito
-                except Exception as e:
-                    if "429 You exceeded your current quota" in str(e):
-                        try:
-                            match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
-                            if match:
-                                server_delay = int(match.group(1))
-                                delay = max(delay, server_delay + 1)
-                        except:
-                            pass # No se pudo extraer el retraso del servidor
-                        
-                        print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
-                        time.sleep(delay)
-                        retries += 1
-                        delay *= 2
-                    else:
-                        print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
-                        break # Sale si es un error no relacionado con la cuota
-            else:  # Este bloque se ejecuta si el bucle while termina sin un 'break' (es decir, todos los reintentos fallaron)
-                print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
+        max_retries = 3
+        initial_delay = 10  
+        retries = 0
+        delay = initial_delay
+
+        while retries < max_retries:
+            try:
+                response = model.generate_content(prompt)
+                print(f"\n🧠 Contenido generado para {ticker}:\n")
                 
-        except Exception as e:  
-            print(f"❌ Error crítico al procesar el ticker {ticker}: {e}. Saltando a la siguiente empresa.")
-            continue  # Continúa con el siguiente ticker
+                asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
+                enviar_email(response.text, asunto_email)
+                break  # Sale del bucle de reintentos si tiene éxito
+            except Exception as e:
+                if "429 You exceeded your current quota" in str(e):
+                    try:
+                        match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
+                        if match:
+                            server_delay = int(match.group(1))
+                            delay = max(delay, server_delay + 1)
+                    except:
+                        pass # No se pudo extraer el retraso del servidor
+                    
+                    print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {retries + 1}/{max_retries})")
+                    time.sleep(delay)
+                    retries += 1
+                    delay *= 2
+                else:
+                    print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
+                    break # Sale si es un error no relacionado con la cuota
+        else:  # Este bloque se ejecuta si el bucle while termina sin un 'break' (es decir, todos los reintentos fallaron)
+            print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
+            
+    except Exception as e:  
+        print(f"❌ Error crítico al procesar el ticker {ticker}: {e}.")
 
-        print(f"⏳ Esperando 60 segundos antes de procesar el siguiente ticker...")
-        time.sleep(60)  # Espera entre cada ticker para evitar saturar las APIs
+    print(f"⏳ Análisis para {ticker} completado.")
+
 
 def main():
     """
-    Función principal para leer tickers, determinar cuáles procesar hoy
-    y generar/enviar el contenido.
+    Función principal para analizar y generar el contenido para "ADX.MC".
     """
-    # Se lee la hoja completa para poder calcular los tickers del día siguiente
-    all_tickers = leer_google_sheets()[1:] # Se asume que la primera fila es de encabezado
-    
-    if not all_tickers:
-        print("No hay tickers para procesar en la hoja de cálculo.")
-        return
-
-    day_of_week = datetime.today().weekday() # 0 para lunes, 6 para domingo
-    
-    num_tickers_per_day = 10  # Número de tickers a procesar por día
-    total_tickers_in_sheet = len(all_tickers)
-    
-    # Calcular el rango de tickers para hoy
-    start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
-    end_index = start_index + num_tickers_per_day
-    
-    tickers_for_today = []
-    if end_index <= total_tickers_in_sheet:
-        tickers_for_today = all_tickers[start_index:end_index]
-    else:
-        # Manejar el "wrap-around" si el rango excede el final de la lista
-        tickers_for_today = all_tickers[start_index:] + all_tickers[:end_index - total_tickers_in_sheet]
-
-    if tickers_for_today:
-        print(f"Procesando tickers para el día {datetime.today().strftime('%A')}: {tickers_for_today}")
-        # Se pasa all_tickers y day_of_week para el cálculo de "mañana" dentro del prompt
-        generar_contenido_con_gemini(tickers_for_today, all_tickers, day_of_week)
-    else:
-        print(f"No hay tickers disponibles para el día {datetime.today().strftime('%A')} en el rango calculado. "
-              f"start_index: {start_index}, end_index: {end_index}, total_tickers: {total_tickers_in_sheet}")
+    ticker_to_analyze = "ADX.MC"
+    print(f"Iniciando el análisis para la empresa: {ticker_to_analyze}")
+    generar_contenido_con_gemini(ticker_to_analyze)
 
 
 if __name__ == '__main__':
