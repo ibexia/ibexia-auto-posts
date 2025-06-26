@@ -76,7 +76,7 @@ def calculate_smi_tv(df):
     # Manejo de división por cero para avgdiff: inicializa con ceros y calcula solo donde avgdiff no es cero
     smi_raw = pd.Series(0.0, index=df.index)
     non_zero_avgdiff_mask = avgdiff != 0
-    smi_raw[non_zero_avg_diff_mask] = (avgrel[non_zero_avg_diff_mask] / (avgdiff[non_zero_avg_diff_mask] / 2)) * 100
+    smi_raw[non_zero_avgdiff_mask] = (avgrel[non_zero_avgdiff_mask] / (avgdiff[non_zero_avgdiff_mask] / 2)) * 100
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
@@ -382,7 +382,8 @@ def obtener_datos_yfinance(ticker):
         # Asegúrate de que haya suficientes datos para al menos 7 notas
         recent_smi_signals = hist['SMI_signal'].dropna().tail(7)
         last_7_notes = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in recent_smi_signals]
-        last_7_dates = [d.strftime('%Y-%m-%d') for d in recent_smi_signals.index]
+        # Formatear las fechas para que sean legibles en el eje X del gráfico
+        last_7_dates = [d.strftime('%m-%d') for d in recent_smi_signals.index] # Formato Mes-Día
 
         # Recopilación de todos los datos relevantes
         datos = {
@@ -504,7 +505,7 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     if end_index_next_day <= total_tickers_in_sheet:
         tickers_for_tomorrow = all_tickers[start_index_next_day:end_index_next_day]
     else:
-        tickers_for_tomorrow = all_tickers[start_index_next_day:] + all_tickers[:end_index_next_day - total_tickers_in_sheet]
+        tickers_for_tomorrow = all_tickers[start_index_next_day:] + all_tickers[:(start_index + num_tickers_per_day) - total_tickers_in_sheet]
 
     if tickers_for_tomorrow:
         tomorrow_companies_text = ", ".join([f"<strong>{t}</strong>" for t in tickers_for_tomorrow])
@@ -512,10 +513,12 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
         tomorrow_companies_text = "otras empresas clave del mercado."
 
     # Datos para el gráfico Chart.js
-    labels = json.dumps(data['LAST_7_DATES'])
-    notes = json.dumps(data['LAST_7_NOTES'])
+    # Convertir las listas de Python a cadenas JSON para JavaScript
+    labels_js = json.dumps(data['LAST_7_DATES'])
+    notes_js = json.dumps(data['LAST_7_NOTES'])
 
     # --- Construcción del prompt completo ---
+    # He envuelto el bloque <script> dentro de un f-string multilinea correctamente.
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera un análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio y usando un lenguaje persuasivo y profesional.
 
@@ -537,11 +540,11 @@ Genera un análisis técnico y fundamental detallado de aproximadamente 1200 pal
 - Recomendación general: {data['RECOMENDACION']}
 - Nota de la empresa (0-10): {data['NOTA_EMPRESA']} sobre 10
 - Precio objetivo de compra: {data['PRECIO_OBJETIVO_COMPRA']}€
-- Ingresos: {data['INGRESOS']}
-- EBITDA: {data['EBITDA']}
-- Beneficios: {data['BENEFICIOS']}
-- Deuda: {data['DEUDA']}
-- Flujo de caja: {data['FLUJO_CAJA']}
+- Ingresos: {formatear_numero(data['INGRESOS'])}
+- EBITDA: {formatear_numero(data['EBITDA'])}
+- Beneficios: {formatear_numero(data['BENEFICIOS'])}
+- Deuda: {formatear_numero(data['DEUDA'])}
+- Flujo de caja: {formatear_numero(data['FLUJO_CAJA'])}
 - Planes de expansión: {data['EXPANSION_PLANES']}
 - Acuerdos: {data['ACUERDOS']}
 - Sentimiento de analistas: {data['SENTIMIENTO_ANALISTAS']}
@@ -590,10 +593,10 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
         const notesChart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: {labels},
+                labels: {labels_js},
                 datasets: [{
                     label: 'Nota Técnica (0-10)',
-                    data: {notes},
+                    data: {notes_js},
                     backgroundColor: [
                         'rgba(255, 99, 132, 0.6)',
                         'rgba(255, 159, 64, 0.6)',
