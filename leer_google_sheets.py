@@ -421,9 +421,12 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
 
     # --- Lógica para el Call to Action del día siguiente (modificado para ser genérico) ---
     # Calcular el índice de inicio para el día siguiente
-    next_day_index = ((current_day_of_week + 1) % 7) * 10
-    # Asegurarse de que no exceda el tamaño de la lista
-    next_companies_slice = all_tickers[next_day_index : next_day_index + 10]
+    next_day_index_start = ((current_day_of_week + 1) % 7) * 10
+    
+    next_companies_slice = []
+    # Asegurarse de que no exceda el tamaño de la lista y que cicla
+    for i in range(next_day_index_start, next_day_index_start + 10):
+        next_companies_slice.append(all_tickers[i % len(all_tickers)])
     
     if next_companies_slice:
         tomorrow_companies_text = "otras empresas clave del mercado como **" + ", ".join(next_companies_slice) + "**."
@@ -628,19 +631,30 @@ def main():
     day_of_week = today.weekday() # Lunes es 0, Domingo es 6
 
     # Calcular el índice de inicio para el día actual
-    start_index = day_of_week * 10
-    # Calcular el índice de fin, asegurando que no exceda el tamaño de la lista
+    # El módulo % len(ALL_TICKERS) asegura que el índice se reinicie si supera el tamaño de la lista.
+    start_index = (day_of_week * 10) % len(ALL_TICKERS)
+    
+    # Calcular el índice de fin
     end_index = start_index + 10
 
-    # Seleccionar los tickers para el día actual, con un ciclo si se excede la lista
     tickers_for_today = []
+    # Usar un bucle para manejar el "ciclado" si el slice excede el final de la lista
     for i in range(start_index, end_index):
+        # El módulo asegura que si i es 65 (ejemplo), iría al índice 0 de ALL_TICKERS, 66 al 1, etc.
         tickers_for_today.append(ALL_TICKERS[i % len(ALL_TICKERS)])
 
     print(f"Iniciando el análisis para las empresas del día {today.strftime('%A')}: {', '.join(tickers_for_today)}")
     
-    for ticker in tickers_for_today:
+    for i, ticker in enumerate(tickers_for_today):
+        print(f"--- Procesando ticker {i+1}/{len(tickers_for_today)}: {ticker} ---")
         generar_contenido_con_gemini(ticker, ALL_TICKERS, day_of_week)
+        
+        # Pausa entre el procesamiento de cada ticker para evitar saturar las APIs
+        if i < len(tickers_for_today) - 1: # No pausar después del último ticker
+            print(f"Pausando 30 segundos antes de procesar el siguiente ticker...")
+            time.sleep(30) # Ajusta este valor según sea necesario
+
+    print("\n--- Análisis diario completado para todas las empresas. ---")
 
 
 if __name__ == '__main__':
