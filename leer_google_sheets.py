@@ -36,7 +36,7 @@ def leer_google_sheets():
 
     service = build('sheets', 'v4', credentials=creds)
     # CORREGIDO: Usar service.spreadsheets().values() en lugar de service.sheets().values()
-    sheet = service.spreadsheets().values()
+    sheet = service.spreadsheets().values() 
     result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
 
@@ -155,49 +155,6 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
             
     return top_3_supports
 
-def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
-    """
-    Traduce texto al español utilizando la API de Gemini, con reintentos para manejar errores de cuota.
-    """
-    if not text or text.strip().lower() in ["n/a", "no disponibles", "no disponible"]:
-        return text
-
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key:
-        print("Advertencia: GEMINI_API_KEY no configurada. No se realizará la traducción.")
-        return text
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")
-    
-    retries = 0
-    delay = initial_delay
-    while retries < max_retries:
-        try:
-            # Petición a Gemini para traducción
-            response = model.generate_content(f"Traduce el siguiente texto al español de forma concisa y profesional: \"{text}\"")
-            translated_text = response.text.strip().replace("**", "").replace("*", "")
-            return translated_text
-        except Exception as e:
-            # Manejo específico de error de cuota (429) y otros errores
-            if "429 You exceeded your current quota" in str(e):
-                try:
-                    match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
-                    if match:
-                        server_delay = int(match.group(1))
-                        delay = max(delay, server_delay + 1)
-                except:
-                    pass # En caso de que no se pueda extraer el retraso del servidor
-                
-                print(f"❌ Cuota de Gemini excedida al traducir. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
-                time.sleep(delay)
-                retries += 1
-                delay *= 2
-            else:
-                print(f"❌ Error al traducir texto con Gemini (no de cuota): {e}")
-                return text # Retorna el texto original en caso de otros errores
-    print(f"❌ Falló la traducción después de {max_retries} reintentos.")
-    return text # Retorna el texto original si fallan todos los reintentos
 
 def obtener_datos_yfinance(ticker):
     """
@@ -362,19 +319,19 @@ def obtener_datos_yfinance(ticker):
         else:
             dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
 
-        # NO SE TRADUCE: Información de Yahoo Finance
+        # Traducir información de Yahoo Finance
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
-        expansion_planes_translated = expansion_planes_raw # Se mantiene el texto original
+        expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000]) # Limitar a 5000 caracteres para traducción
         if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
             expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
 
         acuerdos_raw = info.get("agreements", "No disponibles")
-        acuerdos_translated = acuerdos_raw # Se mantiene el texto original
+        acuerdos_translated = traducir_texto_con_gemini(acuerdos_raw)
         if acuerdos_translated == "No disponibles" and acuerdos_raw != "No disponibles":
             acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
 
         sentimiento_analistas_raw = info.get("recommendationKey", "N/A")
-        sentimiento_analistas_translated = sentimiento_analistas_raw # Se mantiene el texto original
+        sentimiento_analistas_translated = traducir_texto_con_gemini(sentimiento_analistas_raw)
         if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
             sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
             
@@ -589,47 +546,36 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
                     label: 'Nota Técnica (0-10)',
                     data: {notes_js},
                     backgroundColor: [
-                        'rgba(255, 99, 132, 0.7)',
-                        'rgba(255, 159, 64, 0.7)',
-                        'rgba(255, 205, 86, 0.7)',
-                        'rgba(75, 192, 192, 0.7)',
-                        'rgba(54, 162, 235, 0.7)',
-                        'rgba(153, 102, 255, 0.7)',
-                        'rgba(201, 203, 207, 0.7)'
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(255, 205, 86, 0.6)',
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(201, 203, 207, 0.6)'
                     ],
                     borderColor: [
-                        'rgb(255, 99, 132)',
-                        'rgb(255, 159, 64)',
-                        'rgb(255, 205, 86)',
-                        'rgb(75, 192, 192)',
-                        'rgb(54, 162, 235)',
-                        'rgb(153, 102, 255)',
-                        'rgb(201, 203, 207)'
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(255, 205, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(201, 203, 207, 1)'
                     ],
                     borderWidth: 1
                 }}]
             }},
             options: {{
                 responsive: true,
-                plugins: {{
-                    title: {{
-                        display: true,
-                        text: 'Notas Técnicas de los Últimos 7 Días',
-                        font: {{
-                            size: 16
-                        }}
-                    }},
-                    legend: {{
-                        display: false
-                    }}
-                }},
+                maintainAspectRatio: true,
                 scales: {{
                     y: {{
                         beginAtZero: true,
                         max: 10,
                         title: {{
                             display: true,
-                            text: 'Nota (0-10)'
+                            text: 'Nota Técnica'
                         }}
                     }},
                     x: {{
@@ -638,100 +584,237 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
                             text: 'Fecha'
                         }}
                     }}
+                }},
+                plugins: {{
+                    title: {{
+                        display: true,
+                        text: 'Notas Técnicas de los Últimos 7 Días'
+                    }},
+                    legend: {{
+                        display: false
+                    }}
                 }}
             }}
-        });
+        }});
     }});
 </script>
 
-<p>La **nota técnica actual de la empresa es de {data['NOTA_EMPRESA']}/10**, lo que indica un fuerte potencial alcista. Esta calificación, basada en un análisis exhaustivo del Stochastic Momentum Index (SMI), sugiere que la acción se encuentra en una fase de acumulación o de inicio de un impulso positivo. Es un indicador clave que utilizo para identificar oportunidades de entrada cuando el mercado aún no ha descontado completamente el movimiento.</p>
-<p>Mi recomendación es **{data['RECOMENDACION']}**. Esta postura se fundamenta en la confluencia de varios factores técnicos y fundamentales que analizaremos a continuación. Considero que el riesgo actual es favorable en relación con el potencial de beneficio.</p>
 
-<h2>Análisis Técnico Detallado</h2>
-<p>Desde una perspectiva técnica, la acción de <strong>{data['NOMBRE_EMPRESA']}</strong> muestra una estructura interesante. El precio actual de <strong>{data['PRECIO_ACTUAL']:,} €</strong> se encuentra en un punto crucial. Es vital observar cómo reacciona el precio en los próximos días, especialmente en relación con los niveles de soporte identificados.</p>
-<p>Hemos identificado {soportes_texto} Estos niveles son críticos, ya que representan zonas donde la demanda históricamente ha superado a la oferta, deteniendo caídas y sirviendo como puntos de rebote. Un seguimiento cercano de la interacción del precio con estos soportes nos dará confirmación adicional de la fortaleza de la tendencia. La resistencia clave se sitúa en <strong>{data['RESISTENCIA']:,} €</strong>, lo que representa un potencial de revalorización del <strong>{resistencia_porcentaje}</strong> desde el precio actual. Superar este nivel con volumen confirmaría una continuación del movimiento alcista.</p>
-<p>El Stochastic Momentum Index (SMI), un oscilador que valoro enormemente por su capacidad para medir el impulso y las condiciones de sobrecompra/sobreventa, nos muestra que la empresa se encuentra **{data['CONDICION_RSI']}**. La tendencia del SMI es **{data['SMI_TENDENCIA']}**, lo que sugiere que el impulso del precio está ganando fuerza. Esta divergencia o convergencia del SMI con el precio es una señal potente para anticipar movimientos. El valor actual del SMI es <strong>{data['SMI']:,}</strong>, lo que complementa mi análisis y refuerza la perspectiva de una oportunidad.</p>
-<p>En cuanto al volumen, las <strong>{data['VOLUMEN']:,} acciones</strong> negociadas en el último día completo son un indicador vital. Un incremento de volumen en un movimiento alcista valida la fortaleza de la tendencia, mientras que un bajo volumen podría indicar una falta de convicción. Estaré atento a cualquier cambio significativo en el volumen que pueda confirmar o refutar la dirección esperada.</p>
 
-<h2>Análisis Fundamental y Perspectivas</h2>
-<p>Más allá de los gráficos, es fundamental entender la salud financiera de <strong>{data['NOMBRE_EMPRESA']}</strong>. La empresa ha reportado ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong>, un EBITDA de <strong>{formatear_numero(data['EBITDA'])}</strong>, y beneficios de <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. Estas cifras nos dan una instantánea de su rendimiento operativo y su capacidad para generar ganancias. La deuda total de la empresa asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y su flujo de caja libre es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>. Estos datos son cruciales para evaluar la solidez financiera y la capacidad de la empresa para afrontar sus obligaciones y financiar su crecimiento.</p>
-<p>En cuanto a sus perspectivas de crecimiento, los planes de expansión de la empresa son: "{data['EXPANSION_PLANES']}". Estos planes, si se ejecutan con éxito, podrían ser un catalizador significativo para el precio de la acción. Además, la empresa ha estado involucrada en "{data['ACUERDOS']}", lo que podría indicar alianzas estratégicas o movimientos corporativos que impacten positivamente en su valoración.</p>
-<p>El sentimiento general de los analistas es "{data['SENTIMIENTO_ANALISTAS']}". Aunque no es el único factor a considerar, el consenso de los expertos puede ofrecer una perspectiva adicional sobre las expectativas del mercado. La tendencia social actual de la empresa es "{data['TENDENCIA_SOCIAL']}". La percepción pública y la atención en redes sociales pueden influir en el interés de los inversores. Las empresas similares en el sector incluyen: "{data['EMPRESAS_SIMILARES']}". Comparar el rendimiento de <strong>{data['NOMBRE_EMPRESA']}</strong> con sus pares nos ayuda a contextualizar su posición en el mercado.</p>
-<p>En mi evaluación, los principales riesgos y oportunidades para esta inversión son: "{data['RIESGOS_OPORTUNIDADES']}". Es vital que cada inversor evalúe estos factores en función de su propio perfil de riesgo y objetivos de inversión.</p>
+<p>Asignamos una <strong>nota técnica de {data['NOTA_EMPRESA']} sobre 10</strong>. Esta puntuación refleja [Aquí, la IA debe expandir concisamente qué significa esa puntuación en términos de riesgo, potencial de crecimiento, y la solidez *técnica* de la compañía para el corto plazo, utilizando un lenguaje más descriptivo. Por ejemplo, si es alta, hablar de "excelente fortaleza técnica y baja volatilidad esperada"; si es baja, de "riesgo elevado pero potencial de rebote si se confirman patrones de giro"]. A continuación, detallo una visión más completa de mi evaluación profesional, desarrollada en base a una combinación de indicadores técnicos y fundamentos económicos, con la convicción que mi criterio profesional es sólido y basado en una profunda comprensión del mercado.</p>
 
-<h2>Conclusión y Próximos Pasos</h2>
-<p>En resumen, mi análisis de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> revela una oportunidad de inversión atractiva, respaldada por una sólida nota técnica y un impulso creciente. La estimación para una acción significativa es que {data['DIAS_PARA_ACCION']}.</p>
-<p>Mi recomendación final es clara: **{data['RECOMENDACION']}**. Considero que este es un momento estratégico para aquellos inversores que buscan capitalizar un potencial movimiento alcista. Sin embargo, como siempre, la gestión del riesgo es primordial. Establezcan sus niveles de stop-loss y tomen ganancias de forma disciplinada.</p>
-<p>Mañana, en nuestro próximo análisis, nos sumergiremos en las oportunidades y desafíos de **{tomorrow_companies_text}**. ¡Asegúrense de estar atentos para no perderse ninguna actualización clave del mercado!</p>
+<h2>Análisis a Corto Plazo: Soportes, Resistencias y Dinámica del Impulso</h2>
+<p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar el comportamiento reciente del volumen y las zonas clave de soporte y resistencia. Estos niveles no son meros puntos en un gráfico; son reflejos de la psicología del mercado y de puntos donde la oferta y la demanda han encontrado equilibrio o desequilibrio en el pasado, y pueden volver a hacerlo.</p>
+
+<p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{resistencia_porcentaje}</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
+
+<p>Un aspecto crucial en el análisis de corto plazo es la dinámica de impulso de la empresa. Mi evaluación profesional indica que la tendencia actual se caracteriza por: <strong>{data['SMI_TENDENCIA']}</strong>. Específicamente, nuestros indicadores técnicos, nos muestran que <strong>{data['NOMBRE_EMPRESA']}</strong> se encuentra en una zona de sobreventa moderada. Esto significa, en términos sencillos, que la acción ha sido 'castigada' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio al alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo. Calculamos que este impulso podría llevarnos a una potencial zona de toma de beneficios o venta {data['DIAS_PARA_ACCION']} Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [Aquí, la IA debe comparar el volumen actual con el volumen promedio reciente o con el volumen histórico en puntos de inflexión. Comentar si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes y resistencias, y cómo esto valida mi perspectiva. Mínimo 150 palabras aquí. Por ejemplo: "Este volumen, aunque [alto/bajo/promedio], es consistente con la fase de [consolidación/acumulación/distribución] que observo, y refuerza la validez de los niveles de soporte detectados. Un incremento del volumen en la ruptura de la resistencia, por ejemplo, sería una señal inequívoca de fuerza para la tendencia alcista que preveo"]. Estos niveles técnicos y el patrón de volumen, junto con la nota técnica de <strong>{data['NOTA_EMPRESA']} sobre 10</strong>, nos proporcionan una guía invaluable para la operativa a corto plazo.</p>
+
+<h2>Estrategia de Inversión y Gestión de Riesgos</h2>
+<p>Basado en nuestro análisis, una posible estrategia de entrada sería considerar una compra cerca del soporte de <strong>{data['SOPORTE_1']:,} €</strong> o, idealmente, en los <strong>{data['SOPORTE_2']:,} €</strong>. Estos niveles ofrecen una relación riesgo/recompensa atractiva, permitiendo una entrada con mayor margen de seguridad. Para gestionar el riesgo de forma efectiva, se recomienda establecer un stop loss ajustado justo por debajo del soporte más bajo que hemos identificado, por ejemplo, en <strong>{data['SOPORTE_3']:,} €</strong>. Este punto actuaría como un nivel de invalidez de nuestra tesis de inversión. Nuestro objetivo de beneficio (Take Profit) a corto plazo se sitúa en la resistencia clave de <strong>{data['RESISTENCIA']:,} €</strong>, lo que representa un potencial de revalorización significativo. Esta configuración de entrada, stop loss y objetivo permite una relación riesgo/recompensa favorable para el inversor, buscando maximizar el beneficio mientras se protege el capital.</p>
+
+<h2>Resumen de Datos Clave</h2>
+<p>Para facilitar su revisión, aquí les presento una tabla con los datos más relevantes de <strong>{data['NOMBRE_EMPRESA']}</strong>:</p>
+<table border="1" style="width:100%; border-collapse: collapse;">
+    <tr><th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Métrica</th><th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Valor</th></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;">Precio Actual</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['PRECIO_ACTUAL']:,} €</strong></td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;">Volumen Reciente</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['VOLUMEN']:,} acciones</strong></td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;">Soporte Clave 1</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['SOPORTE_1']:,} €</strong></td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;">Resistencia Clave</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['RESISTENCIA']:,} € ({resistencia_porcentaje})</strong></td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;">Recomendación</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['RECOMENDACION']}</strong></td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;">Nota Técnica (0-10)</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['NOTA_EMPRESA']}</strong></td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;">Precio Objetivo Compra</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong></td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;">Tendencia</td><td style="padding: 8px; border: 1px solid #ddd;"><strong>{data['SMI_TENDENCIA']}</strong></td></tr>
+    <tr><td style="padding: 8px; border: 1px solid #ddd;">Días para Acción Estimados</td><td style="padding: 8px; border: 1px solid #ddd;">{data['DIAS_PARA_ACCION']}</td></tr>
+</table>
+
+<h2>Conclusión General y Descargo de Responsabilidad</h2>
+<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que [Aquí el modelo redactará un resumen fluido de unas 100 palabras, reforzando la opinión general y la coherencia entre recomendación, niveles técnicos y fundamentos, utilizando un lenguaje más amplio y persuasivo. Por ejemplo: "los fundamentos sólidos, junto con las claras señales técnicas que apuntan a un rebote, configuran una oportunidad atractiva para aquellos inversores con un perfil de riesgo moderado a alto. La confluencia de la sobreventa con un volumen creciente podría ser el catalizador que impulse el precio hacia nuestros objetivos a corto plazo."].</p>
+
+<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. La inversión en mercados financieros conlleva riesgos, incluyendo la pérdida total del capital invertido. Se recomienda encarecidamente a cada inversor realizar su propia investigación exhaustiva (due diligence), consultar con un asesor financiero cualificado y analizar cada decisión de forma individual, teniendo en cuenta su perfil de riesgo personal, sus objetivos financieros y su situación económica antes de tomar cualquier decisión de inversión. El rendimiento pasado no es indicativo de resultados futuros.</p>
+
+<h2>¿Qué analizaremos mañana? ¡No te lo pierdas!</h2>
+<p>Mañana, pondremos bajo la lupa a {tomorrow_companies_text}. ¿Será el próximo candidato para una oportunidad de compra o venta? ¡Vuelve mañana a la misma hora para descubrirlo y seguir ampliando tu conocimiento de mercado!</p>
+
+<h2>Tu Opinión Importa: ¡Participa!</h2>
+<p>¿Considerarías comprar acciones de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> con este análisis?</p>
+<ul>
+    <li>Sí, la oportunidad es clara.</li>
+    <li>No, prefiero esperar más datos.</li>
+    <li>Ya las tengo en cartera.</li>
+</ul>
+<p>¡Déjanos tu voto y tu comentario sobre tu visión de <strong>{data['NOMBRE_EMPRESA']}</strong> en la sección de comentarios! Queremos saber qué piensas y fomentar una comunidad de inversores informada.</p>
+
 """
-    return prompt
 
-def enviar_email(html_content, recipient_email, ticker_name):
+    return prompt, titulo_post
+
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime # Necesitas esta importación para el nombre del archivo
+
+def enviar_email(texto_generado, asunto_email):
     """
-    Envía un email con el contenido HTML generado.
-    Requiere las variables de entorno EMAIL_SENDER, EMAIL_PASSWORD y EMAIL_RECIPIENT.
+    Envía el contenido (texto_generado) como un archivo .html adjunto.
+    Mantiene la configuración de remitente/destinatario/contraseña hardcodeada como en el original.
     """
-    sender_email = os.getenv('EMAIL_SENDER')
-    sender_password = os.getenv('EMAIL_PASSWORD')
+    remitente = "xumkox@gmail.com"
+    destinatario = "xumkox@gmail.com"
+    # Advertencia: La contraseña está hardcodeada. En un entorno de producción,
+    # se recomienda encarecidamente usar variables de entorno o un servicio de secretos.
+    password = "kdgz lvdo wqvt vfkt"  
 
-    if not sender_email or not sender_password or not recipient_email:
-        print("❌ Error: Variables de entorno de email no configuradas correctamente.")
-        return
+    msg = MIMEMultipart()
+    msg['From'] = remitente
+    msg['To'] = destinatario
+    msg['Subject'] = asunto_email
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"Análisis de la Acción: {ticker_name}"
-    msg["From"] = sender_email
-    msg["To"] = recipient_email
+    # --- Mensaje en el cuerpo del correo (para informar que hay un adjunto) ---
+    # Este texto es lo que verás directamente al abrir el email en Gmail.
+    msg.attach(MIMEText("Adjunto encontrarás el análisis HTML. Por favor, abre el archivo .html adjunto para verlo y copiarlo.", 'plain', 'utf-8'))
 
-    # Crea el cuerpo del email en HTML
-    part_html = MIMEText(html_content, "html")
-    msg.attach(part_html)
-
+    # --- Creación y adjunción del archivo .html con el texto_generado ---
     try:
-        # Conexión al servidor SMTP de Gmail
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, recipient_email, msg.as_string())
-        server.quit()
-        print(f"✅ Email enviado con éxito a {recipient_email} para {ticker_name}")
+        # Generar un nombre de archivo único con la fecha y hora actual
+        # Esto es útil si envías varios correos para diferentes análisis.
+        file_name = f"analisis_reporte_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        
+        # Crear un objeto MIMEText para el adjunto.
+        # El primer argumento es el contenido (tu texto_generado), el segundo es el subtipo ('html').
+        attachment = MIMEText(texto_generado, 'html', 'utf-8')
+        
+        # Añadir el encabezado que lo marca como adjunto y le da un nombre de archivo.
+        attachment.add_header('Content-Disposition', 'attachment', filename=file_name)
+        
+        # Adjuntar el archivo al mensaje.
+        msg.attach(attachment)
+        
+        print(f"✔️ Archivo '{file_name}' preparado para adjuntar.")
+
     except Exception as e:
-        print(f"❌ Error al enviar el email para {ticker_name}: {e}")
+        print(f"❌ Error al preparar el adjunto HTML: {e}")
+        return False # Indica que la preparación del adjunto falló
+
+    # --- Envío del correo ---
+    try:
+        servidor = smtplib.SMTP('smtp.gmail.com', 587)
+        servidor.starttls() # Habilita la seguridad TLS
+        servidor.login(remitente, password)
+        servidor.sendmail(remitente, destinatario, msg.as_string())
+        servidor.quit()
+        print("✅ Correo enviado con éxito.")
+        return True
+    except Exception as e:
+        print("❌ Error al enviar el correo:", e)
+        print(f"Detalle del error: {e}")
+        print("Asegúrate de que la 'Contraseña de aplicación' de tu cuenta de Google está configurada correctamente si usas 2FA.")
+        return False
+
+
+def generar_contenido_con_gemini(tickers, all_tickers, day_of_week):
+    """
+    Genera contenido para cada ticker usando Gemini y lo envía por correo electrónico.
+    Maneja reintentos para la generación de contenido.
+    """
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")  
+
+    for ticker in tickers:
+        print(f"\n📊 Procesando ticker: {ticker}")
+        try:  
+            data = obtener_datos_yfinance(ticker)
+            if not data:
+                continue
+            
+            # Pasa all_tickers y el día de la semana actual a construir_prompt_formateado
+            # para que pueda calcular los tickers del día siguiente.
+            prompt, titulo_post = construir_prompt_formateado(data, all_tickers, day_of_week)
+
+            max_retries = 3
+            initial_delay = 10  
+            retries = 0
+            delay = initial_delay
+
+            while retries < max_retries:
+                try:
+                    response = model.generate_content(prompt)
+                    print(f"\n🧠 Contenido generado para {ticker}:\n")
+                    # Para depuración, puedes imprimir solo una parte o un resumen
+                    # print(response.text[:500] + "...") 
+                    # Considera no imprimir todo el HTML para prompts muy largos
+                    
+                    asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
+                    enviar_email(response.text, asunto_email)
+                    break  # Sale del bucle de reintentos si tiene éxito
+                except Exception as e:
+                    if "429 You exceeded your current quota" in str(e):
+                        try:
+                            match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
+                            if match:
+                                server_delay = int(match.group(1))
+                                delay = max(delay, server_delay + 1)
+                        except:
+                            pass # No se pudo extraer el retraso del servidor
+                        
+                        print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
+                        time.sleep(delay)
+                        retries += 1
+                        delay *= 2
+                    else:
+                        print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
+                        break # Sale si es un error no relacionado con la cuota
+            else:  # Este bloque se ejecuta si el bucle while termina sin un 'break' (es decir, todos los reintentos fallaron)
+                print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
+                
+        except Exception as e:  
+            print(f"❌ Error crítico al procesar el ticker {ticker}: {e}. Saltando a la siguiente empresa.")
+            continue  # Continúa con el siguiente ticker
+
+        print(f"⏳ Esperando 60 segundos antes de procesar el siguiente ticker...")
+        time.sleep(60)  # Espera entre cada ticker para evitar saturar las APIs
 
 def main():
-    try:
-        tickers = leer_google_sheets()
-        if not tickers:
-            print("No hay tickers para procesar. Saliendo.")
-            return
+    """
+    Función principal para leer tickers, determinar cuáles procesar hoy
+    y generar/enviar el contenido.
+    """
+    # Se lee la hoja completa para poder calcular los tickers del día siguiente
+    all_tickers = leer_google_sheets()[1:] # Se asume que la primera fila es de encabezado
+    
+    if not all_tickers:
+        print("No hay tickers para procesar en la hoja de cálculo.")
+        return
 
-        recipient_email = os.getenv('EMAIL_RECIPIENT')
-        if not recipient_email:
-            print("❌ Error: Variable de entorno EMAIL_RECIPIENT no configurada.")
-            return
-        
-        # Obtener el día de la semana actual (0=Lunes, 6=Domingo)
-        current_day_of_week = datetime.now().weekday() 
+    day_of_week = datetime.today().weekday() # 0 para lunes, 6 para domingo
+    
+    num_tickers_per_day = 10  # Número de tickers a procesar por día
+    total_tickers_in_sheet = len(all_tickers)
+    
+    # Calcular el rango de tickers para hoy
+    start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
+    end_index = start_index + num_tickers_per_day
+    
+    tickers_for_today = []
+    if end_index <= total_tickers_in_sheet:
+        tickers_for_today = all_tickers[start_index:end_index]
+    else:
+        # Manejar el "wrap-around" si el rango excede el final de la lista
+        tickers_for_today = all_tickers[start_index:] + all_tickers[:end_index - total_tickers_in_sheet]
 
-        for ticker in tickers:
-            print(f"\n🚀 Procesando ticker: {ticker}")
-            data = obtener_datos_yfinance(ticker)
-            if data:
-                print(f"✅ Datos obtenidos para {ticker}. Generando informe...")
-                
-                # Pasar all_tickers y current_day_of_week a la función que construye el prompt
-                html_report = construir_prompt_formateado(data, tickers, current_day_of_week)
-                
-                if html_report:
-                    # Enviar el email
-                    enviar_email(html_report, recipient_email, data['NOMBRE_EMPRESA'])
-                else:
-                    print(f"❌ No se pudo generar el informe HTML para {ticker}.")
-            else:
-                print(f"❌ No se pudieron obtener o procesar datos para {ticker}. Saltando.")
-            time.sleep(5) # Pequeña pausa entre tickers para evitar bloqueos por tasa
+    if tickers_for_today:
+        print(f"Procesando tickers para el día {datetime.today().strftime('%A')}: {tickers_for_today}")
+        # Se pasa all_tickers y day_of_week para el cálculo de "mañana" dentro del prompt
+        generar_contenido_con_gemini(tickers_for_today, all_tickers, day_of_week)
+    else:
+        print(f"No hay tickers disponibles para el día {datetime.today().strftime('%A')} en el rango calculado. "
+              f"start_index: {start_index}, end_index: {end_index}, total_tickers: {total_tickers_in_sheet}")
 
-    except Exception as e:
-        print(f"❌ Ha ocurrido un error crítico en la ejecución principal: {e}")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
