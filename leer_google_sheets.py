@@ -4,11 +4,52 @@ import smtplib
 import yfinance as yf
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+import google.generativeai as genai
 from datetime import datetime
 import pandas as pd
 import numpy as np
 import time
 import re
+
+def leer_google_sheets():
+    """
+    Lee los tickers de Google Sheets desde la columna A.
+    Requiere las variables de entorno GOOGLE_APPLICATION_CREDENTIALS y SPREADSHEET_ID.
+    """
+    credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    if not credentials_json:
+        raise Exception("No se encontró la variable de entorno GOOGLE_APPLICATION_CREDENTIALS")
+
+    creds_dict = json.loads(credentials_json)
+    creds = service_account.Credentials.from_service_account_info(
+        creds_dict,
+        scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
+    )
+
+    spreadsheet_id = os.getenv('SPREADSHEET_ID') # ¡CORREGIDO: antes SPREADSHEED_ID!
+    if not spreadsheet_id:
+        raise Exception("No se encontró la variable de entorno SPREADSHEET_ID")
+
+    range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
+
+    service = build('sheets', 'v4', credentials=creds)
+    # CORREGIDO: Usar service.spreadsheets().values() en lugar de service.sheets().values()
+    sheet = service.spreadsheets().values()
+    result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
+    values = result.get('values', [])
+
+    if not values:
+        print('No se encontraron datos en la hoja de cálculo.')
+    else:
+        print('Datos leídos de la hoja:')
+        for row in values:
+            print(row)
+
+    # Retorna solo el primer elemento de cada fila que no esté vacía
+    return [row[0] for row in values if row]
+
 
 # Parámetros para el cálculo del SMI (Stochastic Momentum Index)
 length_k = 10
@@ -114,7 +155,49 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
             
     return top_3_supports
 
-# --- FUNCION DE TRADUCCION DE GEMINI ELIMINADA ---
+def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
+    """
+    Traduce texto al español utilizando la API de Gemini, con reintentos para manejar errores de cuota.
+    """
+    if not text or text.strip().lower() in ["n/a", "no disponibles", "no disponible"]:
+        return text
+
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        print("Advertencia: GEMINI_API_KEY no configurada. No se realizará la traducción.")
+        return text
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")
+    
+    retries = 0
+    delay = initial_delay
+    while retries < max_retries:
+        try:
+            # Petición a Gemini para traducción
+            response = model.generate_content(f"Traduce el siguiente texto al español de forma concisa y profesional: \"{text}\"")
+            translated_text = response.text.strip().replace("**", "").replace("*", "")
+            return translated_text
+        except Exception as e:
+            # Manejo específico de error de cuota (429) y otros errores
+            if "429 You exceeded your current quota" in str(e):
+                try:
+                    match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
+                    if match:
+                        server_delay = int(match.group(1))
+                        delay = max(delay, server_delay + 1)
+                except:
+                    pass # En caso de que no se pueda extraer el retraso del servidor
+                
+                print(f"❌ Cuota de Gemini excedida al traducir. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
+                time.sleep(delay)
+                retries += 1
+                delay *= 2
+            else:
+                print(f"❌ Error al traducir texto con Gemini (no de cuota): {e}")
+                return text # Retorna el texto original en caso de otros errores
+    print(f"❌ Falló la traducción después de {max_retries} reintentos.")
+    return text # Retorna el texto original si fallan todos los reintentos
 
 def obtener_datos_yfinance(ticker):
     """
@@ -223,7 +306,7 @@ def obtener_datos_yfinance(ticker):
                 recomendacion = "Sobreventa moderada. Evaluar fortaleza de soportes, el precio podría caer más."
         elif 8 <= nota_empresa < 9: # SMI muy bajo (sobreventa fuerte)
             condicion_rsi = "sobreventa"
-            smi_tendencia = "en una zona de sobreventa fuerte, con potencial de reversión."
+            smi_tendencia = "en una una sobreventa fuerte, con potencial de reversión."
             if smi_actual > smi_anterior:
                 recomendacion = "Se acerca la hora de comprar. Fuerte señal de rebote."
             else:
@@ -279,16 +362,29 @@ def obtener_datos_yfinance(ticker):
         else:
             dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
 
-        # Estos datos ya no se traducen y se toman directamente del info dict
+        # NO SE TRADUCE: Información de Yahoo Finance
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
-        expansion_planes = expansion_planes_raw[:5000] if expansion_planes_raw != "N/A" else "No disponible"
+        expansion_planes_translated = expansion_planes_raw # Se mantiene el texto original
+        if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
+            expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
 
         acuerdos_raw = info.get("agreements", "No disponibles")
-        acuerdos = acuerdos_raw if acuerdos_raw != "No disponibles" else "No disponible"
+        acuerdos_translated = acuerdos_raw # Se mantiene el texto original
+        if acuerdos_translated == "No disponibles" and acuerdos_raw != "No disponibles":
+            acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
 
         sentimiento_analistas_raw = info.get("recommendationKey", "N/A")
-        sentimiento_analistas = sentimiento_analistas_raw if sentimiento_analistas_raw != "N/A" else "No disponible"
+        sentimiento_analistas_translated = sentimiento_analistas_raw # Se mantiene el texto original
+        if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
+            sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
             
+        # Obtener las últimas 7 notas de la empresa (calculadas a partir del SMI)
+        # Asegúrate de que haya suficientes datos para al menos 7 notas
+        recent_smi_signals = hist['SMI_signal'].dropna().tail(7)
+        last_7_notes = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in recent_smi_signals]
+        # Formatear las fechas para que sean legibles en el eje X del gráfico
+        last_7_dates = [d.strftime('%m-%d') for d in recent_smi_signals.index] # Formato Mes-Día
+
         # Recopilación de todos los datos relevantes
         datos = {
             "TICKER": ticker,
@@ -309,14 +405,16 @@ def obtener_datos_yfinance(ticker):
             "BENEFICIOS": info.get("grossProfits", "N/A"),
             "DEUDA": info.get("totalDebt", "N/A"),
             "FLUJO_CAJA": info.get("freeCashflow", "N/A"),
-            "EXPANSION_PLANES": expansion_planes, 
-            "ACUERDOS": acuerdos, 
-            "SENTIMIENTO_ANALISTAS": sentimiento_analistas, 
+            "EXPANSION_PLANES": expansion_planes_translated,
+            "ACUERDOS": acuerdos_translated,
+            "SENTIMIENTO_ANALISTAS": sentimiento_analistas_translated,
             "TENDENCIA_SOCIAL": "No disponible", # Placeholder, ya que no se extrae de yfinance
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles", # Placeholder
             "SMI_TENDENCIA": smi_tendencia,
-            "DIAS_PARA_ACCION": dias_para_accion_str
+            "DIAS_PARA_ACCION": dias_para_accion_str,
+            "LAST_7_NOTES": last_7_notes,
+            "LAST_7_DATES": last_7_dates
         }
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}")
@@ -395,7 +493,7 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     else:
         resistencia_porcentaje = "no calculable debido a un precio actual no disponible o de 0€"
 
-    # --- Lógica para el Call to Action del día siguiente ---
+    # --- Lógica para el Call to Action del día siguiente (esto es lo que se ajusta a tu original) ---
     num_tickers_per_day = 10
     total_tickers_in_sheet = len(all_tickers)
     next_day_of_week = (current_day_of_week + 1) % 7
@@ -407,14 +505,20 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     if end_index_next_day <= total_tickers_in_sheet:
         tickers_for_tomorrow = all_tickers[start_index_next_day:end_index_next_day]
     else:
-        tickers_for_tomorrow = all_tickers[start_index_next_day:] + all_tickers[:end_index_next_day - total_tickers_in_sheet]
+        remaining_tickers = total_tickers_in_sheet - start_index_next_day
+        tickers_for_tomorrow = all_tickers[start_index_next_day:] + all_tickers[:num_tickers_per_day - remaining_tickers]
+
 
     if tickers_for_tomorrow:
         tomorrow_companies_text = ", ".join([f"<strong>{t}</strong>" for t in tickers_for_tomorrow])
     else:
         tomorrow_companies_text = "otras empresas clave del mercado."
 
-    # --- Construcción del prompt completo ---
+    # Datos para el gráfico Chart.js
+    # Convertir las listas de Python a cadenas JSON para JavaScript
+    labels_js = json.dumps(data['LAST_7_DATES'])
+    notes_js = json.dumps(data['LAST_7_NOTES'])
+
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera un análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio y usando un lenguaje persuasivo y profesional.
 
@@ -436,11 +540,11 @@ Genera un análisis técnico y fundamental detallado de aproximadamente 1200 pal
 - Recomendación general: {data['RECOMENDACION']}
 - Nota de la empresa (0-10): {data['NOTA_EMPRESA']} sobre 10
 - Precio objetivo de compra: {data['PRECIO_OBJETIVO_COMPRA']}€
-- Ingresos: {data['INGRESOS']}
-- EBITDA: {data['EBITDA']}
-- Beneficios: {data['BENEFICIOS']}
-- Deuda: {data['DEUDA']}
-- Flujo de caja: {data['FLUJO_CAJA']}
+- Ingresos: {formatear_numero(data['INGRESOS'])}
+- EBITDA: {formatear_numero(data['EBITDA'])}
+- Beneficios: {formatear_numero(data['BENEFICIOS'])}
+- Deuda: {formatear_numero(data['DEUDA'])}
+- Flujo de caja: {formatear_numero(data['FLUJO_CAJA'])}
 - Planes de expansión: {data['EXPANSION_PLANES']}
 - Acuerdos: {data['ACUERDOS']}
 - Sentimiento de analistas: {data['SENTIMIENTO_ANALISTAS']}
@@ -449,11 +553,16 @@ Genera un análisis técnico y fundamental detallado de aproximadamente 1200 pal
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 - Tendencia de impulso (SMI): {data['SMI_TENDENCIA']}
 - Estimación para acción: {data['DIAS_PARA_ACCION']}
+- Últimas 7 notas: {data['LAST_7_NOTES']}
+- Últimas 7 fechas de notas: {data['LAST_7_DATES']}
+
 
 Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disponible", no lo menciones ni digas que falta. Integra la recomendación como una conclusión personal basada en tu experiencia y criterio profesional, sin atribuirla a un indicador específico. Asegura que el lenguaje sea dinámico y no repetitivo.
 
 ---
 <h1>{titulo_post}</h1>
+
+
 
 <h2>Análisis Inicial y Recomendación</h2>
 <p>En el dinámico mercado actual, <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> está enviando señales claras de un potencial giro alcista. ¿Es este el momento ideal para considerar una entrada? Mi análisis técnico apunta a que sí, con una oportunidad de compra inminente y un rebote en el horizonte.</p>
@@ -464,103 +573,165 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
     else:
         prompt += f"""Esto subraya una atractiva oportunidad de compra, al estar el precio actual por debajo de nuestro objetivo, sugiriendo un potencial de revalorización desde los niveles actuales."""
     prompt += f""" El volumen negociado recientemente, que alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>, es un factor clave que valida estos movimientos, y será crucial monitorearlo para confirmar la fuerza de cualquier tendencia emergente.</p>
-<p>Asignamos una <strong>nota técnica de {data['NOTA_EMPRESA']} sobre 10</strong>. Esta puntuación refleja [Aquí, la IA debe expandir concisamente qué significa esa puntuación en términos de riesgo, potencial de crecimiento, y la solidez *técnica* de la compañía para el corto plazo, utilizando un lenguaje más descriptivo. Por ejemplo, si es alta, hablar de "excelente fortaleza técnica y baja volatilidad esperada"; si es baja, de "riesgo elevado pero potencial de rebote si se confirman patrones de giro"]. A continuación, detallo una visión más completa de mi evaluación profesional, desarrollada en base a una combinación de indicadores técnicos y fundamentos económicos, con la convicción que mi criterio profesional es sólido y basado en una profunda comprensión del mercado.</p>
 
-<h2>Análisis a Corto Plazo: Soportes, Resistencias y Dinámica del Impulso</h2>
-<p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar el comportamiento reciente del volumen y las zonas clave de soporte y resistencia. Estos niveles no son meros puntos en un gráfico; son reflejos de la psicología del mercado y de puntos donde la oferta y la demanda han encontrado equilibrio o desequilibrio en el pasado, y pueden volver a hacerlo.</p>
+<div style="width: 100%; max-width: 600px; margin: auto;">
+    <canvas id="notesChart"></canvas>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {{
+        const ctx = document.getElementById('notesChart').getContext('2d');
+        const notesChart = new Chart(ctx, {{
+            type: 'bar',
+            data: {{
+                labels: {labels_js},
+                datasets: [{{
+                    label: 'Nota Técnica (0-10)',
+                    data: {notes_js},
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(255, 159, 64, 0.7)',
+                        'rgba(255, 205, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(201, 203, 207, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgb(255, 99, 132)',
+                        'rgb(255, 159, 64)',
+                        'rgb(255, 205, 86)',
+                        'rgb(75, 192, 192)',
+                        'rgb(54, 162, 235)',
+                        'rgb(153, 102, 255)',
+                        'rgb(201, 203, 207)'
+                    ],
+                    borderWidth: 1
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                plugins: {{
+                    title: {{
+                        display: true,
+                        text: 'Notas Técnicas de los Últimos 7 Días',
+                        font: {{
+                            size: 16
+                        }}
+                    }},
+                    legend: {{
+                        display: false
+                    }}
+                }},
+                scales: {{
+                    y: {{
+                        beginAtZero: true,
+                        max: 10,
+                        title: {{
+                            display: true,
+                            text: 'Nota (0-10)'
+                        }}
+                    }},
+                    x: {{
+                        title: {{
+                            display: true,
+                            text: 'Fecha'
+                        }}
+                    }}
+                }}
+            }}
+        });
+    }});
+</script>
 
-<p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{resistencia_porcentaje}</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión. Si el precio supera la resistencia, es una señal de fortaleza. Si perfora un soporte, podríamos ver una continuación de la caída. Mi enfoque siempre es identificar estos puntos para tomar decisiones informadas y proteger el capital de mis inversores.</p>
+<p>La **nota técnica actual de la empresa es de {data['NOTA_EMPRESA']}/10**, lo que indica un fuerte potencial alcista. Esta calificación, basada en un análisis exhaustivo del Stochastic Momentum Index (SMI), sugiere que la acción se encuentra en una fase de acumulación o de inicio de un impulso positivo. Es un indicador clave que utilizo para identificar oportunidades de entrada cuando el mercado aún no ha descontado completamente el movimiento.</p>
+<p>Mi recomendación es **{data['RECOMENDACION']}**. Esta postura se fundamenta en la confluencia de varios factores técnicos y fundamentales que analizaremos a continuación. Considero que el riesgo actual es favorable en relación con el potencial de beneficio.</p>
 
-<p>La dinámica del SMI (Stochastic Momentum Index) es crucial. Este indicador nos muestra la velocidad y el cambio del precio, no solo la dirección. Actualmente, el SMI para <strong>{data['NOMBRE_EMPRESA']}</strong> está {data['SMI_TENDENCIA']} Esto me indica que [Aquí, la IA debe desarrollar qué significa esa tendencia del SMI para la empresa, con mayor detalle. Por ejemplo, si está "subiendo" en zona de sobreventa, indicar potencial de rebote; si está "bajando" en sobrecompra, riesgo de corrección]. Mi experiencia me dice que el SMI es un indicador adelantado fiable, y su comportamiento actual me da una visión clara de la presión de compra o venta en el valor. Este es el tipo de detalle que nos permite anticipar movimientos y no solo reaccionar a ellos.</p>
+<h2>Análisis Técnico Detallado</h2>
+<p>Desde una perspectiva técnica, la acción de <strong>{data['NOMBRE_EMPRESA']}</strong> muestra una estructura interesante. El precio actual de <strong>{data['PRECIO_ACTUAL']:,} €</strong> se encuentra en un punto crucial. Es vital observar cómo reacciona el precio en los próximos días, especialmente en relación con los niveles de soporte identificados.</p>
+<p>Hemos identificado {soportes_texto} Estos niveles son críticos, ya que representan zonas donde la demanda históricamente ha superado a la oferta, deteniendo caídas y sirviendo como puntos de rebote. Un seguimiento cercano de la interacción del precio con estos soportes nos dará confirmación adicional de la fortaleza de la tendencia. La resistencia clave se sitúa en <strong>{data['RESISTENCIA']:,} €</strong>, lo que representa un potencial de revalorización del <strong>{resistencia_porcentaje}</strong> desde el precio actual. Superar este nivel con volumen confirmaría una continuación del movimiento alcista.</p>
+<p>El Stochastic Momentum Index (SMI), un oscilador que valoro enormemente por su capacidad para medir el impulso y las condiciones de sobrecompra/sobreventa, nos muestra que la empresa se encuentra **{data['CONDICION_RSI']}**. La tendencia del SMI es **{data['SMI_TENDENCIA']}**, lo que sugiere que el impulso del precio está ganando fuerza. Esta divergencia o convergencia del SMI con el precio es una señal potente para anticipar movimientos. El valor actual del SMI es <strong>{data['SMI']:,}</strong>, lo que complementa mi análisis y refuerza la perspectiva de una oportunidad.</p>
+<p>En cuanto al volumen, las <strong>{data['VOLUMEN']:,} acciones</strong> negociadas en el último día completo son un indicador vital. Un incremento de volumen en un movimiento alcista valida la fortaleza de la tendencia, mientras que un bajo volumen podría indicar una falta de convicción. Estaré atento a cualquier cambio significativo en el volumen que pueda confirmar o refutar la dirección esperada.</p>
 
-<p>En cuanto a los "Días para la Acción", mi análisis sugiere que {data['DIAS_PARA_ACCION']}. Este pronóstico, basado en la velocidad de cambio del SMI, nos permite preparar nuestras estrategias con antelación, maximizando la eficiencia de nuestras operaciones. No se trata de adivinar el futuro, sino de identificar las probabilidades más altas con la mayor precisión posible.</p>
+<h2>Análisis Fundamental y Perspectivas</h2>
+<p>Más allá de los gráficos, es fundamental entender la salud financiera de <strong>{data['NOMBRE_EMPRESA']}</strong>. La empresa ha reportado ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong>, un EBITDA de <strong>{formatear_numero(data['EBITDA'])}</strong>, y beneficios de <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. Estas cifras nos dan una instantánea de su rendimiento operativo y su capacidad para generar ganancias. La deuda total de la empresa asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y su flujo de caja libre es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>. Estos datos son cruciales para evaluar la solidez financiera y la capacidad de la empresa para afrontar sus obligaciones y financiar su crecimiento.</p>
+<p>En cuanto a sus perspectivas de crecimiento, los planes de expansión de la empresa son: "{data['EXPANSION_PLANES']}". Estos planes, si se ejecutan con éxito, podrían ser un catalizador significativo para el precio de la acción. Además, la empresa ha estado involucrada en "{data['ACUERDOS']}", lo que podría indicar alianzas estratégicas o movimientos corporativos que impacten positivamente en su valoración.</p>
+<p>El sentimiento general de los analistas es "{data['SENTIMIENTO_ANALISTAS']}". Aunque no es el único factor a considerar, el consenso de los expertos puede ofrecer una perspectiva adicional sobre las expectativas del mercado. La tendencia social actual de la empresa es "{data['TENDENCIA_SOCIAL']}". La percepción pública y la atención en redes sociales pueden influir en el interés de los inversores. Las empresas similares en el sector incluyen: "{data['EMPRESAS_SIMILARES']}". Comparar el rendimiento de <strong>{data['NOMBRE_EMPRESA']}</strong> con sus pares nos ayuda a contextualizar su posición en el mercado.</p>
+<p>En mi evaluación, los principales riesgos y oportunidades para esta inversión son: "{data['RIESGOS_OPORTUNIDADES']}". Es vital que cada inversor evalúe estos factores en función de su propio perfil de riesgo y objetivos de inversión.</p>
 
-<h2>Análisis Fundamental: El Telón de Fondo de la Oportunidad</h2>
-<p>Más allá de los gráficos, es imprescindible bucear en los fundamentos de <strong>{data['NOMBRE_EMPRESA']}</strong> para comprender su verdadero valor y potencial a largo plazo. Los números no mienten y nos ofrecen una fotografía de la salud financiera de la compañía. Como inversor profesional, nunca baso mis decisiones únicamente en el análisis técnico; la combinación de ambos es la clave del éxito.</p>
-
-<p>Los ingresos de la empresa ascienden a <strong>{formatear_numero(data['INGRESOS'])}</strong>, lo que demuestra su capacidad para generar ventas. El EBITDA, un indicador clave de la rentabilidad operativa antes de intereses, impuestos, depreciaciones y amortizaciones, se sitúa en <strong>{formatear_numero(data['EBITDA'])}</strong>. Estos datos son vitales para evaluar la eficiencia con la que la empresa gestiona sus operaciones principales. No debemos pasar por alto los beneficios, que alcanzan los <strong>{formatear_numero(data['BENEFICIOS'])}</strong>, una cifra que refleja la rentabilidad neta del negocio. Mi atención se centra en la consistencia de estas cifras, pues un crecimiento sostenido de los beneficios es un pilar fundamental para cualquier inversión sólida.</p>
-
-<p>En lo que respecta a la estructura financiera, la deuda de <strong>{data['NOMBRE_EMPRESA']}</strong> es de <strong>{formatear_numero(data['DEUDA'])}</strong>. Es crucial evaluar esta cifra en relación con sus activos y su capacidad de generación de efectivo. Un nivel de deuda manejable es un signo de solidez financiera y capacidad para afrontar futuros desafíos o invertir en crecimiento. Por otro lado, el flujo de caja, que se sitúa en <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>, es el verdadero motor de la empresa, indicando la cantidad de efectivo que la compañía genera a través de sus operaciones. Un flujo de caja libre positivo y creciente es lo que busco en las empresas que recomiendo; es el oxígeno de cualquier negocio en expansión.</p>
-
-<p>Los planes de expansión de la empresa, que incluyen {data['EXPANSION_PLANES']}, son un motor de crecimiento futuro. Estos proyectos estratégicos me dan confianza en la visión a largo plazo de la directiva y su compromiso con la creación de valor para el accionista. Asimismo, los acuerdos relevantes, como {data['ACUERDOS']}, demuestran la capacidad de la empresa para establecer alianzas estratégicas o consolidar su posición en el mercado. En el entorno competitivo actual, estas colaboraciones son a menudo la clave para desbloquear nuevas oportunidades y sinergias.</p>
-
-<p>El sentimiento de los analistas, que se describe como {data['SENTIMIENTO_ANALISTAS']}, me ofrece una perspectiva interesante, aunque siempre la filtro a través de mi propio análisis. No me limito a seguir la corriente; mi juicio profesional se basa en datos y experiencia. La tendencia social [Aquí, si se hubiera integrado este dato, la IA podría comentar si hay buzz positivo o negativo en redes, foros, etc., y cómo eso podría influir en el precio a corto plazo, o indicar por qué no es relevante en este caso si el dato no está disponible], aunque no es un factor determinante, puede dar pistas sobre la percepción pública. Además, la identificación de empresas similares, como {data['EMPRESAS_SIMILARES']}, me permite comparar métricas clave y posicionar a <strong>{data['NOMBRE_EMPRESA']}</strong> dentro de su sector, identificando si está sobrevalorada o infravalorada respecto a sus pares.</p>
-
-<p>En cuanto a riesgos y oportunidades [Aquí, la IA debería generar algunos riesgos y oportunidades genéricos para la empresa o el sector si el dato específico no está disponible, en línea con el sentimiento general. Por ejemplo, para una empresa con nota baja, podría hablar de "riesgo de recesión económica" o "competencia intensa" como riesgos, y "posible reestructuración" como oportunidad de rebote. Para una empresa con nota alta, "expansión de mercado" como oportunidad, y "cambios regulatorios" como riesgo], son aspectos que siempre tengo presentes. Evalúo cada variable, desde la macroeconomía hasta los movimientos específicos del sector, para construir una imagen completa y robusta.</p>
-
-<h2>Conclusión y Llamada a la Acción: Mi Visión como Trader</h2>
-<p>Tras un exhaustivo análisis técnico y fundamental, mi recomendación para <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> es clara: <strong>{data['RECOMENDACION']}</strong>. Mi experiencia me ha enseñado a confiar en la convergencia de señales, y en este caso, la oportunidad es innegable. Siempre insisto a mis clientes: la paciencia y la disciplina son las virtudes del inversor exitoso.</p>
-
-<p>El SMI actual y su tendencia [volver a recalcar la tendencia del SMI y lo que significa para la acción, por ejemplo: "confirman un impulso alcista que podría llevarnos a nuevos máximos" o "señalan una debilidad que exige cautela, aunque con potencial de rebote en los soportes clave"]. El precio objetivo de compra de <strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong> no es una cifra arbitraria; es el resultado de una meticulosa evaluación donde el riesgo se minimiza y el potencial de ganancias se maximiza. Estoy seguro de que esta es una de las empresas a las que debemos prestar especial atención en los próximos días.</p>
-
-<p>Mi objetivo es que usted, como inversor, esté siempre un paso adelante. No deje pasar esta oportunidad. El mercado no espera. Prepare su estrategia y esté listo para actuar.</p>
-
-<p>Esté atento a mi próximo análisis para mañana. Cubriremos a fondo {tomorrow_companies_text} y profundizaremos en nuevas oportunidades y desafíos que el mercado nos presentará. La información es poder, y mi compromiso es proporcionársela de forma concisa y efectiva. ¡Hasta la próxima operación!</p>
+<h2>Conclusión y Próximos Pasos</h2>
+<p>En resumen, mi análisis de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> revela una oportunidad de inversión atractiva, respaldada por una sólida nota técnica y un impulso creciente. La estimación para una acción significativa es que {data['DIAS_PARA_ACCION']}.</p>
+<p>Mi recomendación final es clara: **{data['RECOMENDACION']}**. Considero que este es un momento estratégico para aquellos inversores que buscan capitalizar un potencial movimiento alcista. Sin embargo, como siempre, la gestión del riesgo es primordial. Establezcan sus niveles de stop-loss y tomen ganancias de forma disciplinada.</p>
+<p>Mañana, en nuestro próximo análisis, nos sumergiremos en las oportunidades y desafíos de **{tomorrow_companies_text}**. ¡Asegúrense de estar atentos para no perderse ninguna actualización clave del mercado!</p>
 """
     return prompt
 
-def enviar_email(texto_generado, asunto_email):
+def enviar_email(html_content, recipient_email, ticker_name):
     """
-    Envía el contenido generado por Gemini por correo electrónico.
-    Configuración SMTP hardcodeada (se recomienda usar variables de entorno).
+    Envía un email con el contenido HTML generado.
+    Requiere las variables de entorno EMAIL_SENDER, EMAIL_PASSWORD y EMAIL_RECIPIENT.
     """
-    remitente = "xumkox@gmail.com"
-    destinatario = "xumkox@gmail.com"
-    # Advertencia: La contraseña está hardcodeada. En un entorno de producción,
-    # se recomienda encarecidamente usar variables de entorno o un servicio de secretos.
-    password = "kdgz lvdo wqvt vfkt"  
+    sender_email = os.getenv('EMAIL_SENDER')
+    sender_password = os.getenv('EMAIL_PASSWORD')
 
-    msg = MIMEMultipart()
-    msg['From'] = remitente
-    msg['To'] = destinatario
-    msg['Subject'] = asunto_email
-
-    # Adjunta el texto como HTML
-    msg.attach(MIMEText(texto_generado, 'html'))  
-
-    try:
-        servidor = smtplib.SMTP('smtp.gmail.com', 587)
-        servidor.starttls() # Habilita la seguridad TLS
-        servidor.login(remitente, password)
-        servidor.sendmail(remitente, destinatario, msg.as_string())
-        servidor.quit()
-        print("✅ Correo enviado con éxito.")
-    except Exception as e:
-        print("❌ Error al enviar el correo:", e)
-        print(f"Detalle del error: {e}")
-
-# --- Función Principal ---
-def main():
-    # Establecer la zona horaria a España (Madrid)
-    os.environ['TZ'] = 'Europe/Madrid'
-    time.tzset()
-
-    # Obtener el día de la semana actual (0 = lunes, 6 = domingo)
-    current_day_of_week = datetime.now().weekday()
-    
-    # Listado fijo de empresas para analizar
-    all_tickers = ["ADX.MC", "IAG.MC", "IBE.MC", "ENC.MC", "ENG.MC"]
-
-    # Analizar todos los tickers en cada ejecución
-    tickers_to_analyze = all_tickers
-
-    if not tickers_to_analyze:
-        print("No hay tickers para analizar hoy.")
+    if not sender_email or not sender_password or not recipient_email:
+        print("❌ Error: Variables de entorno de email no configuradas correctamente.")
         return
 
-    for ticker in tickers_to_analyze:
-        print(f"\n--- Analizando {ticker} ---")
-        data = obtener_datos_yfinance(ticker)
-        if data:
-            prompt_content = construir_prompt_formateado(data, all_tickers, current_day_of_week)
-            print("--- Contenido del Análisis (HTML) ---")
-            print(prompt_content)
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"Análisis de la Acción: {ticker_name}"
+    msg["From"] = sender_email
+    msg["To"] = recipient_email
 
-            # Envío de correo electrónico
-            subject = f"Análisis de Mercado Diario: {data['NOMBRE_EMPRESA']} ({data['TICKER']})"
-            enviar_email(prompt_content, subject)
-        else:
-            print(f"Skipping {ticker} due to data retrieval issues.")
+    # Crea el cuerpo del email en HTML
+    part_html = MIMEText(html_content, "html")
+    msg.attach(part_html)
+
+    try:
+        # Conexión al servidor SMTP de Gmail
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, msg.as_string())
+        server.quit()
+        print(f"✅ Email enviado con éxito a {recipient_email} para {ticker_name}")
+    except Exception as e:
+        print(f"❌ Error al enviar el email para {ticker_name}: {e}")
+
+def main():
+    try:
+        tickers = leer_google_sheets()
+        if not tickers:
+            print("No hay tickers para procesar. Saliendo.")
+            return
+
+        recipient_email = os.getenv('EMAIL_RECIPIENT')
+        if not recipient_email:
+            print("❌ Error: Variable de entorno EMAIL_RECIPIENT no configurada.")
+            return
+        
+        # Obtener el día de la semana actual (0=Lunes, 6=Domingo)
+        current_day_of_week = datetime.now().weekday() 
+
+        for ticker in tickers:
+            print(f"\n🚀 Procesando ticker: {ticker}")
+            data = obtener_datos_yfinance(ticker)
+            if data:
+                print(f"✅ Datos obtenidos para {ticker}. Generando informe...")
+                
+                # Pasar all_tickers y current_day_of_week a la función que construye el prompt
+                html_report = construir_prompt_formateado(data, tickers, current_day_of_week)
+                
+                if html_report:
+                    # Enviar el email
+                    enviar_email(html_report, recipient_email, data['NOMBRE_EMPRESA'])
+                else:
+                    print(f"❌ No se pudo generar el informe HTML para {ticker}.")
+            else:
+                print(f"❌ No se pudieron obtener o procesar datos para {ticker}. Saltando.")
+            time.sleep(5) # Pequeña pausa entre tickers para evitar bloqueos por tasa
+
+    except Exception as e:
+        print(f"❌ Ha ocurrido un error crítico en la ejecución principal: {e}")
 
 if __name__ == "__main__":
     main()
