@@ -13,6 +13,20 @@ import numpy as np
 import time
 import re
 
+# Lista completa de tickers proporcionada por el usuario, sin duplicados
+ALL_TICKERS = [
+    "MAP.MC", "IBE.MC", "ADX.MC", "ANA.MC", "ANE.MC", "ACX.MC", "ACS.MC",
+    "AEDAS.MC", "AENA.MC", "AIR.MC", "AI.MC", "AMS.MC", "AMP.MC", "BKT.MC",
+    "BBVA.MC", "BKY.MC", "BST.MC", "CABK.MC", "CLNX.MC", "DIA.MC", "ECR.MC",
+    "ELE.MC", "ENC.MC", "ENG.MC", "EZE.MC", "FACE.MC", "FER.MC", "FDR.MC",
+    "GAM.MC", "GIGA.MC", "GRF.MC", "HLZ.MC", "HOME.MC", "IAG.MC", "IBG.MC",
+    "ITX.MC", "IDR.MC", "LOG.MC", "LDA.MC", "MDF.MC", "MEL.MC", "MRL.MC",
+    "MTS.MC", "NTGY.MC", "NBI.MC", "NXT.MC", "NYE.MC", "OHLA.MC", "OLE.MC",
+    "ORY.MC", "PHM.MC", "PSG.MC", "PUIG.MC", "RED.MC", "REP.MC", "ROVI.MC",
+    "SAB.MC", "SCYR.MC", "SLR.MC", "SAI.MC", "SAN.MC", "TLGO.MC", "TEF.MC",
+    "TRG.MC", "TUB.MC", "UNI.MC", "URB.MC"
+]
+
 # Parámetros para el cálculo del SMI (Stochastic Momentum Index)
 length_k = 10
 length_d = 3
@@ -342,7 +356,7 @@ def formatear_numero(valor):
     except (ValueError, TypeError):
         return "No disponible"
         
-def construir_prompt_formateado(data):
+def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     """
     Construye el prompt para Gemini con un formato HTML detallado,
     incorporando nuevos elementos de engagement y llamada a la acción,
@@ -406,7 +420,16 @@ def construir_prompt_formateado(data):
         resistencia_porcentaje = "no calculable debido a un precio actual no disponible o de 0€"
 
     # --- Lógica para el Call to Action del día siguiente (modificado para ser genérico) ---
-    tomorrow_companies_text = "otras empresas clave del mercado como **TEF.MC**, **SAN.MC** o **BBVA.MC**."
+    # Calcular el índice de inicio para el día siguiente
+    next_day_index = ((current_day_of_week + 1) % 7) * 10
+    # Asegurarse de que no exceda el tamaño de la lista
+    next_companies_slice = all_tickers[next_day_index : next_day_index + 10]
+    
+    if next_companies_slice:
+        tomorrow_companies_text = "otras empresas clave del mercado como **" + ", ".join(next_companies_slice) + "**."
+    else:
+        tomorrow_companies_text = "otras empresas clave del mercado. ¡Estad atentos!"
+
 
     # --- Construcción del prompt completo ---
     prompt = f"""
@@ -538,7 +561,7 @@ def enviar_email(texto_generado, asunto_email):
         print(f"Detalle del error: {e}")
 
 
-def generar_contenido_con_gemini(ticker):
+def generar_contenido_con_gemini(ticker, all_tickers, current_day_of_week):
     """
     Genera contenido para un único ticker usando Gemini y lo envía por correo electrónico.
     Maneja reintentos para la generación de contenido.
@@ -556,8 +579,7 @@ def generar_contenido_con_gemini(ticker):
         if not data:
             return # Salir si no se pueden obtener datos para el ticker
 
-        # Ya no se pasan all_tickers ni day_of_week
-        prompt, titulo_post = construir_prompt_formateado(data)
+        prompt, titulo_post = construir_prompt_formateado(data, all_tickers, current_day_of_week)
 
         max_retries = 3
         initial_delay = 10  
@@ -600,11 +622,25 @@ def generar_contenido_con_gemini(ticker):
 
 def main():
     """
-    Función principal para analizar y generar el contenido para "ADX.MC".
+    Función principal para analizar y generar el contenido para un grupo de tickers.
     """
-    ticker_to_analyze = "ADX.MC"
-    print(f"Iniciando el análisis para la empresa: {ticker_to_analyze}")
-    generar_contenido_con_gemini(ticker_to_analyze)
+    today = datetime.now()
+    day_of_week = today.weekday() # Lunes es 0, Domingo es 6
+
+    # Calcular el índice de inicio para el día actual
+    start_index = day_of_week * 10
+    # Calcular el índice de fin, asegurando que no exceda el tamaño de la lista
+    end_index = start_index + 10
+
+    # Seleccionar los tickers para el día actual, con un ciclo si se excede la lista
+    tickers_for_today = []
+    for i in range(start_index, end_index):
+        tickers_for_today.append(ALL_TICKERS[i % len(ALL_TICKERS)])
+
+    print(f"Iniciando el análisis para las empresas del día {today.strftime('%A')}: {', '.join(tickers_for_today)}")
+    
+    for ticker in tickers_for_today:
+        generar_contenido_con_gemini(ticker, ALL_TICKERS, day_of_week)
 
 
 if __name__ == '__main__':
