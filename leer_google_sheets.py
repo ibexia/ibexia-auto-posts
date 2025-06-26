@@ -688,10 +688,15 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
     return prompt, titulo_post
 
 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime # Necesitas esta importación para el nombre del archivo
+
 def enviar_email(texto_generado, asunto_email):
     """
-    Envía el contenido generado por Gemini por correo electrónico.
-    Configuración SMTP hardcodeada (se recomienda usar variables de entorno).
+    Envía el contenido (texto_generado) como un archivo .html adjunto.
+    Mantiene la configuración de remitente/destinatario/contraseña hardcodeada como en el original.
     """
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
@@ -704,9 +709,33 @@ def enviar_email(texto_generado, asunto_email):
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
 
-    # Adjunta el texto como HTML
-    msg.attach(MIMEText(texto_generado, 'html'))  
+    # --- Mensaje en el cuerpo del correo (para informar que hay un adjunto) ---
+    # Este texto es lo que verás directamente al abrir el email en Gmail.
+    msg.attach(MIMEText("Adjunto encontrarás el análisis HTML. Por favor, abre el archivo .html adjunto para verlo y copiarlo.", 'plain', 'utf-8'))
 
+    # --- Creación y adjunción del archivo .html con el texto_generado ---
+    try:
+        # Generar un nombre de archivo único con la fecha y hora actual
+        # Esto es útil si envías varios correos para diferentes análisis.
+        file_name = f"analisis_reporte_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        
+        # Crear un objeto MIMEText para el adjunto.
+        # El primer argumento es el contenido (tu texto_generado), el segundo es el subtipo ('html').
+        attachment = MIMEText(texto_generado, 'html', 'utf-8')
+        
+        # Añadir el encabezado que lo marca como adjunto y le da un nombre de archivo.
+        attachment.add_header('Content-Disposition', 'attachment', filename=file_name)
+        
+        # Adjuntar el archivo al mensaje.
+        msg.attach(attachment)
+        
+        print(f"✔️ Archivo '{file_name}' preparado para adjuntar.")
+
+    except Exception as e:
+        print(f"❌ Error al preparar el adjunto HTML: {e}")
+        return False # Indica que la preparación del adjunto falló
+
+    # --- Envío del correo ---
     try:
         servidor = smtplib.SMTP('smtp.gmail.com', 587)
         servidor.starttls() # Habilita la seguridad TLS
@@ -714,9 +743,12 @@ def enviar_email(texto_generado, asunto_email):
         servidor.sendmail(remitente, destinatario, msg.as_string())
         servidor.quit()
         print("✅ Correo enviado con éxito.")
+        return True
     except Exception as e:
         print("❌ Error al enviar el correo:", e)
         print(f"Detalle del error: {e}")
+        print("Asegúrate de que la 'Contraseña de aplicación' de tu cuenta de Google está configurada correctamente si usas 2FA.")
+        return False
 
 
 def generar_contenido_con_gemini(tickers, all_tickers, day_of_week):
