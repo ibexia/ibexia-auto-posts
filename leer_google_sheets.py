@@ -76,7 +76,8 @@ def calculate_smi_tv(df):
     # Manejo de división por cero para avgdiff: inicializa con ceros y calcula solo donde avgdiff no es cero
     smi_raw = pd.Series(0.0, index=df.index)
     non_zero_avgdiff_mask = avgdiff != 0
-    smi_raw[non_zero_avg_diff_mask] = (avgrel[non_zero_avg_diff_mask] / (avgdiff[non_zero_avg_diff_mask] / 2)) * 100
+    # CORRECCIÓN: Usar 'non_zero_avgdiff_mask' en lugar de 'non_zero_avg_diff_mask'
+    smi_raw[non_zero_avgdiff_mask] = (avgrel[non_zero_avgdiff_mask] / (avgdiff[non_zero_avgdiff_mask] / 2)) * 100
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
@@ -518,9 +519,10 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     notes_js = json.dumps(data['LAST_7_NOTES'])
 
     # --- Construcción del prompt completo ---
-    # Asegúrate de que este bloque f-string contenga todas las líneas HTML y JavaScript correctamente.
-    # El JavaScript está ahora dentro de un triple string literal, y las variables Python
-    # se inyectan correctamente como JSON.
+    # He vuelto a revisar la forma en que se inserta el bloque de script.
+    # Ahora las llaves del objeto JavaScript (por ejemplo, en `scales: {{ y: ... }}`)
+    # están doblemente escapadas `{{` y `}}` para que el f-string de Python las interprete
+    # como literales de llave para el JavaScript, y no como parte de la sintaxis del f-string.
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera un análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio y usando un lenguaje persuasivo y profesional.
 
@@ -755,10 +757,8 @@ def main():
             if destinatario_correo:
                 # Simula la generación de contenido completo por Gemini y luego el envío
                 # En un entorno real, `prompt_html` se enviaría a Gemini y la respuesta sería el cuerpo del email
-                # Por simplicidad, aquí estamos imprimiendo el prompt formateado como si fuera el cuerpo final.
-                print(f"\nSimulando envío de correo a {destinatario_correo} con el análisis HTML...")
-                # Aquí deberías llamar a la API de Gemini con `prompt_html` y usar su respuesta para el cuerpo.
                 # Por ahora, usamos el mismo prompt_html como cuerpo del email.
+                print(f"\nSimulando envío de correo a {destinatario_correo} con el análisis HTML...")
                 enviar_correo(destinatario_correo, asunto_correo, prompt_html)
             else:
                 print("Advertencia: RECIPIENT_EMAIL no configurada. No se enviará el correo.")
