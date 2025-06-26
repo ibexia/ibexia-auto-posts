@@ -76,7 +76,7 @@ def calculate_smi_tv(df):
     # Manejo de división por cero para avgdiff: inicializa con ceros y calcula solo donde avgdiff no es cero
     smi_raw = pd.Series(0.0, index=df.index)
     non_zero_avgdiff_mask = avgdiff != 0
-    smi_raw[non_zero_avgdiff_mask] = (avgrel[non_zero_avgdiff_mask] / (avgdiff[non_zero_avgdiff_mask] / 2)) * 100
+    smi_raw[non_zero_avg_diff_mask] = (avgrel[non_zero_avg_diff_mask] / (avgdiff[non_zero_avg_diff_mask] / 2)) * 100
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
@@ -518,7 +518,9 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     notes_js = json.dumps(data['LAST_7_NOTES'])
 
     # --- Construcción del prompt completo ---
-    # He envuelto el bloque <script> dentro de un f-string multilinea correctamente.
+    # Asegúrate de que este bloque f-string contenga todas las líneas HTML y JavaScript correctamente.
+    # El JavaScript está ahora dentro de un triple string literal, y las variables Python
+    # se inyectan correctamente como JSON.
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera un análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio y usando un lenguaje persuasivo y profesional.
 
@@ -588,13 +590,13 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function() {{
         const ctx = document.getElementById('notesChart').getContext('2d');
-        const notesChart = new Chart(ctx, {
+        const notesChart = new Chart(ctx, {{
             type: 'bar',
-            data: {
+            data: {{
                 labels: {labels_js},
-                datasets: [{
+                datasets: [{{
                     label: 'Nota Técnica (0-10)',
                     data: {notes_js},
                     backgroundColor: [
@@ -616,39 +618,39 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
                         'rgba(201, 203, 207, 1)'
                     ],
                     borderWidth: 1
-                }]
-            },
-            options: {
+                }}]
+            }},
+            options: {{
                 responsive: true,
                 maintainAspectRatio: true,
-                scales: {
-                    y: {
+                scales: {{
+                    y: {{
                         beginAtZero: true,
                         max: 10,
-                        title: {
+                        title: {{
                             display: true,
                             text: 'Nota Técnica'
-                        }
-                    },
-                    x: {
-                        title: {
+                        }}
+                    }},
+                    x: {{
+                        title: {{
                             display: true,
                             text: 'Fecha'
-                        }
-                    }
-                },
-                plugins: {
-                    title: {
+                        }}
+                    }}
+                }},
+                plugins: {{
+                    title: {{
                         display: true,
                         text: 'Notas Técnicas de los Últimos 7 Días'
-                    },
-                    legend: {
+                    }},
+                    legend: {{
                         display: false
-                    }
-                }
-            }
-        });
-    });
+                    }}
+                }}
+            }}
+        }});
+    }});
 </script>
 
 <h2>Análisis Fundamental: Pilares Financieros de {data['NOMBRE_EMPRESA']}</h2>
