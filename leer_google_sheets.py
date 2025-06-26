@@ -590,7 +590,7 @@ def main():
     current_day_of_week = datetime.now().weekday()
     
     # Listado fijo de empresas para analizar
-    all_tickers = ["AUDAX.MC", "IAG.MC", "IBE.MC", "ENC.MC", "ENG.MC"]
+    all_tickers = ["ADX.MC", "IAG.MC", "IBE.MC", "ENCE.MC", "ENG.MC"]
 
     # Analizar todos los tickers en cada ejecución
     tickers_to_analyze = all_tickers
