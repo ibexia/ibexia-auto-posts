@@ -602,8 +602,7 @@ def main():
     """
     Función principal para analizar y generar el contenido para "ADX.MC".
     """
-    ticker_to_analyze = "MAP.MC, IBE.MC, ADX.MC, ANA.MC, ANE.MC, ACX.MC, ACS.MC, AEDAS.MC, AENA.MC, AIR.MC, AI.MC, AMS.MC, AMP.MC, BKT.MC, BBVA.MC, BKY.MC, BST.MC, CABK.MC, CLNX.MC, DIA.MC, ECR.MC, ELE.MC, ENC.MC, ENG.MC, EZE.MC, FACE.MC, FER.MC, FDR.MC, GAM.MC, GIGA.MC, GRF.MC, HLZ.MC, HOME.MC, IAG.MC, IBG.MC, ITX.MC, IDR.MC, LOG.MC, LDA.MC, MDF.MC, MEL.MC, MRL.MC, MTS.MC, NTGY.MC, NBI.MC, NXT.MC, NYE.MC, OHLA.MC, OLE.MC, ORY.MC, PHM.MC, PSG.MC, PUIG.MC, RED.MC, REP.MC, ROVI.MC, SAB.MC, SCYR.MC, SLR.MC, SAI.MC, SAN.MC, TLGO.MC, TEF.MC, TRG.MC, TUB.MC, UNI.MC, URB.MC
-""
+    ticker_to_analyze = "ADX.MC"
     print(f"Iniciando el análisis para la empresa: {ticker_to_analyze}")
     generar_contenido_con_gemini(ticker_to_analyze)
 
