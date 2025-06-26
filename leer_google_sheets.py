@@ -306,7 +306,7 @@ def obtener_datos_yfinance(ticker):
                 recomendacion = "Sobreventa moderada. Evaluar fortaleza de soportes, el precio podría caer más."
         elif 8 <= nota_empresa < 9: # SMI muy bajo (sobreventa fuerte)
             condicion_rsi = "sobreventa"
-            smi_tendencia = "en una una sobreventa fuerte, con potencial de reversión."
+            smi_tendencia = "en una zona de sobreventa fuerte, con potencial de reversión."
             if smi_actual > smi_anterior:
                 recomendacion = "Se acerca la hora de comprar. Fuerte señal de rebote."
             else:
@@ -378,13 +378,6 @@ def obtener_datos_yfinance(ticker):
         if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
             sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
             
-        # Obtener las últimas 7 notas de la empresa (calculadas a partir del SMI)
-        # Asegúrate de que haya suficientes datos para al menos 7 notas
-        recent_smi_signals = hist['SMI_signal'].dropna().tail(7)
-        last_7_notes = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in recent_smi_signals]
-        # Formatear las fechas para que sean legibles en el eje X del gráfico
-        last_7_dates = [d.strftime('%m-%d') for d in recent_smi_signals.index] # Formato Mes-Día
-
         # Recopilación de todos los datos relevantes
         datos = {
             "TICKER": ticker,
@@ -412,9 +405,7 @@ def obtener_datos_yfinance(ticker):
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles", # Placeholder
             "SMI_TENDENCIA": smi_tendencia,
-            "DIAS_PARA_ACCION": dias_para_accion_str,
-            "LAST_7_NOTES": last_7_notes,
-            "LAST_7_DATES": last_7_dates
+            "DIAS_PARA_ACCION": dias_para_accion_str
         }
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}")
@@ -493,7 +484,7 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     else:
         resistencia_porcentaje = "no calculable debido a un precio actual no disponible o de 0€"
 
-    # --- Lógica para el Call to Action del día siguiente (esto es lo que se ajusta a tu original) ---
+    # --- Lógica para el Call to Action del día siguiente ---
     num_tickers_per_day = 10
     total_tickers_in_sheet = len(all_tickers)
     next_day_of_week = (current_day_of_week + 1) % 7
@@ -505,20 +496,14 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     if end_index_next_day <= total_tickers_in_sheet:
         tickers_for_tomorrow = all_tickers[start_index_next_day:end_index_next_day]
     else:
-        remaining_tickers = total_tickers_in_sheet - start_index_next_day
-        tickers_for_tomorrow = all_tickers[start_index_next_day:] + all_tickers[:num_tickers_per_day - remaining_tickers]
-
+        tickers_for_tomorrow = all_tickers[start_index_next_day:] + all_tickers[:end_index_next_day - total_tickers_in_sheet]
 
     if tickers_for_tomorrow:
         tomorrow_companies_text = ", ".join([f"<strong>{t}</strong>" for t in tickers_for_tomorrow])
     else:
         tomorrow_companies_text = "otras empresas clave del mercado."
 
-    # Datos para el gráfico Chart.js
-    # Convertir las listas de Python a cadenas JSON para JavaScript
-    labels_js = json.dumps(data['LAST_7_DATES'])
-    notes_js = json.dumps(data['LAST_7_NOTES'])
-
+    # --- Construcción del prompt completo ---
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera un análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio y usando un lenguaje persuasivo y profesional.
 
@@ -540,11 +525,11 @@ Genera un análisis técnico y fundamental detallado de aproximadamente 1200 pal
 - Recomendación general: {data['RECOMENDACION']}
 - Nota de la empresa (0-10): {data['NOTA_EMPRESA']} sobre 10
 - Precio objetivo de compra: {data['PRECIO_OBJETIVO_COMPRA']}€
-- Ingresos: {formatear_numero(data['INGRESOS'])}
-- EBITDA: {formatear_numero(data['EBITDA'])}
-- Beneficios: {formatear_numero(data['BENEFICIOS'])}
-- Deuda: {formatear_numero(data['DEUDA'])}
-- Flujo de caja: {formatear_numero(data['FLUJO_CAJA'])}
+- Ingresos: {data['INGRESOS']}
+- EBITDA: {data['EBITDA']}
+- Beneficios: {data['BENEFICIOS']}
+- Deuda: {data['DEUDA']}
+- Flujo de caja: {data['FLUJO_CAJA']}
 - Planes de expansión: {data['EXPANSION_PLANES']}
 - Acuerdos: {data['ACUERDOS']}
 - Sentimiento de analistas: {data['SENTIMIENTO_ANALISTAS']}
@@ -553,16 +538,11 @@ Genera un análisis técnico y fundamental detallado de aproximadamente 1200 pal
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 - Tendencia de impulso (SMI): {data['SMI_TENDENCIA']}
 - Estimación para acción: {data['DIAS_PARA_ACCION']}
-- Últimas 7 notas: {data['LAST_7_NOTES']}
-- Últimas 7 fechas de notas: {data['LAST_7_DATES']}
-
 
 Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disponible", no lo menciones ni digas que falta. Integra la recomendación como una conclusión personal basada en tu experiencia y criterio profesional, sin atribuirla a un indicador específico. Asegura que el lenguaje sea dinámico y no repetitivo.
 
 ---
 <h1>{titulo_post}</h1>
-
-
 
 <h2>Análisis Inicial y Recomendación</h2>
 <p>En el dinámico mercado actual, <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> está enviando señales claras de un potencial giro alcista. ¿Es este el momento ideal para considerar una entrada? Mi análisis técnico apunta a que sí, con una oportunidad de compra inminente y un rebote en el horizonte.</p>
@@ -573,77 +553,6 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
     else:
         prompt += f"""Esto subraya una atractiva oportunidad de compra, al estar el precio actual por debajo de nuestro objetivo, sugiriendo un potencial de revalorización desde los niveles actuales."""
     prompt += f""" El volumen negociado recientemente, que alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>, es un factor clave que valida estos movimientos, y será crucial monitorearlo para confirmar la fuerza de cualquier tendencia emergente.</p>
-
-<div style="width: 100%; max-width: 600px; margin: auto;">
-    <canvas id="notesChart"></canvas>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {{
-        const ctx = document.getElementById('notesChart').getContext('2d');
-        const notesChart = new Chart(ctx, {{
-            type: 'bar',
-            data: {{
-                labels: {labels_js},
-                datasets: [{{
-                    label: 'Nota Técnica (0-10)',
-                    data: {notes_js},
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.6)',
-                        'rgba(255, 159, 64, 0.6)',
-                        'rgba(255, 205, 86, 0.6)',
-                        'rgba(75, 192, 192, 0.6)',
-                        'rgba(54, 162, 235, 0.6)',
-                        'rgba(153, 102, 255, 0.6)',
-                        'rgba(201, 203, 207, 0.6)'
-                    ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(255, 159, 64, 1)',
-                        'rgba(255, 205, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(201, 203, 207, 1)'
-                    ],
-                    borderWidth: 1
-                }}]
-            }},
-            options: {{
-                responsive: true,
-                maintainAspectRatio: true,
-                scales: {{
-                    y: {{
-                        beginAtZero: true,
-                        max: 10,
-                        title: {{
-                            display: true,
-                            text: 'Nota Técnica'
-                        }}
-                    }},
-                    x: {{
-                        title: {{
-                            display: true,
-                            text: 'Fecha'
-                        }}
-                    }}
-                }},
-                plugins: {{
-                    title: {{
-                        display: true,
-                        text: 'Notas Técnicas de los Últimos 7 Días'
-                    }},
-                    legend: {{
-                        display: false
-                    }}
-                }}
-            }}
-        }});
-    }});
-</script>
-
-
-
 <p>Asignamos una <strong>nota técnica de {data['NOTA_EMPRESA']} sobre 10</strong>. Esta puntuación refleja [Aquí, la IA debe expandir concisamente qué significa esa puntuación en términos de riesgo, potencial de crecimiento, y la solidez *técnica* de la compañía para el corto plazo, utilizando un lenguaje más descriptivo. Por ejemplo, si es alta, hablar de "excelente fortaleza técnica y baja volatilidad esperada"; si es baja, de "riesgo elevado pero potencial de rebote si se confirman patrones de giro"]. A continuación, detallo una visión más completa de mi evaluación profesional, desarrollada en base a una combinación de indicadores técnicos y fundamentos económicos, con la convicción que mi criterio profesional es sólido y basado en una profunda comprensión del mercado.</p>
 
 <h2>Análisis a Corto Plazo: Soportes, Resistencias y Dinámica del Impulso</h2>
@@ -693,15 +602,10 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
     return prompt, titulo_post
 
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from datetime import datetime # Necesitas esta importación para el nombre del archivo
-
 def enviar_email(texto_generado, asunto_email):
     """
-    Envía el contenido (texto_generado) como un archivo .html adjunto.
-    Mantiene la configuración de remitente/destinatario/contraseña hardcodeada como en el original.
+    Envía el contenido generado por Gemini por correo electrónico.
+    Configuración SMTP hardcodeada (se recomienda usar variables de entorno).
     """
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
@@ -714,33 +618,9 @@ def enviar_email(texto_generado, asunto_email):
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
 
-    # --- Mensaje en el cuerpo del correo (para informar que hay un adjunto) ---
-    # Este texto es lo que verás directamente al abrir el email en Gmail.
-    msg.attach(MIMEText("Adjunto encontrarás el análisis HTML. Por favor, abre el archivo .html adjunto para verlo y copiarlo.", 'plain', 'utf-8'))
+    # Adjunta el texto como HTML
+    msg.attach(MIMEText(texto_generado, 'html'))  
 
-    # --- Creación y adjunción del archivo .html con el texto_generado ---
-    try:
-        # Generar un nombre de archivo único con la fecha y hora actual
-        # Esto es útil si envías varios correos para diferentes análisis.
-        file_name = f"analisis_reporte_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-        
-        # Crear un objeto MIMEText para el adjunto.
-        # El primer argumento es el contenido (tu texto_generado), el segundo es el subtipo ('html').
-        attachment = MIMEText(texto_generado, 'html', 'utf-8')
-        
-        # Añadir el encabezado que lo marca como adjunto y le da un nombre de archivo.
-        attachment.add_header('Content-Disposition', 'attachment', filename=file_name)
-        
-        # Adjuntar el archivo al mensaje.
-        msg.attach(attachment)
-        
-        print(f"✔️ Archivo '{file_name}' preparado para adjuntar.")
-
-    except Exception as e:
-        print(f"❌ Error al preparar el adjunto HTML: {e}")
-        return False # Indica que la preparación del adjunto falló
-
-    # --- Envío del correo ---
     try:
         servidor = smtplib.SMTP('smtp.gmail.com', 587)
         servidor.starttls() # Habilita la seguridad TLS
@@ -748,12 +628,9 @@ def enviar_email(texto_generado, asunto_email):
         servidor.sendmail(remitente, destinatario, msg.as_string())
         servidor.quit()
         print("✅ Correo enviado con éxito.")
-        return True
     except Exception as e:
         print("❌ Error al enviar el correo:", e)
         print(f"Detalle del error: {e}")
-        print("Asegúrate de que la 'Contraseña de aplicación' de tu cuenta de Google está configurada correctamente si usas 2FA.")
-        return False
 
 
 def generar_contenido_con_gemini(tickers, all_tickers, day_of_week):
