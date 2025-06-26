@@ -561,75 +561,6 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
 
 ---
 <h1>{titulo_post}</h1>
-
-<div style="width: 100%; max-width: 600px; margin: auto;">
-    <canvas id="notesChart"></canvas>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {{
-        const ctx = document.getElementById('notesChart').getContext('2d');
-        const notesChart = new Chart(ctx, {{
-            type: 'bar',
-            data: {{
-                labels: {labels_js},
-                datasets: [{{
-                    label: 'Nota Técnica (0-10)',
-                    data: {notes_js},
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.6)',
-                        'rgba(255, 159, 64, 0.6)',
-                        'rgba(255, 205, 86, 0.6)',
-                        'rgba(75, 192, 192, 0.6)',
-                        'rgba(54, 162, 235, 0.6)',
-                        'rgba(153, 102, 255, 0.6)',
-                        'rgba(201, 203, 207, 0.6)'
-                    ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(255, 159, 64, 1)',
-                        'rgba(255, 205, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(201, 203, 207, 1)'
-                    ],
-                    borderWidth: 1
-                }}]
-            }},
-            options: {{
-                responsive: true,
-                maintainAspectRatio: true,
-                scales: {{
-                    y: {{
-                        beginAtZero: true,
-                        max: 10,
-                        title: {{
-                            display: true,
-                            text: 'Nota Técnica'
-                        }}
-                    }},
-                    x: {{
-                        title: {{
-                            display: true,
-                            text: 'Fecha'
-                        }}
-                    }}
-                }},
-                plugins: {{
-                    title: {{
-                        display: true,
-                        text: 'Notas Técnicas de los Últimos 7 Días'
-                    }},
-                    legend: {{
-                        display: false
-                    }}
-                }}
-            }}
-        }});
-    }});
-</script>
-
 <h2>Análisis Inicial y Recomendación</h2>
 <p>En el dinámico mercado actual, <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> está enviando señales claras de un potencial giro alcista. ¿Es este el momento ideal para considerar una entrada? Mi análisis técnico apunta a que sí, con una oportunidad de compra inminente y un rebote en el horizonte.</p>
 <p>La empresa cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,} €</strong>, un nivel que considero estratégico. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong>.
@@ -639,6 +570,117 @@ Importante: si algún dato está marcado como "N/A", "No disponibles" o "No disp
     else:
         prompt += f"""Esto subraya una atractiva oportunidad de compra, al estar el precio actual por debajo de nuestro objetivo, sugiriendo un potencial de revalorización desde los niveles actuales."""
     prompt += f""" El volumen negociado recientemente, que alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>, es un factor clave que valida estos movimientos, y será crucial monitorearlo para confirmar la fuerza de cualquier tendencia emergente.</p>
+
+<div style="width: 100%; max-width: 600px; margin: auto;">
+    <canvas id="notesChart"></canvas>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('notesChart').getContext('2d');
+        
+        let labels = []; // Definición inicial con un array vacío
+        let notes = [];  // Definición inicial con un array vacío
+
+        try {
+            // Se espera que {labels_js} y {notes_js} sean cadenas JSON válidas insertadas por Python.
+            // JSON.parse() convierte esa cadena JSON en un array JavaScript.
+            labels = JSON.parse('{labels_js}');
+            notes = JSON.parse('{notes_js}');
+        } catch (e) {
+            console.error("Error al parsear los datos del gráfico: Es posible que los placeholders de Python no se hayan sustituido correctamente o que los datos no sean JSON válidos.", e);
+            // En caso de error, los arrays labels y notes se mantendrán vacíos,
+            // evitando un ReferenceError y permitiendo que el resto del script se ejecute.
+        }
+
+        // Función para determinar el color de la barra según la nota
+        function getBarColor(note) {
+            if (note < 2) {
+                return 'rgba(239, 68, 68, 0.8)'; // Rojo (Tailwind red-500 con transparencia)
+            } else if (note > 8) {
+                return 'rgba(34, 197, 94, 0.8)'; // Verde (Tailwind green-500 con transparencia)
+            } else {
+                return 'rgba(107, 114, 128, 0.8)'; // Gris (Tailwind gray-500 con transparencia)
+            }
+        }
+
+        // Construir el array de colores de fondo dinámicamente
+        const backgroundColors = notes.map(note => getBarColor(note));
+        
+        // Construir el array de colores de borde dinámicamente (un poco más oscuro para contraste)
+        const borderColors = notes.map(note => {
+            if (note < 2) {
+                return 'rgba(239, 68, 68, 1)';
+            } else if (note > 8) {
+                return 'rgba(34, 197, 94, 1)';
+            } else {
+                return 'rgba(107, 114, 128, 1)';
+            }
+        });
+
+        const notesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels, // Usamos las variables JavaScript 'labels'
+                datasets: [{
+                    label: 'Nota Técnica (0-10)',
+                    data: notes, // Usamos las variables JavaScript 'notes'
+                    backgroundColor: backgroundColors,
+                    borderColor: borderColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 10,
+                        title: {
+                            display: true,
+                            text: 'Nota Técnica'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Fecha'
+                        },
+                        // Formato de la fecha en el eje X (ej. 26Jun)
+                        ticks: {
+                            callback: function(val, index) {
+                                // 'labels' contiene strings como "MM-DD"
+                                const dateString = this.getLabelForValue(val);
+                                // Verificar si dateString es válido antes de intentar parsearlo
+                                if (!dateString || typeof dateString !== 'string' || !dateString.includes('-')) {
+                                    return dateString; // Devuelve el string original si no es un formato esperado
+                                }
+                                const [month, day] = dateString.split('-');
+                                // Asegurarse de que month y day son números antes de crear la fecha
+                                if (isNaN(parseInt(month)) || isNaN(parseInt(day))) {
+                                    return dateString; // Devuelve el string original si no son números
+                                }
+                                const date = new Date(new Date().getFullYear(), parseInt(month) - 1, parseInt(day));
+                                return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Notas Técnicas de los Últimos 7 Días'
+                    },
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    });
+</script>
+    
 <p>Asignamos una <strong>nota técnica de {data['NOTA_EMPRESA']} sobre 10</strong>. Esta puntuación refleja [Aquí, la IA debe expandir concisamente qué significa esa puntuación en términos de riesgo, potencial de crecimiento, y la solidez *técnica* de la compañía para el corto plazo, utilizando un lenguaje más descriptivo. Por ejemplo, si es alta, hablar de "excelente fortaleza técnica y baja volatilidad esperada"; si es baja, de "riesgo elevado pero potencial de rebote si se confirman patrones de giro"]. A continuación, detallo una visión más completa de mi evaluación profesional, desarrollada en base a una combinación de indicadores técnicos y fundamentos económicos, con la convicción que mi criterio profesional es sólido y basado en una profunda comprensión del mercado.</p>
 
 <h2>Análisis a Corto Plazo: Soportes, Resistencias y Dinámica del Impulso</h2>
