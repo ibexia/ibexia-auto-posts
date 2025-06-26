@@ -117,49 +117,6 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
             
     return top_3_supports
 
-def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
-    """
-    Traduce texto al español utilizando la API de Gemini, con reintentos para manejar errores de cuota.
-    """
-    if not text or text.strip().lower() in ["n/a", "no disponibles", "no disponible"]:
-        return text
-
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key:
-        print("Advertencia: GEMINI_API_KEY no configurada. No se realizará la traducción.")
-        return text
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")
-    
-    retries = 0
-    delay = initial_delay
-    while retries < max_retries:
-        try:
-            # Petición a Gemini para traducción
-            response = model.generate_content(f"Traduce el siguiente texto al español de forma concisa y profesional: \"{text}\"")
-            translated_text = response.text.strip().replace("**", "").replace("*", "")
-            return translated_text
-        except Exception as e:
-            # Manejo específico de error de cuota (429) y otros errores
-            if "429 You exceeded your current quota" in str(e):
-                try:
-                    match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
-                    if match:
-                        server_delay = int(match.group(1))
-                        delay = max(delay, server_delay + 1)
-                except:
-                    pass # En caso de que no se pueda extraer el retraso del servidor
-                
-                print(f"❌ Cuota de Gemini excedida al traducir. Reintentando en {retries + 1}/{max_retries})")
-                time.sleep(delay)
-                retries += 1
-                delay *= 2
-            else:
-                print(f"❌ Error al traducir texto con Gemini (no de cuota): {e}")
-                return text # Retorna el texto original en caso de otros errores
-    print(f"❌ Falló la traducción después de {max_retries} reintentos.")
-    return text # Retorna el texto original si fallan todos los reintentos
 
 def obtener_datos_yfinance(ticker):
     """
@@ -324,22 +281,23 @@ def obtener_datos_yfinance(ticker):
         else:
             dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
 
-        # Traducir información de Yahoo Finance
+
+                # Obtener información directamente de Yahoo Finance
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
-        expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000]) # Limitar a 5000 caracteres para traducción
-        if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
-            expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
+        expansion_planes_translated = expansion_planes_raw # No se traduce
+        if expansion_planes_translated == "N/A":
+            expansion_planes_translated = "Información de planes de expansión no disponible en este momento."
 
-        acuerdos_raw = info.get("agreements", "No disponibles")
-        acuerdos_translated = traducir_texto_con_gemini(acuerdos_raw)
-        if acuerdos_translated == "No disponibles" and acuerdos_raw != "No disponibles":
-            acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
+                acuerdos_raw = info.get("agreements", "No disponibles")
+        acuerdos_translated = acuerdos_raw # No se traduce
+        if acuerdos_translated == "No disponibles":
+            acuerdos_translated = "Información sobre acuerdos no disponible en este momento."
 
-        sentimiento_analistas_raw = info.get("recommendationKey", "N/A")
-        sentimiento_analistas_translated = traducir_texto_con_gemini(sentimiento_analistas_raw)
-        if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
-            sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
-            
+                sentimiento_analistas_raw = info.get("recommendationKey", "N/A")
+        sentimiento_analistas_translated = sentimiento_analistas_raw # No se traduce
+        if sentimiento_analistas_translated == "N/A":
+            sentimiento_analistas_translated = "Sentimiento de analistas no disponible."
+
         # Recopilación de todos los datos relevantes
         datos = {
             "TICKER": ticker,
