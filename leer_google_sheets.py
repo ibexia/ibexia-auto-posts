@@ -28,14 +28,13 @@ def leer_google_sheets():
         scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
     )
 
-    spreadsheet_id = os.getenv('SPREADSHEET_ID') # ¡CORREGIDO: antes SPREADSHEED_ID!
+    spreadsheet_id = os.getenv('SPREADSHEET_ID')
     if not spreadsheet_id:
         raise Exception("No se encontró la variable de entorno SPREADSHEET_ID")
 
     range_name = 'A:A'  # Se fuerza el rango a 'A:A' para leer toda la columna A
 
     service = build('sheets', 'v4', credentials=creds)
-    # CORREGIDO: Usar service.spreadsheets().values() en lugar de service.sheets().values()
     sheet = service.spreadsheets().values() 
     result = sheet.get(spreadsheetId=spreadsheet_id, range=range_name).execute()
     values = result.get('values', [])
@@ -76,7 +75,6 @@ def calculate_smi_tv(df):
     # Manejo de división por cero para avgdiff: inicializa con ceros y calcula solo donde avgdiff no es cero
     smi_raw = pd.Series(0.0, index=df.index)
     non_zero_avgdiff_mask = avgdiff != 0
-    # CORRECCIÓN: Usar 'non_zero_avgdiff_mask' en lugar de 'non_zero_avg_diff_mask'
     smi_raw[non_zero_avgdiff_mask] = (avgrel[non_zero_avgdiff_mask] / (avgdiff[non_zero_avgdiff_mask] / 2)) * 100
 
     smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
@@ -506,7 +504,8 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     if end_index_next_day <= total_tickers_in_sheet:
         tickers_for_tomorrow = all_tickers[start_index_next_day:end_index_next_day]
     else:
-        tickers_for_tomorrow = all_tickers[start_index_next_day:] + all_tickers[:(start_index + num_tickers_per_day) - total_tickers_in_sheet]
+        remaining_tickers = len(all_tickers) - start_index_next_day
+        tickers_for_tomorrow = all_tickers[start_index_next_day:] + all_tickers[:num_tickers_per_day - remaining_tickers]
 
     if tickers_for_tomorrow:
         tomorrow_companies_text = ", ".join([f"<strong>{t}</strong>" for t in tickers_for_tomorrow])
@@ -518,11 +517,6 @@ def construir_prompt_formateado(data, all_tickers, current_day_of_week):
     labels_js = json.dumps(data['LAST_7_DATES'])
     notes_js = json.dumps(data['LAST_7_NOTES'])
 
-    # --- Construcción del prompt completo ---
-    # He vuelto a revisar la forma en que se inserta el bloque de script.
-    # Ahora las llaves del objeto JavaScript (por ejemplo, en `scales: {{ y: ... }}`)
-    # están doblemente escapadas `{{` y `}}` para que el f-string de Python las interprete
-    # como literales de llave para el JavaScript, y no como parte de la sintaxis del f-string.
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera un análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio y usando un lenguaje persuasivo y profesional.
 
@@ -730,7 +724,9 @@ def main():
     if start_index + num_tickers_per_day <= len(tickers):
         tickers_to_process = tickers[start_index : start_index + num_tickers_per_day]
     else:
-        tickers_to_process = tickers[start_index:] + tickers[:(start_index + num_tickers_per_day) - len(tickers)]
+        remaining_tickers = len(tickers) - start_index
+        tickers_to_process = tickers[start_index:] + tickers[:num_tickers_per_day - remaining_tickers]
+
 
     print(f"Tickers a procesar hoy ({datetime.now().strftime('%A')}): {tickers_to_process}")
 
@@ -745,7 +741,7 @@ def main():
             # Aquí, en un entorno de producción, enviarías este `prompt_html` a tu API de Gemini
             # para generar el análisis completo. Por ahora, lo imprimiremos.
             print("\n--- HTML GENERADO PARA EL POST (SIMULACIÓN) ---")
-            print(prompt_html)
+            print(f"Contenido HTML generado para {ticker}. Longitud: {len(prompt_html)} caracteres.")
             print("-------------------------------------------------")
             
             # SIMULACIÓN DE ENVÍO DE CORREO
@@ -755,10 +751,9 @@ def main():
             destinatario_correo = os.getenv('RECIPIENT_EMAIL') # Asegúrate de que esta variable de entorno esté configurada
 
             if destinatario_correo:
-                # Simula la generación de contenido completo por Gemini y luego el envío
-                # En un entorno real, `prompt_html` se enviaría a Gemini y la respuesta sería el cuerpo del email
-                # Por ahora, usamos el mismo prompt_html como cuerpo del email.
-                print(f"\nSimulando envío de correo a {destinatario_correo} con el análisis HTML...")
+                print(f"\nIntentando enviar correo a {destinatario_correo} con el análisis HTML...")
+                # Aquí deberías llamar a la API de Gemini con `prompt_html` y usar su respuesta para el cuerpo.
+                # Por ahora, usamos el mismo prompt_html como cuerpo del email para la prueba de envío.
                 enviar_correo(destinatario_correo, asunto_correo, prompt_html)
             else:
                 print("Advertencia: RECIPIENT_EMAIL no configurada. No se enviará el correo.")
