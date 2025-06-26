@@ -321,21 +321,21 @@ def obtener_datos_yfinance(ticker):
             dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
 
 
-# Obtener información directamente de Yahoo Finance
+        # Traducir información de Yahoo Finance
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
         expansion_planes_translated = expansion_planes_raw # No se traduce
         if expansion_planes_translated == "N/A":
-            expansion_planes_translated = "Información de planes de expansión no disponible en este momento."
+            expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
 
-acuerdos_raw = info.get("agreements", "No disponibles")
+        acuerdos_raw = info.get("agreements", "No disponibles")
         acuerdos_translated = acuerdos_raw # No se traduce
         if acuerdos_translated == "No disponibles":
-            acuerdos_translated = "Información sobre acuerdos no disponible en este momento."
+            acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
 
-sentimiento_analistas_raw = info.get("recommendationKey", "N/A")
+        sentimiento_analistas_raw = info.get("recommendationKey", "N/A")
         sentimiento_analistas_translated = sentimiento_analistas_raw # No se traduce
         if sentimiento_analistas_translated == "N/A":
-            sentimiento_analistas_translated = "Sentimiento de analistas no disponible."
+            sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
             
         # Recopilación de todos los datos relevantes
         datos = {
