@@ -319,21 +319,7 @@ def obtener_datos_yfinance(ticker):
         else:
             dias_para_accion_str = "la empresa se encuentra en un periodo de consolidación, sin una dirección clara de impulso a corto plazo que anticipe un punto de acción inminente."
 
-        # Traducir información de Yahoo Finance
-        expansion_planes_raw = info.get("longBusinessSummary", "N/A")
-        expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000]) # Limitar a 5000 caracteres para traducción
-        if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
-            expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
-
-        acuerdos_raw = info.get("agreements", "No disponibles")
-        acuerdos_translated = traducir_texto_con_gemini(acuerdos_raw)
-        if acuerdos_translated == "No disponibles" and acuerdos_raw != "No disponibles":
-            acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
-
-        sentimiento_analistas_raw = info.get("recommendationKey", "N/A")
-        sentimiento_analistas_translated = traducir_texto_con_gemini(sentimiento_analistas_raw)
-        if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
-            sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
+       
             
         # Obtener las últimas 7 notas de la empresa (calculadas a partir del SMI)
         # Asegúrate de que haya suficientes datos para al menos 7 notas
