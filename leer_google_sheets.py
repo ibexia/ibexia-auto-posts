@@ -401,6 +401,10 @@ def construir_prompt_formateado(data):
         volumen_analisis_text = f"Analizando el volumen de **{data['VOLUMEN']:,} acciones**, este volumen [El modelo debe decidir si es alto/bajo/normal en relación al historial y la tendencia. Por ejemplo: 'es consistente con la fase de acumulación que observo en el gráfico, y refuerza la validez de los niveles de soporte detectados.' o 'es ligeramente inferior al promedio reciente, lo que podría indicar una falta de convicción en el movimiento actual.']. Un incremento del volumen en la ruptura de la resistencia, por ejemplo, sería una señal inequívoca de fuerza para la tendencia alcista que preveo. La consolidación actual en torno a los soportes identificados, combinada con el volumen, sugiere [interpreta la combinación de volumen y soportes, como acumulación de posiciones, debilidad de la venta, etc.]. El hecho de que no haya un volumen explosivo en este momento refuerza la idea de un movimiento gradual y menos arriesgado, en contraste con una rápida subida impulsada por especulación."
     else:
         volumen_analisis_text = "Actualmente, no dispongo de datos de volumen reciente para realizar un análisis en profundidad. Sin embargo, en cualquier estrategia de inversión, el volumen es un indicador crucial que valida los movimientos de precio y la fuerza de las tendencias. Un volumen significativo en rupturas de niveles clave o en cambios de tendencia es una señal potente a tener en cuenta."
+    
+    # Pre-formatear los datos JSON para el gráfico
+    fechas_json = json.dumps(data['FECHAS_HISTORICAS_CHART'])
+    notas_json = json.dumps(data['NOTAS_HISTORICAS_CHART'])
 
 
     prompt = f"""
@@ -477,10 +481,10 @@ Es importante recordar que esta nota **no obedece a la situación financiera, lo
     const notaChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: {json.dumps(data['FECHAS_HISTORICAS_CHART'])},
+            labels: {fechas_json},
             datasets: [{
                 label: 'Nota Técnica Diaria',
-                data: {json.dumps(data['NOTAS_HISTORICAS_CHART'])},
+                data: {notas_json},
                 borderColor: 'rgba(75, 192, 192, 1)',
                 backgroundColor: 'rgba(75, 192, 192, 0.2)',
                 tension: 0.4,
