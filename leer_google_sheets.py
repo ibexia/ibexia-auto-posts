@@ -258,6 +258,56 @@ def obtener_datos_yfinance(ticker):
         
         # --- Fin de la traducción ---
 
+        # --- Lógica para la tendencia y días estimados ---
+        smi_history = hist['SMI_signal'].dropna().tail(5).tolist() # Últimos 5 valores de SMI_signal
+        tendencia_smi = "No disponible"
+        dias_estimados_accion = "No disponible"
+
+        if len(smi_history) >= 2:
+            # Calcular la tendencia
+            # Diferencia entre el último SMI y el SMI de hace 5 días
+            smi_start = smi_history[0]
+            smi_end = smi_history[-1]
+            
+            # Convertir nota_empresa de SMI a escala 0-10
+            notas_historicas = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history]
+
+            if len(notas_historicas) >= 2:
+                tendencia_promedio_diaria = (notas_historicas[-1] - notas_historicas[0]) / (len(notas_historicas) - 1)
+                
+                if tendencia_promedio_diaria > 0.1: # umbral pequeño para considerar "mejorando"
+                    tendencia_smi = "mejorando"
+                elif tendencia_promedio_diaria < -0.1: # umbral pequeño para considerar "empeorando"
+                    tendencia_smi = "empeorando"
+                else:
+                    tendencia_smi = "estable"
+
+                # Estimar días para acción
+                target_nota_vender = 2.0
+                target_nota_comprar = 8.0
+
+                if nota_empresa > target_nota_vender and tendencia_promedio_diaria < 0: # Si está bajando y no en zona de venta
+                    diferencia_necesaria = nota_empresa - target_nota_vender
+                    if abs(tendencia_promedio_diaria) > 0.01: # Evitar división por cero o muy cercano
+                        dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
+                        dias_estimados_accion = f"aprox. {int(dias)} días para venta"
+                elif nota_empresa < target_nota_comprar and tendencia_promedio_diaria > 0: # Si está subiendo y no en zona de compra
+                    diferencia_necesaria = target_nota_comprar - nota_empresa
+                    if abs(tendencia_promedio_diaria) > 0.01:
+                        dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
+                        dias_estimados_accion = f"aprox. {int(dias)} días para compra"
+                
+                # Si ya está en la nota objetivo, no decir nada
+                if nota_empresa <= target_nota_vender:
+                    dias_estimados_accion = "Ya en zona de posible venta"
+                elif nota_empresa >= target_nota_comprar:
+                    dias_estimados_accion = "Ya en zona de posible compra"
+                elif tendencia_smi == "estable":
+                    dias_estimados_accion = "Tendencia estable, sin acción inmediata"
+
+
+        # --- Fin de la lógica para la tendencia y días estimados ---
+
 
         datos = {
             "TICKER": ticker,
@@ -283,7 +333,9 @@ def obtener_datos_yfinance(ticker):
             "SENTIMIENTO_ANALISTAS": sentimiento_analistas_translated,
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
-            "RIESGOS_OPORTUNIDADES": "No disponibles"
+            "RIESGOS_OPORTUNIDADES": "No disponibles",
+            "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
+            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion # Nuevo campo
         }
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}")
@@ -360,12 +412,12 @@ def construir_prompt_formateado(data):
         <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong></td>
     </tr>
     <tr>
-        <td style="padding: 8px;">Tendencia</td>
-        <td style="padding: 8px;">No disponible</td>
+        <td style="padding: 8px;">Tendencia de la Nota</td>
+        <td style="padding: 8px;"><strong>{data['TENDENCIA_NOTA']}</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Días Estimados para Acción</td>
-        <td style="padding: 8px;">No disponible</td>
+        <td style="padding: 8px;"><strong>{data['DIAS_ESTIMADOS_ACCION']}</strong></td>
     </tr>
 </table>
 <br/>
@@ -395,6 +447,8 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 - Sentimiento del mercado: {data['SENTIMIENTO_ANALISTAS']}, {data['TENDENCIA_SOCIAL']}
 - Comparativa sectorial: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
+- Tendencia de la nota: {data['TENDENCIA_NOTA']}
+- Días estimados para acción: {data['DIAS_ESTIMADOS_ACCION']}
 
 Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
 
@@ -409,6 +463,8 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <p>La empresa se encuentra en una situación clave. Cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,} €</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong>. Si el precio actual es superior al precio objetivo de compra, explica que este último representa el nivel más atractivo para una entrada conservadora, y que el precio actual, aunque por encima, aún puede presentar una oportunidad si se evalúa el riesgo/recompensa. Si es inferior, recalca la oportunidad de compra al estar por debajo del objetivo. El volumen negociado recientemente alcanza las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
 
 <p>Asignamos una <strong>nota de {data['NOTA_EMPRESA']}</strong>. Esta puntuación refleja [explica concisamente qué significa esa puntuación en términos de riesgo, potencial de crecimiento, y la solidez general de la compañía, conectándola directamente con la recomendación final. Por ejemplo, una nota alta podría indicar 'solidez y gran potencial', mientras que una nota media podría sugerir 'estabilidad con margen de mejora y un perfil de riesgo equilibrado']. A continuación, detallo una visión más completa de mi evaluación profesional, desarrollada en base a una combinación de indicadores técnicos y fundamentos económicos.</p>
+
+<p>Adicionalmente, observo que la **tendencia de nuestra nota técnica es actualmente {data['TENDENCIA_NOTA']}**. {f"Según esta evolución, estimo que podrían ser necesarios {data['DIAS_ESTIMADOS_ACCION']}." if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else ""} Esta tendencia es un factor importante a considerar en nuestra estrategia de corto y medio plazo.</p>
 
 <h2>Análisis a Corto Plazo: Soportes y Resistencias</h2>
 <p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar el comportamiento reciente del volumen y las zonas clave de soporte y resistencia.</p>
