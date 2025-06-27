@@ -259,21 +259,26 @@ def obtener_datos_yfinance(ticker):
         # --- Fin de la traducción ---
 
         # --- Lógica para la tendencia y días estimados ---
-        smi_history = hist['SMI_signal'].dropna().tail(5).tolist() # Últimos 5 valores de SMI_signal
+        smi_history_full = hist['SMI_signal'].dropna()
+        smi_history_last_5 = smi_history_full.tail(5).tolist() # Últimos 5 valores de SMI_signal
+        
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
 
-        if len(smi_history) >= 2:
+        if len(smi_history_last_5) >= 2:
             # Calcular la tendencia
-            # Diferencia entre el último SMI y el SMI de hace 5 días
-            smi_start = smi_history[0]
-            smi_end = smi_history[-1]
-            
-            # Convertir nota_empresa de SMI a escala 0-10
-            notas_historicas = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history]
+            notas_historicas_last_5 = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5]
 
-            if len(notas_historicas) >= 2:
-                tendencia_promedio_diaria = (notas_historicas[-1] - notas_historicas[0]) / (len(notas_historicas) - 1)
+            if len(notas_historicas_last_5) >= 2:
+                # Usar una regresión lineal simple para una estimación más robusta de la tendencia
+                x = np.arange(len(notas_historicas_last_5))
+                y = np.array(notas_historicas_last_5)
+                # Solo si hay suficiente variación para calcular una pendiente significativa
+                if len(x) > 1 and np.std(y) > 0.01:
+                    slope, intercept = np.polyfit(x, y, 1)
+                    tendencia_promedio_diaria = slope
+                else: # Si los valores son casi constantes
+                    tendencia_promedio_diaria = 0.0
                 
                 if tendencia_promedio_diaria > 0.1: # umbral pequeño para considerar "mejorando"
                     tendencia_smi = "mejorando"
@@ -286,26 +291,22 @@ def obtener_datos_yfinance(ticker):
                 target_nota_vender = 2.0
                 target_nota_comprar = 8.0
 
-                if nota_empresa > target_nota_vender and tendencia_promedio_diaria < 0: # Si está bajando y no en zona de venta
-                    diferencia_necesaria = nota_empresa - target_nota_vender
-                    if abs(tendencia_promedio_diaria) > 0.01: # Evitar división por cero o muy cercano
-                        dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
-                        dias_estimados_accion = f"aprox. {int(dias)} días para venta"
-                elif nota_empresa < target_nota_comprar and tendencia_promedio_diaria > 0: # Si está subiendo y no en zona de compra
-                    diferencia_necesaria = target_nota_comprar - nota_empresa
-                    if abs(tendencia_promedio_diaria) > 0.01:
-                        dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
-                        dias_estimados_accion = f"aprox. {int(dias)} días para compra"
-                
-                # Si ya está en la nota objetivo, no decir nada
                 if nota_empresa <= target_nota_vender:
                     dias_estimados_accion = "Ya en zona de posible venta"
                 elif nota_empresa >= target_nota_comprar:
                     dias_estimados_accion = "Ya en zona de posible compra"
-                elif tendencia_smi == "estable":
-                    dias_estimados_accion = "Tendencia estable, sin acción inmediata"
-
-
+                elif tendencia_smi == "estable" or abs(tendencia_promedio_diaria) < 0.01:
+                    dias_estimados_accion = "Tendencia estable, sin acción inmediata clara"
+                elif tendencia_promedio_diaria < 0: # Nota está bajando, hacia venta
+                    diferencia_necesaria = nota_empresa - target_nota_vender
+                    if abs(tendencia_promedio_diaria) > 0.01: 
+                        dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
+                        dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de venta"
+                elif tendencia_promedio_diaria > 0: # Nota está subiendo, hacia compra (o recuperándose de sobreventa)
+                    diferencia_necesaria = target_nota_comprar - nota_empresa
+                    if abs(tendencia_promedio_diaria) > 0.01:
+                        dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
+                        dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de compra"
         # --- Fin de la lógica para la tendencia y días estimados ---
 
 
@@ -363,6 +364,10 @@ def construir_prompt_formateado(data):
             if temp_soportes[i] > 0 and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005: # Tolerancia del 0.5%
                 soportes_unicos.append(temp_soportes[i])
     
+    # Asegurarse de que soportes_unicos tenga al menos un elemento para la tabla
+    if not soportes_unicos:
+        soportes_unicos.append(0) # Valor por defecto si no se encontraron soportes
+
     # Construcción del texto de soportes
     soportes_texto = ""
     if len(soportes_unicos) == 1:
@@ -464,7 +469,6 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 <p>Asignamos una <strong>nota de {data['NOTA_EMPRESA']}</strong>. Esta puntuación refleja [explica concisamente qué significa esa puntuación en términos de riesgo, potencial de crecimiento, y la solidez general de la compañía, conectándola directamente con la recomendación final. Por ejemplo, una nota alta podría indicar 'solidez y gran potencial', mientras que una nota media podría sugerir 'estabilidad con margen de mejora y un perfil de riesgo equilibrado']. A continuación, detallo una visión más completa de mi evaluación profesional, desarrollada en base a una combinación de indicadores técnicos y fundamentos económicos.</p>
 
-<p>Adicionalmente, observo que la **tendencia de nuestra nota técnica es actualmente {data['TENDENCIA_NOTA']}**. {f"Según esta evolución, estimo que podrían ser necesarios {data['DIAS_ESTIMADOS_ACCION']}." if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else ""} Esta tendencia es un factor importante a considerar en nuestra estrategia de corto y medio plazo.</p>
 
 <h2>Análisis a Corto Plazo: Soportes y Resistencias</h2>
 <p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar el comportamiento reciente del volumen y las zonas clave de soporte y resistencia.</p>
@@ -472,6 +476,12 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión, y su cercanía o lejanía tiene implicaciones operativas claras.</p>
 
 <p>Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [compara el volumen actual con el volumen promedio reciente (si está disponible implícitamente en los datos que procesa el modelo) o con el volumen histórico en puntos de inflexión. Comenta si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes o resistencias]. Estos niveles técnicos y el patrón de volumen, junto con la nota de <strong>{data['NOTA_EMPRESA']}</strong>, nos proporcionan una guía para la operativa a corto plazo. [Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. Puede incluir una observación del volumen como confirmación de la fortaleza de soportes o resistencias, y vincularlo a la nota de la empresa si tiene impacto en este horizonte temporal].</p>
+
+<h2>Estrategia de Inversión y Gestión de Riesgos</h2>
+<p>Un aspecto crucial en el análisis de corto plazo es la dinámica del impulso de la empresa, reflejada en la evolución de nuestra nota técnica. Mi evaluación profesional indica que la tendencia actual de la nota de <strong>{data['NOMBRE_EMPRESA']}</strong> es **{data['TENDENCIA_NOTA']}**. Esta evolución sugiere [explica qué implica esa tendencia para el movimiento del precio. Por ejemplo, si es 'mejorando' puede indicar un posible rebote o continuación alcista; si es 'empeorando' puede señalar una posible caída o continuación bajista]. {f"Según esta dinámica, se estima una potencial zona de entrada o salida en aproximadamente <strong>{data['DIAS_ESTIMADOS_ACCION']}</strong>." if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else ("La nota ya se encuentra en una zona de acción clara, lo que sugiere una oportunidad {('de compra' if data['NOTA_EMPRESA'] >= 8 else 'de venta')} inmediata." if "Ya en zona" in data['DIAS_ESTIMADOS_ACCION'] else "Actualmente, la tendencia de la nota es estable, lo que implica que no se proyecta una acción inminente basada únicamente en este indicador.")}</p>
+
+<p>Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, este volumen [comenta el volumen en relación con la tendencia y los niveles técnicos. Por ejemplo, "es consistente con la fase de acumulación que observo en el gráfico, y refuerza la validez de los niveles de soporte detectados." o "es ligeramente inferior al promedio reciente, lo que podría indicar una falta de convicción en el movimiento actual."]. Un incremento del volumen en la ruptura de la resistencia, por ejemplo, sería una señal inequívoca de fuerza para la tendencia alcista que preveo. La consolidación actual en torno a los soportes identificados, combinada con el volumen, sugiere [interpreta la combinación de volumen y soportes, como acumulación de posiciones, debilidad de la venta, etc.]. El hecho de que no haya un volumen explosivo en este momento refuerza la idea de un movimiento gradual y menos arriesgado, en contraste con una rápida subida impulsada por especulación.</p>
+
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 <p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas.</p>
