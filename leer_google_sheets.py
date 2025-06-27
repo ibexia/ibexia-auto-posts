@@ -427,6 +427,45 @@ def construir_prompt_formateado(data):
     </tr>
 </table>
 <br/>
+
+# Dentro de construir_prompt_formateado()
+notas_historicas_last_5 = data.get('NOTAS_HISTORICAS_5', [0, 0, 0, 0, 0])  # Asegura que exista
+grafico_html = f"""
+<canvas id="notasChart" width="400" height="200" style="margin-top: 30px;"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('notasChart').getContext('2d');
+const notasChart = new Chart(ctx, {{
+    type: 'bar',
+    data: {{
+        labels: ['Día -4', 'Día -3', 'Día -2', 'Día -1', 'Hoy'],
+        datasets: [{{
+            label: 'Evolución de la Nota Técnica',
+            data: {notas_historicas_last_5},
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }}]
+    }},
+    options: {{
+        scales: {{
+            y: {{
+                suggestedMin: 0,
+                suggestedMax: 10,
+                ticks: {{
+                    stepSize: 1
+                }},
+                title: {{
+                    display: true,
+                    text: 'Nota Técnica'
+                }}
+            }}
+        }}
+    }}
+}});
+</script>
+
+
 """
 
     # Dinámica del Impulso - Contenido generado dinámicamente
@@ -495,6 +534,41 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
     {"una debilidad técnica significativa y una posible sobrecompra en el gráfico, lo que sugiere un alto riesgo de corrección. La puntuación se basa en el análisis de los patrones de precio y volumen, indicando que es un momento para la cautela extrema." if data['NOTA_EMPRESA'] < 3 else ""}
 Es importante recordar que esta nota es puramente un reflejo del **análisis del gráfico y sus indicadores técnicos**, y no obedece a la situación financiera o de otro tipo de la empresa. Como profesional, esta nota es mi valoración experta al interpretar el comportamiento del precio y los indicadores.</p>
 
+<canvas id="notasChart" width="400" height="200" style="margin-top: 30px;"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('notasChart').getContext('2d');
+const notasChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['Día -4', 'Día -3', 'Día -2', 'Día -1', 'Hoy'],
+        datasets: [{
+            label: 'Evolución de la Nota Técnica',
+            data: [{{nota_dia_4}}, {{nota_dia_3}}, {{nota_dia_2}}, {{nota_dia_1}}, {{nota_hoy}}],
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        scales: {
+            y: {
+                suggestedMin: 0,
+                suggestedMax: 10,
+                ticks: {
+                    stepSize: 1
+                },
+                title: {
+                    display: true,
+                    text: 'Nota Técnica'
+                }
+            }
+        }
+    }
+});
+</script>
+
+
 <h2>Análisis a Corto Plazo: Soportes, Resistencias y Dinámica del Impulso</h2>
 <p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar el comportamiento reciente del volumen y las zonas clave de soporte y resistencia. Estos niveles no son meros puntos en un gráfico; son reflejos de la psicología del mercado y de puntos donde la oferta y la demanda han encontrado equilibrio o desequilibrio en el pasado, y pueden volver a hacerlo.</p>
 
@@ -520,7 +594,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 <p>[Si 'EXPANSION_PLANES' o 'ACUERDOS' contienen texto relevante y no genérico, sintetízalo y comenta su posible impacto estratégico. Si la información es demasiado breve o indica 'no disponible/no traducible', elabora sobre la importancia general de tales estrategias para el sector de la empresa o para la empresa en sí, sin inventar detalles específicos]. La información disponible sugiere [integra estas cifras con una interpretación crítica. Evita conectar esto directamente con la nota técnica; en su lugar, enfócate en cómo estas cifras impactan la solvencia, crecimiento potencial y estabilidad a largo plazo. Por ejemplo: "una base financiera sólida que respalda su potencial de crecimiento a largo plazo." o "la necesidad de un seguimiento de su gestión de deuda a largo plazo."].</p>
 
 <p>[Aquí el modelo debe elaborar una proyección fundamentada (mínimo 150 palabras) con párrafos de máximo 3 líneas. Debe integrar estas cifras con una interpretación crítica. Evita la nota técnica aquí; concéntrate en cómo los fundamentales impactan la valoración a largo plazo].</p>
-
+{grafico_html}  # Insertar aquí
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
 <p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con [menciona brevemente los aspectos positivos o neutrales de los fundamentales aquí, sin vincularlos a la nota técnica], hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
 {tabla_resumen}
