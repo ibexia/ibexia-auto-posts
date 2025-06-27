@@ -302,9 +302,11 @@ def obtener_datos_yfinance(ticker):
         notas_chart = []
         fechas_chart = []
         if 'SMI_signal' in hist.columns:
-            for i in range(min(7, len(hist))):
-                date = hist.index[-(i+1)].strftime('%Y-%m-%d')
-                smi_val = hist['SMI_signal'].iloc[-(i+1)]
+            # Iterar para obtener los últimos 7 días con datos disponibles
+            for i in range(1, min(len(hist), 8)): # Ir de 1 a 7 días atrás
+                date_index = -(i)
+                date = hist.index[date_index].strftime('%Y-%m-%d')
+                smi_val = hist['SMI_signal'].iloc[date_index]
                 nota_val = round((-(max(min(smi_val, 60), -60)) + 60) * 10 / 120, 1)
                 notas_chart.insert(0, nota_val) # Insertar al principio para orden cronológico
                 fechas_chart.insert(0, date)
@@ -382,9 +384,11 @@ def construir_prompt_formateado(data):
 
     dinamica_impulso_text = ""
     if data['TENDENCIA_NOTA'] == "mejorando":
-        dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **mejorando**, lo que sugiere un **impulso alcista** en el comportamiento técnico de la acción. Esto indica que los indicadores del gráfico están mostrando una fortaleza creciente. {f'Según esta dinámica, estimo que podríamos estar a {data["DIAS_ESTIMADOS_ACCION"]} para una posible acción de compra.' if 'compra' in data['DIAS_ESTIMADOS_ACCION'] else ''}"
+        dias_accion_text = f"Según esta dinámica, estimo que podríamos estar a {data['DIAS_ESTIMADOS_ACCION']} para una posible acción de compra." if 'compra' in data['DIAS_ESTIMADOS_ACCION'] else ''
+        dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **mejorando**, lo que sugiere un **impulso alcista** en el comportamiento técnico de la acción. Esto indica que los indicadores del gráfico están mostrando una fortaleza creciente. {dias_accion_text}"
     elif data['TENDENCIA_NOTA'] == "empeorando":
-        dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **empeorando**, lo que sugiere un **impulso bajista** en el comportamiento técnico de la acción. Esto indica que los indicadores del gráfico están mostrando una debilidad creciente. {f'Según esta dinámica, estimo que podríamos estar a {data["DIAS_ESTIMADOS_ACCION']} para una posible acción de venta.' if 'venta' in data['DIAS_ESTIMADOS_ACCION'] else ''}"
+        dias_accion_text = f"Según esta dinámica, estimo que podríamos estar a {data['DIAS_ESTIMADOS_ACCION']} para una posible acción de venta." if 'venta' in data['DIAS_ESTIMADOS_ACCION'] else ''
+        dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **empeorando**, lo que sugiere un **impulso bajista** en el comportamiento técnico de la acción. Esto indica que los indicadores del gráfico están mostrando una debilidad creciente. {dias_accion_text}"
     else: 
         if "Ya en zona" in data['DIAS_ESTIMADOS_ACCION']:
             dinamica_impulso_text = f"La nota técnica de la empresa ya se encuentra en una **zona de {('posible compra' if data['NOTA_EMPRESA'] >= 8 else 'posible venta')}**, lo que indica que el mercado ya ha descontado gran parte del movimiento en esa dirección. Esto podría ofrecer una oportunidad {('de entrada inmediata para compra' if data['NOTA_EMPRESA'] >= 8 else 'de salida inmediata para venta')} para el inversor que busque una acción rápida. Si bien la nota es **{data['NOTA_EMPRESA']}**, es crucial vigilar la volatilidad y los eventos externos que puedan alterar el impulso actual."
@@ -625,7 +629,7 @@ def enviar_email(texto_generado_html, asunto_email, ticker_nombre):
 
     msg.attach(MIMEText("Adjunto encontrarás el análisis técnico de " + ticker_nombre + ". Por favor, abre el archivo HTML adjunto para ver el análisis completo.", 'plain'))
 
-    html_attachment = MIMEApplication(texto_generado_html.encode('utf-8'), _subtype="html", _encoding="utf-8") # Asegurarse de codificar a utf-8
+    html_attachment = MIMEApplication(texto_generado_html.encode('utf-8'), _subtype="html", _encoding="utf-8") 
     html_attachment.add_header('Content-Disposition', 'attachment', filename=f'Analisis_{ticker_nombre}.html')
     msg.attach(html_attachment)
 
