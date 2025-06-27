@@ -190,7 +190,7 @@ def obtener_datos_yfinance(ticker):
         current_price = round(info.get("currentPrice", 0), 2)
         
         # --- MODIFICACIÓN: Obtener el volumen del último día completo del historial ---
-        current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0 
+        current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0  
         # --- FIN MODIFICACIÓN ---
 
         soportes = find_significant_supports(hist, current_price)
@@ -263,7 +263,7 @@ def obtener_datos_yfinance(ticker):
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
-            "VOLUMEN": current_volume, 
+            "VOLUMEN": current_volume,  
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
@@ -323,6 +323,54 @@ def construir_prompt_formateado(data):
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
 
+    # Construcción de la tabla de resumen de puntos clave
+    tabla_resumen = f"""
+<h2>Resumen de Puntos Clave</h2>
+<table border="1" style="width:100%; border-collapse: collapse;">
+    <tr>
+        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Métrica</th>
+        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Valor</th>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Precio Actual</td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,} €</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Volumen</td>
+        <td style="padding: 8px;"><strong>{data['VOLUMEN']:,} acciones</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Soporte Clave</td>
+        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,} €</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Resistencia Clave</td>
+        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,} €</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Recomendación</td>
+        <td style="padding: 8px;"><strong>{data['RECOMENDACION']}</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Nota Técnica (0-10)</td>
+        <td style="padding: 8px;"><strong>{data['NOTA_EMPRESA']:,}</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Precio Objetivo de Compra</td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Tendencia</td>
+        <td style="padding: 8px;">No disponible</td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Días Estimados para Acción</td>
+        <td style="padding: 8px;">No disponible</td>
+    </tr>
+</table>
+<br/>
+"""
+
 
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
@@ -353,6 +401,8 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 ---
 <h1>{titulo_post}</h1>
 
+{tabla_resumen}
+
 <h2>Análisis Inicial y Recomendación</h2>
 <p>Comienzo el análisis de <strong>{data['NOMBRE_EMPRESA']}</strong> destacando mi recomendación principal: <strong>{data['RECOMENDACION']}</strong>.</p>
 
@@ -365,7 +415,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión, y su cercanía o lejanía tiene implicaciones operativas claras.</p>
 
-<p>Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [compara el volumen actual con el volumen promedio reciente (si está disponible implícitamente en los datos que procesa el modelo) o con el volumen histórico en puntos de inflexión. Comenta si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes y resistencias]. Estos niveles técnicos y el patrón de volumen, junto con la nota de <strong>{data['NOTA_EMPRESA']}</strong>, nos proporcionan una guía para la operativa a corto plazo. [Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. Puede incluir una observación del volumen como confirmación de la fortaleza de soportes o resistencias, y vincularlo a la nota de la empresa si tiene impacto en este horizonte temporal].</p>
+<p>Analizando el volumen de <strong>{data['VOLUMEN']:,} acciones</strong>, [compara el volumen actual con el volumen promedio reciente (si está disponible implícitamente en los datos que procesa el modelo) o con el volumen histórico en puntos de inflexión. Comenta si el volumen actual es 'saludable', 'bajo', 'elevado' o 'anormal' para confirmar la validez de los movimientos de precio en los soportes o resistencias]. Estos niveles técnicos y el patrón de volumen, junto con la nota de <strong>{data['NOTA_EMPRESA']}</strong>, nos proporcionan una guía para la operativa a corto plazo. [Aquí el modelo desarrollará un análisis de mínimo 150 palabras, con lectura segmentada, mencionando cómo estos niveles influyen en la operativa a corto plazo. Puede incluir una observación del volumen como confirmación de la fortaleza de soportes o resistencias, y vincularlo a la nota de la empresa si tiene impacto en este horizonte temporal].</p>
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 <p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas.</p>
@@ -471,7 +521,7 @@ def main():
 
     day_of_week = datetime.today().weekday()
     
-    num_tickers_per_day = 10 
+    num_tickers_per_day = 10  
     total_tickers_in_sheet = len(all_tickers)
     
     start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
