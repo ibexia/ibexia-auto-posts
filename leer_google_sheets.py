@@ -4,6 +4,7 @@ import smtplib
 import yfinance as yf
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication # Importar para adjuntos
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import google.generativeai as genai
@@ -189,9 +190,7 @@ def obtener_datos_yfinance(ticker):
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
         current_price = round(info.get("currentPrice", 0), 2)
         
-        # --- MODIFICACIÓN: Obtener el volumen del último día completo del historial ---
         current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0  
-        # --- FIN MODIFICACIÓN ---
 
         soportes = find_significant_supports(hist, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
@@ -200,10 +199,9 @@ def obtener_datos_yfinance(ticker):
 
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
-        # La recomendación se basa en la nota técnica, que a su vez se basa en el SMI
         if nota_empresa <= 2:
             recomendacion = "Vender"
-            condicion_rsi = "muy sobrecomprado" # Se mantiene el texto de "RSI" pero se interpreta como estado técnico
+            condicion_rsi = "muy sobrecomprado" 
         elif 2 < nota_empresa <= 4:
             recomendacion = "Vigilar posible venta"
             condicion_rsi = "algo sobrecomprado"
@@ -241,7 +239,6 @@ def obtener_datos_yfinance(ticker):
             
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
 
-        # --- Aplicar traducción a los campos relevantes aquí ---
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
         expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000])
         if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
@@ -257,38 +254,31 @@ def obtener_datos_yfinance(ticker):
         if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
              sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
         
-        # --- Fin de la traducción ---
-
-        # --- Lógica para la tendencia y días estimados ---
         smi_history_full = hist['SMI_signal'].dropna()
-        smi_history_last_5 = smi_history_full.tail(5).tolist() # Últimos 5 valores de SMI_signal
+        smi_history_last_5 = smi_history_full.tail(5).tolist() 
         
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
 
         if len(smi_history_last_5) >= 2:
-            # Calcular la tendencia
             notas_historicas_last_5 = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5]
 
             if len(notas_historicas_last_5) >= 2:
-                # Usar una regresión lineal simple para una estimación más robusta de la tendencia
                 x = np.arange(len(notas_historicas_last_5))
                 y = np.array(notas_historicas_last_5)
-                # Solo si hay suficiente variación para calcular una pendiente significativa
                 if len(x) > 1 and np.std(y) > 0.01:
                     slope, intercept = np.polyfit(x, y, 1)
                     tendencia_promedio_diaria = slope
-                else: # Si los valores son casi constantes
+                else: 
                     tendencia_promedio_diaria = 0.0
                 
-                if tendencia_promedio_diaria > 0.1: # umbral pequeño para considerar "mejorando"
+                if tendencia_promedio_diaria > 0.1: 
                     tendencia_smi = "mejorando"
-                elif tendencia_promedio_diaria < -0.1: # umbral pequeño para considerar "empeorando"
+                elif tendencia_promedio_diaria < -0.1: 
                     tendencia_smi = "empeorando"
                 else:
                     tendencia_smi = "estable"
 
-                # Estimar días para acción
                 target_nota_vender = 2.0
                 target_nota_comprar = 8.0
 
@@ -298,18 +288,16 @@ def obtener_datos_yfinance(ticker):
                     dias_estimados_accion = "Ya en zona de posible compra"
                 elif tendencia_smi == "estable" or abs(tendencia_promedio_diaria) < 0.01:
                     dias_estimados_accion = "Tendencia estable, sin acción inmediata clara"
-                elif tendencia_promedio_diaria < 0: # Nota está bajando, hacia venta
+                elif tendencia_promedio_diaria < 0: 
                     diferencia_necesaria = nota_empresa - target_nota_vender
                     if abs(tendencia_promedio_diaria) > 0.01: 
                         dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
                         dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de venta"
-                elif tendencia_promedio_diaria > 0: # Nota está subiendo, hacia compra (o recuperándose de sobreventa)
+                elif tendencia_promedio_diaria > 0: 
                     diferencia_necesaria = target_nota_comprar - nota_empresa
                     if abs(tendencia_promedio_diaria) > 0.01:
                         dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
                         dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de compra"
-        # --- Fin de la lógica para la tendencia y días estimados ---
-
 
         datos = {
             "TICKER": ticker,
@@ -336,8 +324,8 @@ def obtener_datos_yfinance(ticker):
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
-            "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
-            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion # Nuevo campo
+            "TENDENCIA_NOTA": tendencia_smi, 
+            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion 
         }
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}")
@@ -355,21 +343,18 @@ def formatear_numero(valor):
 def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€) {data['TICKER']}"
 
-    # Pre-procesamiento de soportes para agruparlos si son muy cercanos
     soportes_unicos = []
     temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
     
     if len(temp_soportes) > 0 and temp_soportes[0] > 0:
         soportes_unicos.append(temp_soportes[0])
         for i in range(1, len(temp_soportes)):
-            if temp_soportes[i] > 0 and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005: # Tolerancia del 0.5%
+            if temp_soportes[i] > 0 and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005: 
                 soportes_unicos.append(temp_soportes[i])
     
-    # Asegurarse de que soportes_unicos tenga al menos un elemento para la tabla
     if not soportes_unicos:
-        soportes_unicos.append(0) # Valor por defecto si no se encontraron soportes
+        soportes_unicos.append(0) 
 
-    # Construcción del texto de soportes
     soportes_texto = ""
     if len(soportes_unicos) == 1:
         soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,} €</strong>."
@@ -381,7 +366,6 @@ def construir_prompt_formateado(data):
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
 
-    # Construcción de la tabla de resumen de puntos clave
     tabla_resumen = f"""
 <h2>Resumen de Puntos Clave</h2>
 <table border="1" style="width:100%; border-collapse: collapse;">
@@ -429,22 +413,20 @@ def construir_prompt_formateado(data):
 <br/>
 """
 
-    # Dinámica del Impulso - Contenido generado dinámicamente
     dinamica_impulso_text = ""
     if data['TENDENCIA_NOTA'] == "mejorando":
         dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **mejorando**, lo que sugiere un **impulso alcista** en el comportamiento técnico de la acción. Esto indica que los indicadores del gráfico están mostrando una fortaleza creciente. {f'Según esta dinámica, estimo que podríamos estar a {data["DIAS_ESTIMADOS_ACCION"]} para una posible acción de compra.' if 'compra' in data['DIAS_ESTIMADOS_ACCION'] else ''}"
     elif data['TENDENCIA_NOTA'] == "empeorando":
         dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **empeorando**, lo que sugiere un **impulso bajista** en el comportamiento técnico de la acción. Esto indica que los indicadores del gráfico están mostrando una debilidad creciente. {f'Según esta dinámica, estimo que podríamos estar a {data["DIAS_ESTIMADOS_ACCION"]} para una posible acción de venta.' if 'venta' in data['DIAS_ESTIMADOS_ACCION'] else ''}"
-    else: # Estable o "Ya en zona de posible venta/compra"
+    else: 
         if "Ya en zona" in data['DIAS_ESTIMADOS_ACCION']:
             dinamica_impulso_text = f"La nota técnica de la empresa ya se encuentra en una **zona de {('posible compra' if data['NOTA_EMPRESA'] >= 8 else 'posible venta')}**, lo que indica que el mercado ya ha descontado gran parte del movimiento en esa dirección. Esto podría ofrecer una oportunidad {('de entrada inmediata para compra' if data['NOTA_EMPRESA'] >= 8 else 'de salida inmediata para venta')} para el inversor que busque una acción rápida. Si bien la nota es **{data['NOTA_EMPRESA']}**, es crucial vigilar la volatilidad y los eventos externos que puedan alterar el impulso actual."
         else:
             dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **estable**, lo que sugiere que el comportamiento técnico de la acción se mantiene sin cambios significativos. Esto implica que no se proyecta una acción inminente basada únicamente en este indicador, aunque siempre es importante estar atento a cualquier cambio en el volumen o los niveles de soporte y resistencia."
 
 
-    # Volumen - Contenido generado dinámicamente
     volumen_analisis_text = ""
-    if data['VOLUMEN'] > 0: # Asumiendo que 0 significa "No disponible" o error
+    if data['VOLUMEN'] > 0: 
         volumen_analisis_text = f"Analizando el volumen de **{data['VOLUMEN']:,} acciones**, este volumen [El modelo debe decidir si es alto/bajo/normal en relación al historial y la tendencia. Por ejemplo: 'es consistente con la fase de acumulación que observo en el gráfico, y refuerza la validez de los niveles de soporte detectados.' o 'es ligeramente inferior al promedio reciente, lo que podría indicar una falta de convicción en el movimiento actual.']. Un incremento del volumen en la ruptura de la resistencia, por ejemplo, sería una señal inequívoca de fuerza para la tendencia alcista que preveo. La consolidación actual en torno a los soportes identificados, combinada con el volumen, sugiere [interpreta la combinación de volumen y soportes, como acumulación de posiciones, debilidad de la venta, etc.]. El hecho de que no haya un volumen explosivo en este momento refuerza la idea de un movimiento gradual y menos arriesgado, en contraste con una rápida subida impulsada por especulación."
     else:
         volumen_analisis_text = "Actualmente, no dispongo de datos de volumen reciente para realizar un análisis en profundidad. Sin embargo, en cualquier estrategia de inversión, el volumen es un indicador crucial que valida los movimientos de precio y la fuerza de las tendencias. Un volumen significativo en rupturas de niveles clave o en cambios de tendencia es una señal potente a tener en cuenta."
@@ -488,13 +470,13 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 <p>La empresa cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,} €</strong>, un nivel que considero estratégico. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong>. Este último representa el nivel más atractivo para una entrada conservadora, y aunque el precio actual está {('por encima' if data['PRECIO_ACTUAL'] > data['PRECIO_OBJETIVO_COMPRA'] else 'por debajo')}, aún puede presentar una oportunidad si se evalúa cuidadosamente la relación riesgo/recompensa. Como analista, mi visión es que la convergencia hacia este objetivo podría ser el punto de partida para un movimiento significativo. El volumen negociado recientemente, que alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>, es un factor clave que valida estos movimientos, y será crucial monitorearlo para confirmar la fuerza de cualquier tendencia emergente.</p>
 
-<p>Asignamos una <strong>nota técnica de {data['NOTA_EMPRESA']} sobre 10</strong>. Esta puntuación refleja [elige una de las siguientes opciones basadas en la nota, manteniendo el foco en el análisis técnico]:
+<p>Asignamos una <strong>nota técnica de {data['NOTA_EMPRESA']} sobre 10</strong>. Esta puntuación es exclusivamente un reflejo del **análisis técnico del gráfico y sus indicadores**, como el impulso, los soportes y las resistencias. Como profesional, esta nota es mi valoración experta al interpretar el comportamiento del precio y los patrones visuales. Indica [elige una de las siguientes opciones basadas en la nota, manteniendo el foco en el análisis técnico]:
     {"una excelente fortaleza técnica y baja volatilidad esperada a corto plazo. La sólida puntuación se basa en la evaluación de indicadores clave de impulso, soporte y resistencia, lo que indica un bajo riesgo técnico en relación con el potencial de crecimiento a corto plazo." if data['NOTA_EMPRESA'] >= 8 else ""}
     {"una fortaleza técnica moderada, con un equilibrio entre potencial y riesgo. Se basa en el comportamiento del gráfico, soportes, resistencias e impulso, sugiriendo una oportunidad que requiere seguimiento." if 6 <= data['NOTA_EMPRESA'] < 8 else ""}
     {"una situación técnica neutral, donde el gráfico no muestra un patrón direccional claro. La puntuación se deriva del análisis de los movimientos de precio y volumen, indicando que es un momento para la observación y no para la acción inmediata." if 5 <= data['NOTA_EMPRESA'] < 6 else ""}
     {"cierta debilidad técnica, con posibles señales de corrección o continuación bajista. La puntuación se basa en los indicadores del gráfico, que muestran una pérdida de impulso alcista y un aumento de la presión vendedora." if 3 <= data['NOTA_EMPRESA'] < 5 else ""}
     {"una debilidad técnica significativa y una posible sobrecompra en el gráfico, lo que sugiere un alto riesgo de corrección. La puntuación se basa en el análisis de los patrones de precio y volumen, indicando que es un momento para la cautela extrema." if data['NOTA_EMPRESA'] < 3 else ""}
-Es importante recordar que esta nota es puramente un reflejo del **análisis del gráfico y sus indicadores técnicos**, y no obedece a la situación financiera o de otro tipo de la empresa. Como profesional, esta nota es mi valoración experta al interpretar el comportamiento del precio y los indicadores.</p>
+Es importante recordar que esta nota **no obedece a la situación financiera, los resultados económicos o cualquier otro dato fundamental de la empresa**, los cuales se analizan por separado para una visión a largo plazo.</p>
 
 <h2>Análisis a Corto Plazo: Soportes, Resistencias y Dinámica del Impulso</h2>
 <p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar el comportamiento reciente del volumen y las zonas clave de soporte y resistencia. Estos niveles no son meros puntos en un gráfico; son reflejos de la psicología del mercado y de puntos donde la oferta y la demanda han encontrado equilibrio o desequilibrio en el pasado, y pueden volver a hacerlo.</p>
@@ -509,7 +491,7 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 
 <p>{volumen_analisis_text}</p>
 
-<p>Basado en nuestro análisis, una posible estrategia de entrada sería considerar una compra cerca {f"del soporte de <strong>{soportes_unicos[0]:,} €</strong>" if len(soportes_unicos) > 0 and soportes_unicos[0] > 0 else ""} o, idealmente, en {f"los <strong>{soportes_unicos[1]:,} €</strong>." if len(soportes_unicos) > 1 and soportes_unicos[1] > 0 else "."} Estos niveles ofrecen una relación riesgo/recompensa atractiva, permitiendo una entrada con mayor margen de seguridad. Para gestionar el riesgo de forma efectiva, se recomienda establecer un stop loss ajustado justo por debajo del soporte más bajo que hemos identificado, por ejemplo, en {f"<strong>{soportes_unicos[-1]:,} €</strong>." if len(soportes_unicos) > 0 and soportes_unicos[-1] > 0 else "un nivel apropiado de invalidación."} Este punto actuaría como un nivel de invalidez de nuestra tesis de inversión. Nuestro objetivo de beneficio (Take Profit) a corto plazo se sitúa en la resistencia clave de <strong>{data['RESISTENCIA']:,} €</strong>, lo que representa un potencial de revalorización significativo. Esta configuración de entrada, stop loss y objetivo permite una relación riesgo/recompensa favorable para el inversor, buscando maximizar el beneficio mientras se protege el capital.</p>
+<p>Basado en nuestro análisis, una posible estrategia de entrada sería considerar una compra cerca {f"del soporte de <strong>{soportes_unicos[0]:,} €</strong>" if len(soportes_unicos) > 0 and soportes_unicos[0] > 0 else ""} o, idealmente, en {f"los <strong>{soportes_unicos[1]:,} €</strong>." if len(soportes_unicos) > 1 and soportes_unicos[1] > 0 else "."} Estos niveles ofrecen una relación riesgo/recompensa atractiva, permitiendo una entrada con mayor margen de seguridad. Para gestionar el riesgo de forma efectiva, se recomienda establecer un stop loss ajustado justo por debajo del soporte más bajo que hemos identificado, por ejemplo, en {f"<strong>{soportes_unicos[-1]:,} €</strong>." if len(soportes_unicos) > 0 and soportes_unicos[-1] > 0 else "un nivel apropiado de invalidación."} Este punto actuaría como un nivel de invalidación de nuestra tesis de inversión. Nuestro objetivo de beneficio (Take Profit) a corto plazo se sitúa en la resistencia clave de <strong>{data['RESISTENCIA']:,} €</strong>, lo que representa un potencial de revalorización significativo. Esta configuración de entrada, stop loss y objetivo permite una relación riesgo/recompensa favorable para el inversor, buscando maximizar el beneficio mientras se protege el capital.</p>
 
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
@@ -518,9 +500,9 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 <p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. 
 En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
 
-<p>[Si 'EXPANSION_PLANES' o 'ACUERDOS' contienen texto relevante y no genérico, sintetízalo y comenta su posible impacto estratégico. Si la información es demasiado breve o indica 'no disponible/no traducible', elabora sobre la importancia general de tales estrategias para el sector de la empresa o para la empresa en sí, sin inventar detalles específicos]. La información disponible sugiere [integra estas cifras con una interpretación crítica. Evita conectar esto directamente con la nota técnica; en su lugar, enfócate en cómo estas cifras impactan la solvencia, crecimiento potencial y estabilidad a largo plazo. Por ejemplo: "una base financiera sólida que respalda su potencial de crecimiento a largo plazo." o "la necesidad de un seguimiento de su gestión de deuda a largo plazo."].</p>
+<p>[Si 'EXPANSION_PLANES' o 'ACUERDOS' contienen texto relevante y no genérico, sintetízalo y comenta su posible impacto estratégico. Si la información es demasiado breve o indica 'no disponible/no traducible', elabora sobre la importancia general de tales estrategias para el sector de la empresa o para la empresa en sí, sin inventar detalles específicos]. La información disponible sugiere [integra estas cifras con una interpretación crítica. Enfócate en cómo estas cifras impactan la solvencia, crecimiento potencial y estabilidad a largo plazo. Por ejemplo: "una base financiera sólida que respalda su potencial de crecimiento a largo plazo." o "la necesidad de un seguimiento de su gestión de deuda a largo plazo."].</p>
 
-<p>[Aquí el modelo debe elaborar una proyección fundamentada (mínimo 150 palabras) con párrafos de máximo 3 líneas. Debe integrar estas cifras con una interpretación crítica. Evita la nota técnica aquí; concéntrate en cómo los fundamentales impactan la valoración a largo plazo].</p>
+<p>[Aquí el modelo debe elaborar una proyección fundamentada (mínimo 150 palabras) con párrafos de máximo 3 líneas. Concéntrate en cómo los fundamentales impactan la valoración a largo plazo].</p>
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
 <p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con [menciona brevemente los aspectos positivos o neutrales de los fundamentales aquí, sin vincularlos a la nota técnica], hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
@@ -543,17 +525,23 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
     return prompt, titulo_post
 
 
-def enviar_email(texto_generado, asunto_email):
+def enviar_email(texto_generado_html, asunto_email, ticker_nombre): # Cambiado el nombre del parámetro
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt"  # ¡RECORDATORIO! Considera usar variables de entorno para la contraseña por seguridad
+    password = "kdgz lvdo wqvt vfkt"  
 
     msg = MIMEMultipart()
     msg['From'] = remitente
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
 
-    msg.attach(MIMEText(texto_generado, 'html'))  
+    # Mensaje de texto plano para clientes de correo que no muestran HTML
+    msg.attach(MIMEText("Adjunto encontrarás el análisis técnico de " + ticker_nombre + ". Por favor, abre el archivo HTML adjunto para ver el análisis completo.", 'plain'))
+
+    # Adjuntar el contenido HTML
+    html_attachment = MIMEApplication(texto_generado_html, _subtype="html")
+    html_attachment.add_header('Content-Disposition', 'attachment', filename=f'Analisis_{ticker_nombre}.html')
+    msg.attach(html_attachment)
 
     try:
         servidor = smtplib.SMTP('smtp.gmail.com', 587)
@@ -561,7 +549,7 @@ def enviar_email(texto_generado, asunto_email):
         servidor.login(remitente, password)
         servidor.sendmail(remitente, destinatario, msg.as_string())
         servidor.quit()
-        print("✅ Correo enviado con éxito.")
+        print("✅ Correo enviado con éxito como adjunto HTML.")
     except Exception as e:
         print("❌ Error al enviar el correo:", e)
 
@@ -589,10 +577,10 @@ def generar_contenido_con_gemini(tickers):
         while retries < max_retries:
             try:
                 response = model.generate_content(prompt)
-                print(f"\n🧠 Contenido generado para {ticker}:\n")
-                print(response.text)
+                html_content = response.text # Obtener el HTML generado
+                print(f"\n🧠 Contenido generado para {ticker} (listo para adjuntar).")
                 asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
-                enviar_email(response.text, asunto_email)
+                enviar_email(html_content, asunto_email, data['NOMBRE_EMPRESA']) # Pasar el HTML y el nombre de la empresa
                 break  
             except Exception as e:
                 if "429 You exceeded your current quota" in str(e):
@@ -614,9 +602,8 @@ def generar_contenido_con_gemini(tickers):
         else:  
             print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
             
-        # --- PAUSA DE 1 MINUTO DESPUÉS DE CADA TICKER ---
         print(f"⏳ Esperando 60 segundos antes de procesar el siguiente ticker...")
-        time.sleep(60) # Pausa de 60 segundos entre cada ticker
+        time.sleep(60) 
 
 def main():
     all_tickers = leer_google_sheets()[1:]
