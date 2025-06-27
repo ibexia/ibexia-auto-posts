@@ -256,6 +256,7 @@ def obtener_datos_yfinance(ticker):
         sentimiento_analistas_translated = traducir_texto_con_gemini(sentimiento_analistas_raw)
         if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
              sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
+        
         # --- Fin de la traducción ---
 
         # --- Lógica para la tendencia y días estimados ---
@@ -299,7 +300,7 @@ def obtener_datos_yfinance(ticker):
                     dias_estimados_accion = "Tendencia estable, sin acción inmediata clara"
                 elif tendencia_promedio_diaria < 0: # Nota está bajando, hacia venta
                     diferencia_necesaria = nota_empresa - target_nota_vender
-                    if abs(tendencia_promedio_diaria) > 0.01:  
+                    if abs(tendencia_promedio_diaria) > 0.01: 
                         dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
                         dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de venta"
                 elif tendencia_promedio_diaria > 0: # Nota está subiendo, hacia compra (o recuperándose de sobreventa)
@@ -480,6 +481,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 ---
 <h1>{titulo_post}</h1>
 
+
 <h2>Análisis Inicial y Recomendación</h2>
 <p>En el dinámico mercado actual, <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> está enviando señales claras de un potencial giro. ¿Es este el momento ideal para considerar una entrada o salida? Mi análisis técnico apunta a que sí, con una oportunidad {('de compra inminente y un rebote en el horizonte' if data['NOTA_EMPRESA'] >= 7 else 'de venta potencial o de esperar una corrección')}.</p>
 
@@ -520,9 +522,8 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 <p>[Aquí el modelo debe elaborar una proyección fundamentada (mínimo 150 palabras) con párrafos de máximo 3 líneas. Debe integrar estas cifras con una interpretación crítica. Evita la nota técnica aquí; concéntrate en cómo los fundamentales impactan la valoración a largo plazo].</p>
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
-{tabla_resumen}
 <p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con [menciona brevemente los aspectos positivos o neutrales de los fundamentales aquí, sin vincularlos a la nota técnica], hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
-
+{tabla_resumen}
 <p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. La inversión en mercados financieros conlleva riesgos, incluyendo la pérdida total del capital invertido. Se recomienda encarecidamente a cada inversor realizar su propia investigación exhaustiva (due diligence), consultar con un asesor financiero cualificado y analizar cada decisión de forma individual, teniendo en cuenta su perfil de riesgo personal, sus objetivos financieros y su situación económica antes de tomar cualquier decisión de inversión. El rendimiento pasado no es indicativo de resultados futuros.</p>
 
 <h3>¿Qué analizaremos mañana? ¡No te lo pierdas!</h3>
