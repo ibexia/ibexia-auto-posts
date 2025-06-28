@@ -543,27 +543,16 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 
 
 def enviar_email(texto_generado, asunto_email):
-    from email.mime.application import MIMEApplication
-
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt"  # Se mantiene igual, como pediste
+    password = "kdgz lvdo wqvt vfkt"  # ¡RECORDATORIO! Considera usar variables de entorno para la contraseña por seguridad
 
     msg = MIMEMultipart()
     msg['From'] = remitente
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
 
-    # Guardar el HTML en un archivo temporal
-    nombre_archivo = asunto_email.replace(" ", "_") + ".html"
-    with open(nombre_archivo, "w", encoding="utf-8") as f:
-        f.write(texto_generado)
-
-    # Adjuntar el archivo HTML
-    with open(nombre_archivo, "rb") as f:
-        adjunto = MIMEApplication(f.read(), _subtype="html")
-        adjunto.add_header('Content-Disposition', 'attachment', filename=nombre_archivo)
-        msg.attach(adjunto)
+    msg.attach(MIMEText(texto_generado, 'html'))  
 
     try:
         servidor = smtplib.SMTP('smtp.gmail.com', 587)
@@ -571,10 +560,9 @@ def enviar_email(texto_generado, asunto_email):
         servidor.login(remitente, password)
         servidor.sendmail(remitente, destinatario, msg.as_string())
         servidor.quit()
-        print("✅ Correo enviado con el archivo HTML adjunto.")
+        print("✅ Correo enviado con éxito.")
     except Exception as e:
         print("❌ Error al enviar el correo:", e)
-
 
 
 def generar_contenido_con_gemini(tickers):
