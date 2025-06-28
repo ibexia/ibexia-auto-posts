@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import os
 import json
 import smtplib
@@ -61,13 +60,14 @@ def calculate_smi_tv(df):
     diff = hh - ll
     rdiff = close - (hh + ll) / 2
 
+    # Manejo de división por cero en smi_raw
     avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
     avgdiff = diff.ewm(span=length_d, adjust=False).mean()
 
-    smi_raw = (avgrel / (avgdiff / 2)) * 100
-    smi_raw[avgdiff == 0] = 0.0
+    # Usar np.where para evitar divisiones por cero y asignar 0.0 cuando avgdiff es 0
+    smi_raw = np.where(avgdiff != 0, (avgrel / (avgdiff / 2)) * 100, 0.0)
 
-    smi_smoothed = smi_raw.rolling(window=smooth_period).mean()
+    smi_smoothed = pd.Series(smi_raw).rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
 
     df = df.copy()
@@ -81,6 +81,10 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     Identifica los 3 soportes más significativos y cercanos al precio actual
     basándose en mínimos locales y agrupaciones de precios.
     """
+    # Asegurarse de que recent_data no esté vacío
+    if df.empty:
+        return [0, 0, 0] # Retorna valores por defecto si el DataFrame está vacío
+
     recent_data = df.tail(window)
     lows = recent_data['Low']
     
@@ -97,8 +101,7 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for support in potential_supports:
         found_zone = False
         for zone_level in support_zones.keys():
-            # Cambio aquí: Añadir comprobación para evitar división por cero
-            if support > 0 and abs(support - zone_level) / support <= tolerance_percent:
+            if support != 0 and abs(support - zone_level) / support <= tolerance_percent: # Añadir chequeo support != 0
                 support_zones[zone_level].append(support)
                 found_zone = True
                 break
@@ -109,32 +112,26 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for zone_level, values in support_zones.items():
         avg_support = np.mean(values)
         if avg_support < current_price:
-            # Cambio aquí: Añadir comprobación para evitar división por cero
-            if current_price > 0 and abs(current_price - avg_support) / current_price <= max_deviation_percent:
+            if avg_support != 0 and abs(current_price - avg_support) / current_price <= max_deviation_percent: # Añadir chequeo avg_support != 0
                 final_supports.append({'level': avg_support, 'frequency': len(values)})
 
     final_supports.sort(key=lambda x: (abs(x['level'] - current_price), -x['frequency']))
     
     top_3_supports = [round(s['level'], 2) for s in final_supports if s['level'] < current_price][:3]
     
-    if len(top_3_supports) < 3:
-        sorted_lows = sorted([l for l in lows.tolist() if l < current_price], reverse=True)
-        for low_val in sorted_lows:
-            rounded_low_val = round(low_val, 2)
-            if rounded_low_val not in top_3_supports:
-                top_3_supports.append(rounded_low_val)
-                if len(top_3_supports) == 3:
-                    break
-    
+    # Asegurarse de que haya 3 soportes, rellenando con valores calculados si es necesario
     while len(top_3_supports) < 3:
         if len(top_3_supports) > 0:
-            # Aquí, si top_3_supports[-1] fuera 0, se mantendría en 0. Se asume que no debería ser 0 si se entra aquí.
-            top_3_supports.append(round(top_3_supports[-1] * 0.95, 2))
+            # Asegurarse de que el cálculo no resulte en 0 si el último soporte es 0
+            if top_3_supports[-1] > 0:
+                top_3_supports.append(round(top_3_supports[-1] * 0.95, 2))
+            else:
+                top_3_supports.append(round(current_price * 0.90, 2)) # Usar current_price si el soporte es 0
         else:
-            # Aquí, si current_price fuera 0, se mantendría en 0. Se asume que current_price es mayor que 0.
-            top_3_supports.append(round(current_price * 0.90, 2))
-            
+            top_3_supports.append(round(current_price * 0.90, 2)) # Si no hay soportes, empezar desde current_price
+
     return top_3_supports
+
 
 def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
     if not text or text.strip().lower() in ["n/a", "no disponibles", "no disponible"]:
@@ -176,36 +173,57 @@ def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
     return text
 
 def obtener_datos_yfinance(ticker):
-    stock = yf.Ticker(ticker)
-    info = stock.info
-    
-    hist = stock.history(period="60d", interval="1d")  
-
-    if hist.empty:
-        print(f"❌ No se pudieron obtener datos históricos para {ticker}")
-        return None
-
     try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # Validar si 'info' está vacío o no contiene datos esenciales
+        if not info or not info.get("currentPrice") is not None:
+            print(f"❌ No se pudo obtener información básica para {ticker}. Saltando...")
+            return None
+        
+        # Intentar obtener el historial, si falla, se registrará el error y se devolverá None
+        hist = stock.history(period="60d", interval="1d")  
+
+        if hist.empty:
+            print(f"❌ No se pudieron obtener datos históricos para {ticker}. Saltando...")
+            return None
+
+        # Asegurarse de que las columnas 'High', 'Low', 'Close', 'Volume' existan
+        required_cols = ['High', 'Low', 'Close', 'Volume']
+        if not all(col in hist.columns for col in required_cols):
+            print(f"❌ Datos históricos incompletos para {ticker}. Faltan columnas esenciales. Saltando...")
+            return None
+            
         hist = calculate_smi_tv(hist)
-        if 'SMI_signal' not in hist.columns or hist['SMI_signal'].empty:
-            print(f"❌ SMI_signal no disponible para {ticker}")
+        
+        # Validar que SMI_signal no esté vacío o contenga NaN al final
+        if 'SMI_signal' not in hist.columns or hist['SMI_signal'].empty or hist['SMI_signal'].dropna().empty:
+            print(f"❌ SMI_signal no disponible o vacío para {ticker}. Saltando...")
             return None
 
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
         current_price = round(info.get("currentPrice", 0), 2)
         
+        # --- MODIFICACIÓN: Obtener el volumen del último día completo del historial ---
         current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0  
+        # --- FIN MODIFICACIÓN ---
 
         soportes = find_significant_supports(hist, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
         soporte_2 = soportes[1] if len(soportes) > 1 else 0
         soporte_3 = soportes[2] if len(soportes) > 2 else 0
 
-        nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
+        # Manejo de la división por cero para nota_empresa si smi_actual causa problemas
+        try:
+            nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
+        except Exception:
+            nota_empresa = 5.0 # Valor neutral por defecto si hay un error en el cálculo
 
+        # La recomendación se basa en la nota técnica, que a su vez se basa en el SMI
         if nota_empresa <= 2:
             recomendacion = "Vender"
-            condicion_rsi = "muy sobrecomprado"
+            condicion_rsi = "muy sobrecomprado" # Se mantiene el texto de "RSI" pero se interpreta como estado técnico
         elif 2 < nota_empresa <= 4:
             recomendacion = "Vigilar posible venta"
             condicion_rsi = "algo sobrecomprado"
@@ -233,20 +251,18 @@ def obtener_datos_yfinance(ticker):
 
         precio_objetivo_compra = 0.0
         
+        # Manejo de caso donde soporte_1 pueda ser 0
         base_precio_obj = soporte_1 if soporte_1 > 0 else current_price * 0.95
 
         if nota_empresa >= 7:
             precio_objetivo_compra = base_precio_obj
         else:
-            # Cambio aquí: Añadir comprobación para evitar división por cero
-            if 7 > 0: # Esto siempre será True, pero lo mantengo por si la lógica cambia
-                drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
-                precio_objetivo_compra = base_precio_obj * (1 - drop_percentage_from_base)
-            else:
-                precio_objetivo_compra = base_precio_obj # O un valor por defecto sensato
+            drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
+            precio_objetivo_compra = base_precio_obj * (1 - drop_percentage_from_base)
             
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
 
+        # --- Aplicar traducción a los campos relevantes aquí ---
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
         expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000])
         if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
@@ -262,33 +278,38 @@ def obtener_datos_yfinance(ticker):
         if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
              sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
         
+        # --- Fin de la traducción ---
+
+        # --- Lógica para la tendencia y días estimados ---
         smi_history_full = hist['SMI_signal'].dropna()
-        smi_history_last_5 = smi_history_full.tail(5).tolist() 
+        smi_history_last_5 = smi_history_full.tail(5).tolist() # Últimos 5 valores de SMI_signal
         
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
 
         if len(smi_history_last_5) >= 2:
+            # Calcular la tendencia
             notas_historicas_last_5 = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5]
 
             if len(notas_historicas_last_5) >= 2:
+                # Usar una regresión lineal simple para una estimación más robusta de la tendencia
                 x = np.arange(len(notas_historicas_last_5))
                 y = np.array(notas_historicas_last_5)
-                
-                # Cambio aquí: Asegurar que hay suficiente variación para calcular la pendiente
-                if len(x) > 1 and np.std(y) > 0.01: # Solo si hay suficiente variación para calcular una pendiente significativa
+                # Solo si hay suficiente variación para calcular una pendiente significativa
+                if len(x) > 1 and np.std(y) > 0.01:
                     slope, intercept = np.polyfit(x, y, 1)
                     tendencia_promedio_diaria = slope
                 else: # Si los valores son casi constantes
                     tendencia_promedio_diaria = 0.0
                 
-                if tendencia_promedio_diaria > 0.1: 
+                if tendencia_promedio_diaria > 0.1: # umbral pequeño para considerar "mejorando"
                     tendencia_smi = "mejorando"
-                elif tendencia_promedio_diaria < -0.1:
+                elif tendencia_promedio_diaria < -0.1: # umbral pequeño para considerar "empeorando"
                     tendencia_smi = "empeorando"
                 else:
                     tendencia_smi = "estable"
 
+                # Estimar días para acción
                 target_nota_vender = 2.0
                 target_nota_comprar = 8.0
 
@@ -298,22 +319,24 @@ def obtener_datos_yfinance(ticker):
                     dias_estimados_accion = "Ya en zona de posible compra"
                 elif tendencia_smi == "estable" or abs(tendencia_promedio_diaria) < 0.01:
                     dias_estimados_accion = "Tendencia estable, sin acción inmediata clara"
-                elif tendencia_promedio_diaria < 0:
+                elif tendencia_promedio_diaria < 0: # Nota está bajando, hacia venta
                     diferencia_necesaria = nota_empresa - target_nota_vender
-                    # Cambio aquí: Añadir comprobación para evitar división por cero
+                    # Evitar división por cero
                     if abs(tendencia_promedio_diaria) > 0.01: 
                         dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
                         dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de venta"
                     else:
-                        dias_estimados_accion = "Tendencia muy débil para estimar días a venta" # Si la tendencia es casi cero
-                elif tendencia_promedio_diaria > 0: 
+                        dias_estimados_accion = "Tendencia muy lenta hacia venta"
+                elif tendencia_promedio_diaria > 0: # Nota está subiendo, hacia compra (o recuperándose de sobreventa)
                     diferencia_necesaria = target_nota_comprar - nota_empresa
-                    # Cambio aquí: Añadir comprobación para evitar división por cero
+                    # Evitar división por cero
                     if abs(tendencia_promedio_diaria) > 0.01:
                         dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
                         dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de compra"
                     else:
-                        dias_estimados_accion = "Tendencia muy débil para estimar días a compra" # Si la tendencia es casi cero
+                        dias_estimados_accion = "Tendencia muy lenta hacia compra"
+        # --- Fin de la lógica para la tendencia y días estimados ---
+
 
         datos = {
             "TICKER": ticker,
@@ -323,7 +346,7 @@ def obtener_datos_yfinance(ticker):
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
-            "RESISTENCIA": round(hist["High"].max(), 2),
+            "RESISTENCIA": round(hist["High"].max(), 2) if not hist["High"].empty else 0, # Asegurarse que haya datos
             "CONDICION_RSI": condicion_rsi,
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
@@ -340,32 +363,46 @@ def obtener_datos_yfinance(ticker):
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
-            "TENDENCIA_NOTA": tendencia_smi, 
-            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion,
-            # Añade esto para el gráfico de notas:
-            "ULTIMAS_5_NOTAS": [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5],
+            "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
+            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion # Nuevo campo
         }
+        return datos
     except Exception as e:
-        print(f"❌ Error al obtener datos de {ticker}: {e}")
+        print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
-
-    return datos
 
 def formatear_numero(valor):
     try:
         numero = int(valor)
-        return f"{numero:,} €"
+        return f"{numero:,} €".replace(",", ".") # Formato español para miles
     except (ValueError, TypeError):
         return "No disponible"
         
 def construir_prompt_formateado(data):
-    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']}€) {data['TICKER']}"
+    # Asegurarse de que los valores numéricos sean tratados como tales para el formato
+    try:
+        current_price = float(data['PRECIO_ACTUAL']) if data['PRECIO_ACTUAL'] is not None else 0.0
+    except (ValueError, TypeError):
+        current_price = 0.0
+
+    try:
+        resistencia = float(data['RESISTENCIA']) if data['RESISTENCIA'] is not None else 0.0
+    except (ValueError, TypeError):
+        resistencia = 0.0
+
+    # Manejo de la división por cero para el porcentaje de resistencia
+    resistencia_percentage = 0.0
+    if current_price > 0:
+        resistencia_percentage = ((resistencia - current_price) / current_price) * 100
+
+    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']}"
 
     # Pre-procesamiento de soportes para agruparlos si son muy cercanos
     soportes_unicos = []
-    temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
+    # Filtrar soportes que no sean cero o 'None' antes de ordenar
+    temp_soportes = sorted([s for s in [data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']] if s is not None and s > 0], reverse=True)
     
-    if len(temp_soportes) > 0 and temp_soportes[0] > 0:
+    if len(temp_soportes) > 0:
         soportes_unicos.append(temp_soportes[0])
         for i in range(1, len(temp_soportes)):
             if temp_soportes[i] > 0 and abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005: # Tolerancia del 0.5%
@@ -373,35 +410,19 @@ def construir_prompt_formateado(data):
     
     # Asegurarse de que soportes_unicos tenga al menos un elemento para la tabla
     if not soportes_unicos:
-        soportes_unicos.append(0) # Valor por defecto si no se encontraron soportes
-
-# ... (código existente antes de la tabla_resumen) ...
+        soportes_unicos.append(0.0) # Valor por defecto si no se encontraron soportes
 
     # Construcción del texto de soportes
     soportes_texto = ""
-    if len(soportes_unicos) == 1:
-        soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,} €</strong>."
-    elif len(soportes_unicos) == 2:
-        soportes_texto = f"dos soportes importantes en <strong>{soportes_unicos[0]:,} €</strong> y <strong>{soportes_unicos[1]:,} €</strong>."
-    elif len(soportes_unicos) >= 3:
-        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{soportes_unicos[0]:,} €</strong>, "
-                          f"el segundo en <strong>{soportes_unicos[1]:,} €</strong>, y el tercero en <strong>{soportes_unicos[2]:,} €</strong>.")
+    if len(soportes_unicos) == 1 and soportes_unicos[0] > 0:
+        soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,.2f} €</strong>."
+    elif len(soportes_unicos) == 2 and soportes_unicos[0] > 0 and soportes_unicos[1] > 0:
+        soportes_texto = f"dos soportes importantes en <strong>{soportes_unicos[0]:,.2f} €</strong> y <strong>{soportes_unicos[1]:,.2f} €</strong>."
+    elif len(soportes_unicos) >= 3 and all(s > 0 for s in soportes_unicos[:3]):
+        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{soportes_unicos[0]:,.2f} €</strong>, "
+                          f"el segundo en <strong>{soportes_unicos[1]:,.2f} €</strong>, y el tercero en <strong>{soportes_unicos[2]:,.2f} €</strong>.")
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
-
-    # Cálculo del porcentaje de distancia de la resistencia
-    distancia_resistencia_porcentaje = "N/A"
-    if float(data['PRECIO_ACTUAL']) > 0:
-        distancia_resistencia_porcentaje = f"{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%"
-
-    # ... (código existente del tabla_resumen) ...
-
-    # Dentro del párrafo de Soportes, Resistencias y Dinámica del Impulso
-    # Modifica la línea que usa este porcentaje
-    # ...
-    <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,}€</strong>, situada a una distancia del <strong>{distancia_resistencia_porcentaje}</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
-
-    # ... (el resto del prompt) ...
 
     # Construcción de la tabla de resumen de puntos clave
     tabla_resumen = f"""
@@ -421,7 +442,7 @@ def construir_prompt_formateado(data):
     </tr>
     <tr>
         <td style="padding: 8px;">Soporte Clave</td>
-        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,} €</strong></td>
+        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.2f} €</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Resistencia Clave</td>
@@ -456,7 +477,7 @@ def construir_prompt_formateado(data):
     if data['TENDENCIA_NOTA'] == "mejorando":
         dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **mejorando**, lo que sugiere un **impulso alcista** en el comportamiento técnico de la acción. Esto indica que los indicadores del gráfico están mostrando una fortaleza creciente. {f'Según esta dinámica, estimo que podríamos estar a {data["DIAS_ESTIMADOS_ACCION"]} para una posible acción de compra.' if 'compra' in data['DIAS_ESTIMADOS_ACCION'] else ''}"
     elif data['TENDENCIA_NOTA'] == "empeorando":
-        dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **empeorando**, lo que sugiere un **impulso bajista** en el comportamiento técnico de la acción. Esto indica que los indicadores del gráfico están mostrando una debilidad creciente. {f'Según esta dinámica, estimo que podríamos estar a {data["DIAS_ESTIMADOS_ACCION"]} para una posible acción de venta.' if 'venta' in data['DIAS_ESTIMADOS_ACCION'] else ''}"
+        dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **empeorando**, lo que sugiere un **impulso bajista** en el comportamiento técnico de la acción. Esto indica que los indicadores del gráfico están mostrando una debilidad creciente. {f'Según esta dinámica, estimo que podríamos estar a {data["DIAS_ESTIMADOS_ACCION']} para una posible acción de venta.' if 'venta' in data['DIAS_ESTIMADOS_ACCION'] else ''}"
     else: # Estable o "Ya en zona de posible venta/compra"
         if "Ya en zona" in data['DIAS_ESTIMADOS_ACCION']:
             dinamica_impulso_text = f"La nota técnica de la empresa ya se encuentra en una **zona de {('posible compra' if data['NOTA_EMPRESA'] >= 8 else 'posible venta')}**, lo que indica que el mercado ya ha descontado gran parte del movimiento en esa dirección. Esto podría ofrecer una oportunidad {('de entrada inmediata para compra' if data['NOTA_EMPRESA'] >= 8 else 'de salida inmediata para venta')} para el inversor que busque una acción rápida. Si bien la nota es **{data['NOTA_EMPRESA']}**, es crucial vigilar la volatilidad y los eventos externos que puedan alterar el impulso actual."
@@ -466,7 +487,7 @@ def construir_prompt_formateado(data):
 
     # Volumen - Contenido generado dinámicamente
     volumen_analisis_text = ""
-    if data['VOLUMEN'] > 0: # Asumiendo que 0 significa "No disponible" o error
+    if data['VOLUMEN'] and data['VOLUMEN'] > 0: # Asumiendo que 0 significa "No disponible" o error
         volumen_analisis_text = f"Analizando el volumen de **{data['VOLUMEN']:,} acciones**, este volumen [El modelo debe decidir si es alto/bajo/normal en relación al historial y la tendencia. Por ejemplo: 'es consistente con la fase de acumulación que observo en el gráfico, y refuerza la validez de los niveles de soporte detectados.' o 'es ligeramente inferior al promedio reciente, lo que podría indicar una falta de convicción en el movimiento actual.']. Un incremento del volumen en la ruptura de la resistencia, por ejemplo, sería una señal inequívoca de fuerza para la tendencia alcista que preveo. La consolidación actual en torno a los soportes identificados, combinada con el volumen, sugiere [interpreta la combinación de volumen y soportes, como acumulación de posiciones, debilidad de la venta, etc.]. El hecho de que no haya un volumen explosivo en este momento refuerza la idea de un movimiento gradual y menos arriesgado, en contraste con una rápida subida impulsada por especulación."
     else:
         volumen_analisis_text = "Actualmente, no dispongo de datos de volumen reciente para realizar un análisis en profundidad. Sin embargo, en cualquier estrategia de inversión, el volumen es un indicador crucial que valida los movimientos de precio y la fuerza de las tendencias. Un volumen significativo en rupturas de niveles clave o en cambios de tendencia es una señal potente a tener en cuenta."
@@ -507,7 +528,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <h2>Análisis Inicial y Recomendación</h2>
 <p>En el dinámico mercado actual, <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> está enviando señales claras de un potencial giro. ¿Es este el momento ideal para considerar una entrada o salida? Mi análisis técnico apunta a que sí, con una oportunidad {('de compra inminente y un rebote en el horizonte' if data['NOTA_EMPRESA'] >= 7 else 'de venta potencial o de esperar una corrección')}.</p>
 
-<p>La empresa cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,} €</strong>, un nivel que considero estratégico. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong>. Este último representa el nivel más atractivo para una entrada conservadora, y aunque el precio actual está {('por encima' if data['PRECIO_ACTUAL'] > data['PRECIO_OBJETIVO_COMPRA'] else 'por debajo')}, aún puede presentar una oportunidad si se evalúa cuidadosamente la relación riesgo/recompensa. Como analista, mi visión es que la convergencia hacia este objetivo podría ser el punto de partida para un movimiento significativo. El volumen negociado recientemente, que alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>, es un factor clave que valida estos movimientos, y será crucial monitorearlo para confirmar la fuerza de cualquier tendencia emergente.</p>
+<p>La empresa cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,} €</strong>, un nivel que considero estratégico. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,} €</strong>. Este último representa el nivel más atractivo para una entrada conservadora, y aunque el precio actual está {('por encima' if current_price > data['PRECIO_OBJETIVO_COMPRA'] else 'por debajo')}, aún puede presentar una oportunidad si se evalúa cuidadosamente la relación riesgo/recompensa. Como analista, mi visión es que la convergencia hacia este objetivo podría ser el punto de partida para un movimiento significativo. El volumen negociado recientemente, que alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>, es un factor clave que valida estos movimientos, y será crucial monitorearlo para confirmar la fuerza de cualquier tendencia emergente.</p>
 
 <p>Asignamos una <strong>nota técnica de {data['NOTA_EMPRESA']} sobre 10</strong>. Esta puntuación refleja [elige una de las siguientes opciones basadas en la nota, manteniendo el foco en el análisis técnico]:
     {"una excelente fortaleza técnica y baja volatilidad esperada a corto plazo. La sólida puntuación se basa en la evaluación de indicadores clave de impulso, soporte y resistencia, lo que indica un bajo riesgo técnico en relación con el potencial de crecimiento a corto plazo." if data['NOTA_EMPRESA'] >= 8 else ""}
@@ -520,75 +541,9 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 <h2>Análisis a Corto Plazo: Soportes, Resistencias y Dinámica del Impulso</h2>
 <p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar el comportamiento reciente del volumen y las zonas clave de soporte y resistencia. Estos niveles no son meros puntos en un gráfico; son reflejos de la psicología del mercado y de puntos donde la oferta y la demanda han encontrado equilibrio o desequilibrio en el pasado, y pueden volver a hacerlo.</p>
 
-<p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
+<p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{resistencia_percentage:.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
-<h2>Historial Reciente de Notas Técnicas</h2>
-<canvas id="notasTecnicasChart" width="800" height="400"></canvas>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var ctx = document.getElementById('notasTecnicasChart').getContext('2d');
-        var ultimasNotas = {data['ULTIMAS_5_NOTAS']}; // Esto insertará el array de Python directamente
-        var labels = ['Día -4', 'Día -3', 'Día -2', 'Día -1', 'Hoy']; // Etiquetas para los 5 días
-
-        var notasChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Nota Técnica (0-10)',
-                    data: ultimasNotas,
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.5)',
-                        'rgba(54, 162, 235, 0.5)',
-                        'rgba(255, 206, 86, 0.5)',
-                        'rgba(75, 192, 192, 0.5)',
-                        'rgba(153, 102, 255, 0.5)'
-                    ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 10, // La nota va de 0 a 10
-                        title: {
-                            display: true,
-                            text: 'Nota Técnica'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Días'
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    title: {
-                        display: true,
-                        text: 'Notas Técnicas de los Últimos 5 Días'
-                    }
-                }
-            }
-        });
-    });
-</script>
-<br/>
 <p>Un aspecto crucial en el análisis de corto plazo es la dinámica del impulso de la empresa. Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**. Esto sugiere {('un rebote inminente, dado que los indicadores muestran una sobreventa extrema, lo que significa que la acción ha sido \'castigada\' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio al alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo.' if data['TENDENCIA_NOTA'] == 'mejorando' and data['NOTA_EMPRESA'] < 6 else '')}
 {('una potencial continuación bajista, con los indicadores técnicos mostrando una sobrecompra significativa o una pérdida de impulso alcista. Esto sugiere que la acción podría experimentar una corrección. Es un momento para la cautela y la vigilancia de los niveles de soporte.' if data['TENDENCIA_NOTA'] == 'empeorando' and data['NOTA_EMPRESA'] > 4 else '')}
 {('una fase de consolidación o lateralidad, donde los indicadores técnicos no muestran una dirección clara. Es un momento para esperar la confirmación de una nueva tendencia antes de tomar decisiones.' if data['TENDENCIA_NOTA'] == 'estable' else '')}
@@ -596,7 +551,7 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 
 <p>{volumen_analisis_text}</p>
 
-<p>Basado en nuestro análisis, una posible estrategia de entrada sería considerar una compra cerca {f"del soporte de <strong>{soportes_unicos[0]:,} €</strong>" if len(soportes_unicos) > 0 and soportes_unicos[0] > 0 else ""} o, idealmente, en {f"los <strong>{soportes_unicos[1]:,} €</strong>." if len(soportes_unicos) > 1 and soportes_unicos[1] > 0 else "."} Estos niveles ofrecen una relación riesgo/recompensa atractiva, permitiendo una entrada con mayor margen de seguridad. Para gestionar el riesgo de forma efectiva, se recomienda establecer un stop loss ajustado justo por debajo del soporte más bajo que hemos identificado, por ejemplo, en {f"<strong>{soportes_unicos[-1]:,} €</strong>." if len(soportes_unicos) > 0 and soportes_unicos[-1] > 0 else "un nivel apropiado de invalidación."} Este punto actuaría como un nivel de invalidez de nuestra tesis de inversión. Nuestro objetivo de beneficio (Take Profit) a corto plazo se sitúa en la resistencia clave de <strong>{data['RESISTENCIA']:,} €</strong>, lo que representa un potencial de revalorización significativo. Esta configuración de entrada, stop loss y objetivo permite una relación riesgo/recompensa favorable para el inversor, buscando maximizar el beneficio mientras se protege el capital.</p>
+<p>Basado en nuestro análisis, una posible estrategia de entrada sería considerar una compra cerca {f"del soporte de <strong>{soportes_unicos[0]:,.2f} €</strong>" if len(soportes_unicos) > 0 and soportes_unicos[0] > 0 else ""} o, idealmente, en {f"los <strong>{soportes_unicos[1]:,.2f} €</strong>." if len(soportes_unicos) > 1 and soportes_unicos[1] > 0 else "."} Estos niveles ofrecen una relación riesgo/recompensa atractiva, permitiendo una entrada con mayor margen de seguridad. Para gestionar el riesgo de forma efectiva, se recomienda establecer un stop loss ajustado justo por debajo del soporte más bajo que hemos identificado, por ejemplo, en {f"<strong>{soportes_unicos[-1]:,.2f} €</strong>." if len(soportes_unicos) > 0 and soportes_unicos[-1] > 0 else "un nivel apropiado de invalidación."} Este punto actuaría como un nivel de invalidez de nuestra tesis de inversión. Nuestro objetivo de beneficio (Take Profit) a corto plazo se sitúa en la resistencia clave de <strong>{data['RESISTENCIA']:,} €</strong>, lo que representa un potencial de revalorización significativo. Esta configuración de entrada, stop loss y objetivo permite una relación riesgo/recompensa favorable para el inversor, buscando maximizar el beneficio mientras se protege el capital.</p>
 
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
@@ -605,12 +560,12 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 <p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. 
 En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
 
-<p>[Si 'EXPANSION_PLANES' o 'ACUERDOS' contienen texto relevante y no genérico, sintetízalo y comenta su posible impacto estratégico. Si la información es demasiado breve o indica 'no disponible/no traducible', elabora sobre la importancia general de tales estrategias para el sector de la empresa o para la empresa en sí, sin inventar detalles específicos]. La información disponible sugiere [integra estas cifras con una interpretación crítica. Evita conectar esto directamente con la nota técnica; en su lugar, enfócate en cómo estas cifras impactan la solvencia, crecimiento potencial y estabilidad a largo plazo. Por ejemplo: "una base financiera sólida que respalda su potencial de crecimiento a largo plazo." o "la necesidad de un seguimiento de su gestión de deuda a largo plazo."].</p>
+<p>{data['EXPANSION_PLANES'] if data['EXPANSION_PLANES'] != 'N/A' and 'no disponible' not in data['EXPANSION_PLANES'].lower() else f"Aunque la información específica sobre planes de expansión no está detallada en este momento, es crucial para <strong>{data['NOMBRE_EMPRESA']}</strong> delinear una estrategia clara de crecimiento. La capacidad de la empresa para innovar, expandir su cuota de mercado o diversificar sus operaciones será determinante para su valor a largo plazo y para mantener la competitividad en su sector. Estoy monitoreando cualquier anuncio futuro que pueda dar luz sobre estas iniciativas."} {data['ACUERDOS'] if data['ACUERDOS'] != 'No disponibles' and 'no disponible' not in data['ACUERDOS'].lower() else f"Respecto a posibles acuerdos estratégicos o colaboraciones, la información actual es limitada. Sin embargo, en el sector de <strong>{data['NOMBRE_EMPRESA']}</strong>, las alianzas y asociaciones son a menudo catalizadores clave para la expansión y la optimización de recursos, lo que podría impactar positivamente su perfil de crecimiento futuro."}</p>
 
-<p>[Aquí el modelo debe elaborar una proyección fundamentada (mínimo 150 palabras) con párrafos de máximo 3 líneas. Debe integrar estas cifras con una interpretación crítica. Evita la nota técnica aquí; concéntrate en cómo los fundamentales impactan la valoración a largo plazo].</p>
+<p>Considerando la información financiera disponible, <strong>{data['NOMBRE_EMPRESA']}</strong> {f"muestra unos ingresos sólidos de <strong>{formatear_numero(data['INGRESOS'])}</strong>, lo que sugiere una base de operaciones robusta. Su EBITDA de <strong>{formatear_numero(data['EBITDA'])}</strong> indica una buena capacidad para generar ganancias antes de intereses, impuestos, depreciaciones y amortizaciones, lo cual es un indicador de eficiencia operativa. Los beneficios de <strong>{formatear_numero(data['BENEFICIOS'])}</strong>, aunque importantes, deben evaluarse en el contexto de la deuda de <strong>{formatear_numero(data['DEUDA'])}</strong> y el flujo de caja de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>. Un flujo de caja positivo es vital para la sostenibilidad y la capacidad de la empresa para invertir en su futuro y afrontar sus obligaciones financieras. Si bien la deuda es una métrica a observar, un flujo de caja saludable puede mitigar los riesgos asociados, sugiriendo que la empresa tiene la capacidad de generar liquidez para soportar sus operaciones y posibles expansiones. Mi interpretación es que la empresa presenta una situación financiera que, si bien tiene aspectos a monitorear como la deuda, se sustenta en una generación de ingresos y un EBITDA consistentes, lo que le confiere una base para un crecimiento potencial sostenido a largo plazo." if data['INGRESOS'] != 'N/A' else "carece de datos financieros recientes para una evaluación fundamental completa. En general, para cualquier empresa, la solidez financiera es la base de un crecimiento sostenible. Ingresos consistentes, un EBITDA saludable y beneficios positivos son señales de un negocio bien gestionado. Un nivel de deuda manejable y un flujo de caja libre positivo son indicadores críticos de la solvencia y capacidad de la empresa para generar valor a largo plazo. La ausencia de estos datos fundamentales impide una predicción sólida a largo plazo, por lo que recomiendo una investigación adicional exhaustiva de sus estados financieros antes de cualquier decisión de inversión a largo plazo."}</p>
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
-<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con [menciona brevemente los aspectos positivos o neutrales de los fundamentales aquí, sin vincularlos a la nota técnica], hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
+<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
 {tabla_resumen}
 <p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. La inversión en mercados financieros conlleva riesgos, incluyendo la pérdida total del capital invertido. Se recomienda encarecidamente a cada inversor realizar su propia investigación exhaustiva (due diligence), consultar con un asesor financiero cualificado y analizar cada decisión de forma individual, teniendo en cuenta su perfil de riesgo personal, sus objetivos financieros y su situación económica antes de tomar cualquier decisión de inversión. El rendimiento pasado no es indicativo de resultados futuros.</p>
 
@@ -665,7 +620,11 @@ def generar_contenido_con_gemini(tickers):
         print(f"\n📊 Procesando ticker: {ticker}")
         data = obtener_datos_yfinance(ticker)
         if not data:
+            # Si obtener_datos_yfinance devuelve None, significa que hubo un error y ya se imprimió.
+            # Continuamos con el siguiente ticker.
+            print(f"⏩ Saltando {ticker} debido a errores de datos.")
             continue
+        
         prompt, titulo_post = construir_prompt_formateado(data)
 
         max_retries = 3
@@ -706,7 +665,11 @@ def generar_contenido_con_gemini(tickers):
         time.sleep(60) # Pausa de 60 segundos entre cada ticker
 
 def main():
-    all_tickers = leer_google_sheets()[1:]
+    try:
+        all_tickers = leer_google_sheets()[1:]
+    except Exception as e:
+        print(f"❌ Error al leer Google Sheets: {e}. Asegúrate de que las variables de entorno están configuradas correctamente y el archivo JSON de credenciales es válido.")
+        return
     
     if not all_tickers:
         print("No hay tickers para procesar.")
