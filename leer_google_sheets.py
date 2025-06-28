@@ -96,7 +96,8 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for support in potential_supports:
         found_zone = False
         for zone_level in support_zones.keys():
-            if abs(support - zone_level) / support <= tolerance_percent:
+            # Cambio aquí: Añadir comprobación para evitar división por cero
+            if support > 0 and abs(support - zone_level) / support <= tolerance_percent:
                 support_zones[zone_level].append(support)
                 found_zone = True
                 break
@@ -107,7 +108,8 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     for zone_level, values in support_zones.items():
         avg_support = np.mean(values)
         if avg_support < current_price:
-            if abs(current_price - avg_support) / current_price <= max_deviation_percent:
+            # Cambio aquí: Añadir comprobación para evitar división por cero
+            if current_price > 0 and abs(current_price - avg_support) / current_price <= max_deviation_percent:
                 final_supports.append({'level': avg_support, 'frequency': len(values)})
 
     final_supports.sort(key=lambda x: (abs(x['level'] - current_price), -x['frequency']))
@@ -125,8 +127,10 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     
     while len(top_3_supports) < 3:
         if len(top_3_supports) > 0:
+            # Aquí, si top_3_supports[-1] fuera 0, se mantendría en 0. Se asume que no debería ser 0 si se entra aquí.
             top_3_supports.append(round(top_3_supports[-1] * 0.95, 2))
         else:
+            # Aquí, si current_price fuera 0, se mantendría en 0. Se asume que current_price es mayor que 0.
             top_3_supports.append(round(current_price * 0.90, 2))
             
     return top_3_supports
@@ -189,9 +193,7 @@ def obtener_datos_yfinance(ticker):
         smi_actual = round(hist['SMI_signal'].dropna().iloc[-1], 2)
         current_price = round(info.get("currentPrice", 0), 2)
         
-        # --- MODIFICACIÓN: Obtener el volumen del último día completo del historial ---
         current_volume = hist['Volume'].iloc[-1] if not hist.empty else 0  
-        # --- FIN MODIFICACIÓN ---
 
         soportes = find_significant_supports(hist, current_price)
         soporte_1 = soportes[0] if len(soportes) > 0 else 0
@@ -200,10 +202,9 @@ def obtener_datos_yfinance(ticker):
 
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
-        # La recomendación se basa en la nota técnica, que a su vez se basa en el SMI
         if nota_empresa <= 2:
             recomendacion = "Vender"
-            condicion_rsi = "muy sobrecomprado" # Se mantiene el texto de "RSI" pero se interpreta como estado técnico
+            condicion_rsi = "muy sobrecomprado"
         elif 2 < nota_empresa <= 4:
             recomendacion = "Vigilar posible venta"
             condicion_rsi = "algo sobrecomprado"
@@ -236,12 +237,15 @@ def obtener_datos_yfinance(ticker):
         if nota_empresa >= 7:
             precio_objetivo_compra = base_precio_obj
         else:
-            drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
-            precio_objetivo_compra = base_precio_obj * (1 - drop_percentage_from_base)
+            # Cambio aquí: Añadir comprobación para evitar división por cero
+            if 7 > 0: # Esto siempre será True, pero lo mantengo por si la lógica cambia
+                drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
+                precio_objetivo_compra = base_precio_obj * (1 - drop_percentage_from_base)
+            else:
+                precio_objetivo_compra = base_precio_obj # O un valor por defecto sensato
             
         precio_objetivo_compra = max(0.01, round(precio_objetivo_compra, 2))
 
-        # --- Aplicar traducción a los campos relevantes aquí ---
         expansion_planes_raw = info.get("longBusinessSummary", "N/A")
         expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000])
         if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
@@ -257,38 +261,33 @@ def obtener_datos_yfinance(ticker):
         if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
              sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
         
-        # --- Fin de la traducción ---
-
-        # --- Lógica para la tendencia y días estimados ---
         smi_history_full = hist['SMI_signal'].dropna()
-        smi_history_last_5 = smi_history_full.tail(5).tolist() # Últimos 5 valores de SMI_signal
+        smi_history_last_5 = smi_history_full.tail(5).tolist() 
         
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
 
         if len(smi_history_last_5) >= 2:
-            # Calcular la tendencia
             notas_historicas_last_5 = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5]
 
             if len(notas_historicas_last_5) >= 2:
-                # Usar una regresión lineal simple para una estimación más robusta de la tendencia
                 x = np.arange(len(notas_historicas_last_5))
                 y = np.array(notas_historicas_last_5)
-                # Solo si hay suficiente variación para calcular una pendiente significativa
-                if len(x) > 1 and np.std(y) > 0.01:
+                
+                # Cambio aquí: Asegurar que hay suficiente variación para calcular la pendiente
+                if len(x) > 1 and np.std(y) > 0.01: # Solo si hay suficiente variación para calcular una pendiente significativa
                     slope, intercept = np.polyfit(x, y, 1)
                     tendencia_promedio_diaria = slope
                 else: # Si los valores son casi constantes
                     tendencia_promedio_diaria = 0.0
                 
-                if tendencia_promedio_diaria > 0.1: # umbral pequeño para considerar "mejorando"
+                if tendencia_promedio_diaria > 0.1: 
                     tendencia_smi = "mejorando"
-                elif tendencia_promedio_diaria < -0.1: # umbral pequeño para considerar "empeorando"
+                elif tendencia_promedio_diaria < -0.1:
                     tendencia_smi = "empeorando"
                 else:
                     tendencia_smi = "estable"
 
-                # Estimar días para acción
                 target_nota_vender = 2.0
                 target_nota_comprar = 8.0
 
@@ -298,18 +297,22 @@ def obtener_datos_yfinance(ticker):
                     dias_estimados_accion = "Ya en zona de posible compra"
                 elif tendencia_smi == "estable" or abs(tendencia_promedio_diaria) < 0.01:
                     dias_estimados_accion = "Tendencia estable, sin acción inmediata clara"
-                elif tendencia_promedio_diaria < 0: # Nota está bajando, hacia venta
+                elif tendencia_promedio_diaria < 0:
                     diferencia_necesaria = nota_empresa - target_nota_vender
+                    # Cambio aquí: Añadir comprobación para evitar división por cero
                     if abs(tendencia_promedio_diaria) > 0.01: 
                         dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
                         dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de venta"
-                elif tendencia_promedio_diaria > 0: # Nota está subiendo, hacia compra (o recuperándose de sobreventa)
+                    else:
+                        dias_estimados_accion = "Tendencia muy débil para estimar días a venta" # Si la tendencia es casi cero
+                elif tendencia_promedio_diaria > 0: 
                     diferencia_necesaria = target_nota_comprar - nota_empresa
+                    # Cambio aquí: Añadir comprobación para evitar división por cero
                     if abs(tendencia_promedio_diaria) > 0.01:
                         dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
                         dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de compra"
-        # --- Fin de la lógica para la tendencia y días estimados ---
-
+                    else:
+                        dias_estimados_accion = "Tendencia muy débil para estimar días a compra" # Si la tendencia es casi cero
 
         datos = {
             "TICKER": ticker,
@@ -336,8 +339,9 @@ def obtener_datos_yfinance(ticker):
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
-            "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
-            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion # Nuevo campo
+            "TENDENCIA_NOTA": tendencia_smi, 
+            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion,
+            # Añade esto para el gráfico de notas:
             "ULTIMAS_5_NOTAS": [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5],
         }
     except Exception as e:
@@ -370,6 +374,8 @@ def construir_prompt_formateado(data):
     if not soportes_unicos:
         soportes_unicos.append(0) # Valor por defecto si no se encontraron soportes
 
+# ... (código existente antes de la tabla_resumen) ...
+
     # Construcción del texto de soportes
     soportes_texto = ""
     if len(soportes_unicos) == 1:
@@ -381,6 +387,20 @@ def construir_prompt_formateado(data):
                           f"el segundo en <strong>{soportes_unicos[1]:,} €</strong>, y el tercero en <strong>{soportes_unicos[2]:,} €</strong>.")
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
+
+    # Cálculo del porcentaje de distancia de la resistencia
+    distancia_resistencia_porcentaje = "N/A"
+    if float(data['PRECIO_ACTUAL']) > 0:
+        distancia_resistencia_porcentaje = f"{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%"
+
+    # ... (código existente del tabla_resumen) ...
+
+    # Dentro del párrafo de Soportes, Resistencias y Dinámica del Impulso
+    # Modifica la línea que usa este porcentaje
+    # ...
+    <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,} €</strong>, situada a una distancia del <strong>{distancia_resistencia_porcentaje}</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
+
+    # ... (el resto del prompt) ...
 
     # Construcción de la tabla de resumen de puntos clave
     tabla_resumen = f"""
