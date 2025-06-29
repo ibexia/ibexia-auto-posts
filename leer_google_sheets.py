@@ -6,7 +6,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-import google.generativeai as genai
 from datetime import datetime
 import pandas as pd
 import numpy as np
@@ -127,44 +126,7 @@ def find_significant_supports(df, current_price, window=40, tolerance_percent=0.
     return top_3_supports
 
 
-def traducir_texto_con_gemini(text, max_retries=3, initial_delay=5):
-    if not text or text.strip().lower() in ["n/a", "no disponibles", "no disponible"]:
-        return text
 
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key:
-        print("Advertencia: GEMINI_API_KEY no configurada. No se realizará la traducción.")
-        return text
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")
-    
-    retries = 0
-    delay = initial_delay
-    while retries < max_retries:
-        try:
-            response = model.generate_content(f"Traduce el siguiente texto al español de forma concisa y profesional: \"{text}\"")
-            translated_text = response.text.strip().replace("**", "").replace("*", "")
-            return translated_text
-        except Exception as e:
-            if "429 You exceeded your current quota" in str(e):
-                try:
-                    match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
-                    if match:
-                        server_delay = int(match.group(1))
-                        delay = max(delay, server_delay + 1)
-                except:
-                    pass
-                
-                print(f"❌ Cuota de Gemini excedida al traducir. Reintentando en {delay} segundos... (Intento {retries + 1}/{max_retries})")
-                time.sleep(delay)
-                retries += 1
-                delay *= 2
-            else:
-                print(f"❌ Error al traducir texto con Gemini (no de cuota): {e}")
-                return text
-    print(f"❌ Falló la traducción después de {max_retries} reintentos.")
-    return text
 
 def obtener_datos_yfinance(ticker):
     try:
@@ -224,18 +186,15 @@ def obtener_datos_yfinance(ticker):
         precio_objetivo_compra = round(precio_objetivo_compra, 2)
 
         # --- Aplicar traducción a los campos relevantes aquí ---
-        expansion_planes_raw = info.get("longBusinessSummary", "N/A")
-        expansion_planes_translated = traducir_texto_con_gemini(expansion_planes_raw[:5000])
+        expansion_planes_translated = info.get("longBusinessSummary", "N/A")
         if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
             expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
 
-        acuerdos_raw = info.get("agreements", "No disponibles")
-        acuerdos_translated = traducir_texto_con_gemini(acuerdos_raw)
+        acuerdos_translated = info.get("agreements", "No disponibles")
         if acuerdos_translated == "No disponibles" and acuerdos_raw != "No disponibles":
             acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
 
-        sentimiento_analistas_raw = info.get("recommendationKey", "N/A")
-        sentimiento_analistas_translated = traducir_texto_con_gemini(sentimiento_analistas_raw)
+        sentimiento_analistas_translated = info.get("recommendationKey", "N/A")
         if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
              sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
         
