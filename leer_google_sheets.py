@@ -2,6 +2,7 @@ import os
 import json
 import smtplib
 import yfinance as yf
+import google.generativeai as genai
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from google.oauth2 import service_account
@@ -524,7 +525,7 @@ def generar_contenido_con_gemini(tickers):
     if not api_key:
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
-    genai.configure(api_key=api_key)
+    
     model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")  
 
     for ticker in tickers:
