@@ -188,15 +188,15 @@ def obtener_datos_yfinance(ticker):
 
         # --- Aplicar traducción a los campos relevantes aquí ---
         expansion_planes_translated = info.get("longBusinessSummary", "N/A")
-        if expansion_planes_translated == "N/A" and expansion_planes_raw != "N/A":
+    
             expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
 
         acuerdos_translated = info.get("agreements", "No disponibles")
-        if acuerdos_translated == "No disponibles" and acuerdos_raw != "No disponibles":
+       
             acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
 
         sentimiento_analistas_translated = info.get("recommendationKey", "N/A")
-        if sentimiento_analistas_translated == "N/A" and sentimiento_analistas_raw != "N/A":
+
              sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
         
         # --- Fin de la traducción ---
