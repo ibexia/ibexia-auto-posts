@@ -187,16 +187,11 @@ def obtener_datos_yfinance(ticker):
         precio_objetivo_compra = round(precio_objetivo_compra, 2)
 
         # --- Aplicar traducción a los campos relevantes aquí ---
-        expansion_planes_translated = info.get("longBusinessSummary", "N/A")
-    
+        expansion_planes_translated = info.get("longBusinessSummary", "N/A")  
             expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
-
         acuerdos_translated = info.get("agreements", "No disponibles")
-       
             acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
-
         sentimiento_analistas_translated = info.get("recommendationKey", "N/A")
-
              sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
         
         # --- Fin de la traducción ---
