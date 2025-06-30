@@ -201,21 +201,22 @@ def obtener_datos_yfinance(ticker):
 
         # --- Lógica para la tendencia y días estimados ---
         smi_history_full = hist['SMI_signal'].dropna()
-        smi_history_last_30 = smi_history_full.tail(30).tolist() # Últimos 30 valores de SMI_signal
-        # Calcular las últimas 30 notas de la empresa
-        notas_historicas_ultimos_30_dias = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_30]
+        smi_history_last_7 = smi_history_full.tail(7).tolist() # Últimos 7 valores de SMI_signal
+        
+        # Calcular las últimas 7 notas de la empresa
+        notas_historicas_ultimos_7_dias = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_7]
         
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
 
-        if len(smi_history_last_30) >= 2: # Cambiado de 5 a 2 para asegurar que haya al menos 2 puntos para tendencia
+        if len(smi_history_last_7) >= 2: # Cambiado de 5 a 2 para asegurar que haya al menos 2 puntos para tendencia
             # Calcular la tendencia
             # notas_historicas_last_5 = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5] # Esta línea ya no es necesaria con el cambio de nombre de la variable
             
-            if len(notas_historicas_ultimos_30_dias) >= 2: # Asegurarse de que hay al menos 2 puntos para la regresión
+            if len(notas_historicas_ultimos_7_dias) >= 2: # Asegurarse de que hay al menos 2 puntos para la regresión
                 # Usar una regresión lineal simple para una estimación más robusta de la tendencia
-                x = np.arange(len(notas_historicas_ultimos_30_dias))
-                y = np.array(notas_historicas_ultimos_30_dias)
+                x = np.arange(len(notas_historicas_ultimos_7_dias))
+                y = np.array(notas_historicas_ultimos_7_dias)
                 # Solo si hay suficiente variación para calcular una pendiente significativa
                 if len(x) > 1 and np.std(y) > 0.01:
                     slope, intercept = np.polyfit(x, y, 1)
@@ -286,7 +287,7 @@ def obtener_datos_yfinance(ticker):
             "RIESGOS_OPORTUNIDADES": "No disponibles",
             "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
             "DIAS_ESTIMADOS_ACCION": dias_estimados_accion, # Nuevo campo
-            "NOTAS_HISTORICAS_30_DIAS": notas_historicas_ultimos_30_dias # NUEVO CAMPO
+            "NOTAS_HISTORICAS_7_DIAS": notas_historicas_ultimos_7_dias # NUEVO CAMPO
         }
         return datos
     except Exception as e:
@@ -304,112 +305,102 @@ def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']}"
     
        # NUEVO: Obtener las notas históricas para el gráfico
-    
-    notas_historicas = data.get('NOTAS_HISTORICAS_30_DIAS', [])
-    # Ajustar para asegurar que siempre haya 30 elementos, rellenando con el último valor si hay menos
-    if len(notas_historicas) < 30 and notas_historicas:
-    notas_historicas = [notas_historicas[0]] * (30 - len(notas_historicas)) + notas_historicas
+    notas_historicas = data.get('NOTAS_HISTORICAS_7_DIAS', [])
+    # Ajustar para asegurar que siempre haya 7 elementos, rellenando con el último valor si hay menos
+    if len(notas_historicas) < 7 and notas_historicas:
+        notas_historicas = [notas_historicas[0]] * (7 - len(notas_historicas)) + notas_historicas
     elif not notas_historicas:
-    notas_historicas = [0.0] * 30 # Si no hay datos, rellenar con ceros
-    notas_historicas = notas_historicas[-30:] # Asegurarse de que sean solo las últimas 30
+        notas_historicas = [0.0] * 7 # Si no hay datos, rellenar con ceros
+    notas_historicas = notas_historicas[-7:] # Asegurarse de que sean solo las últimas 7
+    
     # ... (el resto de tu código para soportes_unicos y tabla_resumen) ...
 
     # COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
     chart_html = ""
     if notas_historicas:
         # Generar etiquetas para los últimos 7 días (Hoy, Ayer, -2, -3, etc.)
-        labels = [f"Día -{i}" for i in range(29, -1, -1)]
-        labels[-1] = "Hoy" # Último día es "Hoy"
-        labels[-2] = "Ayer" # Penúltimo día es "Ayer"
+        labels = [f"Día -{i}" for i in range(6, -1, -1)]
+        labels[6] = "Hoy" # Último día es "Hoy"
+        labels[5] = "Ayer" # Penúltimo día es "Ayer"
         
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
         notas_historicas_display = notas_historicas
 
         chart_html = f"""
 <h2>Evolución de la Nota Técnica</h2>
+<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, he preparado un gráfico que muestra los valores de los últimos siete días.  . Esto nos permite identificar tendencias recientes y el momentum actual de la empresa.Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa nuestra valoración técnica sobre el momento actual de una acción. La escala va de 0 (momento óptimo para vender o mantenerse al margen) hasta 10 (máximo interés para una posible entrada). Esta nota resume la fuerza técnica detectada en el gráfico, y permite a los inversores tener una referencia clara y rápida sobre si una acción se encuentra en zona de oportunidad o de precaución. No es una recomendación directa de compra o venta, sino un indicador técnico propio que complementa el análisis profesional.</p>
 <div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="notasChart"></canvas>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function () {{
-    const ctx = document.getElementById('notasChart').getContext('2d');
-    const notas = {json.dumps(notas_historicas_ultimos_30_dias)};
-    const labels = Array.from({{ length: 30 }}, (_, i) => `Día -${{29 - i}}`);
-
-    new Chart(ctx, {{
-        type: 'bar',
-        data: {{
-            labels: labels,
-            datasets: [
-                {{
-                    type: 'bar',
+    document.addEventListener('DOMContentLoaded', function() {{
+        var ctx = document.getElementById('notasChart').getContext('2d');
+        var notasChart = new Chart(ctx, {{
+            type: 'bar',
+            data: {{
+                labels: {json.dumps(labels)},
+                datasets: [{{
                     label: 'Nota Técnica',
-                    data: notas,
-                    backgroundColor: notas.map(v => 
-                        v >= 8 ? 'rgba(0, 200, 0, 0.2)' : 
-                        v <= 2 ? 'rgba(255, 0, 0, 0.2)' : 
-                        'rgba(54, 162, 235, 0.5)'
-                    ),
-                    borderColor: 'rgba(54, 162, 235, 1)',
+                    data: {json.dumps(notas_historicas_display)},
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.5)', // Rojo para valores bajos
+                        'rgba(255, 159, 64, 0.5)',
+                        'rgba(255, 205, 86, 0.5)',
+                        'rgba(75, 192, 192, 0.5)',
+                        'rgba(54, 162, 235, 0.5)',
+                        'rgba(153, 102, 255, 0.5)',
+                        'rgba(0, 128, 0, 0.5)'  // Verde para valores altos
+                    ],
+                    borderColor: [
+                        'rgb(255, 99, 132)',
+                        'rgb(255, 159, 64)',
+                        'rgb(255, 205, 86)',
+                        'rgb(75, 192, 192)',
+                        'rgb(54, 162, 235)',
+                        'rgb(153, 102, 255)',
+                        'rgb(0, 128, 0)'
+                    ],
                     borderWidth: 1
-                }},
-                {{
-                    type: 'line',
-                    label: 'Línea 2',
-                    data: new Array(notas.length).fill(2),
-                    borderColor: 'red',
-                    borderWidth: 1,
-                    pointRadius: 0,
-                    borderDash: [5, 5]
-                }},
-                {{
-                    type: 'line',
-                    label: 'Línea 8',
-                    data: new Array(notas.length).fill(8),
-                    borderColor: 'green',
-                    borderWidth: 1,
-                    pointRadius: 0,
-                    borderDash: [5, 5]
-                }}
-            ]
-        }},
-        options: {{
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {{
-                y: {{
-                    min: 0,
-                    max: 10,
-                    title: {{
-                        display: true,
-                        text: 'Nota Técnica (0-10)'
-                    }}
-                }},
-                x: {{
-                    title: {{
-                        display: true,
-                        text: 'Últimos 30 días'
-                    }}
-                }}
+                }}]
             }},
-            plugins: {{
-                tooltip: {{
-                    callbacks: {{
-                        label: function (context) {{
-                            return context.dataset.label + ': ' + context.parsed.y.toFixed(1);
+            options: {{
+                scales: {{
+                    y: {{
+                        beginAtZero: true,
+                        max: 10,
+                        title: {{
+                            display: true,
+                            text: 'Nota (0-10)'
+                        }}
+                    }},
+                    x: {{
+                        title: {{
+                            display: true,
+                            text: 'Últimos 7 Días (ibexia.es)'
                         }}
                     }}
                 }},
-                legend: {{
-                    display: true
-                }}
+                plugins: {{
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(context) {{
+                                return context.dataset.label + ': ' + context.parsed.y.toFixed(1);
+                            }}
+                        }}
+                    }},
+                    legend: {{
+                        display: false
+                    }}
+                }},
+                responsive: true,
+                maintainAspectRatio: false
             }}
-        }}
+        }});
     }});
-}});
 </script>
+<br/>
 """
     
     # Pre-procesamiento de soportes para agruparlos si son muy cercanos
