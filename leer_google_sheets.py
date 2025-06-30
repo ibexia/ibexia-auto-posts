@@ -285,7 +285,7 @@ def obtener_datos_yfinance(ticker):
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
             "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
-            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion # Nuevo campo
+            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion, # Nuevo campo
             "NOTAS_ULTIMOS_7_DIAS": notas_historicas  # ✅ Nuevo campo para el gráfico
         }
         return datos
