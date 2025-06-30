@@ -201,10 +201,10 @@ def obtener_datos_yfinance(ticker):
 
         # --- Lógica para la tendencia y días estimados ---
         smi_history_full = hist['SMI_signal'].dropna()
-        smi_history_last_7 = smi_history_full.tail(7).tolist() # Últimos 7 valores de SMI_signal
+        smi_history_last_30 = smi_history_full.tail(30).tolist() # Últimos 30 valores de SMI_signal
         
         # Calcular las últimas 7 notas de la empresa
-        notas_historicas_ultimos_7_dias = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_7]
+        notas_historicas_ultimos_30_dias = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_30]
         
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
@@ -335,70 +335,97 @@ def construir_prompt_formateado(data):
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {{
-        var ctx = document.getElementById('notasChart').getContext('2d');
-        var notasChart = new Chart(ctx, {{
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('notasChart').getContext('2d');
+
+        const gradientAbove = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientAbove.addColorStop(0, 'rgba(0, 255, 0, 0.2)');
+        gradientAbove.addColorStop(1, 'rgba(0, 255, 0, 0)');
+
+        const gradientBelow = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientBelow.addColorStop(0, 'rgba(255, 0, 0, 0)');
+        gradientBelow.addColorStop(1, 'rgba(255, 0, 0, 0.2)');
+
+        const notas = {{ notas_json|safe }};  // Reemplaza por tu array de 30 notas
+        const labels = Array.from({ length: 30 }, (_, i) => `Día -${29 - i}`);
+
+        new Chart(ctx, {
             type: 'bar',
-            data: {{
-                labels: {json.dumps(labels)},
-                datasets: [{{
-                    label: 'Nota Técnica',
-                    data: {json.dumps(notas_historicas_display)},
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.5)', // Rojo para valores bajos
-                        'rgba(255, 159, 64, 0.5)',
-                        'rgba(255, 205, 86, 0.5)',
-                        'rgba(75, 192, 192, 0.5)',
-                        'rgba(54, 162, 235, 0.5)',
-                        'rgba(153, 102, 255, 0.5)',
-                        'rgba(0, 128, 0, 0.5)'  // Verde para valores altos
-                    ],
-                    borderColor: [
-                        'rgb(255, 99, 132)',
-                        'rgb(255, 159, 64)',
-                        'rgb(255, 205, 86)',
-                        'rgb(75, 192, 192)',
-                        'rgb(54, 162, 235)',
-                        'rgb(153, 102, 255)',
-                        'rgb(0, 128, 0)'
-                    ],
-                    borderWidth: 1
-                }}]
-            }},
-            options: {{
-                scales: {{
-                    y: {{
-                        beginAtZero: true,
-                        max: 10,
-                        title: {{
-                            display: true,
-                            text: 'Nota (0-10)'
-                        }}
-                    }},
-                    x: {{
-                        title: {{
-                            display: true,
-                            text: 'Últimos 7 Días (ibexia.es)'
-                        }}
-                    }}
-                }},
-                plugins: {{
-                    tooltip: {{
-                        callbacks: {{
-                            label: function(context) {{
-                                return context.dataset.label + ': ' + context.parsed.y.toFixed(1);
-                            }}
-                        }}
-                    }},
-                    legend: {{
-                        display: false
-                    }}
-                }},
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Nota Técnica',
+                        data: notas,
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1,
+                    },
+                    {
+                        type: 'line',
+                        label: 'Línea 2',
+                        data: Array(notas.length).fill(2),
+                        borderColor: 'red',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        borderDash: [5, 5]
+                    },
+                    {
+                        type: 'line',
+                        label: 'Línea 8',
+                        data: Array(notas.length).fill(8),
+                        borderColor: 'green',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        borderDash: [5, 5]
+                    },
+                ]
+            },
+            options: {
                 responsive: true,
-                maintainAspectRatio: false
-            }}
-        }});
-    }});
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 10,
+                        title: {
+                            display: true,
+                            text: 'Nota Técnica (0-10)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Últimos 30 días'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return context.dataset.label + ': ' + context.parsed.y.toFixed(1);
+                            }
+                        }
+                    },
+                    legend: {
+                        display: true
+                    }
+                },
+                elements: {
+                    bar: {
+                        backgroundColor: (context) => {
+                            const value = context.raw;
+                            if (value >= 8) return 'rgba(0, 200, 0, 0.2)'; // Verde claro
+                            if (value <= 2) return 'rgba(255, 0, 0, 0.2)'; // Rojo claro
+                            return 'rgba(54, 162, 235, 0.5)';
+                        }
+                    }
+                }
+            }
+        });
+    });
 </script>
 <br/>
 """
