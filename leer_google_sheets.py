@@ -255,6 +255,8 @@ def obtener_datos_yfinance(ticker):
                     else:
                         dias_estimados_accion = "Tendencia muy lenta hacia compra"
         # --- Fin de la lógica para la tendencia y días estimados ---
+        # Guardar las últimas 7 notas técnicas
+        notas_historicas = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_full.tail(7)]
 
 
         datos = {
@@ -284,6 +286,7 @@ def obtener_datos_yfinance(ticker):
             "RIESGOS_OPORTUNIDADES": "No disponibles",
             "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
             "DIAS_ESTIMADOS_ACCION": dias_estimados_accion # Nuevo campo
+            "NOTAS_ULTIMOS_7_DIAS": notas_historicas  # ✅ Nuevo campo para el gráfico
         }
         return datos
     except Exception as e:
@@ -434,6 +437,8 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 ---
 <h1>{titulo_post}</h1>
 
+{grafico_html}
+
 
 <h2>Análisis Inicial y Recomendación</h2>
 <p>En el dinámico mercado actual, <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> está enviando señales claras de un potencial giro. ¿Es este el momento ideal para considerar una entrada o salida? Mi análisis técnico apunta a que sí, con una oportunidad {('de compra inminente y un rebote en el horizonte' if data['NOTA_EMPRESA'] >= 7 else 'de venta potencial o de esperar una corrección')}.</p>
@@ -462,6 +467,45 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 <p>{volumen_analisis_text}</p>
 
 <p>Basado en nuestro análisis, una posible estrategia de entrada sería considerar una compra cerca {f"del soporte de <strong>{soportes_unicos[0]:,.2f}€</strong>" if len(soportes_unicos) > 0 else ""} o, idealmente, en {f"los <strong>{soportes_unicos[1]:,.2f}€</strong>." if len(soportes_unicos) > 1 else "."} Estos niveles ofrecen una relación riesgo/recompensa atractiva, permitiendo una entrada con mayor margen de seguridad. Para gestionar el riesgo de forma efectiva, se recomienda establecer un stop loss ajustado justo por debajo del soporte más bajo que hemos identificado, por ejemplo, en {f"<strong>{soportes_unicos[-1]:,.2f}€</strong>." if len(soportes_unicos) > 0 else "un nivel apropiado de invalidación."} Este punto actuaría como un nivel de invalidez de nuestra tesis de inversión. Nuestro objetivo de beneficio (Take Profit) a corto plazo se sitúa en la resistencia clave de <strong>{data['RESISTENCIA']:,}€</strong>, lo que representa un potencial de revalorización significativo. Esta configuración de entrada, stop loss y objetivo permite una relación riesgo/recompensa favorable para el inversor, buscando maximizar el beneficio mientras se protege el capital.</p>
+
+# Sección: Evolución de la Empresa
+grafico_labels = [f"Día {i+1}" for i in range(len(data["NOTAS_ULTIMOS_7_DIAS"]))]
+grafico_datos = data["NOTAS_ULTIMOS_7_DIAS"]
+
+grafico_html = f"""
+<h2>Evolución de la Empresa</h2>
+<canvas id="graficoNotas" width="400" height="200"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('graficoNotas').getContext('2d');
+    new Chart(ctx, {{
+        type: 'bar',
+        data: {{
+            labels: {grafico_labels},
+            datasets: [{{
+                label: 'Nota Técnica (0-10)',
+                data: {grafico_datos},
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }}]
+        }},
+        options: {{
+            scales: {{
+                y: {{
+                    beginAtZero: true,
+                    max: 10
+                }}
+            }}
+        }}
+    }});
+</script>
+<p>La evolución técnica de <strong>{data['NOMBRE_EMPRESA']}</strong> en los últimos días ha mostrado {('una mejora constante' if grafico_datos[-1] > grafico_datos[0] else 'una caída progresiva' if grafico_datos[-1] < grafico_datos[0] else 'una estabilidad relativa')}, lo que puede indicar {('una creciente confianza técnica por parte del mercado' if grafico_datos[-1] > grafico_datos[0] else 'una pérdida de impulso técnico que podría requerir precaución' if grafico_datos[-1] < grafico_datos[0] else 'una fase de consolidación en su comportamiento técnico')}. 
+Durante los últimos 7 días, las notas técnicas han oscilado entre <strong>{min(grafico_datos)}</strong> y <strong>{max(grafico_datos)}</strong>. Esta información visual permite evaluar la tendencia con mayor claridad y detectar posibles puntos de inflexión. 
+El comportamiento técnico es clave para anticipar movimientos del mercado, y la consistencia (o falta de ella) en las últimas sesiones puede revelar señales valiosas para decisiones estratégicas. 
+A medida que esta evolución continúa, es importante vigilar si se mantiene el impulso, se estanca o se revierte, ya que esto podría modificar sustancialmente la estrategia de entrada o salida a corto plazo.
+</p>
+"""
 
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
