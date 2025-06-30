@@ -283,8 +283,7 @@ def obtener_datos_yfinance(ticker):
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
             "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
-            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion, # Nuevo campo
-            "smi_historico_ultimos7": [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_full.tail(7).tolist()]
+            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion # Nuevo campo
         }
         return datos
     except Exception as e:
@@ -477,45 +476,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
 <p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
-
-prompt += f"""
-<h2>Evolución de la Nota Técnica (Últimos 7 días)</h2>
-<canvas id='graficoNotas' width='400' height='200'></canvas>
-<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
-<script>
-window.addEventListener('DOMContentLoaded', function () {{
-    const ctx = document.getElementById('graficoNotas').getContext('2d');
-    const graficoNotas = new Chart(ctx, {{
-        type: 'bar',
-        data: {{
-            labels: ['Hace 6 días', 'Hace 5 días', 'Hace 4 días', 'Hace 3 días', 'Hace 2 días', 'Ayer', 'Hoy'],
-            datasets: [{{
-                label: 'Nota Técnica',
-                data: {json.dumps(data['smi_historico_ultimos7'])},
-                backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
-            }}]
-        }},
-        options: {{
-            scales: {{
-                y: {{
-                    beginAtZero: true,
-                    max: 10
-                }}
-            }}
-        }}
-    }});
-}});
-</script>
-<p>La evolución técnica de los últimos siete días muestra una tendencia <strong>{'ascendente' if data['TENDENCIA_NOTA'] == 'mejorando' else 'descendente' if data['TENDENCIA_NOTA'] == 'empeorando' else 'estable'}</strong>. Esta dinámica permite evaluar la dirección y fuerza del impulso técnico de la acción. Cuando las notas mejoran, suele interpretarse como un incremento del interés comprador, mientras que una caída sugiere una pérdida de fuerza en el mercado. Visualizar esta progresión ayuda a anticipar posibles giros y consolidaciones, y ofrece un recurso adicional para tomar decisiones estratégicas con mayor fundamento técnico.</p>
-"""
-
 {tabla_resumen}
-
-
-
-
 <p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. La inversión en mercados financieros conlleva riesgos, incluyendo la pérdida total del capital invertido. Se recomienda encarecidamente a cada inversor realizar su propia investigación exhaustiva (due diligence), consultar con un asesor financiero cualificado y analizar cada decisión de forma individual, teniendo en cuenta su perfil de riesgo personal, sus objetivos financieros y su situación económica antes de tomar cualquier decisión de inversión. El rendimiento pasado no es indicativo de resultados futuros.</p>
 
 <h3>¿Qué analizaremos mañana? ¡No te lo pierdas!</h3>
