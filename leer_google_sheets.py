@@ -472,7 +472,7 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 grafico_labels = [f"Día {i+1}" for i in range(len(data["NOTAS_ULTIMOS_7_DIAS"]))]
 grafico_datos = data["NOTAS_ULTIMOS_7_DIAS"]
 
-grafico_html = f"""
+    grafico_html = f"""
 <h2>Evolución de la Empresa</h2>
 <canvas id="graficoNotas" width="400" height="200"></canvas>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
