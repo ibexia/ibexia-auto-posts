@@ -482,6 +482,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 <canvas id="graficoNotas" width="400" height="200"></canvas>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+document.addEventListener("DOMContentLoaded", function () {
     const ctx = document.getElementById('graficoNotas').getContext('2d');
     const graficoNotas = new Chart(ctx, {
         type: 'bar',
@@ -496,6 +497,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
             }]
         },
         options: {
+            responsive: true,
             scales: {
                 y: {
                     beginAtZero: true,
@@ -504,11 +506,13 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
             }
         }
     });
+});
 </script>
 
-<p>En los últimos siete días, la nota técnica de la empresa ha mostrado una <strong>evolución {('ascendente' if data['TENDENCIA_NOTA'] == 'mejorando' else 'descendente' if data['TENDENCIA_NOTA'] == 'empeorando' else 'estable')}</strong>. Esta tendencia indica que los indicadores técnicos han reaccionado a factores clave del mercado, mostrando una variación que debe ser tenida en cuenta. Un patrón creciente suele anticipar movimientos positivos, mientras que una caída puede advertir sobre una pérdida de impulso. Este comportamiento se refleja claramente en el gráfico, permitiendo visualizar si la acción está consolidando, recuperándose o debilitándose. Es vital integrar esta evolución diaria en la toma de decisiones estratégicas a corto plazo.</p>
+<p>En los últimos siete días, la nota técnica de la empresa ha mostrado una <strong>evolución """ + ("ascendente" if data["TENDENCIA_NOTA"] == "mejorando" else "descendente" if data["TENDENCIA_NOTA"] == "empeorando" else "estable") + """</strong>. Esta tendencia indica que los indicadores técnicos han reaccionado a factores clave del mercado, mostrando una variación que debe ser tenida en cuenta. Un patrón creciente suele anticipar movimientos positivos, mientras que una caída puede advertir sobre una pérdida de impulso. Este comportamiento se refleja claramente en el gráfico, permitiendo visualizar si la acción está consolidando, recuperándose o debilitándose. Es vital integrar esta evolución diaria en la toma de decisiones estratégicas a corto plazo.</p>
 
-{tabla_resumen}
+""" + tabla_resumen + """
+
 
 <p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. La inversión en mercados financieros conlleva riesgos, incluyendo la pérdida total del capital invertido. Se recomienda encarecidamente a cada inversor realizar su propia investigación exhaustiva (due diligence), consultar con un asesor financiero cualificado y analizar cada decisión de forma individual, teniendo en cuenta su perfil de riesgo personal, sus objetivos financieros y su situación económica antes de tomar cualquier decisión de inversión. El rendimiento pasado no es indicativo de resultados futuros.</p>
 
