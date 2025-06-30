@@ -201,19 +201,22 @@ def obtener_datos_yfinance(ticker):
 
         # --- Lógica para la tendencia y días estimados ---
         smi_history_full = hist['SMI_signal'].dropna()
-        smi_history_last_5 = smi_history_full.tail(5).tolist() # Últimos 5 valores de SMI_signal
+        smi_history_last_7 = smi_history_full.tail(7).tolist() # Últimos 7 valores de SMI_signal
+        
+        # Calcular las últimas 7 notas de la empresa
+        notas_historicas_ultimos_7_dias = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_7]
         
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
 
-        if len(smi_history_last_5) >= 2:
+        if len(smi_history_last_7) >= 2: # Cambiado de 5 a 2 para asegurar que haya al menos 2 puntos para tendencia
             # Calcular la tendencia
-            notas_historicas_last_5 = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5]
-
-            if len(notas_historicas_last_5) >= 2:
+            # notas_historicas_last_5 = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5] # Esta línea ya no es necesaria con el cambio de nombre de la variable
+            
+            if len(notas_historicas_ultimos_7_dias) >= 2: # Asegurarse de que hay al menos 2 puntos para la regresión
                 # Usar una regresión lineal simple para una estimación más robusta de la tendencia
-                x = np.arange(len(notas_historicas_last_5))
-                y = np.array(notas_historicas_last_5)
+                x = np.arange(len(notas_historicas_ultimos_7_dias))
+                y = np.array(notas_historicas_ultimos_7_dias)
                 # Solo si hay suficiente variación para calcular una pendiente significativa
                 if len(x) > 1 and np.std(y) > 0.01:
                     slope, intercept = np.polyfit(x, y, 1)
@@ -283,7 +286,8 @@ def obtener_datos_yfinance(ticker):
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
             "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
-            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion # Nuevo campo
+            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion, # Nuevo campo
+            "NOTAS_HISTORICAS_7_DIAS": notas_historicas_ultimos_7_dias # NUEVO CAMPO
         }
         return datos
     except Exception as e:
@@ -299,7 +303,106 @@ def formatear_numero(valor):
         
 def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']}"
+    
+       # NUEVO: Obtener las notas históricas para el gráfico
+    notas_historicas = data.get('NOTAS_HISTORICAS_7_DIAS', [])
+    # Ajustar para asegurar que siempre haya 7 elementos, rellenando con el último valor si hay menos
+    if len(notas_historicas) < 7 and notas_historicas:
+        notas_historicas = [notas_historicas[0]] * (7 - len(notas_historicas)) + notas_historicas
+    elif not notas_historicas:
+        notas_historicas = [0.0] * 7 # Si no hay datos, rellenar con ceros
+    notas_historicas = notas_historicas[-7:] # Asegurarse de que sean solo las últimas 7
+    
+    # ... (el resto de tu código para soportes_unicos y tabla_resumen) ...
 
+    # COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
+    chart_html = ""
+    if notas_historicas:
+        # Generar etiquetas para los últimos 7 días (Hoy, Ayer, -2, -3, etc.)
+        labels = [f"Día -{i}" for i in range(6, -1, -1)]
+        labels[6] = "Hoy" # Último día es "Hoy"
+        labels[5] = "Ayer" # Penúltimo día es "Ayer"
+        
+        # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
+        notas_historicas_display = notas_historicas
+
+        chart_html = f"""
+<h2>Evolución de la Nota Técnica</h2>
+<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, he preparado un gráfico que muestra los valores de los últimos siete días. Esto nos permite identificar tendencias recientes y el momentum actual de la empresa.</p>
+<div style="width: 80%; margin: auto;">
+    <canvas id="notasChart"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {{
+        var ctx = document.getElementById('notasChart').getContext('2d');
+        var notasChart = new Chart(ctx, {{
+            type: 'bar',
+            data: {{
+                labels: {json.dumps(labels)},
+                datasets: [{{
+                    label: 'Nota Técnica',
+                    data: {json.dumps(notas_historicas_display)},
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.5)', // Rojo para valores bajos
+                        'rgba(255, 159, 64, 0.5)',
+                        'rgba(255, 205, 86, 0.5)',
+                        'rgba(75, 192, 192, 0.5)',
+                        'rgba(54, 162, 235, 0.5)',
+                        'rgba(153, 102, 255, 0.5)',
+                        'rgba(0, 128, 0, 0.5)'  // Verde para valores altos
+                    ],
+                    borderColor: [
+                        'rgb(255, 99, 132)',
+                        'rgb(255, 159, 64)',
+                        'rgb(255, 205, 86)',
+                        'rgb(75, 192, 192)',
+                        'rgb(54, 162, 235)',
+                        'rgb(153, 102, 255)',
+                        'rgb(0, 128, 0)'
+                    ],
+                    borderWidth: 1
+                }}]
+            }},
+            options: {{
+                scales: {{
+                    y: {{
+                        beginAtZero: true,
+                        max: 10,
+                        title: {{
+                            display: true,
+                            text: 'Nota (0-10)'
+                        }}
+                    }},
+                    x: {{
+                        title: {{
+                            display: true,
+                            text: 'Días'
+                        }}
+                    }}
+                }},
+                plugins: {{
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(context) {{
+                                return context.dataset.label + ': ' + context.parsed.y.toFixed(1);
+                            }}
+                        }}
+                    }},
+                    legend: {{
+                        display: false
+                    }}
+                }},
+                responsive: true,
+                maintainAspectRatio: false
+            }}
+        }});
+    }});
+</script>
+<br/>
+"""
+    
     # Pre-procesamiento de soportes para agruparlos si son muy cercanos
     soportes_unicos = []
     temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
@@ -473,7 +576,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 <p>{data['EXPANSION_PLANES'] if data['EXPANSION_PLANES'] != 'N/A' and 'no disponible' not in data['EXPANSION_PLANES'].lower() else f"Aunque la información específica sobre planes de expansión no está detallada en este momento, es crucial para <strong>{data['NOMBRE_EMPRESA']}</strong> delinear una estrategia clara de crecimiento. La capacidad de la empresa para innovar, expandir su cuota de mercado o diversificar sus operaciones será determinante para su valor a largo plazo y para mantener la competitividad en su sector. Estoy monitoreando cualquier anuncio futuro que pueda dar luz sobre estas iniciativas."} {data['ACUERDOS'] if data['ACUERDOS'] != 'No disponibles' and 'no disponible' not in data['ACUERDOS'].lower() else f"Respecto a posibles acuerdos estratégicos o colaboraciones, la información actual es limitada. Sin embargo, en el sector de <strong>{data['NOMBRE_EMPRESA']}</strong>, las alianzas y asociaciones son a menudo catalizadores clave para la expansión y la optimización de recursos, lo que podría impactar positivamente su perfil de crecimiento futuro."}</p>
 
 <p>Considerando la información financiera disponible, <strong>{data['NOMBRE_EMPRESA']}</strong> {f"muestra unos ingresos sólidos de <strong>{formatear_numero(data['INGRESOS'])}</strong>, lo que sugiere una base de operaciones robusta. Su EBITDA de <strong>{formatear_numero(data['EBITDA'])}</strong> indica una buena capacidad para generar ganancias antes de intereses, impuestos, depreciaciones y amortizaciones, lo cual es un indicador de eficiencia operativa. Los beneficios de <strong>{formatear_numero(data['BENEFICIOS'])}</strong>, aunque importantes, deben evaluarse en el contexto de la deuda de <strong>{formatear_numero(data['DEUDA'])}</strong> y el flujo de caja de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>. Un flujo de caja positivo es vital para la sostenibilidad y la capacidad de la empresa para invertir en su futuro y afrontar sus obligaciones financieras. Si bien la deuda es una métrica a observar, un flujo de caja saludable puede mitigar los riesgos asociados, sugiriendo que la empresa tiene la capacidad de generar liquidez para soportar sus operaciones y posibles expansiones. Mi interpretación es que la empresa presenta una situación financiera que, si bien tiene aspectos a monitorear como la deuda, se sustenta en una generación de ingresos y un EBITDA consistentes, lo que le confiere una base para un crecimiento potencial sostenido a largo plazo." if data['INGRESOS'] != 'N/A' else "carece de datos financieros recientes para una evaluación fundamental completa. En general, para cualquier empresa, la solidez financiera es la base de un crecimiento sostenible. Ingresos consistentes, un EBITDA saludable y beneficios positivos son señales de un negocio bien gestionado. Un nivel de deuda manejable y un flujo de caja libre positivo son indicadores críticos de la solvencia y capacidad de la empresa para generar valor a largo plazo. La ausencia de estos datos fundamentales impide una predicción sólida a largo plazo, por lo que recomiendo una investigación adicional exhaustiva de sus estados financieros antes de cualquier decisión de inversión a largo plazo."}</p>
-
+{chart_html}
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
 <p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
 {tabla_resumen}
