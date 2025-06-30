@@ -255,19 +255,7 @@ def obtener_datos_yfinance(ticker):
                     else:
                         dias_estimados_accion = "Tendencia muy lenta hacia compra"
         # --- Fin de la lógica para la tendencia y días estimados ---
-        # --- NUEVA LÓGICA PARA OBTENER LAS ÚLTIMAS 7 NOTAS Y FECHAS ---
-        # Asegurarse de tener suficientes datos históricos para el gráfico
-        # Si el periodo de history es "60d", tendremos al menos 7 días.
-        smi_history_full = hist['SMI_signal'].dropna()
-        # Calcula la nota para cada valor SMI en el historial
-        notas_historicas_completas = pd.Series([round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_full])
 
-        # Obtener las últimas 7 notas
-        last_7_notes = notas_historicas_completas.tail(7).tolist()
-        # Obtener las fechas correspondientes (formato DD/MM)
-        last_7_dates = [d.strftime('%d/%m') for d in hist.tail(7).index]
-
-        # --- FIN DE LA NUEVA LÓGICA ---
 
         datos = {
             "TICKER": ticker,
@@ -440,7 +428,6 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 - Tendencia de la nota: {data['TENDENCIA_NOTA']}
 - Días estimados para acción: {data['DIAS_ESTIMADOS_ACCION']}
-- Últimas 7 notas: {data['LAST_7_NOTES']}  <-- PARA ASEGURAR QUE GEMINI LAS TIENE EN CUENTA
 
 Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
 
@@ -475,57 +462,7 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 <p>{volumen_analisis_text}</p>
 
 <p>Basado en nuestro análisis, una posible estrategia de entrada sería considerar una compra cerca {f"del soporte de <strong>{soportes_unicos[0]:,.2f}€</strong>" if len(soportes_unicos) > 0 else ""} o, idealmente, en {f"los <strong>{soportes_unicos[1]:,.2f}€</strong>." if len(soportes_unicos) > 1 else "."} Estos niveles ofrecen una relación riesgo/recompensa atractiva, permitiendo una entrada con mayor margen de seguridad. Para gestionar el riesgo de forma efectiva, se recomienda establecer un stop loss ajustado justo por debajo del soporte más bajo que hemos identificado, por ejemplo, en {f"<strong>{soportes_unicos[-1]:,.2f}€</strong>." if len(soportes_unicos) > 0 else "un nivel apropiado de invalidación."} Este punto actuaría como un nivel de invalidez de nuestra tesis de inversión. Nuestro objetivo de beneficio (Take Profit) a corto plazo se sitúa en la resistencia clave de <strong>{data['RESISTENCIA']:,}€</strong>, lo que representa un potencial de revalorización significativo. Esta configuración de entrada, stop loss y objetivo permite una relación riesgo/recompensa favorable para el inversor, buscando maximizar el beneficio mientras se protege el capital.</p>
-<h2>Evolución Reciente de la Nota Técnica</h2>
-<div style="width: 80%; margin: auto;">
-    <canvas id="notesChart"></canvas>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const labels = {json.dumps(data['LAST_7_DATES'])};
-        const notes = {json.dumps(data['LAST_7_NOTES'])};
 
-        const ctx = document.getElementById('notesChart').getContext('2d');
-        new Chart(ctx, {{
-            type: 'line',
-            data: {{
-                labels: labels,
-                datasets: [{{
-                    label: 'Nota Técnica (0-10)',
-                    data: notes,
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1,
-                    fill: false
-                }}]
-            }},
-            options: {{
-                responsive: true,
-                plugins: {{
-                    title: {{
-                        display: true,
-                        text: 'Historial de Notas Técnicas de {data['NOMBRE_EMPRESA']}'
-                    }}
-                }},
-                scales: {{
-                    y: {{
-                        beginAtZero: true,
-                        max: 10,
-                        title: {{
-                            display: true,
-                            text: 'Nota (0-10)'
-                        }}
-                    }},
-                    x: {{
-                        title: {{
-                            display: true,
-                            text: 'Fecha'
-                        }}
-                    }}
-                }}
-            }}
-        }});
-    });
-</script>
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 <p>En un enfoque a largo plazo, el análisis se vuelve más robusto y se apoya en los fundamentos reales del negocio. Aquí, la evolución de <strong>{data['NOMBRE_EMPRESA']}</strong> dependerá en gran parte de sus cifras estructurales y sus perspectivas estratégicas.</p>
