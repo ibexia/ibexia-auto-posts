@@ -328,8 +328,8 @@ def construir_prompt_formateado(data):
 
         chart_html = f"""
 <h2>Evolución de la Nota Técnica</h2>
-<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, he preparado un gráfico que muestra los valores de los últimos siete días.  . Esto nos permite identificar tendencias recientes y el momentum actual de la empresa.</p>
-<div style="width: 80%; margin: auto; height: 400px;">Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa nuestra valoración técnica sobre el momento actual de una acción. La escala va de 0 (momento óptimo para vender o mantenerse al margen) hasta 10 (máximo interés para una posible entrada). Esta nota resume la fuerza técnica detectada en el gráfico, y permite a los inversores tener una referencia clara y rápida sobre si una acción se encuentra en zona de oportunidad o de precaución. No es una recomendación directa de compra o venta, sino un indicador técnico propio que complementa el análisis profesional.</p>
+<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, he preparado un gráfico que muestra los valores de los últimos siete días.  . Esto nos permite identificar tendencias recientes y el momentum actual de la empresa.Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa nuestra valoración técnica sobre el momento actual de una acción. La escala va de 0 (momento óptimo para vender o mantenerse al margen) hasta 10 (máximo interés para una posible entrada). Esta nota resume la fuerza técnica detectada en el gráfico, y permite a los inversores tener una referencia clara y rápida sobre si una acción se encuentra en zona de oportunidad o de precaución. No es una recomendación directa de compra o venta, sino un indicador técnico propio que complementa el análisis profesional.</p>
+<div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="notasChart"></canvas>
 </div>
 
