@@ -478,40 +478,42 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
 <p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
 
+prompt += f"""
 <h2>Evolución Reciente de la Nota Técnica</h2>
-<canvas id="graficoNotas" width="400" height="200"></canvas>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<canvas id='graficoNotas' width='400' height='200'></canvas>
+<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+window.addEventListener('DOMContentLoaded', function () {{
     const ctx = document.getElementById('graficoNotas').getContext('2d');
-    const graficoNotas = new Chart(ctx, {
+    const graficoNotas = new Chart(ctx, {{
         type: 'bar',
-        data: {
+        data: {{
             labels: ['Hace 6 días', 'Hace 5 días', 'Hace 4 días', 'Hace 3 días', 'Hace 2 días', 'Ayer', 'Hoy'],
-            datasets: [{
+            datasets: [{{
                 label: 'Nota Técnica',
-                data: """ + json.dumps(data['smi_historico_ultimos7']) + """,
+                data: {json.dumps(data['smi_historico_ultimos7'])},
                 backgroundColor: 'rgba(54, 162, 235, 0.6)',
                 borderColor: 'rgba(54, 162, 235, 1)',
                 borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
+            }}]
+        }},
+        options: {{
+            scales: {{
+                y: {{
                     beginAtZero: true,
                     max: 10
-                }
-            }
-        }
-    });
-});
+                }}
+            }}
+        }}
+    }});
+}});
 </script>
 
-<p>En los últimos siete días, la nota técnica de la empresa ha mostrado una <strong>evolución """ + ("ascendente" if data["TENDENCIA_NOTA"] == "mejorando" else "descendente" if data["TENDENCIA_NOTA"] == "empeorando" else "estable") + """</strong>. Esta tendencia indica que los indicadores técnicos han reaccionado a factores clave del mercado, mostrando una variación que debe ser tenida en cuenta. Un patrón creciente suele anticipar movimientos positivos, mientras que una caída puede advertir sobre una pérdida de impulso. Este comportamiento se refleja claramente en el gráfico, permitiendo visualizar si la acción está consolidando, recuperándose o debilitándose. Es vital integrar esta evolución diaria en la toma de decisiones estratégicas a corto plazo.</p>
+<p>En los últimos siete días, la nota técnica de la empresa ha mostrado una <strong>evolución {"ascendente" if data["TENDENCIA_NOTA"] == "mejorando" else "descendente" if data["TENDENCIA_NOTA"] == "empeorando" else "estable"}</strong>. Esta tendencia indica que los indicadores técnicos han reaccionado a factores clave del mercado, mostrando una variación que debe ser tenida en cuenta. Un patrón creciente suele anticipar movimientos positivos, mientras que una caída puede advertir sobre una pérdida de impulso. Este comportamiento se refleja claramente en el gráfico, permitiendo visualizar si la acción está consolidando, recuperándose o debilitándose. Es vital integrar esta evolución diaria en la toma de decisiones estratégicas a corto plazo.</p>
 
-""" + tabla_resumen + """
+{tabla_resumen}
+"""
+
 
 
 <p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. La inversión en mercados financieros conlleva riesgos, incluyendo la pérdida total del capital invertido. Se recomienda encarecidamente a cada inversor realizar su propia investigación exhaustiva (due diligence), consultar con un asesor financiero cualificado y analizar cada decisión de forma individual, teniendo en cuenta su perfil de riesgo personal, sus objetivos financieros y su situación económica antes de tomar cualquier decisión de inversión. El rendimiento pasado no es indicativo de resultados futuros.</p>
