@@ -201,9 +201,8 @@ def obtener_datos_yfinance(ticker):
 
         # --- Lógica para la tendencia y días estimados ---
         smi_history_full = hist['SMI_signal'].dropna()
-        smi_history_last_30 = smi_history_full.tail(30).tolist() # Últimos 7 valores de SMI_signal
-        
-        # Calcular las últimas 7 notas de la empresa
+        smi_history_last_30 = smi_history_full.tail(30).tolist() # Últimos 30 valores de SMI_signal
+        # Calcular las últimas 30 notas de la empresa
         notas_historicas_ultimos_30_dias = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_30]
         
         tendencia_smi = "No disponible"
@@ -305,23 +304,23 @@ def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']}"
     
        # NUEVO: Obtener las notas históricas para el gráfico
-    notas_historicas = data.get('NOTAS_HISTORICAS_30_DIAS', [])
-    # Ajustar para asegurar que siempre haya 7 elementos, rellenando con el último valor si hay menos
-    if len(notas_historicas) < 30 and notas_historicas:
-        notas_historicas = [notas_historicas[0]] * (30 - len(notas_historicas)) + notas_historicas
-    elif not notas_historicas:
-        notas_historicas = [0.0] * 30 # Si no hay datos, rellenar con ceros
-    notas_historicas = notas_historicas[-30:] # Asegurarse de que sean solo las últimas 7
     
+    notas_historicas = data.get('NOTAS_HISTORICAS_30_DIAS', [])
+    # Ajustar para asegurar que siempre haya 30 elementos, rellenando con el último valor si hay menos
+    if len(notas_historicas) < 30 and notas_historicas:
+    notas_historicas = [notas_historicas[0]] * (30 - len(notas_historicas)) + notas_historicas
+    elif not notas_historicas:
+    notas_historicas = [0.0] * 30 # Si no hay datos, rellenar con ceros
+    notas_historicas = notas_historicas[-30:] # Asegurarse de que sean solo las últimas 30
     # ... (el resto de tu código para soportes_unicos y tabla_resumen) ...
 
     # COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
     chart_html = ""
     if notas_historicas:
         # Generar etiquetas para los últimos 7 días (Hoy, Ayer, -2, -3, etc.)
-        labels = [f"Día -{i}" for i in range(30, -1, -1)]
-        labels[30] = "Hoy" # Último día es "Hoy"
-        labels[29] = "Ayer" # Penúltimo día es "Ayer"
+        labels = [f"Día -{i}" for i in range(29, -1, -1)]
+        labels[-1] = "Hoy" # Último día es "Hoy"
+        labels[-2] = "Ayer" # Penúltimo día es "Ayer"
         
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
         notas_historicas_display = notas_historicas
