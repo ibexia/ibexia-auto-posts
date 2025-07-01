@@ -295,6 +295,7 @@ def construir_prompt_formateado(data):
         chart_html = f"""
 <h2>Evolución de la Nota Técnica</h2>
 <p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, he preparado un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa nuestra valoración técnica sobre el momento actual de una acción. La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
+<p>Este gráfico no solo nos permite visualizar la evolución técnica de la acción a lo largo de los últimos 30 días, sino que también incluye la línea del precio de cierre diario. Esta doble representación cumple un doble objetivo: por un lado, proyectar posibles zonas de oportunidad futura; y por otro, dejar constancia clara de nuestras valoraciones y su grado de acierto con el paso del tiempo. Así, no solo anticipamos movimientos, sino que también construimos una trazabilidad transparente de nuestras decisiones técnicas.</p>
 <div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="notasChart"></canvas>
 </div>
