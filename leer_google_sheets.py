@@ -325,12 +325,13 @@ def construir_prompt_formateado(data):
 
         chart_html = f"""
 <h2>Evolución de la Nota Técnica</h2>
-<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, he preparado un gráfico que muestra los valores de los últimos siete días.  . Esto nos permite identificar tendencias recientes y el momentum actual de la empresa.Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa nuestra valoración técnica sobre el momento actual de una acción. La escala va de 0 (momento óptimo para vender o mantenerse al margen) hasta 10 (máximo interés para una posible entrada). Esta nota resume la fuerza técnica detectada en el gráfico, y permite a los inversores tener una referencia clara y rápida sobre si una acción se encuentra en zona de oportunidad o de precaución. No es una recomendación directa de compra o venta, sino un indicador técnico propio que complementa el análisis profesional.</p>
+<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, he preparado un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa nuestra valoración técnica sobre el momento actual de una acción. La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
 <div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="notasChart"></canvas>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
         var ctx = document.getElementById('notasChart').getContext('2d');
@@ -341,28 +342,68 @@ def construir_prompt_formateado(data):
                 datasets: [{{
                     label: 'Nota Técnica',
                     data: {json.dumps(notas_historicas_display)},
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.5)', // Rojo para valores bajos
-                        'rgba(255, 159, 64, 0.5)',
-                        'rgba(255, 205, 86, 0.5)',
-                        'rgba(75, 192, 192, 0.5)',
-                        'rgba(54, 162, 235, 0.5)',
-                        'rgba(153, 102, 255, 0.5)',
-                        'rgba(0, 128, 0, 0.5)'  // Verde para valores altos
-                    ],
-                    borderColor: [
-                        'rgb(255, 99, 132)',
-                        'rgb(255, 159, 64)',
-                        'rgb(255, 205, 86)',
-                        'rgb(75, 192, 192)',
-                        'rgb(54, 162, 235)',
-                        'rgb(153, 102, 255)',
-                        'rgb(0, 128, 0)'
-                    ],
+                    backgroundColor: 'rgba(0, 128, 255, 0.4)',
+                    borderColor: 'rgba(0, 128, 255, 1)',
                     borderWidth: 1
                 }}]
             }},
             options: {{
+                plugins: {{
+                    annotation: {{
+                        annotations: {{
+                            zonaVerde: {{
+                                type: 'box',
+                                yMin: 8,
+                                yMax: 10,
+                                backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                                borderWidth: 0
+                            }},
+                            zonaRoja: {{
+                                type: 'box',
+                                yMin: 0,
+                                yMax: 2,
+                                backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                                borderWidth: 0
+                            }},
+                            lineaCompra: {{
+                                type: 'line',
+                                yMin: 8,
+                                yMax: 8,
+                                borderColor: 'rgba(0, 200, 0, 1)',
+                                borderWidth: 2,
+                                label: {{
+                                    enabled: true,
+                                    content: 'Zona de Compra (8)',
+                                    position: 'end',
+                                    backgroundColor: 'rgba(0, 200, 0, 0.8)'
+                                }}
+                            }},
+                            lineaVenta: {{
+                                type: 'line',
+                                yMin: 2,
+                                yMax: 2,
+                                borderColor: 'rgba(200, 0, 0, 1)',
+                                borderWidth: 2,
+                                label: {{
+                                    enabled: true,
+                                    content: 'Zona de Venta (2)',
+                                    position: 'end',
+                                    backgroundColor: 'rgba(200, 0, 0, 0.8)'
+                                }}
+                            }}
+                        }}
+                    }},
+                    legend: {{
+                        display: false
+                    }},
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(context) {{
+                                return context.dataset.label + ': ' + context.parsed.y.toFixed(1);
+                            }}
+                        }}
+                    }}
+                }},
                 scales: {{
                     y: {{
                         beginAtZero: true,
@@ -379,18 +420,6 @@ def construir_prompt_formateado(data):
                         }}
                     }}
                 }},
-                plugins: {{
-                    tooltip: {{
-                        callbacks: {{
-                            label: function(context) {{
-                                return context.dataset.label + ': ' + context.parsed.y.toFixed(1);
-                            }}
-                        }}
-                    }},
-                    legend: {{
-                        display: false
-                    }}
-                }},
                 responsive: true,
                 maintainAspectRatio: false
             }}
@@ -399,6 +428,7 @@ def construir_prompt_formateado(data):
 </script>
 <br/>
 """
+
     
     # Pre-procesamiento de soportes para agruparlos si son muy cercanos
     soportes_unicos = []
