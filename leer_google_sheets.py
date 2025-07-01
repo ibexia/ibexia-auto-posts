@@ -134,23 +134,21 @@ def obtener_datos_yfinance(ticker):
         stock = yf.Ticker(ticker)
         info = stock.info
         hist = stock.history(period="60d", interval="1d")
-        
+
         hist = calculate_smi_tv(hist)
-        
+
         smi_actual = round(hist['SMI_signal'].iloc[-1], 2)
         current_price = round(info["currentPrice"], 2)
         current_volume = info.get("volume", 0)
 
         soportes = find_significant_supports(hist, current_price)
-        soporte_1 = soportes[0]
-        soporte_2 = soportes[1]
-        soporte_3 = soportes[2]
+        soporte_1, soporte_2, soporte_3 = soportes
 
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
         if nota_empresa <= 2:
             recomendacion = "Vender"
-            condicion_rsi = "muy sobrecomprado" # Se mantiene el texto de "RSI" pero se interpreta como estado técnico
+            condicion_rsi = "muy sobrecomprado"
         elif 2 < nota_empresa <= 4:
             recomendacion = "Vigilar posible venta"
             condicion_rsi = "algo sobrecomprado"
@@ -176,97 +174,53 @@ def obtener_datos_yfinance(ticker):
             recomendacion = "Indefinido"
             condicion_rsi = "desconocido"
 
-        precio_objetivo_compra = 0.0
-        
         if nota_empresa >= 7:
             precio_objetivo_compra = soporte_1
         else:
             drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
             precio_objetivo_compra = soporte_1 * (1 - drop_percentage_from_base)
-            
+
         precio_objetivo_compra = round(precio_objetivo_compra, 2)
 
-        # --- Aplicar traducción a los campos relevantes aquí ---
-        expansion_planes_translated = info.get("longBusinessSummary", "N/A")
-        expansion_planes_translated = "Información de planes de expansión no disponible o no traducible en este momento."
-
-        acuerdos_translated = info.get("agreements", "No disponibles")
-        acuerdos_translated = "Información sobre acuerdos no disponible o no traducible en este momento."
-
-        sentimiento_analistas_translated = info.get("recommendationKey", "N/A")
-        sentimiento_analistas_translated = "Sentimiento de analistas no disponible o no traducible."
-
-        
-        # --- Fin de la traducción ---
-
-        # --- Lógica para la tendencia y días estimados ---
-        smi_history_full = hist['SMI_signal'].dropna()
-        smi_history_last_30 = smi_history_full.tail(30).tolist()  # Últimos 30 valores de SMI_signal
-        
-        # Calcular las últimas 7 notas de la empresa
+        smi_history_last_30 = hist['SMI_signal'].dropna().tail(30).tolist()
         notas_historicas_ultimos_30_dias = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_30]
-        cierres_ultimos_30_dias = hist['Close'].dropna().tail(30).tolist()
-        datos["CIERRES_30_DIAS"] = [round(float(c), 2) for c in cierres_ultimos_30_dias]
 
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
 
-        if len(smi_history_last_30) >= 2: # Cambiado de 5 a 2 para asegurar que haya al menos 2 puntos para tendencia
-            # Calcular la tendencia
-            # notas_historicas_last_5 = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5] # Esta línea ya no es necesaria con el cambio de nombre de la variable
-            
-            if len(notas_historicas_ultimos_30_dias) >= 2: # Asegurarse de que hay al menos 2 puntos para la regresión
-                # Usar una regresión lineal simple para una estimación más robusta de la tendencia
-                x = np.arange(len(notas_historicas_ultimos_30_dias))
-                y = np.array(notas_historicas_ultimos_30_dias)
-                # Solo si hay suficiente variación para calcular una pendiente significativa
-                if len(x) > 1 and np.std(y) > 0.01:
-                    slope, intercept = np.polyfit(x, y, 1)
-                    tendencia_promedio_diaria = slope
-                else: # Si los valores son casi constantes
-                    tendencia_promedio_diaria = 0.0
-                
-                if tendencia_promedio_diaria > 0.1: # umbral pequeño para considerar "mejorando"
-                    tendencia_smi = "mejorando"
-                elif tendencia_promedio_diaria < -0.1: # umbral pequeño para considerar "empeorando"
-                    tendencia_smi = "empeorando"
-                else:
-                    tendencia_smi = "estable"
+        if len(notas_historicas_ultimos_30_dias) >= 2:
+            x = np.arange(len(notas_historicas_ultimos_30_dias))
+            y = np.array(notas_historicas_ultimos_30_dias)
+            if np.std(y) > 0.01:
+                slope, intercept = np.polyfit(x, y, 1)
+            else:
+                slope = 0.0
 
-                # Estimar días para acción
-                target_nota_vender = 2.0
-                target_nota_comprar = 8.0
+            if slope > 0.1:
+                tendencia_smi = "mejorando"
+            elif slope < -0.1:
+                tendencia_smi = "empeorando"
+            else:
+                tendencia_smi = "estable"
 
-                if nota_empresa <= target_nota_vender:
-                    dias_estimados_accion = "Ya en zona de posible venta"
-                elif nota_empresa >= target_nota_comprar:
-                    dias_estimados_accion = "Ya en zona de posible compra"
-                elif tendencia_smi == "estable" or abs(tendencia_promedio_diaria) < 0.01:
-                    dias_estimados_accion = "Tendencia estable, sin acción inmediata clara"
-                elif tendencia_promedio_diaria < 0: # Nota está bajando, hacia venta
-                    diferencia_necesaria = nota_empresa - target_nota_vender
-                    # Evitar división por cero
-                    if abs(tendencia_promedio_diaria) > 0.01: 
-                        dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
-                        dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de venta"
-                    else:
-                        dias_estimados_accion = "Tendencia muy lenta hacia venta"
-                elif tendencia_promedio_diaria > 0: # Nota está subiendo, hacia compra (o recuperándose de sobreventa)
-                    diferencia_necesaria = target_nota_comprar - nota_empresa
-                    # Evitar división por cero
-                    if abs(tendencia_promedio_diaria) > 0.01:
-                        dias = diferencia_necesaria / abs(tendencia_promedio_diaria)
-                        dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de compra"
-                    else:
-                        dias_estimados_accion = "Tendencia muy lenta hacia compra"
-        # --- Fin de la lógica para la tendencia y días estimados ---
-
+            if nota_empresa <= 2:
+                dias_estimados_accion = "Ya en zona de posible venta"
+            elif nota_empresa >= 8:
+                dias_estimados_accion = "Ya en zona de posible compra"
+            elif abs(slope) < 0.01:
+                dias_estimados_accion = "Tendencia estable, sin acción inmediata clara"
+            elif slope < 0:
+                dias = (nota_empresa - 2.0) / abs(slope)
+                dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de venta"
+            elif slope > 0:
+                dias = (8.0 - nota_empresa) / abs(slope)
+                dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de compra"
 
         datos = {
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
-            "VOLUMEN": current_volume,  
+            "VOLUMEN": current_volume,
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
@@ -281,21 +235,27 @@ def obtener_datos_yfinance(ticker):
             "BENEFICIOS": info.get("grossProfits", "N/A"),
             "DEUDA": info.get("totalDebt", "N/A"),
             "FLUJO_CAJA": info.get("freeCashflow", "N/A"),
-            "EXPANSION_PLANES": expansion_planes_translated,
-            "ACUERDOS": acuerdos_translated,
-            "SENTIMIENTO_ANALISTAS": sentimiento_analistas_translated,
+            "EXPANSION_PLANES": "Información de planes de expansión no disponible o no traducible en este momento.",
+            "ACUERDOS": "Información sobre acuerdos no disponible o no traducible en este momento.",
+            "SENTIMIENTO_ANALISTAS": "Sentimiento de analistas no disponible o no traducible.",
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
-            "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
-            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion, # Nuevo campo
+            "TENDENCIA_NOTA": tendencia_smi,
+            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion,
             "NOTAS_HISTORICAS_30_DIAS": notas_historicas_ultimos_30_dias
-            
         }
+
+        # 🔴 Esta parte debe ir aquí, después de crear 'datos'
+        cierres_ultimos_30_dias = hist['Close'].dropna().tail(30).tolist()
+        datos["CIERRES_30_DIAS"] = [round(float(c), 2) for c in cierres_ultimos_30_dias]
+
         return datos
+
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
+
 
 def formatear_numero(valor):
     try:
