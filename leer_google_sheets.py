@@ -209,7 +209,7 @@ def obtener_datos_yfinance(ticker):
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
 
-        if len(smi_history_last_7) >= 2: # Cambiado de 5 a 2 para asegurar que haya al menos 2 puntos para tendencia
+        if len(smi_history_last_30) >= 2: # Cambiado de 5 a 2 para asegurar que haya al menos 2 puntos para tendencia
             # Calcular la tendencia
             # notas_historicas_last_5 = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5] # Esta línea ya no es necesaria con el cambio de nombre de la variable
             
@@ -307,10 +307,10 @@ def construir_prompt_formateado(data):
        # NUEVO: Obtener las notas históricas para el gráfico
     notas_historicas = data.get('NOTAS_HISTORICAS_30_DIAS', [])
     # Ajustar para asegurar que siempre haya 7 elementos, rellenando con el último valor si hay menos
-    if len(notas_historicas) < 7 and notas_historicas:
-        notas_historicas = [notas_historicas[0]] * (7 - len(notas_historicas)) + notas_historicas
+    if len(notas_historicas) < 30 and notas_historicas:
+        notas_historicas = [notas_historicas[0]] * (30 - len(notas_historicas)) + notas_historicas
     elif not notas_historicas:
-        notas_historicas = [0.0] * 7 # Si no hay datos, rellenar con ceros
+        notas_historicas = [0.0] * 30 # Si no hay datos, rellenar con ceros
     
     
     # ... (el resto de tu código para soportes_unicos y tabla_resumen) ...
@@ -378,7 +378,7 @@ def construir_prompt_formateado(data):
                     x: {{
                         title: {{
                             display: true,
-                            text: 'Últimos 7 Días (ibexia.es)'
+                            text: 'Últimos 30 Días (ibexia.es)'
                         }}
                     }}
                 }},
