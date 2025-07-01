@@ -205,7 +205,9 @@ def obtener_datos_yfinance(ticker):
         
         # Calcular las últimas 7 notas de la empresa
         notas_historicas_ultimos_30_dias = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_30]
-        
+        cierres_ultimos_30_dias = hist['Close'].dropna().tail(30).tolist()
+        datos["CIERRES_30_DIAS"] = [round(float(c), 2) for c in cierres_ultimos_30_dias]
+
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
 
@@ -288,6 +290,7 @@ def obtener_datos_yfinance(ticker):
             "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
             "DIAS_ESTIMADOS_ACCION": dias_estimados_accion, # Nuevo campo
             "NOTAS_HISTORICAS_30_DIAS": notas_historicas_ultimos_30_dias
+            
         }
         return datos
     except Exception as e:
@@ -306,6 +309,12 @@ def construir_prompt_formateado(data):
     
        # NUEVO: Obtener las notas históricas para el gráfico
     notas_historicas = data.get('NOTAS_HISTORICAS_30_DIAS', [])
+    cierres_historicos = data.get('CIERRES_30_DIAS', [])
+    if len(cierres_historicos) < 30 and cierres_historicos:
+        cierres_historicos = [cierres_historicos[0]] * (30 - len(cierres_historicos)) + cierres_historicos
+    elif not cierres_historicos:
+        cierres_historicos = [0.0] * 30
+
     # Ajustar para asegurar que siempre haya 7 elementos, rellenando con el último valor si hay menos
     if len(notas_historicas) < 30 and notas_historicas:
         notas_historicas = [notas_historicas[0]] * (30 - len(notas_historicas)) + notas_historicas
@@ -339,13 +348,26 @@ def construir_prompt_formateado(data):
             type: 'bar',
             data: {{
                 labels: {json.dumps(labels)},
-                datasets: [{{
-                    label: 'Nota Técnica',
-                    data: {json.dumps(notas_historicas_display)},
-                    backgroundColor: 'rgba(0, 128, 255, 0.4)',
-                    borderColor: 'rgba(0, 128, 255, 1)',
-                    borderWidth: 1
-                }}]
+                datasets: [
+                    {{
+                        label: 'Nota Técnica',
+                        data: {json.dumps(notas_historicas_display)},
+                        backgroundColor: 'rgba(0, 128, 255, 0.4)',
+                        borderColor: 'rgba(0, 128, 255, 1)',
+                        borderWidth: 1,
+                        type: 'bar',
+                        yAxisID: 'y'
+                    }},
+                    {{
+                        label: 'Precio de Cierre',
+                        data: {json.dumps(cierres_historicos)},
+                        type: 'line',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2,
+                        fill: false,
+                        yAxisID: 'y1'
+                    }}
+                ]
             }},
             options: {{
                 plugins: {{
@@ -394,12 +416,19 @@ def construir_prompt_formateado(data):
                         }}
                     }},
                     legend: {{
-                        display: false
+                        display: true
                     }},
                     tooltip: {{
+                        mode: 'index',
+                        intersect: false,
                         callbacks: {{
                             label: function(context) {{
-                                return context.dataset.label + ': ' + context.parsed.y.toFixed(1);
+                                let label = context.dataset.label || '';
+                                if (label) {{
+                                    label += ': ';
+                                }}
+                                label += context.parsed.y.toFixed(2);
+                                return label;
                             }}
                         }}
                     }}
@@ -410,7 +439,18 @@ def construir_prompt_formateado(data):
                         max: 10,
                         title: {{
                             display: true,
-                            text: 'Nota (0-10)'
+                            text: 'Nota Técnica (0-10)'
+                        }}
+                    }},
+                    y1: {{
+                        position: 'right',
+                        beginAtZero: false,
+                        title: {{
+                            display: true,
+                            text: 'Precio de Cierre (€)'
+                        }},
+                        grid: {{
+                            drawOnChartArea: false
                         }}
                     }},
                     x: {{
