@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 import time
@@ -318,8 +318,7 @@ def construir_prompt_formateado(data):
     # COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
     chart_html = ""
     if notas_historicas:
-    from datetime import datetime, timedelta
-    labels = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
+        labels = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
         
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
         notas_historicas_display = notas_historicas
