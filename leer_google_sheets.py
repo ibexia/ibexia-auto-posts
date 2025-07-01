@@ -318,10 +318,8 @@ def construir_prompt_formateado(data):
     # COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
     chart_html = ""
     if notas_historicas:
-        # Generar etiquetas para los últimos 7 días (Hoy, Ayer, -2, -3, etc.)
-        labels = [f"Día -{i}" for i in range(29, -1, -1)]
-        labels[-1] = "Hoy"
-        labels[-2] = "Ayer"
+    from datetime import datetime, timedelta
+    labels = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
         
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
         notas_historicas_display = notas_historicas
