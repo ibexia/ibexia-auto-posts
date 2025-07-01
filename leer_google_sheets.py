@@ -303,6 +303,10 @@ def construir_prompt_formateado(data):
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
+        const precios = {json.dumps(cierres_historicos)};
+        const minPrecio = Math.min(...precios) * 0.97;
+        const maxPrecio = Math.max(...precios) * 1.03;
+
         var ctx = document.getElementById('notasChart').getContext('2d');
         var notasChart = new Chart(ctx, {{
             type: 'bar',
@@ -320,7 +324,7 @@ def construir_prompt_formateado(data):
                     }},
                     {{
                         label: 'Precio de Cierre',
-                        data: {json.dumps(cierres_historicos)},
+                        data: precios,
                         type: 'line',
                         borderColor: 'rgba(255, 99, 132, 1)',
                         borderWidth: 2,
@@ -404,10 +408,16 @@ def construir_prompt_formateado(data):
                     }},
                     y1: {{
                         position: 'right',
-                        beginAtZero: false,
+                        suggestedMin: minPrecio,
+                        suggestedMax: maxPrecio,
                         title: {{
                             display: true,
                             text: 'Precio de Cierre (€)'
+                        }},
+                        ticks: {{
+                            callback: function(value) {{
+                                return value.toFixed(2) + '€';
+                            }}
                         }},
                         grid: {{
                             drawOnChartArea: false
