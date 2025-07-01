@@ -411,7 +411,12 @@ def construir_prompt_formateado(data):
                         }},
                         grid: {{
                             drawOnChartArea: false
-                        }}
+                        }},
+                        ticks: {{
+                            padding: 5
+                        }},
+                        suggestedMin: Math.min(...{json.dumps(cierres_historicos)}) * 0.98,
+                        suggestedMax: Math.max(...{json.dumps(cierres_historicos)}) * 1.02
                     }},
                     x: {{
                         title: {{
