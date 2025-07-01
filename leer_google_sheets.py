@@ -533,7 +533,7 @@ def construir_prompt_formateado(data):
         volumen_analisis_text = "Actualmente, no dispongo de datos de volumen reciente para realizar un análisis en profundidad. Sin embargo, en cualquier estrategia de inversión, el volumen es un indicador crucial que valida los movimientos de precio y la fuerza de las tendencias. Un volumen significativo en rupturas de niveles clave o en cambios de tendencia es una señal potente a tener en cuenta."
 
 
-prompt = f"""
+    prompt = f"""
 Eres un analista técnico profesional con años de experiencia en los mercados financieros. Redacta un análisis completo en formato HTML, ideal para publicarse en un blog financiero.
 
 Usa exclusivamente la información real que aparece en este diccionario JSON:
