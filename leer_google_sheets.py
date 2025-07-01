@@ -201,10 +201,10 @@ def obtener_datos_yfinance(ticker):
 
         # --- Lógica para la tendencia y días estimados ---
         smi_history_full = hist['SMI_signal'].dropna()
-        smi_history_last_7 = smi_history_full.tail(7).tolist() # Últimos 7 valores de SMI_signal
+        smi_history_last_30 = smi_history_full.tail(30).tolist()  # Últimos 30 valores de SMI_signal
         
         # Calcular las últimas 7 notas de la empresa
-        notas_historicas_ultimos_7_dias = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_7]
+        notas_historicas_ultimos_30_dias = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_30]
         
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
@@ -213,10 +213,10 @@ def obtener_datos_yfinance(ticker):
             # Calcular la tendencia
             # notas_historicas_last_5 = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_5] # Esta línea ya no es necesaria con el cambio de nombre de la variable
             
-            if len(notas_historicas_ultimos_7_dias) >= 2: # Asegurarse de que hay al menos 2 puntos para la regresión
+            if len(notas_historicas_ultimos_30_dias) >= 2: # Asegurarse de que hay al menos 2 puntos para la regresión
                 # Usar una regresión lineal simple para una estimación más robusta de la tendencia
-                x = np.arange(len(notas_historicas_ultimos_7_dias))
-                y = np.array(notas_historicas_ultimos_7_dias)
+                x = np.arange(len(notas_historicas_ultimos_30_dias))
+                y = np.array(notas_historicas_ultimos_30_dias)
                 # Solo si hay suficiente variación para calcular una pendiente significativa
                 if len(x) > 1 and np.std(y) > 0.01:
                     slope, intercept = np.polyfit(x, y, 1)
@@ -287,7 +287,7 @@ def obtener_datos_yfinance(ticker):
             "RIESGOS_OPORTUNIDADES": "No disponibles",
             "TENDENCIA_NOTA": tendencia_smi, # Nuevo campo
             "DIAS_ESTIMADOS_ACCION": dias_estimados_accion, # Nuevo campo
-            "NOTAS_HISTORICAS_7_DIAS": notas_historicas_ultimos_7_dias # NUEVO CAMPO
+            "NOTAS_HISTORICAS_30_DIAS": notas_historicas_ultimos_30_dias
         }
         return datos
     except Exception as e:
@@ -305,13 +305,13 @@ def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']}"
     
        # NUEVO: Obtener las notas históricas para el gráfico
-    notas_historicas = data.get('NOTAS_HISTORICAS_7_DIAS', [])
+    notas_historicas = data.get('NOTAS_HISTORICAS_30_DIAS', [])
     # Ajustar para asegurar que siempre haya 7 elementos, rellenando con el último valor si hay menos
     if len(notas_historicas) < 7 and notas_historicas:
         notas_historicas = [notas_historicas[0]] * (7 - len(notas_historicas)) + notas_historicas
     elif not notas_historicas:
         notas_historicas = [0.0] * 7 # Si no hay datos, rellenar con ceros
-    notas_historicas = notas_historicas[-7:] # Asegurarse de que sean solo las últimas 7
+    
     
     # ... (el resto de tu código para soportes_unicos y tabla_resumen) ...
 
@@ -319,9 +319,9 @@ def construir_prompt_formateado(data):
     chart_html = ""
     if notas_historicas:
         # Generar etiquetas para los últimos 7 días (Hoy, Ayer, -2, -3, etc.)
-        labels = [f"Día -{i}" for i in range(6, -1, -1)]
-        labels[6] = "Hoy" # Último día es "Hoy"
-        labels[5] = "Ayer" # Penúltimo día es "Ayer"
+        labels = [f"Día -{i}" for i in range(29, -1, -1)]
+        labels[-1] = "Hoy"
+        labels[-2] = "Ayer"
         
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
         notas_historicas_display = notas_historicas
