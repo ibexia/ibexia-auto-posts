@@ -472,8 +472,6 @@ def construir_prompt_formateado(data):
             idx, inicio, minimo, pct = mejor_venta
             fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
             descripcion_grafico += f"<p>En el lado de las <strong>ventas</strong>, subrayamos nuestra señal del {fecha}, con un precio inicial de <strong>{inicio:.2f}€</strong>. Posteriormente, la acción cayó hasta un mínimo de <strong>{minimo:.2f}€</strong>, registrando un descenso del <strong>{-pct:.2f}%</strong>. Esto refuerza la efectividad de nuestras alertas para proteger el capital en momentos de debilidad del mercado.</p>"
-
-
         chart_html += f"""
         <div style="margin-top:20px;">
             <h3>Resumen de nuestro mejor acierto</h3>
@@ -633,10 +631,6 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 <h2>Análisis a Corto Plazo: Soportes, Resistencias y Dinámica del Impulso</h2>
 <p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar el comportamiento reciente del volumen y las zonas clave de soporte y resistencia. Estos niveles no son meros puntos en un gráfico; son reflejos de la psicología del mercado y de puntos donde la oferta y la demanda han encontrado equilibrio o desequilibrio en el pasado, y pueden volver a hacerlo.</p>
 
-<p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,}€</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
-
-<h2>Niveles Clave y Proyecciones</h2>
-<p>Para visualizar mejor la estructura de precios y mis proyecciones, he preparado un gráfico que sitúa el precio actual en relación con los principales soportes, la resistencia clave y mi precio objetivo de compra. Entender estos niveles es fundamental para cualquier estrategia de trading.</p>
 <div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="nivelesChart"></canvas>
 </div>
@@ -722,6 +716,8 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
         }});
     }});
 </script>
+
+<p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,}€</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
 <p>Un aspecto crucial en el análisis de corto plazo es la dinámica del impulso de la empresa. Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**. Esto sugiere {('un rebote inminente, dado que los indicadores muestran una sobreventa extrema, lo que significa que la acción ha sido \'castigada\' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio al alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo.' if data['TENDENCIA_NOTA'] == 'mejorando' and data['NOTA_EMPRESA'] < 6 else '')}
