@@ -472,6 +472,8 @@ def construir_prompt_formateado(data):
             idx, inicio, minimo, pct = mejor_venta
             fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
             descripcion_grafico += f"<p>En el lado de las <strong>ventas</strong>, subrayamos nuestra señal del {fecha}, con un precio inicial de <strong>{inicio:.2f}€</strong>. Posteriormente, la acción cayó hasta un mínimo de <strong>{minimo:.2f}€</strong>, registrando un descenso del <strong>{-pct:.2f}%</strong>. Esto refuerza la efectividad de nuestras alertas para proteger el capital en momentos de debilidad del mercado.</p>"
+
+
         chart_html += f"""
         <div style="margin-top:20px;">
             <h3>Resumen de nuestro mejor acierto</h3>
@@ -631,92 +633,6 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 <h2>Análisis a Corto Plazo: Soportes, Resistencias y Dinámica del Impulso</h2>
 <p>Para entender los posibles movimientos a corto plazo en <strong>{data['NOMBRE_EMPRESA']}</strong>, es fundamental analizar el comportamiento reciente del volumen y las zonas clave de soporte y resistencia. Estos niveles no son meros puntos en un gráfico; son reflejos de la psicología del mercado y de puntos donde la oferta y la demanda han encontrado equilibrio o desequilibrio en el pasado, y pueden volver a hacerlo.</p>
 
-<div style="width: 80%; margin: auto; height: 400px;">
-    <canvas id="nivelesChart"></canvas>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {{
-        var ctx = document.getElementById('nivelesChart').getContext('2d');
-        var nivelesChart = new Chart(ctx, {{
-            type: 'bar',
-            data: {{
-                labels: ['Soporte 3', 'Soporte 2', 'Soporte 1', 'Precio Objetivo Compra', 'Precio Actual', 'Resistencia'],
-                datasets: [{{
-                    label: 'Precio (€)',
-                    data: [
-                        {data['SOPORTE_3'] if isinstance(data['SOPORTE_3'], (int, float)) else 0},
-                        {data['SOPORTE_2'] if isinstance(data['SOPORTE_2'], (int, float)) else 0},
-                        {data['SOPORTE_1'] if isinstance(data['SOPORTE_1'], (int, float)) else 0},
-                        {data['PRECIO_OBJETIVO_COMPRA'] if isinstance(data['PRECIO_OBJETIVO_COMPRA'], (int, float)) else 0},
-                        {data['PRECIO_ACTUAL'] if isinstance(data['PRECIO_ACTUAL'], (int, float)) else 0},
-                        {data['RESISTENCIA'] if isinstance(data['RESISTENCIA'], (int, float)) else 0}
-                    ],
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.6)', // Soporte 3
-                        'rgba(255, 159, 64, 0.6)', // Soporte 2
-                        'rgba(255, 205, 86, 0.6)', // Soporte 1
-                        'rgba(54, 162, 235, 0.6)', // Precio Objetivo Compra
-                        'rgba(75, 192, 192, 1)',  // Precio Actual (más opaco)
-                        'rgba(153, 102, 255, 0.6)' // Resistencia
-                    ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(255, 159, 64, 1)',
-                        'rgba(255, 205, 86, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)'
-                    ],
-                    borderWidth: 1
-                }}]
-            }},
-            options: {{
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {{
-                    legend: {{
-                        display: false
-                    }},
-                    tooltip: {{
-                        callbacks: {{
-                            label: function(context) {{
-                                return context.label + ': ' + context.parsed.x.toFixed(2) + '€';
-                            }}
-                        }}
-                    }}
-                }},
-                scales: {{
-                    x: {{
-                        beginAtZero: false,
-                        title: {{
-                            display: true,
-                            text: 'Precio (€)'
-                        }},
-                        ticks: {{
-                             callback: function(value) {{
-                                return value.toFixed(2) + '€';
-                            }}
-                        }},
-                        min: 0, // Escala fija desde 0
-                        max: 200 // <<--- AJUSTA ESTE VALOR según el rango máximo de tus precios
-                    }},
-                    y: {{
-                        stacked: false,
-                        beginAtZero: false,
-                        grid: {{
-                            display: false
-                        }}
-                    }}
-                }}
-            }}
-        }});
-    }});
-</script>
-
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,}€</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
@@ -737,6 +653,8 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
 
 <p>{data['EXPANSION_PLANES'] if data['EXPANSION_PLANES'] != 'N/A' and 'no disponible' not in data['EXPANSION_PLANES'].lower() else f"Aunque la información específica sobre planes de expansión no está detallada en este momento, es crucial para <strong>{data['NOMBRE_EMPRESA']}</strong> delinear una estrategia clara de crecimiento. La capacidad de la empresa para innovar, expandir su cuota de mercado o diversificar sus operaciones será determinante para su valor a largo plazo y para mantener la competitividad en su sector. Estoy monitoreando cualquier anuncio futuro que pueda dar luz sobre estas iniciativas."} {data['ACUERDOS'] if data['ACUERDOS'] != 'No disponibles' and 'no disponible' not in data['ACUERDOS'].lower() else f"Respecto a posibles acuerdos estratégicos o colaboraciones, la información actual es limitada. Sin embargo, en el sector de <strong>{data['NOMBRE_EMPRESA']}</strong>, las alianzas y asociaciones son a menudo catalizadores clave para la expansión y la optimización de recursos, lo que podría impactar positivamente su perfil de crecimiento futuro."}</p>
+
+<p>Considerando la información financiera disponible, <strong>{data['NOMBRE_EMPRESA']}</strong> {f"muestra unos ingresos sólidos de <strong>{formatear_numero(data['INGRESOS'])}</strong>, lo que sugiere una base de operaciones robusta. Su EBITDA de <strong>{formatear_numero(data['EBITDA'])}</strong> indica una buena capacidad para generar ganancias antes de intereses, impuestos, depreciaciones y amortizaciones, lo cual es un indicador de eficiencia operativa. Los beneficios de <strong>{formatear_numero(data['BENEFICIOS'])}</strong>, aunque importantes, deben evaluarse en el contexto de la deuda de <strong>{formatear_numero(data['DEUDA'])}</strong> y el flujo de caja de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>. Un flujo de caja positivo es vital para la sostenibilidad y la capacidad de la empresa para invertir en su futuro y afrontar sus obligaciones financieras. Si bien la deuda es una métrica a observar, un flujo de caja saludable puede mitigar los riesgos asociados, sugiriendo que la empresa tiene la capacidad de generar liquidez para soportar sus operaciones y posibles expansiones. Mi interpretación es que la empresa presenta una situación financiera que, si bien tiene aspectos a monitorear como la deuda, se sustenta en una generación de ingresos y un EBITDA consistentes, lo que le confiere una base para un crecimiento potencial sostenido a largo plazo." if data['INGRESOS'] != 'N/A' else "carece de datos financieros recientes para una evaluación fundamental completa. En general, para cualquier empresa, la solidez financiera es la base de un crecimiento sostenible. Ingresos consistentes, un EBITDA saludable y beneficios positivos son señales de un negocio bien gestionado. Un nivel de deuda manejable y un flujo de caja libre positivo son indicadores críticos de la solvencia y capacidad de la empresa para generar valor a largo plazo. La ausencia de estos datos fundamentales impide una predicción sólida a largo plazo, por lo que recomiendo una investigación adicional exhaustiva de sus estados financieros antes de cualquier decisión de inversión a largo plazo."}</p>
 
 <h2>Comparativa Financiera: EBITDA vs Deuda</h2>
 <p>Para evaluar de forma visual la salud financiera de <strong>{data['NOMBRE_EMPRESA']}</strong>, a continuación muestro un gráfico de barras horizontales centradas que compara el <strong>EBITDA</strong> (capacidad operativa de generación de beneficios) frente a la <strong>Deuda total</strong>. Un EBITDA superior a la deuda es generalmente una señal positiva de solvencia. En cambio, una deuda que excede al EBITDA requiere análisis adicional sobre su sostenibilidad.</p>
@@ -800,7 +718,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
     }});
 </script>
 
-<p>Considerando la información financiera disponible, <strong>{data['NOMBRE_EMPRESA']}</strong> {f"muestra unos ingresos sólidos de <strong>{formatear_numero(data['INGRESOS'])}</strong>, lo que sugiere una base de operaciones robusta. Su EBITDA de <strong>{formatear_numero(data['EBITDA'])}</strong> indica una buena capacidad para generar ganancias antes de intereses, impuestos, depreciaciones y amortizaciones, lo cual es un indicador de eficiencia operativa. Los beneficios de <strong>{formatear_numero(data['BENEFICIOS'])}</strong>, aunque importantes, deben evaluarse en el contexto de la deuda de <strong>{formatear_numero(data['DEUDA'])}</strong> y el flujo de caja de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>. Un flujo de caja positivo es vital para la sostenibilidad y la capacidad de la empresa para invertir en su futuro y afrontar sus obligaciones financieras. Si bien la deuda es una métrica a observar, un flujo de caja saludable puede mitigar los riesgos asociados, sugiriendo que la empresa tiene la capacidad de generar liquidez para soportar sus operaciones y posibles expansiones. Mi interpretación es que la empresa presenta una situación financiera que, si bien tiene aspectos a monitorear como la deuda, se sustenta en una generación de ingresos y un EBITDA consistentes, lo que le confiere una base para un crecimiento potencial sostenido a largo plazo." if data['INGRESOS'] != 'N/A' else "carece de datos financieros recientes para una evaluación fundamental completa. En general, para cualquier empresa, la solidez financiera es la base de un crecimiento sostenible. Ingresos consistentes, un EBITDA saludable y beneficios positivos son señales de un negocio bien gestionado. Un nivel de deuda manejable y un flujo de caja libre positivo son indicadores críticos de la solvencia y capacidad de la empresa para generar valor a largo plazo. La ausencia de estos datos fundamentales impide una predicción sólida a largo plazo, por lo que recomiendo una investigación adicional exhaustiva de sus estados financieros antes de cualquier decisión de inversión a largo plazo."}</p>
+
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
 <p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
 {tabla_resumen}
