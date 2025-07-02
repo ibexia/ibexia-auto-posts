@@ -635,7 +635,93 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,}€</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
 
+<h2>Niveles Clave y Proyecciones</h2>
+<p>Para visualizar mejor la estructura de precios y mis proyecciones, he preparado un gráfico que sitúa el precio actual en relación con los principales soportes, la resistencia clave y mi precio objetivo de compra. Entender estos niveles es fundamental para cualquier estrategia de trading.</p>
+<div style="width: 80%; margin: auto; height: 400px;">
+    <canvas id="nivelesChart"></canvas>
+</div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {{
+        var ctx = document.getElementById('nivelesChart').getContext('2d');
+        var nivelesChart = new Chart(ctx, {{
+            type: 'bar',
+            data: {{
+                labels: ['Soporte 3', 'Soporte 2', 'Soporte 1', 'Precio Objetivo Compra', 'Precio Actual', 'Resistencia'],
+                datasets: [{{
+                    label: 'Precio (€)',
+                    data: [
+                        {data['SOPORTE_3'] if isinstance(data['SOPORTE_3'], (int, float)) else 0},
+                        {data['SOPORTE_2'] if isinstance(data['SOPORTE_2'], (int, float)) else 0},
+                        {data['SOPORTE_1'] if isinstance(data['SOPORTE_1'], (int, float)) else 0},
+                        {data['PRECIO_OBJETIVO_COMPRA'] if isinstance(data['PRECIO_OBJETIVO_COMPRA'], (int, float)) else 0},
+                        {data['PRECIO_ACTUAL'] if isinstance(data['PRECIO_ACTUAL'], (int, float)) else 0},
+                        {data['RESISTENCIA'] if isinstance(data['RESISTENCIA'], (int, float)) else 0}
+                    ],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.6)', // Soporte 3
+                        'rgba(255, 159, 64, 0.6)', // Soporte 2
+                        'rgba(255, 205, 86, 0.6)', // Soporte 1
+                        'rgba(54, 162, 235, 0.6)', // Precio Objetivo Compra
+                        'rgba(75, 192, 192, 1)',  // Precio Actual (más opaco)
+                        'rgba(153, 102, 255, 0.6)' // Resistencia
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(255, 205, 86, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)'
+                    ],
+                    borderWidth: 1
+                }}]
+            }},
+            options: {{
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {{
+                    legend: {{
+                        display: false
+                    }},
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(context) {{
+                                return context.label + ': ' + context.parsed.x.toFixed(2) + '€';
+                            }}
+                        }}
+                    }}
+                }},
+                scales: {{
+                    x: {{
+                        beginAtZero: false,
+                        title: {{
+                            display: true,
+                            text: 'Precio (€)'
+                        }},
+                        ticks: {{
+                             callback: function(value) {{
+                                return value.toFixed(2) + '€';
+                            }}
+                        }},
+                        min: 0, // Escala fija desde 0
+                        max: 200 // <<--- AJUSTA ESTE VALOR según el rango máximo de tus precios
+                    }},
+                    y: {{
+                        stacked: false,
+                        beginAtZero: false,
+                        grid: {{
+                            display: false
+                        }}
+                    }}
+                }}
+            }}
+        }});
+    }});
+</script>
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
 <p>Un aspecto crucial en el análisis de corto plazo es la dinámica del impulso de la empresa. Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**. Esto sugiere {('un rebote inminente, dado que los indicadores muestran una sobreventa extrema, lo que significa que la acción ha sido \'castigada\' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio al alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo.' if data['TENDENCIA_NOTA'] == 'mejorando' and data['NOTA_EMPRESA'] < 6 else '')}
