@@ -635,88 +635,91 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,}€</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
 
-<h2>Rango de Precios Clave</h2>
-<p>A continuación te muestro una representación visual de los precios más importantes para <strong>{{nombre_empresa}}</strong>: el precio actual, los principales niveles de soporte y resistencia, y nuestro precio objetivo de compra.</p>
+<h2>Comparativa Visual de Precios Clave</h2>
+<p>Este gráfico muestra de forma comparativa el <strong>precio actual</strong>, el <strong>nivel de soporte clave</strong>, la <strong>resistencia</strong> y el <strong>precio objetivo de compra</strong> de <strong>{{data['NOMBRE_EMPRESA']}}</strong>. Es una representación clara de dónde se encuentra el valor dentro de su rango técnico.</p>
 
 <div style="width: 90%; margin: auto;">
-  <canvas id="preciosClavesChart" height="100"></canvas>
+  <canvas id="graficoPreciosClave"></canvas>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    const precioActual = {{ data['PRECIO_ACTUAL'] }};
-    const soporte = {{ data['SOPORTE_1'] }};
-    const resistencia = {{ data['RESISTENCIA'] }};
-    const precioObjetivo = {{ data['PRECIO_OBJETIVO_COMPRA'] }};
+document.addEventListener('DOMContentLoaded', function () {{
+    const precioActual = {{data['PRECIO_ACTUAL']}};
+    const soporte = {{data['SOPORTE_1']}};
+    const resistencia = {{data['RESISTENCIA']}};
+    const precioObjetivo = {{data['PRECIO_OBJETIVO_COMPRA']}};
 
-    // Cálculo de márgenes dinámicos para el eje X
     const precios = [precioActual, soporte, resistencia, precioObjetivo];
     const minPrecio = Math.min(...precios);
     const maxPrecio = Math.max(...precios);
-    const margen = (maxPrecio - minPrecio) * 0.5;
+    const margen = (maxPrecio - minPrecio) * 0.5 || 1.0;  // evita margen cero
     const escalaMin = Math.max(0, minPrecio - margen);
     const escalaMax = maxPrecio + margen;
 
-    const ctx = document.getElementById('preciosClavesChart').getContext('2d');
-    new Chart(ctx, {
+    const ctx = document.getElementById('graficoPreciosClave').getContext('2d');
+    new Chart(ctx, {{
         type: 'bar',
-        data: {
-            labels: [''],
+        data: {{
+            labels: ['Precio Clave'],
             datasets: [
-                {
+                {{
                     label: 'Precio Actual',
                     data: [precioActual],
-                    backgroundColor: '#2e86de'
-                },
-                {
+                    backgroundColor: 'rgba(46, 134, 222, 0.7)'
+                }},
+                {{
                     label: 'Soporte',
                     data: [soporte],
-                    backgroundColor: '#27ae60'
-                },
-                {
+                    backgroundColor: 'rgba(39, 174, 96, 0.7)'
+                }},
+                {{
                     label: 'Resistencia',
                     data: [resistencia],
-                    backgroundColor: '#c0392b'
-                },
-                {
+                    backgroundColor: 'rgba(192, 57, 43, 0.7)'
+                }},
+                {{
                     label: 'Precio Objetivo',
                     data: [precioObjetivo],
-                    backgroundColor: '#f1c40f'
-                }
+                    backgroundColor: 'rgba(241, 196, 15, 0.8)'
+                }}
             ]
-        },
-        options: {
+        }},
+        options: {{
             indexAxis: 'y',
             responsive: true,
-            plugins: {
-                legend: {
+            plugins: {{
+                legend: {{
                     position: 'top'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
+                }},
+                tooltip: {{
+                    callbacks: {{
+                        label: function(context) {{
                             return context.dataset.label + ': ' + context.raw.toFixed(2) + '€';
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
+                        }}
+                    }}
+                }}
+            }},
+            scales: {{
+                x: {{
                     min: escalaMin,
                     max: escalaMax,
-                    title: {
+                    title: {{
                         display: true,
                         text: 'Precio (€)'
-                    }
-                },
-                y: {
-                    stacked: true
-                }
-            }
-        }
-    });
-});
+                    }}
+                }},
+                y: {{
+                    stacked: true,
+                    title: {{
+                        display: false
+                    }}
+                }}
+            }}
+        }}
+    }});
+}});
 </script>
+
 
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
