@@ -635,87 +635,140 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,}€</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
 
-<h2>Visualización de Precio Actual, Soporte y Resistencia</h2>
-<p>Para facilitar la toma de decisiones, he preparado una visualización que sitúa el <strong>precio actual</strong> de la acción entre su <strong>soporte clave</strong>, el <strong>precio objetivo de compra</strong> y la <strong>resistencia técnica</strong>. Esta representación gráfica te ayudará a evaluar de forma rápida dónde estamos y hacia dónde podemos ir.</p>
+<h2>Rango de Precio y Recomendaciones Clave</h2>
+<p>Esta barra representa el rango técnico actual de <strong>{data['NOMBRE_EMPRESA']}</strong>, desde el soporte hasta la resistencia. Los marcadores indican el <strong>precio actual</strong, el <strong>precio objetivo de compra</strong>, el <strong>soporte</strong> y la <strong>resistencia</strong>. Esta visualización facilita una comprensión inmediata de dónde se encuentra el precio en relación con los niveles clave.</p>
 
-<div style="width: 90%; margin: auto; height: 200px;">
-    <canvas id="precioPosicionChart"></canvas>
+<div style="width: 100%; max-width: 700px; margin: auto; height: 120px;">
+    <canvas id="barraRangoChart"></canvas>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {{
-        var ctx = document.getElementById('precioPosicionChart').getContext('2d');
-        new Chart(ctx, {{
-            type: 'bar',
-            data: {{
-                labels: ['Soporte 1', 'Precio Objetivo', 'Precio Actual', 'Resistencia'],
-                datasets: [{{
-                    label: 'Precio (€)',
-                    data: [{data['SOPORTE_1']}, {data['PRECIO_OBJETIVO_COMPRA']}, {data['PRECIO_ACTUAL']}, {data['RESISTENCIA']}],
-                    backgroundColor: [
-                        'rgba(75, 192, 192, 0.6)',  // Soporte
-                        'rgba(0, 200, 0, 0.9)',      // Objetivo de compra
-                        'rgba(54, 162, 235, 0.9)',   // Actual
-                        'rgba(255, 99, 132, 0.7)'    // Resistencia
-                    ]
-                }}]
-            }},
-            options: {{
-                indexAxis: 'y',
-                responsive: true,
-                plugins: {{
-                    legend: {{
-                        display: false
+document.addEventListener('DOMContentLoaded', function () {{
+    const soporte = {data['SOPORTE_1']};
+    const objetivo = {data['PRECIO_OBJETIVO_COMPRA']};
+    const actual = {data['PRECIO_ACTUAL']};
+    const resistencia = {data['RESISTENCIA']};
+
+    const valores = [soporte, objetivo, actual, resistencia];
+    const min = Math.min(...valores);
+    const max = Math.max(...valores);
+    const padding = (max - min) * 0.2;
+
+    const ctx = document.getElementById('barraRangoChart').getContext('2d');
+    new Chart(ctx, {{
+        type: 'bar',
+        data: {{
+            labels: [''],
+            datasets: [{{
+                label: 'Rango de Precios',
+                data: [max - min + padding * 2],
+                backgroundColor: 'rgba(200, 200, 200, 0.4)',
+                borderSkipped: false
+            }}]
+        }},
+        options: {{
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {{
+                x: {{
+                    min: min - padding,
+                    max: max + padding,
+                    title: {{
+                        display: true,
+                        text: 'Precio (€)'
                     }},
-                    tooltip: {{
-                        callbacks: {{
-                            label: function(context) {{
-                                return context.label + ': ' + context.parsed.x.toFixed(2) + ' €';
-                            }}
-                        }}
-                    }},
-                    annotation: {{
-                        annotations: {{
-                            recomendacion: {{
-                                type: 'line',
-                                xMin: {data['PRECIO_OBJETIVO_COMPRA']},
-                                xMax: {data['PRECIO_OBJETIVO_COMPRA']},
-                                borderColor: 'rgba(0, 200, 0, 1)',
-                                borderWidth: 2,
-                                label: {{
-                                    content: 'Recomendación de compra',
-                                    enabled: true,
-                                    position: 'start',
-                                    backgroundColor: 'rgba(0, 200, 0, 0.9)',
-                                    color: 'white',
-                                    font: {{
-                                        weight: 'bold'
-                                    }}
-                                }}
-                            }}
+                    ticks: {{
+                        callback: function(value) {{
+                            return value.toFixed(2) + ' €';
                         }}
                     }}
                 }},
-                scales: {{
-                    x: {{
-                        beginAtZero: true,
-                        title: {{
-                            display: true,
-                            text: 'Precio en Euros (€)'
-                        }}
-                    }},
-                    y: {{
-                        ticks: {{
-                            font: {{
-                                weight: 'bold'
+                y: {{
+                    display: false
+                }}
+            }},
+            plugins: {{
+                legend: {{
+                    display: false
+                }},
+                annotation: {{
+                    annotations: {{
+                        soporte: {{
+                            type: 'line',
+                            xMin: soporte,
+                            xMax: soporte,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 2,
+                            label: {{
+                                content: 'Soporte',
+                                enabled: true,
+                                position: 'start',
+                                backgroundColor: 'rgba(75, 192, 192, 0.8)',
+                                font: {{
+                                    weight: 'bold'
+                                }}
+                            }}
+                        }},
+                        objetivo: {{
+                            type: 'line',
+                            xMin: objetivo,
+                            xMax: objetivo,
+                            borderColor: 'rgba(0, 200, 0, 1)',
+                            borderWidth: 3,
+                            label: {{
+                                content: '🎯 Precio Objetivo',
+                                enabled: true,
+                                position: 'start',
+                                backgroundColor: 'rgba(0, 200, 0, 0.9)',
+                                color: '#fff',
+                                font: {{
+                                    weight: 'bold'
+                                }}
+                            }}
+                        }},
+                        actual: {{
+                            type: 'line',
+                            xMin: actual,
+                            xMax: actual,
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 2,
+                            label: {{
+                                content: 'Precio Actual',
+                                enabled: true,
+                                position: 'start',
+                                backgroundColor: 'rgba(54, 162, 235, 0.9)',
+                                color: '#fff',
+                                font: {{
+                                    weight: 'bold'
+                                }}
+                            }}
+                        }},
+                        resistencia: {{
+                            type: 'line',
+                            xMin: resistencia,
+                            xMax: resistencia,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2,
+                            label: {{
+                                content: 'Resistencia',
+                                enabled: true,
+                                position: 'start',
+                                backgroundColor: 'rgba(255, 99, 132, 0.9)',
+                                color: '#fff',
+                                font: {{
+                                    weight: 'bold'
+                                }}
                             }}
                         }}
                     }}
                 }}
             }}
-        }});
+        }}
     }});
+}});
 </script>
+
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
 <p>Un aspecto crucial en el análisis de corto plazo es la dinámica del impulso de la empresa. Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**. Esto sugiere {('un rebote inminente, dado que los indicadores muestran una sobreventa extrema, lo que significa que la acción ha sido \'castigada\' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio al alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo.' if data['TENDENCIA_NOTA'] == 'mejorando' and data['NOTA_EMPRESA'] < 6 else '')}
