@@ -435,7 +435,7 @@ def construir_prompt_formateado(data):
 <br/>
 """
 
-                chart_html += f"""
+        chart_html += f"""
 <h2>Evolución del Precio con Soportes y Resistencias</h2>
 <p>A continuación, muestro un gráfico de precios de cierre de los últimos 30 días para <strong>{data['NOMBRE_EMPRESA']}</strong>, con las zonas clave de soporte, resistencia y el precio objetivo de compra claramente marcadas. Estas líneas permiten identificar visualmente los puntos más relevantes para la toma de decisiones estratégicas.</p>
 
