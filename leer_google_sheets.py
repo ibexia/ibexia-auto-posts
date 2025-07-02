@@ -434,7 +434,32 @@ def construir_prompt_formateado(data):
 </script>
 <br/>
 """
+        # Cálculo dinámico de la descripción del gráfico
+        descripcion_grafico = ""
+        cierres = data.get("CIERRES_30_DIAS", [])
+        notas = data.get("NOTAS_HISTORICAS_30_DIAS", [])
 
+        if cierres and notas and len(cierres) == len(notas):
+            for i in range(len(notas)):
+                nota = notas[i]
+                cierre = cierres[i]
+                if nota >= 8:
+                    j = min(i + 3, len(cierres) - 1)
+                    cierre_posterior = cierres[j]
+                    cambio_pct = ((cierre_posterior - cierre) / cierre) * 100
+                    descripcion_grafico += f"<p>El día {labels[i]} recomendábamos <strong>comprar</strong> y el precio subió un <strong>{cambio_pct:.2f}%</strong> en los días siguientes.</p>"
+                elif nota <= 2:
+                    j = min(i + 3, len(cierres) - 1)
+                    cierre_posterior = cierres[j]
+                    cambio_pct = ((cierre_posterior - cierre) / cierre) * 100
+                    descripcion_grafico += f"<p>El día {labels[i]} recomendábamos <strong>vender</strong> y el precio bajó un <strong>{-cambio_pct:.2f}%</strong> en los días siguientes.</p>"
+
+        chart_html += f"""
+        <div style="margin-top:20px;">
+            <h3>Interpretación de las recomendaciones y resultado</h3>
+            {descripcion_grafico}
+        </div>
+        """
     
     # Pre-procesamiento de soportes para agruparlos si son muy cercanos
     soportes_unicos = []
