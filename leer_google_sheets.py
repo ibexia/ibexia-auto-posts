@@ -635,11 +635,11 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,}€</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
 
-<h2>Rango Técnico de Precio</h2>
-<p>Visualiza a continuación una barra que representa el rango clave entre soporte y resistencia. Los marcadores muestran el precio actual, el soporte, la resistencia y nuestra recomendación de compra.</p>
+<h2>Mapa Visual del Precio Actual y Niveles Clave</h2>
+<p>Este gráfico representa el rango de precios clave para <strong>{data['NOMBRE_EMPRESA']}</strong>, desde el soporte hasta la resistencia. Dentro de este rango se destacan el <strong>precio objetivo de compra</strong> y el <strong>precio actual</strong>, permitiendo visualizar si la acción está en zona de oportunidad o riesgo.</p>
 
-<div style="width: 100%; max-width: 700px; margin: auto; height: 120px;">
-    <canvas id="rangoPrecioChart"></canvas>
+<div style="width: 100%; max-width: 800px; margin: auto; height: 150px;">
+    <canvas id="graficoNivelesPrecio"></canvas>
 </div>
 
 <script>
@@ -652,125 +652,88 @@ document.addEventListener('DOMContentLoaded', function () {{
     const valores = [soporte, objetivo, actual, resistencia];
     const min = Math.min(...valores);
     const max = Math.max(...valores);
-    const padding = (max - min) * 0.2;
+    const rango = max - min;
 
-    const ctx = document.getElementById('rangoPrecioChart').getContext('2d');
+    const padding = rango * 0.2;
+    const base = min - padding;
 
+    function porcentaje(valor) {{
+        return ((valor - base) / (rango + padding * 2)) * 100;
+    }}
+
+    const ctx = document.getElementById('graficoNivelesPrecio').getContext('2d');
     new Chart(ctx, {{
-        type: 'scatter',
+        type: 'bar',
         data: {{
-            datasets: [{{
-                label: 'Rango de precio',
-                data: [],
-                backgroundColor: 'transparent',
-            }}]
+            labels: ['Rango de Precio'],
+            datasets: [
+                {{
+                    label: 'Antes del Soporte',
+                    data: [porcentaje(soporte)],
+                    backgroundColor: 'rgba(230,230,230,0.6)'
+                }},
+                {{
+                    label: 'Zona entre Soporte y Objetivo',
+                    data: [porcentaje(objetivo) - porcentaje(soporte)],
+                    backgroundColor: 'rgba(75, 192, 192, 0.6)'
+                }},
+                {{
+                    label: 'Zona entre Objetivo y Actual',
+                    data: [porcentaje(actual) - porcentaje(objetivo)],
+                    backgroundColor: 'rgba(0, 200, 0, 0.6)'
+                }},
+                {{
+                    label: 'Zona entre Actual y Resistencia',
+                    data: [porcentaje(resistencia) - porcentaje(actual)],
+                    backgroundColor: 'rgba(255, 206, 86, 0.6)'
+                }},
+                {{
+                    label: 'Más allá de Resistencia',
+                    data: [100 - porcentaje(resistencia)],
+                    backgroundColor: 'rgba(255, 99, 132, 0.3)'
+                }}
+            ]
         }},
         options: {{
+            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
             plugins: {{
-                legend: {{
-                    display: false
-                }},
-                annotation: {{
-                    annotations: {{
-                        bar: {{
-                            type: 'box',
-                            xMin: min,
-                            xMax: max,
-                            yMin: -0.5,
-                            yMax: 0.5,
-                            backgroundColor: 'rgba(220, 220, 220, 0.5)',
-                            borderColor: 'rgba(150, 150, 150, 0.8)',
-                            borderWidth: 1
-                        }},
-                        soporte: {{
-                            type: 'line',
-                            xMin: soporte,
-                            xMax: soporte,
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            borderWidth: 2,
-                            label: {{
-                                content: 'Soporte',
-                                enabled: true,
-                                position: 'start',
-                                backgroundColor: 'rgba(75, 192, 192, 0.9)',
-                                color: 'white',
-                                font: {{ weight: 'bold' }}
+                tooltip: {{
+                    callbacks: {{
+                        label: function(context) {{
+                            const index = context.datasetIndex;
+                            let from = 0;
+                            if (index > 0) {{
+                                from = context.chart.data.datasets
+                                    .slice(0, index)
+                                    .map(ds => ds.data[0])
+                                    .reduce((a, b) => a + b, 0);
                             }}
-                        }},
-                        objetivo: {{
-                            type: 'line',
-                            xMin: objetivo,
-                            xMax: objetivo,
-                            borderColor: 'rgba(0, 200, 0, 1)',
-                            borderWidth: 3,
-                            label: {{
-                                content: '🎯 Objetivo Compra',
-                                enabled: true,
-                                position: 'start',
-                                backgroundColor: 'rgba(0, 200, 0, 0.9)',
-                                color: 'white',
-                                font: {{ weight: 'bold' }}
-                            }}
-                        }},
-                        actual: {{
-                            type: 'line',
-                            xMin: actual,
-                            xMax: actual,
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            borderWidth: 2,
-                            label: {{
-                                content: 'Precio Actual',
-                                enabled: true,
-                                position: 'start',
-                                backgroundColor: 'rgba(54, 162, 235, 0.9)',
-                                color: 'white',
-                                font: {{ weight: 'bold' }}
-                            }}
-                        }},
-                        resistencia: {{
-                            type: 'line',
-                            xMin: resistencia,
-                            xMax: resistencia,
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 2,
-                            label: {{
-                                content: 'Resistencia',
-                                enabled: true,
-                                position: 'start',
-                                backgroundColor: 'rgba(255, 99, 132, 0.9)',
-                                color: 'white',
-                                font: {{ weight: 'bold' }}
-                            }}
+                            const to = from + context.dataset.data[0];
+                            const precioFrom = (base + (to - context.dataset.data[0]) * (rango + padding * 2) / 100).toFixed(2);
+                            const precioTo = (base + to * (rango + padding * 2) / 100).toFixed(2);
+                            return context.dataset.label + ': ' + precioFrom + '€ - ' + precioTo + '€';
                         }}
                     }}
+                }},
+                legend: {{
+                    position: 'bottom'
                 }}
             }},
             scales: {{
                 x: {{
-                    min: min - padding,
-                    max: max + padding,
-                    title: {{
-                        display: true,
-                        text: 'Precio (€)'
-                    }},
-                    ticks: {{
-                        callback: function(value) {{
-                            return value.toFixed(2) + ' €';
-                        }}
-                    }}
+                    stacked: true,
+                    display: false
                 }},
                 y: {{
-                    display: false
+                    stacked: true
                 }}
             }}
         }}
     }});
 }});
 </script>
-
-
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
 <p>Un aspecto crucial en el análisis de corto plazo es la dinámica del impulso de la empresa. Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**. Esto sugiere {('un rebote inminente, dado que los indicadores muestran una sobreventa extrema, lo que significa que la acción ha sido \'castigada\' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio al alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo.' if data['TENDENCIA_NOTA'] == 'mejorando' and data['NOTA_EMPRESA'] < 6 else '')}
