@@ -635,6 +635,88 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,}€</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
 
+<h2>Visualización de Precio Actual, Soporte y Resistencia</h2>
+<p>Para facilitar la toma de decisiones, he preparado una visualización que sitúa el <strong>precio actual</strong> de la acción entre su <strong>soporte clave</strong>, el <strong>precio objetivo de compra</strong> y la <strong>resistencia técnica</strong>. Esta representación gráfica te ayudará a evaluar de forma rápida dónde estamos y hacia dónde podemos ir.</p>
+
+<div style="width: 90%; margin: auto; height: 200px;">
+    <canvas id="precioPosicionChart"></canvas>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {{
+        var ctx = document.getElementById('precioPosicionChart').getContext('2d');
+        new Chart(ctx, {{
+            type: 'bar',
+            data: {{
+                labels: ['Soporte 1', 'Precio Objetivo', 'Precio Actual', 'Resistencia'],
+                datasets: [{{
+                    label: 'Precio (€)',
+                    data: [{data['SOPORTE_1']}, {data['PRECIO_OBJETIVO_COMPRA']}, {data['PRECIO_ACTUAL']}, {data['RESISTENCIA']}],
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.6)',  // Soporte
+                        'rgba(0, 200, 0, 0.9)',      // Objetivo de compra
+                        'rgba(54, 162, 235, 0.9)',   // Actual
+                        'rgba(255, 99, 132, 0.7)'    // Resistencia
+                    ]
+                }}]
+            }},
+            options: {{
+                indexAxis: 'y',
+                responsive: true,
+                plugins: {{
+                    legend: {{
+                        display: false
+                    }},
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(context) {{
+                                return context.label + ': ' + context.parsed.x.toFixed(2) + ' €';
+                            }}
+                        }}
+                    }},
+                    annotation: {{
+                        annotations: {{
+                            recomendacion: {{
+                                type: 'line',
+                                xMin: {data['PRECIO_OBJETIVO_COMPRA']},
+                                xMax: {data['PRECIO_OBJETIVO_COMPRA']},
+                                borderColor: 'rgba(0, 200, 0, 1)',
+                                borderWidth: 2,
+                                label: {{
+                                    content: 'Recomendación de compra',
+                                    enabled: true,
+                                    position: 'start',
+                                    backgroundColor: 'rgba(0, 200, 0, 0.9)',
+                                    color: 'white',
+                                    font: {{
+                                        weight: 'bold'
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }}
+                }},
+                scales: {{
+                    x: {{
+                        beginAtZero: true,
+                        title: {{
+                            display: true,
+                            text: 'Precio en Euros (€)'
+                        }}
+                    }},
+                    y: {{
+                        ticks: {{
+                            font: {{
+                                weight: 'bold'
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }});
+    }});
+</script>
+
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
 <p>Un aspecto crucial en el análisis de corto plazo es la dinámica del impulso de la empresa. Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**. Esto sugiere {('un rebote inminente, dado que los indicadores muestran una sobreventa extrema, lo que significa que la acción ha sido \'castigada\' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio al alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo.' if data['TENDENCIA_NOTA'] == 'mejorando' and data['NOTA_EMPRESA'] < 6 else '')}
 {('una potencial continuación bajista, con los indicadores técnicos mostrando una sobrecompra significativa o una pérdida de impulso alcista. Esto sugiere que la acción podría experimentar una corrección. Es un momento para la cautela y la vigilancia de los niveles de soporte.' if data['TENDENCIA_NOTA'] == 'empeorando' and data['NOTA_EMPRESA'] > 4 else '')}
