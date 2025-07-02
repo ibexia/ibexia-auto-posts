@@ -635,11 +635,11 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,}€</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
 
-<h2>Rango de Precio y Recomendaciones Clave</h2>
-<p>Esta barra representa el rango técnico actual de <strong>{data['NOMBRE_EMPRESA']}</strong>, desde el soporte hasta la resistencia. Los marcadores indican el <strong>precio actual</strong, el <strong>precio objetivo de compra</strong>, el <strong>soporte</strong> y la <strong>resistencia</strong>. Esta visualización facilita una comprensión inmediata de dónde se encuentra el precio en relación con los niveles clave.</p>
+<h2>Rango Técnico de Precio</h2>
+<p>Visualiza a continuación una barra que representa el rango clave entre soporte y resistencia. Los marcadores muestran el precio actual, el soporte, la resistencia y nuestra recomendación de compra.</p>
 
 <div style="width: 100%; max-width: 700px; margin: auto; height: 120px;">
-    <canvas id="barraRangoChart"></canvas>
+    <canvas id="rangoPrecioChart"></canvas>
 </div>
 
 <script>
@@ -654,22 +654,99 @@ document.addEventListener('DOMContentLoaded', function () {{
     const max = Math.max(...valores);
     const padding = (max - min) * 0.2;
 
-    const ctx = document.getElementById('barraRangoChart').getContext('2d');
+    const ctx = document.getElementById('rangoPrecioChart').getContext('2d');
+
     new Chart(ctx, {{
-        type: 'bar',
+        type: 'scatter',
         data: {{
-            labels: [''],
             datasets: [{{
-                label: 'Rango de Precios',
-                data: [max - min + padding * 2],
-                backgroundColor: 'rgba(200, 200, 200, 0.4)',
-                borderSkipped: false
+                label: 'Rango de precio',
+                data: [],
+                backgroundColor: 'transparent',
             }}]
         }},
         options: {{
-            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            plugins: {{
+                legend: {{
+                    display: false
+                }},
+                annotation: {{
+                    annotations: {{
+                        bar: {{
+                            type: 'box',
+                            xMin: min,
+                            xMax: max,
+                            yMin: -0.5,
+                            yMax: 0.5,
+                            backgroundColor: 'rgba(220, 220, 220, 0.5)',
+                            borderColor: 'rgba(150, 150, 150, 0.8)',
+                            borderWidth: 1
+                        }},
+                        soporte: {{
+                            type: 'line',
+                            xMin: soporte,
+                            xMax: soporte,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 2,
+                            label: {{
+                                content: 'Soporte',
+                                enabled: true,
+                                position: 'start',
+                                backgroundColor: 'rgba(75, 192, 192, 0.9)',
+                                color: 'white',
+                                font: {{ weight: 'bold' }}
+                            }}
+                        }},
+                        objetivo: {{
+                            type: 'line',
+                            xMin: objetivo,
+                            xMax: objetivo,
+                            borderColor: 'rgba(0, 200, 0, 1)',
+                            borderWidth: 3,
+                            label: {{
+                                content: '🎯 Objetivo Compra',
+                                enabled: true,
+                                position: 'start',
+                                backgroundColor: 'rgba(0, 200, 0, 0.9)',
+                                color: 'white',
+                                font: {{ weight: 'bold' }}
+                            }}
+                        }},
+                        actual: {{
+                            type: 'line',
+                            xMin: actual,
+                            xMax: actual,
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 2,
+                            label: {{
+                                content: 'Precio Actual',
+                                enabled: true,
+                                position: 'start',
+                                backgroundColor: 'rgba(54, 162, 235, 0.9)',
+                                color: 'white',
+                                font: {{ weight: 'bold' }}
+                            }}
+                        }},
+                        resistencia: {{
+                            type: 'line',
+                            xMin: resistencia,
+                            xMax: resistencia,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2,
+                            label: {{
+                                content: 'Resistencia',
+                                enabled: true,
+                                position: 'start',
+                                backgroundColor: 'rgba(255, 99, 132, 0.9)',
+                                color: 'white',
+                                font: {{ weight: 'bold' }}
+                            }}
+                        }}
+                    }}
+                }}
+            }},
             scales: {{
                 x: {{
                     min: min - padding,
@@ -687,87 +764,12 @@ document.addEventListener('DOMContentLoaded', function () {{
                 y: {{
                     display: false
                 }}
-            }},
-            plugins: {{
-                legend: {{
-                    display: false
-                }},
-                annotation: {{
-                    annotations: {{
-                        soporte: {{
-                            type: 'line',
-                            xMin: soporte,
-                            xMax: soporte,
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            borderWidth: 2,
-                            label: {{
-                                content: 'Soporte',
-                                enabled: true,
-                                position: 'start',
-                                backgroundColor: 'rgba(75, 192, 192, 0.8)',
-                                font: {{
-                                    weight: 'bold'
-                                }}
-                            }}
-                        }},
-                        objetivo: {{
-                            type: 'line',
-                            xMin: objetivo,
-                            xMax: objetivo,
-                            borderColor: 'rgba(0, 200, 0, 1)',
-                            borderWidth: 3,
-                            label: {{
-                                content: '🎯 Precio Objetivo',
-                                enabled: true,
-                                position: 'start',
-                                backgroundColor: 'rgba(0, 200, 0, 0.9)',
-                                color: '#fff',
-                                font: {{
-                                    weight: 'bold'
-                                }}
-                            }}
-                        }},
-                        actual: {{
-                            type: 'line',
-                            xMin: actual,
-                            xMax: actual,
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            borderWidth: 2,
-                            label: {{
-                                content: 'Precio Actual',
-                                enabled: true,
-                                position: 'start',
-                                backgroundColor: 'rgba(54, 162, 235, 0.9)',
-                                color: '#fff',
-                                font: {{
-                                    weight: 'bold'
-                                }}
-                            }}
-                        }},
-                        resistencia: {{
-                            type: 'line',
-                            xMin: resistencia,
-                            xMax: resistencia,
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 2,
-                            label: {{
-                                content: 'Resistencia',
-                                enabled: true,
-                                position: 'start',
-                                backgroundColor: 'rgba(255, 99, 132, 0.9)',
-                                color: '#fff',
-                                font: {{
-                                    weight: 'bold'
-                                }}
-                            }}
-                        }}
-                    }}
-                }}
             }}
         }}
     }});
 }});
 </script>
+
 
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
