@@ -635,89 +635,87 @@ Es importante recordar que esta nota es puramente un reflejo del **análisis del
 
 <p>En este momento, observo {soportes_texto} La resistencia clave se encuentra en <strong>{data['RESISTENCIA']:,}€</strong>, situada a una distancia del <strong>{((float(data['RESISTENCIA']) - float(data['PRECIO_ACTUAL'])) / float(data['PRECIO_ACTUAL']) * 100):.2f}%</strong> desde el precio actual. Estas zonas técnicas pueden actuar como puntos de inflexión vitales, y su cercanía o lejanía tiene implicaciones operativas claras. Romper la resistencia implicaría un nuevo camino al alza, mientras que la pérdida de un soporte podría indicar una continuación de la caída. Estoy siguiendo de cerca cómo el precio interactúa con estos niveles.</p>
 
-<h2>Visualización de Precios Clave</h2>
-<p>La siguiente barra representa el rango de precios clave para <strong>{data['NOMBRE_EMPRESA']}</strong>. Se destaca el <strong>soporte</strong>, el <strong>precio objetivo de compra</strong>, el <strong>precio actual</strong> y la <strong>resistencia</strong>, permitiendo ver de un vistazo si estamos cerca de una oportunidad o zona de riesgo.</p>
+<h2>Rango de Precios Clave</h2>
+<p>A continuación te muestro una representación visual de los precios más importantes para <strong>{{nombre_empresa}}</strong>: el precio actual, los principales niveles de soporte y resistencia, y nuestro precio objetivo de compra.</p>
 
-<div style="width: 100%; max-width: 700px; margin: auto; height: 120px;">
-  <canvas id="rangoPreciosChart"></canvas>
+<div style="width: 90%; margin: auto;">
+  <canvas id="preciosClavesChart" height="100"></canvas>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-document.addEventListener('DOMContentLoaded', function () {{
-    const soporte = {data['SOPORTE_1']};
-    const objetivo = {data['PRECIO_OBJETIVO_COMPRA']};
-    const actual = {data['PRECIO_ACTUAL']};
-    const resistencia = {data['RESISTENCIA']};
+document.addEventListener('DOMContentLoaded', function () {
+    const precioActual = {{ data['PRECIO_ACTUAL'] }};
+    const soporte = {{ data['SOPORTE_1'] }};
+    const resistencia = {{ data['RESISTENCIA'] }};
+    const precioObjetivo = {{ data['PRECIO_OBJETIVO_COMPRA'] }};
 
-    const valores = [soporte, objetivo, actual, resistencia];
-    const ordenados = [...valores].sort((a, b) => a - b);
+    // Cálculo de márgenes dinámicos para el eje X
+    const precios = [precioActual, soporte, resistencia, precioObjetivo];
+    const minPrecio = Math.min(...precios);
+    const maxPrecio = Math.max(...precios);
+    const margen = (maxPrecio - minPrecio) * 0.5;
+    const escalaMin = Math.max(0, minPrecio - margen);
+    const escalaMax = maxPrecio + margen;
 
-    const segmentos = [
-        ordenados[0],
-        ordenados[1] - ordenados[0],
-        ordenados[2] - ordenados[1],
-        ordenados[3] - ordenados[2]
-    ];
-
-    const etiquetas = ['Zona Baja', 'Objetivo Compra', 'Precio Actual', 'Resistencia'];
-
-    const colores = [
-        'rgba(200, 200, 200, 0.6)',   // zona baja
-        'rgba(0, 200, 0, 0.7)',       // objetivo
-        'rgba(54, 162, 235, 0.7)',    // actual
-        'rgba(255, 99, 132, 0.7)'     // resistencia
-    ];
-
-    const datasets = segmentos.map((valor, i) => {{
-        return {{
-            label: etiquetas[i],
-            data: [valor],
-            backgroundColor: colores[i],
-            borderWidth: 1
-        }};
-    }});
-
-    const ctx = document.getElementById('rangoPreciosChart').getContext('2d');
-    new Chart(ctx, {{
+    const ctx = document.getElementById('preciosClavesChart').getContext('2d');
+    new Chart(ctx, {
         type: 'bar',
-        data: {{
+        data: {
             labels: [''],
-            datasets: datasets
-        }},
-        options: {{
+            datasets: [
+                {
+                    label: 'Precio Actual',
+                    data: [precioActual],
+                    backgroundColor: '#2e86de'
+                },
+                {
+                    label: 'Soporte',
+                    data: [soporte],
+                    backgroundColor: '#27ae60'
+                },
+                {
+                    label: 'Resistencia',
+                    data: [resistencia],
+                    backgroundColor: '#c0392b'
+                },
+                {
+                    label: 'Precio Objetivo',
+                    data: [precioObjetivo],
+                    backgroundColor: '#f1c40f'
+                }
+            ]
+        },
+        options: {
             indexAxis: 'y',
             responsive: true,
-            plugins: {{
-                tooltip: {{
-                    callbacks: {{
-                        label: function(context) {{
-                            const start = ordenados.slice(0, context.datasetIndex).reduce((a,b) => a + b, 0);
-                            const end = start + context.raw;
-                            return context.dataset.label + ': ' + (start + ordenados[0]).toFixed(2) + '€ a ' + (end + ordenados[0]).toFixed(2) + '€';
-                        }}
-                    }}
-                }},
-                legend: {{
-                    position: 'bottom'
-                }}
-            }},
-            scales: {{
-                x: {{
-                    stacked: true,
-                    title: {{
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.raw.toFixed(2) + '€';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    min: escalaMin,
+                    max: escalaMax,
+                    title: {
                         display: true,
                         text: 'Precio (€)'
-                    }}
-                }},
-                y: {{
+                    }
+                },
+                y: {
                     stacked: true
-                }}
-            }}
-        }}
-    }});
-}});
+                }
+            }
+        }
+    });
+});
 </script>
 
 
