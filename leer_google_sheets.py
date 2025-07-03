@@ -436,6 +436,13 @@ def construir_prompt_formateado(data):
 """
 
         chart_html += f"""
+        <div style="margin-top:20px;">
+            <h3>Resumen de nuestro mejor acierto</h3>
+            {descripcion_grafico}
+        </div>
+        """        
+        
+        chart_html += f"""
 <h2>Evolución del Precio con Soportes y Resistencias</h2>
 <p>A continuación, muestro un gráfico de precios de cierre de los últimos 30 días para <strong>{data['NOMBRE_EMPRESA']}</strong>, con las zonas clave de soporte, resistencia y el precio objetivo de compra claramente marcadas. Estas líneas permiten identificar visualmente los puntos más relevantes para la toma de decisiones estratégicas.</p>
 
@@ -593,12 +600,7 @@ document.addEventListener('DOMContentLoaded', function () {{
             descripcion_grafico += f"<p>En el lado de las <strong>ventas</strong>, subrayamos nuestra señal del {fecha}, con un precio inicial de <strong>{inicio:.2f}€</strong>. Posteriormente, la acción cayó hasta un mínimo de <strong>{minimo:.2f}€</strong>, registrando un descenso del <strong>{-pct:.2f}%</strong>. Esto refuerza la efectividad de nuestras alertas para proteger el capital en momentos de debilidad del mercado.</p>"
 
 
-        chart_html += f"""
-        <div style="margin-top:20px;">
-            <h3>Resumen de nuestro mejor acierto</h3>
-            {descripcion_grafico}
-        </div>
-        """
+
     
     # Pre-procesamiento de soportes para agruparlos si son muy cercanos
     soportes_unicos = []
