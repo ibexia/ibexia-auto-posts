@@ -434,13 +434,52 @@ def construir_prompt_formateado(data):
 </script>
 <br/>
 """
+        # Cálculo dinámico de la descripción del gráfico
+                  
+        descripcion_grafico = ""
+        cierres = data.get("CIERRES_30_DIAS", [])
+        notas = data.get("NOTAS_HISTORICAS_30_DIAS", [])
+
+        mejor_compra = None  # (nota_idx, cierre_inicial, cierre_maximo, porcentaje)
+        mejor_venta = None   # (nota_idx, cierre_inicial, cierre_minimo, porcentaje)
+
+        if cierres and notas and len(cierres) == len(notas):
+            for i in range(len(notas)):
+                nota = notas[i]
+                cierre = cierres[i]
+        
+                if nota >= 8:
+                    # Buscar el máximo después de la recomendación de compra
+                    max_post = max(cierres[i:], default=cierre)
+                    pct = ((max_post - cierre) / cierre) * 100
+                    if (not mejor_compra) or (pct > mejor_compra[3]):
+                        mejor_compra = (i, cierre, max_post, pct)
+        
+                elif nota <= 2:
+                    # Buscar el mínimo después de la recomendación de venta
+                    min_post = min(cierres[i:], default=cierre)
+                    pct = ((min_post - cierre) / cierre) * 100
+                    if (not mejor_venta) or (pct < mejor_venta[3]):
+                        mejor_venta = (i, cierre, min_post, pct)
+
+        # Generar el párrafo explicativo
+        if mejor_compra:
+            idx, inicio, maximo, pct = mejor_compra
+            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
+            descripcion_grafico += f"<p>Destacamos especialmente nuestra recomendación de <strong>compra</strong> el día {fecha}, cuando el precio era de <strong>{inicio:.2f}€</strong>. A partir de ese momento, el valor alcanzó un máximo de <strong>{maximo:.2f}€</strong>, lo que representó una revalorización del <strong>{pct:.2f}%</strong>. Este acierto muestra cómo nuestras señales pueden anticipar movimientos significativos en el mercado.</p>"
+
+        if mejor_venta:
+            idx, inicio, minimo, pct = mejor_venta
+            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
+            descripcion_grafico += f"<p>En el lado de las <strong>ventas</strong>, subrayamos nuestra señal del {fecha}, con un precio inicial de <strong>{inicio:.2f}€</strong>. Posteriormente, la acción cayó hasta un mínimo de <strong>{minimo:.2f}€</strong>, registrando un descenso del <strong>{-pct:.2f}%</strong>. Esto refuerza la efectividad de nuestras alertas para proteger el capital en momentos de debilidad del mercado.</p>"
+
 
         chart_html += f"""
         <div style="margin-top:20px;">
             <h3>Resumen de nuestro mejor acierto</h3>
             {descripcion_grafico}
         </div>
-        """        
+        """
         
         chart_html += f"""
 <h2>Evolución del Precio con Soportes y Resistencias</h2>
@@ -560,46 +599,6 @@ document.addEventListener('DOMContentLoaded', function () {{
 
 
         
-        # Cálculo dinámico de la descripción del gráfico
-                  
-        descripcion_grafico = ""
-        cierres = data.get("CIERRES_30_DIAS", [])
-        notas = data.get("NOTAS_HISTORICAS_30_DIAS", [])
-
-        mejor_compra = None  # (nota_idx, cierre_inicial, cierre_maximo, porcentaje)
-        mejor_venta = None   # (nota_idx, cierre_inicial, cierre_minimo, porcentaje)
-
-        if cierres and notas and len(cierres) == len(notas):
-            for i in range(len(notas)):
-                nota = notas[i]
-                cierre = cierres[i]
-        
-                if nota >= 8:
-                    # Buscar el máximo después de la recomendación de compra
-                    max_post = max(cierres[i:], default=cierre)
-                    pct = ((max_post - cierre) / cierre) * 100
-                    if (not mejor_compra) or (pct > mejor_compra[3]):
-                        mejor_compra = (i, cierre, max_post, pct)
-        
-                elif nota <= 2:
-                    # Buscar el mínimo después de la recomendación de venta
-                    min_post = min(cierres[i:], default=cierre)
-                    pct = ((min_post - cierre) / cierre) * 100
-                    if (not mejor_venta) or (pct < mejor_venta[3]):
-                        mejor_venta = (i, cierre, min_post, pct)
-
-        # Generar el párrafo explicativo
-        if mejor_compra:
-            idx, inicio, maximo, pct = mejor_compra
-            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            descripcion_grafico += f"<p>Destacamos especialmente nuestra recomendación de <strong>compra</strong> el día {fecha}, cuando el precio era de <strong>{inicio:.2f}€</strong>. A partir de ese momento, el valor alcanzó un máximo de <strong>{maximo:.2f}€</strong>, lo que representó una revalorización del <strong>{pct:.2f}%</strong>. Este acierto muestra cómo nuestras señales pueden anticipar movimientos significativos en el mercado.</p>"
-
-        if mejor_venta:
-            idx, inicio, minimo, pct = mejor_venta
-            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            descripcion_grafico += f"<p>En el lado de las <strong>ventas</strong>, subrayamos nuestra señal del {fecha}, con un precio inicial de <strong>{inicio:.2f}€</strong>. Posteriormente, la acción cayó hasta un mínimo de <strong>{minimo:.2f}€</strong>, registrando un descenso del <strong>{-pct:.2f}%</strong>. Esto refuerza la efectividad de nuestras alertas para proteger el capital en momentos de debilidad del mercado.</p>"
-
-
 
     
     # Pre-procesamiento de soportes para agruparlos si son muy cercanos
