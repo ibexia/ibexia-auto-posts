@@ -20,9 +20,10 @@ jobs:
 
       - name: Ejecutar script de análisis de ticker manual
         env:
-          # Se mantienen solo las variables de entorno necesarias para Gemini y autenticación
+          # ¡Ahora se incluyen TODAS las variables de entorno, igual que en tu workflow funcional!
           GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }} # Re-incluida
+          RANGE_NAME: 'A1:C10' # Re-incluida, ajusta si es necesario en tus secretos
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # Las variables SPREADSHEET_ID y RANGE_NAME se han eliminado ya que este script no lee de Google Sheets
         run: |
           python analizar_ticker_manual.py # Ejecuta el nuevo script
