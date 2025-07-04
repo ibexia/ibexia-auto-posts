@@ -483,6 +483,57 @@ def construir_prompt_formateado(data):
                         mejor_venta = (i, cierre, min_post, pct, perdida_evitada_neta_actual)
                         ganancia_neta_venta = perdida_evitada_neta_actual
 
+
+        mejor_punto_giro_compra = None
+        mejor_punto_giro_venta = None
+
+        if cierres and notas and len(cierres) == len(notas) and len(notas) > 1:
+            for i in range(1, len(notas) - 1): # Empezar desde el segundo elemento para comparar con el anterior y mirar el siguiente
+                nota_anterior = notas[i-1]
+                nota_actual = notas[i]
+                nota_siguiente = notas[i+1]
+                cierre_actual = cierres[i]
+
+                # Detección de giro de tendencia bajista a alcista (posible punto de compra)
+                if (nota_actual >= nota_anterior and nota_siguiente > nota_actual) and (nota_anterior < nota_actual):
+                    # Si la nota venía bajando o plana y empieza a subir, es un posible punto de compra
+                    max_post = max(cierres[i:], default=cierre_actual)
+                    pct = ((max_post - cierre_actual) / cierre_actual) * 100
+                    if (not mejor_punto_giro_compra) or (pct > mejor_punto_giro_compra[3]):
+                        ganancia_bruta = (max_post - cierre_actual) * (inversion_base / cierre_actual)
+                        comision_compra = inversion_base * comision_por_operacion_porcentual
+                        comision_venta = (inversion_base + ganancia_bruta) * comision_por_operacion_porcentual
+                        comision_total = comision_compra + comision_venta
+                        ganancia_neta_actual = ganancia_bruta - comision_total
+                        mejor_punto_giro_compra = (i, cierre_actual, max_post, pct, ganancia_neta_actual)
+
+                # Detección de giro de tendencia alcista a bajista (posible punto de venta para evitar pérdida)
+                if (nota_actual <= nota_anterior and nota_siguiente < nota_actual) and (nota_anterior > nota_actual):
+                    # Si la nota venía subiendo o plana y empieza a bajar, es un posible punto de venta
+                    min_post = min(cierres[i:], default=cierre_actual)
+                    pct = ((min_post - cierre_actual) / cierre_actual) * 100 # Será un porcentaje negativo
+                    if (not mejor_punto_giro_venta) or (pct < mejor_punto_giro_venta[3]):
+                        perdida_bruta_evitada = (cierre_actual - min_post) * (inversion_base / cierre_actual)
+                        comision_compra_imaginaria = inversion_base * comision_por_operacion_porcentual
+                        comision_venta_real = (inversion_base - (inversion_base * abs(pct)/100)) * comision_por_operacion_porcentual
+                        comision_total_simulada = comision_compra_imaginaria + comision_venta_real
+                        perdida_evitada_neta_actual = perdida_bruta_evitada - comision_total_simulada
+                        mejor_punto_giro_venta = (i, cierre_actual, min_post, pct, perdida_evitada_neta_actual)
+
+        punto_giro_texto = ""
+        if mejor_punto_giro_compra:
+            idx, inicio, maximo, pct, ganancia_neta = mejor_punto_giro_compra
+            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
+            punto_giro_texto += f"<p>También, identificamos un punto de inflexión alcista el día {fecha}, cuando el precio era de <strong>{inicio:.2f}€</strong>. Si hubiéramos aprovechado este giro de la nota técnica, el valor alcanzó <strong>{maximo:.2f}€</strong>, lo que podría haber generado una ganancia neta estimada de <strong>{ganancia_neta:,.2f}€</strong> con una inversión de {inversion_base:,.2f}€.</p>"
+        
+        if mejor_punto_giro_venta:
+            idx, inicio, minimo, pct, perdida_evitada_neta = mejor_punto_giro_venta
+            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
+            punto_giro_texto += f"<p>De manera similar, un punto de inflexión bajista se observó el día {fecha} con el precio a <strong>{inicio:.2f}€</strong>. Al anticipar esta caída hasta <strong>{minimo:.2f}€</strong>, se habría podido evitar una pérdida neta estimada de <strong>{abs(perdida_evitada_neta):,.2f}€</strong> con una inversión de {inversion_base:,.2f}€.</p>"
+
+        if punto_giro_texto:
+            ganancia_seccion_contenido += punto_giro_texto
+
         # Generar el párrafo explicativo
         ganancia_compra_texto = ""
         ganancia_venta_texto = ""
