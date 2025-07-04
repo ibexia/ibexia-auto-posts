@@ -521,7 +521,7 @@ def construir_prompt_formateado(data):
                 cierre_actual = cierres[i]
 
                 # Detección de giro de tendencia bajista a alcista (posible punto de compra)
-                if (nota_actual >= nota_anterior and nota_siguiente > nota_actual) and (nota_anterior < nota_actual):
+                if nota_anterior > nota_actual and nota_siguiente > nota_actual:
                     # Si la nota venía bajando o plana y empieza a subir, es un posible punto de compra
                     max_post = max(cierres[i:], default=cierre_actual)
                     pct = ((max_post - cierre_actual) / cierre_actual) * 100
@@ -534,7 +534,7 @@ def construir_prompt_formateado(data):
                         mejor_punto_giro_compra = (i, cierre_actual, max_post, pct, ganancia_neta_actual)
 
                 # Detección de giro de tendencia alcista a bajista (posible punto de venta para evitar pérdida)
-                if (nota_actual <= nota_anterior and nota_siguiente < nota_actual) and (nota_anterior > nota_actual):
+                if nota_anterior < nota_actual and nota_siguiente < nota_actual:
                     # Si la nota venía subiendo o plana y empieza a bajar, es un posible punto de venta
                     min_post = min(cierres[i:], default=cierre_actual)
                     pct = ((min_post - cierre_actual) / cierre_actual) * 100 # Será un porcentaje negativo
