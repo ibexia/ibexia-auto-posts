@@ -508,7 +508,7 @@ def construir_prompt_formateado(data):
        
         chart_html += f"""
         <div style="margin-top:20px;">
-            <h2>Ganaríamos {inversion_base:,.2f}€ con nuestra inversión</h2>
+            <h2>Ganaríamos {(ganancia_neta_compra + ganancia_neta_venta):,.2f}€ con nuestra inversión</h2>
             {ganancia_seccion_contenido}
         </div>
         """
