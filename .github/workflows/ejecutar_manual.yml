@@ -1,0 +1,25 @@
+name: Ejecutar Script Python Manualmente
+
+on:
+  workflow_dispatch: # Esto habilita el botón "Run workflow" en la interfaz de GitHub
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest # Puedes usar 'windows-latest' o 'macos-latest' si lo prefieres
+
+    steps:
+    - name: Checkout del repositorio
+      uses: actions/checkout@v4 # Descarga el código de tu repositorio
+
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9' # Puedes cambiar a la versión de Python que uses (ej. '3.10', '3.11')
+
+    - name: Instalar dependencias
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt # Asegúrate de que tienes un archivo requirements.txt en tu repo
+
+    - name: Ejecutar el script Python
+      run: python analizar_ticker_manual.py # Asegúrate de que el nombre del archivo es correcto aquí
