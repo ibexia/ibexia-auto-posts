@@ -1,28 +1,28 @@
-name: Ejecutar Script Python Manualmente
+name: Ejecutar Ticker Manualmente
 
 on:
-  workflow_dispatch: # Esto habilita el botón "Run workflow" en la interfaz de GitHub
+  workflow_dispatch: # Este es el disparador manual
 
 jobs:
-  run-script:
-    runs-on: ubuntu-latest # Puedes usar 'windows-latest' o 'macos-latest' si lo prefieres
+  run-script: # Nombre del trabajo
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout del repositorio
-      uses: actions/checkout@v4 # Descarga el código de tu repositorio
+      - name: Descargar código
+        uses: actions/checkout@v4 # Actualizado a la versión más reciente (v4)
 
-    - name: Configurar Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.9' # Puedes cambiar a la versión de Python que uses (ej. '3.10', '3.11')
+      - name: Instalar Python y dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client google-generativeai
+          pip install yfinance pandas
+          pip install yfinance pandas feedparser # Incluido según tu workflow funcional
 
-    - name: Instalar dependencias
-      run: |
-        python -m pip install --upgrade pip
-        pip install --upgrade google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client google-generativeai
-
-        pip install yfinance pandas
-        pip install yfinance pandas feedparser # Asegúrate de que tu script lo usa, si no, puedes quitarlo
-
-    - name: Ejecutar el script Python
-      run: python analizar_ticker_manual.py # Asegúrate de que el nombre del archivo es correcto aquí
+      - name: Ejecutar script de análisis de ticker manual
+        env:
+          # Se mantienen solo las variables de entorno necesarias para Gemini y autenticación
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Las variables SPREADSHEET_ID y RANGE_NAME se han eliminado ya que este script no lee de Google Sheets
+        run: |
+          python analizar_ticker_manual.py # Ejecuta el nuevo script
