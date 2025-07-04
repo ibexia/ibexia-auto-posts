@@ -267,7 +267,9 @@ def formatear_numero(valor):
         
 def construir_prompt_formateado(data):
     titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']}"
-    
+    inversion_base = 10000.0
+    comision_por_operacion_porcentual = 0.001
+
        # NUEVO: Obtener las notas históricas para el gráfico
     notas_historicas = data.get('NOTAS_HISTORICAS_30_DIAS', [])
     cierres_historicos = data.get('CIERRES_30_DIAS', [])
@@ -441,46 +443,76 @@ def construir_prompt_formateado(data):
         cierres = data.get("CIERRES_30_DIAS", [])
         notas = data.get("NOTAS_HISTORICAS_30_DIAS", [])
 
-        mejor_compra = None  # (nota_idx, cierre_inicial, cierre_maximo, porcentaje)
-        mejor_venta = None   # (nota_idx, cierre_inicial, cierre_minimo, porcentaje)
-
+        mejor_compra = None
+        mejor_venta = None
+        ganancia_neta_compra = 0.0
+        ganancia_neta_venta = 0.0
+        
         if cierres and notas and len(cierres) == len(notas):
             for i in range(len(notas)):
                 nota = notas[i]
                 cierre = cierres[i]
         
                 if nota >= 8:
-                    # Buscar el máximo después de la recomendación de compra
                     max_post = max(cierres[i:], default=cierre)
                     pct = ((max_post - cierre) / cierre) * 100
+                    
                     if (not mejor_compra) or (pct > mejor_compra[3]):
-                        mejor_compra = (i, cierre, max_post, pct)
+                        ganancia_bruta = (max_post - cierre) * (inversion_base / cierre)
+                        comision_compra = inversion_base * comision_por_operacion_porcentual
+                        comision_venta = (inversion_base + ganancia_bruta) * comision_por_operacion_porcentual
+                        comision_total = comision_compra + comision_venta
+                        
+                        ganancia_neta_compra_actual = ganancia_bruta - comision_total
+                        
+                        mejor_compra = (i, cierre, max_post, pct, ganancia_neta_compra_actual)
+                        ganancia_neta_compra = ganancia_neta_compra_actual
         
                 elif nota <= 2:
-                    # Buscar el mínimo después de la recomendación de venta
                     min_post = min(cierres[i:], default=cierre)
                     pct = ((min_post - cierre) / cierre) * 100
+                    
                     if (not mejor_venta) or (pct < mejor_venta[3]):
-                        mejor_venta = (i, cierre, min_post, pct)
+                        perdida_bruta_evitada = (cierre - min_post) * (inversion_base / cierre)
+                        comision_compra_imaginaria = inversion_base * comision_por_operacion_porcentual
+                        comision_venta_real = (inversion_base - (inversion_base * abs(pct)/100)) * comision_por_operacion_porcentual
+                        comision_total_simulada = comision_compra_imaginaria + comision_venta_real
+                        
+                        perdida_evitada_neta_actual = perdida_bruta_evitada - comision_total_simulada
+                        
+                        mejor_venta = (i, cierre, min_post, pct, perdida_evitada_neta_actual)
+                        ganancia_neta_venta = perdida_evitada_neta_actual
 
         # Generar el párrafo explicativo
+        ganancia_compra_texto = ""
+        ganancia_venta_texto = ""
+        
         if mejor_compra:
-            idx, inicio, maximo, pct = mejor_compra
+            idx, inicio, maximo, pct, ganancia_neta = mejor_compra
             fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            descripcion_grafico += f"<p>Destacamos especialmente nuestra recomendación de <strong>compra</strong> el día {fecha}, cuando el precio era de <strong>{inicio:.2f}€</strong>. A partir de ese momento, el valor alcanzó un máximo de <strong>{maximo:.2f}€</strong>, lo que representó una revalorización del <strong>{pct:.2f}%</strong>. Este acierto muestra cómo nuestras señales pueden anticipar movimientos significativos en el mercado.</p>"
+            ganancia_compra_texto = f"<p>En nuestra mejor recomendación de <strong>compra</strong>, el día {fecha}, con el precio a <strong>{inicio:.2f}€</strong>, el valor alcanzó un máximo de <strong>{maximo:.2f}€</strong>. Con una inversión de <strong>{inversion_base:,.2f}€</strong>, esto habría generado una ganancia neta estimada de <strong>{ganancia_neta:,.2f}€</strong> (tras descontar las comisiones del {comision_por_operacion_porcentual*100:.1f}% por operación). Este acierto demuestra la potencia de nuestras señales para capturar el potencial alcista del mercado.</p>"
 
         if mejor_venta:
-            idx, inicio, minimo, pct = mejor_venta
+            idx, inicio, minimo, pct, perdida_evitada_neta = mejor_venta
             fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            descripcion_grafico += f"<p>En el lado de las <strong>ventas</strong>, subrayamos nuestra señal del {fecha}, con un precio inicial de <strong>{inicio:.2f}€</strong>. Posteriormente, la acción cayó hasta un mínimo de <strong>{minimo:.2f}€</strong>, registrando un descenso del <strong>{-pct:.2f}%</strong>. Esto refuerza la efectividad de nuestras alertas para proteger el capital en momentos de debilidad del mercado.</p>"
+            ganancia_venta_texto = f"<p>En cuanto a nuestras señales de <strong>venta</strong>, la más destacada ocurrió el día {fecha}, con un precio de <strong>{inicio:.2f}€</strong>. Si hubiéramos invertido <strong>{inversion_base:,.2f}€</strong> y seguido nuestra señal para evitar la caída hasta <strong>{minimo:.2f}€</strong>, habríamos evitado una pérdida neta estimada de <strong>{abs(perdida_evitada_neta):,.2f}€</strong> (tras descontar comisiones). Esto subraya la capacidad de nuestros análisis para proteger tu capital en momentos de debilidad del mercado.</p>"
 
-
+        ganancia_seccion_contenido = ""
+        if ganancia_compra_texto:
+            ganancia_seccion_contenido += ganancia_compra_texto
+        if ganancia_venta_texto:
+            ganancia_seccion_contenido += ganancia_venta_texto
+        
+        if not ganancia_seccion_contenido:
+            ganancia_seccion_contenido = f"<p>En este análisis no se detectaron señales de compra o venta lo suficientemente claras en el histórico reciente para proyectar ganancias o pérdidas evitadas significativas con una inversión de {inversion_base:,.2f}€.</p>"
+       
         chart_html += f"""
         <div style="margin-top:20px;">
-            <h3>Resumen de nuestro mejor acierto</h3>
-            {descripcion_grafico}
+            <h2>Ganaríamos {inversion_base:,.2f}€ con nuestra inversión</h2>
+            {ganancia_seccion_contenido}
         </div>
         """
+
         
         chart_html += f"""
 <h2>Evolución del Precio con Soportes y Resistencias</h2>
