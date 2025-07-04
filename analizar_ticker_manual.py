@@ -1045,6 +1045,8 @@ def generar_contenido_con_gemini(tickers):
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180) # Pausa de 180 segundos entre cada ticker
 
+
+
 def main():
     # Define el ticker que quieres analizar
     ticker_deseado = "BBVA.MC"  # <-- ¡CAMBIA "BBVA.MC" por el Ticker que quieras analizar!
