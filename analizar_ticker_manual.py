@@ -686,38 +686,35 @@ document.addEventListener('DOMContentLoaded', function () {{
 
         chart_html += f"""
 <h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
-<p>Este gráfico permite observar si la evolución de la nota técnica está alineada con el movimiento real del precio de la acción. Las divergencias pueden anticipar oportunidades o alertas importantes.</p>
+<p>Este gráfico permite observar si la evolución de la nota técnica está alineada con el movimiento real del precio de la acción. Las divergencias (cuando una sube y la otra no) pueden anticipar cambios significativos en el mercado.</p>
 
 <div style="width: 80%; margin: auto; height: 400px;">
-    <canvas id="divergenciaChart_{data['TICKER']}"></canvas>
+    <canvas id="divergenciaChart"></canvas>
 </div>
 
 <script>
-setTimeout(function () {
-    var canvas = document.getElementById('divergenciaChart');
-    if (!canvas) {
-        console.error("No se encontró el canvas 'divergenciaChart'");
-        return;
-    }
+document.addEventListener('DOMContentLoaded', function () {{
+    var ctx = document.getElementById('divergenciaChart').getContext('2d');
 
-    var ctx = canvas.getContext('2d');
-
-    var preciosOriginales = {{ json.dumps(data['CIERRES_30_DIAS']) }};
-    var notasOriginales = {{ json.dumps(data['NOTAS_HISTORICAS_30_DIAS']) }};
+    // Normalizamos el precio entre 0 y 10 para compararlo visualmente con la nota
+    var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
+    var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
 
     var minPrecio = Math.min(...preciosOriginales);
     var maxPrecio = Math.max(...preciosOriginales);
 
-    var preciosNormalizados = (maxPrecio - minPrecio === 0)
-        ? preciosOriginales.map(() => 5)
-        : preciosOriginales.map(p => ((p - minPrecio) / (maxPrecio - minPrecio)) * 10);
+    var preciosNormalizados = preciosOriginales.map(function(p) {{
+        return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
+    }});
 
-    new Chart(ctx, {
+    var labels = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
+
+    new Chart(ctx, {{
         type: 'line',
-        data: {
-            labels: {{ json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]) }},
+        data: {{
+            labels: labels,
             datasets: [
-                {
+                {{
                     label: 'Nota Técnica (0-10)',
                     data: notasOriginales,
                     borderColor: 'rgba(0, 128, 255, 1)',
@@ -726,8 +723,8 @@ setTimeout(function () {
                     fill: false,
                     tension: 0.2,
                     yAxisID: 'y'
-                },
-                {
+                }},
+                {{
                     label: 'Precio (normalizado 0-10)',
                     data: preciosNormalizados,
                     borderColor: 'rgba(255, 99, 132, 1)',
@@ -736,34 +733,42 @@ setTimeout(function () {
                     fill: false,
                     tension: 0.2,
                     yAxisID: 'y'
-                }
+                }}
             ]
-        },
-        options: {
+        }},
+        options: {{
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
-                y: {
+            plugins: {{
+                tooltip: {{
+                    mode: 'index',
+                    intersect: false
+                }},
+                legend: {{
+                    display: true
+                }}
+            }},
+            scales: {{
+                y: {{
                     beginAtZero: true,
                     max: 10,
-                    title: {
+                    title: {{
                         display: true,
                         text: 'Escala 0-10 (Nota y Precio Normalizado)'
-                    }
-                },
-                x: {
-                    title: {
+                    }}
+                }},
+                x: {{
+                    title: {{
                         display: true,
                         text: 'Últimos 30 Días'
-                    }
-                }
-            }
-        }
-    });
-}, 100); // esperar 100ms a que todo el HTML se cargue
+                    }}
+                }}
+            }}
+        }}
+    }});
+}});
 </script>
 """
-
 
         
 
