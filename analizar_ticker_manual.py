@@ -685,8 +685,8 @@ document.addEventListener('DOMContentLoaded', function () {{
 """
 
         chart_html += f"""
-<h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
-<p>Este gráfico permite observar si la evolución de la nota técnica está alineada con el movimiento real del precio de la acción. Las divergencias (cuando una sube y la otra no) pueden anticipar cambios significativos en el mercado.</p>
+<h2>Gráfico de Divergencia: Discrepancia entre Precio Normalizado y Nota Técnica</h2>
+<p>Este gráfico muestra la diferencia directa entre el **Precio de Cierre normalizado** (escala 0-10) y la **Nota Técnica** (escala 0-10). Las barras por encima de cero indican que el precio normalizado es mayor que la nota, sugiriendo una posible **divergencia bajista** (el precio sube o se mantiene, pero la nota indica debilidad subyacente). Las barras por debajo de cero señalan que la nota es mayor que el precio normalizado, lo que podría indicar una **divergencia alcista** (el precio baja o se mantiene, pero la nota muestra fortaleza subyacente).</p>
 
 <div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="divergenciaChart"></canvas>
@@ -696,7 +696,7 @@ document.addEventListener('DOMContentLoaded', function () {{
 document.addEventListener('DOMContentLoaded', function () {{
     var ctx = document.getElementById('divergenciaChart').getContext('2d');
 
-    // Normalizamos el precio entre 0 y 10 para compararlo visualmente con la nota
+    // Mantenemos el cálculo de preciosOriginales, notasOriginales y preciosNormalizados
     var preciosOriginales = {{ {json.dumps(data['CIERRES_30_DIAS'])} }};
     var notasOriginales = {{ {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])} }};
 
@@ -705,40 +705,43 @@ document.addEventListener('DOMContentLoaded', function () {{
 
     var preciosNormalizados;
     if (maxPrecio === minPrecio) {{
-        // Si el precio es constante, normalizamos a un valor medio (ej. 5)
-        preciosNormalizados = preciosOriginales.map(function() {{ return 5; }}); 
+        preciosNormalizados = preciosOriginales.map(function() {{ return 5; }}); // Normaliza a 5 si el precio es constante
     }} else {{
         preciosNormalizados = preciosOriginales.map(function(p) {{
             return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
         }});
     }}
 
+    // *** NUEVO CÁLCULO: Diferencia entre Precio Normalizado y Nota Técnica ***
+    var divergenciaData = [];
+    for (var i = 0; i < preciosNormalizados.length; i++) {{
+        divergenciaData.push(preciosNormalizados[i] - notasOriginales[i]);
+    }}
+
+    // *** NUEVOS COLORES BASADOS EN LA DIFERENCIA ***
+    var barColors = divergenciaData.map(function(val) {{
+        if (val > 0) {{
+            return 'rgba(255, 99, 132, 0.6)'; // Rojo/Naranja para Precio Normalizado > Nota Técnica (Posible Divergencia Bajista)
+        }} else if (val < 0) {{
+            return 'rgba(75, 192, 192, 0.6)'; // Verde/Azul para Nota Técnica > Precio Normalizado (Posible Divergencia Alcista)
+        }} else {{
+            return 'rgba(200, 200, 200, 0.6)'; // Gris para Convergencia
+        }}
+    }});
+
     var labels = {{ {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])} }};
 
     new Chart(ctx, {{
-        type: 'line',
+        type: 'bar', // Cambiamos el tipo de gráfico a 'bar' (barras)
         data: {{
             labels: labels,
             datasets: [
                 {{
-                    label: 'Nota Técnica (0-10)',
-                    data: notasOriginales,
-                    borderColor: 'rgba(0, 128, 255, 1)',
-                    backgroundColor: 'rgba(0, 128, 255, 0.1)',
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.2,
-                    yAxisID: 'y'
-                }},
-                {{
-                    label: 'Precio (normalizado 0-10)',
-                    data: preciosNormalizados,
-                    borderColor: 'rgba(255, 99, 132, 1)',
-                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.2,
-                    yAxisID: 'y'
+                    label: 'Diferencia (Precio Normalizado - Nota Técnica)',
+                    data: divergenciaData,
+                    backgroundColor: barColors, // Usamos los colores dinámicos
+                    borderColor: barColors.map(color => color.replace('0.6', '1')), // Borde más fuerte
+                    borderWidth: 1
                 }}
             ]
         }},
@@ -748,7 +751,25 @@ document.addEventListener('DOMContentLoaded', function () {{
             plugins: {{
                 tooltip: {{
                     mode: 'index',
-                    intersect: false
+                    intersect: false,
+                    callbacks: {{
+                        label: function(context) {{
+                            let label = context.dataset.label || '';
+                            if (label) {{
+                                label += ': ';
+                            }}
+                            let value = context.parsed.y.toFixed(2);
+                            let type = '';
+                            if (value > 0) {{
+                                type = ' (Precio > Nota - Posible Divergencia Bajista)';
+                            }} else if (value < 0) {{
+                                type = ' (Nota > Precio - Posible Divergencia Alcista)';
+                            }} else {{
+                                type = ' (Convergencia)';
+                            }}
+                            return label + value + type;
+                        }}
+                    }}
                 }},
                 legend: {{
                     display: true
@@ -756,11 +777,10 @@ document.addEventListener('DOMContentLoaded', function () {{
             }},
             scales: {{
                 y: {{
-                    beginAtZero: true,
-                    max: 10,
+                    beginAtZero: true, // Permite que las barras vayan por encima y por debajo de cero
                     title: {{
                         display: true,
-                        text: 'Escala 0-10 (Nota y Precio Normalizado)'
+                        text: 'Diferencia (Precio Normalizado - Nota Técnica)'
                     }}
                 }},
                 x: {{
@@ -770,8 +790,7 @@ document.addEventListener('DOMContentLoaded', function () {{
                     }}
                 }}
             }}
-        }}
-    }});
+        }});
 }});
 </script>
 """
