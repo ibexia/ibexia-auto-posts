@@ -693,75 +693,74 @@ document.addEventListener('DOMContentLoaded', function () {{
 </div>
 
 <script>
-    var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
-    var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
+setTimeout(function () {
+    var canvas = document.getElementById('divergenciaChart');
+    if (!canvas) {
+        console.error("No se encontró el canvas 'divergenciaChart'");
+        return;
+    }
+
+    var ctx = canvas.getContext('2d');
+
+    var preciosOriginales = {{ json.dumps(data['CIERRES_30_DIAS']) }};
+    var notasOriginales = {{ json.dumps(data['NOTAS_HISTORICAS_30_DIAS']) }};
 
     var minPrecio = Math.min(...preciosOriginales);
     var maxPrecio = Math.max(...preciosOriginales);
 
-    var preciosNormalizados = preciosOriginales.map(function(p) {{
-        return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
-    }});
+    var preciosNormalizados = (maxPrecio - minPrecio === 0)
+        ? preciosOriginales.map(() => 5)
+        : preciosOriginales.map(p => ((p - minPrecio) / (maxPrecio - minPrecio)) * 10);
 
-    var labels = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
-
-    var ctx = document.getElementById('divergenciaChart_{data['TICKER']}').getContext('2d');
-
-    new Chart(ctx, {{
+    new Chart(ctx, {
         type: 'line',
-        data: {{
-            labels: labels,
+        data: {
+            labels: {{ json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]) }},
             datasets: [
-                {{
+                {
                     label: 'Nota Técnica (0-10)',
                     data: notasOriginales,
                     borderColor: 'rgba(0, 128, 255, 1)',
                     backgroundColor: 'rgba(0, 128, 255, 0.1)',
                     borderWidth: 2,
                     fill: false,
-                    tension: 0.3
-                }},
-                {{
+                    tension: 0.2,
+                    yAxisID: 'y'
+                },
+                {
                     label: 'Precio (normalizado 0-10)',
                     data: preciosNormalizados,
                     borderColor: 'rgba(255, 99, 132, 1)',
                     backgroundColor: 'rgba(255, 99, 132, 0.1)',
                     borderWidth: 2,
                     fill: false,
-                    tension: 0.3
-                }}
+                    tension: 0.2,
+                    yAxisID: 'y'
+                }
             ]
-        }},
-        options: {{
+        },
+        options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: {{
-                y: {{
+            scales: {
+                y: {
                     beginAtZero: true,
                     max: 10,
-                    title: {{
+                    title: {
                         display: true,
-                        text: 'Escala 0-10 (Nota y Precio)'
-                    }}
-                }},
-                x: {{
-                    title: {{
+                        text: 'Escala 0-10 (Nota y Precio Normalizado)'
+                    }
+                },
+                x: {
+                    title: {
                         display: true,
                         text: 'Últimos 30 Días'
-                    }}
-                }}
-            }},
-            plugins: {{
-                legend: {{
-                    display: true
-                }},
-                tooltip: {{
-                    mode: 'index',
-                    intersect: false
-                }}
-            }}
-        }}
-    }});
+                    }
+                }
+            }
+        }
+    });
+}, 100); // esperar 100ms a que todo el HTML se cargue
 </script>
 """
 
