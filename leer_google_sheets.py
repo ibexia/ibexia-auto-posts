@@ -1,3 +1,4 @@
+
 import os
 import json
 import smtplib
@@ -684,6 +685,116 @@ document.addEventListener('DOMContentLoaded', function () {{
 </script>
 """
 
+        chart_html += f"""
+<h2>Gráfico de Divergencia: Discrepancia entre Precio Normalizado y Nota Técnica</h2>
+<p>Este gráfico muestra la diferencia directa entre el **Precio de Cierre normalizado** (escala 0-10) y la **Nota Técnica** (escala 0-10). Las barras por encima de cero indican que el precio normalizado es mayor que la nota, sugiriendo una posible **divergencia bajista** (el precio sube o se mantiene, pero la nota indica debilidad subyacente). Las barras por debajo de cero señalan que la nota es mayor que el precio normalizado, lo que podría indicar una **divergencia alcista** (el precio baja o se mantiene, pero la nota muestra fortaleza subyacente).</p>
+
+<div style="width: 80%; margin: auto; height: 400px;">
+    <canvas id="divergenciaChart"></canvas>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {{
+    var ctx = document.getElementById('divergenciaChart').getContext('2d');
+
+    // Mantenemos el cálculo de preciosOriginales, notasOriginales y preciosNormalizados
+    var preciosOriginales = {{ {json.dumps(data['CIERRES_30_DIAS'])} }};
+    var notasOriginales = {{ {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])} }};
+
+    var minPrecio = Math.min(...preciosOriginales);
+    var maxPrecio = Math.max(...preciosOriginales);
+
+    var preciosNormalizados;
+    if (maxPrecio === minPrecio) {{
+        preciosNormalizados = preciosOriginales.map(function() {{ return 5; }}); // Normaliza a 5 si el precio es constante
+    }} else {{
+        preciosNormalizados = preciosOriginales.map(function(p) {{
+            return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
+        }});
+    }}
+
+    // *** NUEVO CÁLCULO: Diferencia entre Precio Normalizado y Nota Técnica ***
+    var divergenciaData = [];
+    for (var i = 0; i < preciosNormalizados.length; i++) {{
+        divergenciaData.push(preciosNormalizados[i] - notasOriginales[i]);
+    }}
+
+    // *** NUEVOS COLORES BASADOS EN LA DIFERENCIA ***
+    var barColors = divergenciaData.map(function(val) {{
+        if (val > 0) {{
+            return 'rgba(255, 99, 132, 0.6)'; // Rojo/Naranja para Precio Normalizado > Nota Técnica (Posible Divergencia Bajista)
+        }} else if (val < 0) {{
+            return 'rgba(75, 192, 192, 0.6)'; // Verde/Azul para Nota Técnica > Precio Normalizado (Posible Divergencia Alcista)
+        }} else {{
+            return 'rgba(200, 200, 200, 0.6)'; // Gris para Convergencia
+        }}
+    }});
+
+    var labels = {{ {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])} }};
+
+    new Chart(ctx, {{
+        type: 'bar', // Cambiamos el tipo de gráfico a 'bar' (barras)
+        data: {{
+            labels: labels,
+            datasets: [
+                {{
+                    label: 'Diferencia (Precio Normalizado - Nota Técnica)',
+                    data: divergenciaData,
+                    backgroundColor: barColors, // Usamos los colores dinámicos
+                    borderColor: barColors.map(color => color.replace('0.6', '1')), // Borde más fuerte
+                    borderWidth: 1
+                }}
+            ]
+        }},
+        options: {{
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {{
+                tooltip: {{
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {{
+                        label: function(context) {{
+                            let label = context.dataset.label || '';
+                            if (label) {{
+                                label += ': ';
+                            }}
+                            let value = context.parsed.y.toFixed(2);
+                            let type = '';
+                            if (value > 0) {{
+                                type = ' (Precio > Nota - Posible Divergencia Bajista)';
+                            }} else if (value < 0) {{
+                                type = ' (Nota > Precio - Posible Divergencia Alcista)';
+                            }} else {{
+                                type = ' (Convergencia)';
+                            }}
+                            return label + value + type;
+                        }}
+                    }}
+                }},
+                legend: {{
+                    display: true
+                }}
+            }},
+            scales: {{
+                y: {{
+                    beginAtZero: true, // Permite que las barras vayan por encima y por debajo de cero
+                    title: {{
+                        display: true,
+                        text: 'Diferencia (Precio Normalizado - Nota Técnica)'
+                    }}
+                }},
+                x: {{
+                    title: {{
+                        display: true,
+                        text: 'Últimos 30 Días'
+                    }}
+                }}
+            }}
+        }});
+}});
+</script>
+"""
 
         
 
