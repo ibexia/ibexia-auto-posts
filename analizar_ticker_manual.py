@@ -148,10 +148,10 @@ def obtener_datos_yfinance(ticker):
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
         if nota_empresa <= 2:
-            recomendacion = "Riesgo de entrar muy elevado"
+            recomendacion = "Vender"
             condicion_rsi = "muy sobrecomprado"
         elif 2 < nota_empresa <= 4:
-            recomendacion = "Inversion con riesgo"
+            recomendacion = "Vigilar posible venta"
             condicion_rsi = "algo sobrecomprado"
         elif 4 < nota_empresa <= 5:
             recomendacion = "Cuidado. Revisar soportes y resistencias"
@@ -160,16 +160,16 @@ def obtener_datos_yfinance(ticker):
             recomendacion = "Mantener (Neutro)"
             condicion_rsi = "neutral"
         elif 6 <= nota_empresa < 7:
-            recomendacion = "Posible oportunidad. Revisar soportes y resistencias"
+            recomendacion = "Posible compra. Revisar soportes y resistencias"
             condicion_rsi = "muy poca sobreventa"
         elif 7 <= nota_empresa < 8:
-            recomendacion = "Oportunidad de entrar, bajo riesgo"
+            recomendacion = "Considerar posible compra"
             condicion_rsi = "algo de sobreventa"
         elif 8 <= nota_empresa < 9:
-            recomendacion = "Sin Riesgo. Buena oportunidad de invertir"
+            recomendacion = "Se acerca la hora de comprar"
             condicion_rsi = "sobreventa"
         elif nota_empresa >= 9:
-            recomendacion = "Excelente entrada para invertir"
+            recomendacion = "Comprar"
             condicion_rsi = "extremadamente sobrevendido"
         else:
             recomendacion = "Indefinido"
@@ -295,69 +295,6 @@ def construir_prompt_formateado(data):
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
         notas_historicas_display = notas_historicas
 
-    # --- CÁLCULO DE DATOS PARA EL GRÁFICO DE GIROS Y TRAMOS DE TENDENCIA ---
-    # Gráfico 1: Gráfico de Cambios de Tendencia (Giros de Ciclo) -> Línea +1/-1/0
-    tendencia_giro = []
-    # Usaremos una lógica simple: si la nota sube (+1), baja (-1), o se mantiene (0)
-    for i in range(len(data['NOTAS_HISTORICAS_30_DIAS'])):
-        if i == 0:
-            # Para el primer día, se asume sin cambio (0) ya que no hay día anterior para comparar
-            tendencia_giro.append(0)
-        else:
-            if data['NOTAS_HISTORICAS_30_DIAS'][i] > data['NOTAS_HISTORICAS_30_DIAS'][i-1]:
-                tendencia_giro.append(1) # Alcista
-            elif data['NOTAS_HISTORICAS_30_DIAS'][i] < data['NOTAS_HISTORICAS_30_DIAS'][i-1]:
-                tendencia_giro.append(-1) # Bajista
-            else:
-                tendencia_giro.append(0) # Sin cambio
-
-    # Gráfico 5: Gráfico de Duración de Tramos -> Fondos o bloques de color (para annotations)
-    tramos_info = [] # Almacenará {'start_index': x, 'end_index': y, 'type': 1/0/-1, 'duration': z}
-    if len(tendencia_giro) > 0:
-        current_trend = tendencia_giro[0]
-        current_start_index = 0
-        for i in range(1, len(tendencia_giro)):
-            if tendencia_giro[i] != current_trend:
-                tramos_info.append({
-                    'start_index': current_start_index,
-                    'end_index': i - 1,
-                    'type': current_trend,
-                    'duration': (i - 1) - current_start_index + 1
-                })
-                current_trend = tendencia_giro[i]
-                current_start_index = i
-        # Añadir el último tramo
-        tramos_info.append({
-            'start_index': current_start_index,
-            'end_index': len(tendencia_giro) - 1,
-            'type': current_trend,
-            'duration': (len(tendencia_giro) - 1) - current_start_index + 1
-        })
-
-    # Gráfico 8: Gráfico de Reversiones en Zonas Extremas -> Símbolos ★
-    reversion_puntos = [] # Almacenará objetos {x: index, y: valor, symbol: '★'}
-    for i in range(1, len(data['NOTAS_HISTORICAS_30_DIAS'])):
-        nota_hoy = data['NOTAS_HISTORICAS_30_DIAS'][i]
-        nota_ayer = data['NOTAS_HISTORICAS_30_DIAS'][i-1]
-        
-        is_extreme_today = (nota_hoy <= 2 or nota_hoy >= 8)
-        
-        if is_extreme_today:
-            # Detectar giro claro: si estaba bajando y ahora sube en extremo, o viceversa
-            if (nota_hoy > nota_ayer and tendencia_giro[i-1] == -1) or \
-               (nota_hoy < nota_ayer and tendencia_giro[i-1] == 1):
-                reversion_puntos.append({'x': i, 'y': tendencia_giro[i], 'symbol': '★'})
-            # Detectar entrada en extremo con posible giro (o consolidación en extremo)
-            elif tendencia_giro[i] == 0: # Si la tendencia es lateral
-                # Comprobar si acaba de entrar en zona extrema (ej. de 3 a 2 o de 7 a 8)
-                was_not_extreme_yesterday_low = (nota_ayer > 2 and nota_hoy <= 2)
-                was_not_extreme_yesterday_high = (nota_ayer < 8 and nota_hoy >= 8)
-                if was_not_extreme_yesterday_low or was_not_extreme_yesterday_high:
-                    reversion_puntos.append({'x': i, 'y': tendencia_giro[i], 'symbol': '★'})
-
-
-
-        
         chart_html = f"""
 <h2>Evolución de la Nota Técnica</h2>
 <p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
@@ -749,56 +686,58 @@ document.addEventListener('DOMContentLoaded', function () {{
 
         chart_html += f"""
 <h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
-<p>Este gráfico permite observar si la evolución de la nota técnica está alineada con el movimiento real del precio de la acción. Las divergencias (cuando una sube y la otra no) pueden anticipar cambios significativos en el mercado.</p>
+<p>Este gráfico es crucial para identificar **divergencias significativas** entre nuestra valoración técnica (la Nota Técnica) y el movimiento real del precio de la acción. Una divergencia positiva (barras verdes) sugiere que nuestra nota está indicando una fortaleza técnica mayor de lo que el precio actual refleja, lo que podría anticipar un movimiento alcista. Por el contrario, una divergencia negativa (barras rojas) indica que la nota técnica es más débil que el precio, lo que podría ser una señal de advertencia o anticipar una corrección.</p>
 
 <div style="width: 80%; margin: auto; height: 400px;">
-    <canvas id="divergenciaChart"></canvas>
+    <canvas id="divergenciaColorChart"></canvas>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {{
-    var ctx = document.getElementById('divergenciaChart').getContext('2d');
+    var ctx = document.getElementById('divergenciaColorChart').getContext('2d');
 
-    // Normalizamos el precio entre 0 y 10 para compararlo visualmente con la nota
     var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
     var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
 
     var minPrecio = Math.min(...preciosOriginales);
     var maxPrecio = Math.max(...preciosOriginales);
 
-    // FIX para evitar división por cero si todos los precios son iguales o el rango es 0
-    var preciosNormalizados = preciosOriginales.map(function(p) {{
-        if (maxPrecio === minPrecio) {{
-            return 5; // Asigna un valor medio (5) si el rango de precios es cero, para evitar NaN y mostrar el gráfico
+    var preciosNormalizados = [];
+    if (minPrecio === maxPrecio) {{
+        // Si todos los precios son iguales, normalizarlos a un punto medio (ej. 5)
+        preciosNormalizados = preciosOriginales.map(function() {{ return 5; }});
+    }} else {{
+        preciosNormalizados = preciosOriginales.map(function(p) {{
+            return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
+        }});
+    }}
+
+    // Calcular la divergencia (Nota - Precio Normalizado)
+    var divergenciaData = [];
+    var backgroundColors = [];
+    for (var i = 0; i < notasOriginales.length; i++) {{
+        var diff = notasOriginales[i] - preciosNormalizados[i];
+        divergenciaData.push(diff);
+        if (diff >= 0) {{
+            backgroundColors.push('rgba(0, 150, 0, 0.7)'); // Verde para divergencia alcista o neutra
+        }} else {{
+            backgroundColors.push('rgba(255, 0, 0, 0.7)'); // Rojo para divergencia bajista
         }}
-        return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
-    }});
+    }}
 
     var labels = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
 
     new Chart(ctx, {{
-        type: 'line',
+        type: 'bar', // Usamos un gráfico de barras para visualizar mejor la divergencia
         data: {{
             labels: labels,
             datasets: [
                 {{
-                    label: 'Nota Técnica (0-10)',
-                    data: notasOriginales,
-                    borderColor: 'rgba(0, 128, 255, 1)',
-                    backgroundColor: 'rgba(0, 128, 255, 0.1)',
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.2,
-                    yAxisID: 'y'
-                }},
-                {{
-                    label: 'Precio (normalizado 0-10)',
-                    data: preciosNormalizados,
-                    borderColor: 'rgba(255, 99, 132, 1)',
-                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.2,
+                    label: 'Divergencia (Nota - Precio Normalizado)',
+                    data: divergenciaData,
+                    backgroundColor: backgroundColors,
+                    borderColor: backgroundColors.map(color => color.replace('0.7', '1')), // Border más oscuro
+                    borderWidth: 1,
                     yAxisID: 'y'
                 }}
             ]
@@ -809,19 +748,41 @@ document.addEventListener('DOMContentLoaded', function () {{
             plugins: {{
                 tooltip: {{
                     mode: 'index',
-                    intersect: false
+                    intersect: false,
+                    callbacks: {{
+                        label: function(context) {{
+                            return 'Divergencia: ' + context.parsed.y.toFixed(2);
+                        }}
+                    }}
                 }},
                 legend: {{
                     display: true
+                }},
+                annotation: {{
+                    annotations: {{
+                        zeroLine: {{
+                            type: 'line',
+                            yMin: 0,
+                            yMax: 0,
+                            borderColor: 'rgba(0, 0, 0, 0.5)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            label: {{
+                                enabled: true,
+                                content: 'Sin Divergencia (0)',
+                                position: 'end',
+                                backgroundColor: 'rgba(0, 0, 0, 0.6)'
+                            }}
+                        }}
+                    }}
                 }}
             }},
             scales: {{
                 y: {{
-                    beginAtZero: true,
-                    max: 10,
+                    beginAtZero: false, // Permitir valores negativos para la divergencia
                     title: {{
                         display: true,
-                        text: 'Escala 0-10 (Nota y Precio Normalizado)'
+                        text: 'Divergencia (Nota - Precio Normalizado)'
                     }}
                 }},
                 x: {{
@@ -832,159 +793,6 @@ document.addEventListener('DOMContentLoaded', function () {{
                 }}
             }}
         }}
-    }});
-}});
-</script>
-"""
-        # --- NUEVO GRÁFICO: Gráfico de Giros y Tramos de Tendencia ---
-        # Añade este bloque inmediatamente después del script del gráfico de divergencia
-        chart_html += f"""
-<h2 style="color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px;">Gráfico de Giros y Tramos de Tendencia</h2>
-<p style="font-size: 0.9em; color: #666; margin-bottom: 20px;">Este gráfico combina el giro de ciclo de la Nota Técnica, la duración de sus tramos y las reversiones en zonas extremas. Una línea ascendente (+1) indica un ciclo alcista, descendente (-1) uno bajista, y horizontal (0) un ciclo lateral. Los fondos coloreados representan la duración de cada tramo (verde claro para alcista, rojo claro para bajista, gris claro para lateral). Las estrellas (⭐) marcan reversiones clave cuando la nota toca zonas extremas (≤2 o ≥8) y cambia de dirección, indicando fuertes señales de giro.</p>
-
-<div style="width: 80%; margin: auto; height: 450px;">
-    <canvas id="girosTramosReversionesChart"></canvas>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {{
-    var ctx = document.getElementById('girosTramosReversionesChart').getContext('2d');
-
-    var labels = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
-    var tendenciaGiroData = {json.dumps(tendencia_giro)}; // Datos de +1/-1/0
-    var tramosInfo = {json.dumps(tramos_info)}; // Información de los tramos
-    var reversionPuntosData = {json.dumps(reversion_puntos)}; // Puntos de reversión
-
-    // Crear puntos de los símbolos para un dataset de scatter
-    var scatterPoints = reversionPuntosData.map(point => ({{ x: labels[point.x], y: point.y }}));
-
-    var chartOptions = {{
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {{
-            tooltip: {{
-                mode: 'index',
-                intersect: false,
-                callbacks: {{
-                    label: function(context) {{
-                        if (context.dataset.label === 'Giros de Ciclo') {{
-                            let value = context.parsed.y;
-                            if (value === 1) return 'Tendencia: Alcista';
-                            if (value === -1) return 'Tendencia: Bajista';
-                            if (value === 0) return 'Tendencia: Lateral/Sin Cambio';
-                        }}
-                        if (context.dataset.label === 'Reversión Extrema') {{
-                             return 'Reversión en Extremo: ' + context.parsed.y;
-                        }}
-                        return context.dataset.label + ': ' + context.parsed.y;
-                    }}
-                }}
-            }},
-            legend: {{
-                display: true
-            }},
-            annotation: {{
-                annotations: {{
-                    // Línea central en 0
-                    zeroLine: {{
-                        type: 'line',
-                        yMin: 0,
-                        yMax: 0,
-                        borderColor: 'rgba(0, 0, 0, 0.5)',
-                        borderWidth: 1,
-                        label: {{
-                            enabled: true,
-                            content: 'Sin Cambio',
-                            position: 'end'
-                        }}
-                    }},
-                    // Añadir bloques de color para la duración de los tramos
-                    ...tramosInfo.reduce((acc, tramo, index) => {{
-                        let color;
-                        if (tramo.type === 1) color = 'rgba(0, 150, 0, 0.1)'; // Verde claro para alcista
-                        else if (tramo.type === -1) color = 'rgba(255, 0, 0, 0.1)'; // Rojo claro para bajista
-                        else color = 'rgba(128, 128, 128, 0.1)'; // Gris claro para lateral
-
-                        acc[`box${index}`] = {{
-                            type: 'box',
-                            xMin: labels[tramo.start_index],
-                            xMax: labels[tramo.end_index],
-                            yMin: -1.5, // Extender por debajo del -1.0 para cubrir todo el rango
-                            yMax: 1.5,  // Extender por encima del +1.0
-                            backgroundColor: color,
-                            borderColor: color.replace('0.1', '0.4'),
-                            borderWidth: 0,
-                            label: {{
-                                enabled: true,
-                                content: `Duración: ${tramo.duration} días (${tramo.type === 1 ? 'Alcista' : (tramo.type === -1 ? 'Bajista' : 'Lateral')})`,
-                                position: 'center',
-                                backgroundColor: 'rgba(0,0,0,0.5)',
-                                font: {{
-                                    size: 10
-                                }}
-                            }}
-                        }};
-                        return acc;
-                    }}, {{}})
-                }}
-            }}
-        }},
-        scales: {{
-            y: {{
-                min: -1.5,
-                max: 1.5,
-                ticks: {{
-                    callback: function(value, index, values) {{
-                        if (value === 1) return 'Alcista';
-                        if (value === -1) return 'Bajista';
-                        if (value === 0) return 'Sin Cambio';
-                        return '';
-                    }}
-                }},
-                title: {{
-                    display: true,
-                    text: 'Tipo de Tendencia'
-                }}
-            }},
-            x: {{
-                title: {{
-                    display: true,
-                    text: 'Últimos 30 Días'
-                }}
-            }}
-        }}
-    }};
-
-    new Chart(ctx, {{
-        type: 'line',
-        data: {{
-            labels: labels,
-            datasets: [
-                {{
-                    label: 'Giros de Ciclo',
-                    data: tendenciaGiroData,
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.1,
-                    yAxisID: 'y'
-                }},
-                {{
-                    label: 'Reversión Extrema',
-                    data: scatterPoints,
-                    backgroundColor: 'rgba(255, 206, 86, 1)',
-                    borderColor: 'rgba(255, 206, 86, 1)',
-                    pointStyle: 'star', // Usar estrella
-                    radius: 7,          // Tamaño de la estrella
-                    hoverRadius: 10,
-                    showLine: false,    // No conectar los puntos
-                    yAxisID: 'y'
-                }}
-            ]
-        }},
-        options: chartOptions
     }});
 }});
 </script>
@@ -1349,6 +1157,8 @@ def generar_contenido_con_gemini(tickers):
         # --- PAUSA DE 3 MINUTO DESPUÉS DE CADA TICKER ---
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180) # Pausa de 180 segundos entre cada ticker
+
+
 
 def main():
     # Define el ticker que quieres analizar
