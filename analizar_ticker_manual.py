@@ -148,10 +148,10 @@ def obtener_datos_yfinance(ticker):
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
         if nota_empresa <= 2:
-            recomendacion = "Vender"
+            recomendacion = "Riesgo de entrar muy elevado"
             condicion_rsi = "muy sobrecomprado"
         elif 2 < nota_empresa <= 4:
-            recomendacion = "Vigilar posible venta"
+            recomendacion = "Inversion con riesgo"
             condicion_rsi = "algo sobrecomprado"
         elif 4 < nota_empresa <= 5:
             recomendacion = "Cuidado. Revisar soportes y resistencias"
@@ -160,16 +160,16 @@ def obtener_datos_yfinance(ticker):
             recomendacion = "Mantener (Neutro)"
             condicion_rsi = "neutral"
         elif 6 <= nota_empresa < 7:
-            recomendacion = "Posible compra. Revisar soportes y resistencias"
+            recomendacion = "Posible oportunidad. Revisar soportes y resistencias"
             condicion_rsi = "muy poca sobreventa"
         elif 7 <= nota_empresa < 8:
-            recomendacion = "Considerar posible compra"
+            recomendacion = "Oportunidad de entrar, bajo riesgo"
             condicion_rsi = "algo de sobreventa"
         elif 8 <= nota_empresa < 9:
-            recomendacion = "Se acerca la hora de comprar"
+            recomendacion = "Sin Riesgo. Buena oportunidad de invertir"
             condicion_rsi = "sobreventa"
         elif nota_empresa >= 9:
-            recomendacion = "Comprar"
+            recomendacion = "Excelente entrada para invertir"
             condicion_rsi = "extremadamente sobrevendido"
         else:
             recomendacion = "Indefinido"
