@@ -298,7 +298,7 @@ def construir_prompt_formateado(data):
         chart_html = f"""
 <h2>Evolución de la Nota Técnica</h2>
 <p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
-<p>Esta deja constancia clara de nuestras valoraciones y su grado de acierto con el paso del tiempo. Así, no solo anticipamos movimientos, sino que también construimos una trazabilidad transparente de nuestras decisiones técnicas.</p>
+
 <div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="notasChart"></canvas>
 </div>
@@ -570,7 +570,7 @@ def construir_prompt_formateado(data):
         
         chart_html += f"""
 <h2>Evolución del Precio con Soportes y Resistencias</h2>
-<p>A continuación, muestro un gráfico de precios de cierre de los últimos 30 días para <strong>{data['NOMBRE_EMPRESA']}</strong>, con las zonas clave de soporte, resistencia y el precio objetivo de compra claramente marcadas. Estas líneas permiten identificar visualmente los puntos más relevantes para la toma de decisiones estratégicas.</p>
+<p>A continuación, muestro un gráfico de precios de cierre de los últimos 30 días para <strong>{data['NOMBRE_EMPRESA']}</strong>, con las zonas clave de soporte, resistencia y el precio objetivo de compra claramente marcadas.</p>
 
 <div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="preciosChart"></canvas>
@@ -944,8 +944,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
     {"una fortaleza técnica moderada, con un equilibrio entre potencial y riesgo. Se basa en el comportamiento del gráfico, soportes, resistencias e impulso, sugiriendo una oportunidad que requiere seguimiento." if 6 <= data['NOTA_EMPRESA'] < 8 else ""}
     {"una situación técnica neutral, donde el gráfico no muestra un patrón direccional claro. La puntuación se deriva del análisis de los movimientos de precio y volumen, indicando que es un momento para la observación y no para la acción inmediata." if 5 <= data['NOTA_EMPRESA'] < 6 else ""}
     {"cierta debilidad técnica, con posibles señales de corrección o continuación bajista. La puntuación se basa en los indicadores del gráfico, que muestran una pérdida de impulso alcista y un aumento de la presión vendedora." if 3 <= data['NOTA_EMPRESA'] < 5 else ""}
-    {"una debilidad técnica significativa y una posible sobrecompra en el gráfico, lo que sugiere un alto riesgo de corrección. La puntuación se basa en el análisis de los patrones de precio y volumen, indicando que es un momento para la cautela extrema." if data['NOTA_EMPRESA'] < 3 else ""}
-Es importante recordar que esta nota técnica que IBEXIA otorga es puramente un reflejo del **análisis del gráfico y sus indicadores técnicos**, y no obedece a la situación financiera o de otro tipo de la empresa. Como profesional, esta nota es mi valoración experta al interpretar el comportamiento del precio y los indicadores.</p>
+    {"una debilidad técnica significativa y una posible sobrecompra en el gráfico, lo que sugiere un alto riesgo de corrección. </p>
 {chart_html}
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
@@ -956,7 +955,7 @@ Es importante recordar que esta nota técnica que IBEXIA otorga es puramente un 
 
 <p>{volumen_analisis_text}</p>
 
-<p>Basado en nuestro análisis, una posible estrategia de entrada sería considerar una compra cerca {f"del soporte de <strong>{soportes_unicos[0]:,.2f}€</strong>" if len(soportes_unicos) > 0 else ""} o, idealmente, en {f"los <strong>{soportes_unicos[1]:,.2f}€</strong>." if len(soportes_unicos) > 1 else "."} Estos niveles ofrecen una relación riesgo/recompensa atractiva, permitiendo una entrada con mayor margen de seguridad. Para gestionar el riesgo de forma efectiva, se recomienda establecer un stop loss ajustado justo por debajo del soporte más bajo que hemos identificado, por ejemplo, en {f"<strong>{soportes_unicos[-1]:,.2f}€</strong>." if len(soportes_unicos) > 0 else "un nivel apropiado de invalidación."} Este punto actuaría como un nivel de invalidez de nuestra tesis de inversión. Nuestro objetivo de beneficio (Take Profit) a corto plazo se sitúa en la resistencia clave de <strong>{data['RESISTENCIA']:,}€</strong>, lo que representa un potencial de revalorización significativo. Esta configuración de entrada, stop loss y objetivo permite una relación riesgo/recompensa favorable para el inversor, buscando maximizar el beneficio mientras se protege el capital.</p>
+
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 
@@ -1030,20 +1029,9 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 <p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
 {tabla_resumen}
 
-<h3>¿Qué analizaremos mañana? ¡No te lo pierdas!</h3>
-<p>Mañana, pondremos bajo la lupa a otros 10 valores más. ¿Será el próximo candidato para una oportunidad de compra o venta? ¡Vuelve mañana a la misma hora para descubrirlo y seguir ampliando tu conocimiento de mercado!</p>
-
-<h3>Tu Opinión Importa: ¡Participa!</h3>
-<p>¿Considerarías comprar acciones de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> con este análisis?</p>
-<ul>
-    <li>Sí, la oportunidad es clara.</li>
-    <li>No, prefiero esperar más datos.</li>
-    <li>Ya las tengo en cartera.</li>
-</ul>
-<p>¡Déjanos tu voto y tu comentario sobre tu visión de <strong>{data['NOMBRE_EMPRESA']}</strong> en la sección de comentarios! Queremos saber qué piensas y fomentar una comunidad de inversores informada.</p>
 
 <h2>Descargo de Responsabilidad</h2>
-<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. La inversión en mercados financieros conlleva riesgos, incluyendo la pérdida total del capital invertido. Se recomienda encarecidamente a cada inversor realizar su propia investigación exhaustiva (due diligence), consultar con un asesor financiero cualificado y analizar cada decisión de forma individual, teniendo en cuenta su perfil de riesgo personal, sus objetivos financieros y su situación económica antes de tomar cualquier decisión de inversión. El rendimiento pasado no es indicativo de resultados futuros.</p>
+<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. </p>
 
 
 """
