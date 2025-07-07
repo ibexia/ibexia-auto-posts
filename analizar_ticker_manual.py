@@ -134,7 +134,7 @@ def obtener_datos_yfinance(ticker):
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
-        hist = stock.history(period="60d", interval="1d")
+        hist = stock.history(period="30d", interval="1d")
 
         hist = calculate_smi_tv(hist)
 
@@ -254,7 +254,7 @@ def obtener_datos_yfinance(ticker):
         # Obtener datos históricos del IBEX 35
         ibex_ticker = yf.Ticker("^IBEX") # Ticker para el IBEX 35
         # Asegúrate de que el periodo sea al menos igual al de la empresa
-        ibex_hist = ibex_ticker.history(period="90d", interval="1d")
+        ibex_hist = ibex_ticker.history(period="30d", interval="1d")
         if ibex_hist.empty:
             print(f"❌ No se pudieron obtener datos históricos para el IBEX 35.")
             return None
