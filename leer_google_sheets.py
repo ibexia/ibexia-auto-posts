@@ -690,122 +690,6 @@ document.addEventListener('DOMContentLoaded', function () {{
 </script>
 """
 
-        chart_html += f"""
-<h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
-<p>Este gráfico es crucial para identificar **divergencias significativas** entre nuestra valoración técnica (la Nota Técnica) y el movimiento real del precio de la acción. Una divergencia positiva (barras verdes) sugiere que nuestra nota está indicando una fortaleza técnica mayor de lo que el precio actual refleja, lo que podría anticipar un movimiento alcista. Por el contrario, una divergencia negativa (barras rojas) indica que la nota técnica es más débil que el precio, lo que podría ser una señal de advertencia o anticipar una corrección.</p>
-
-<div style="width: 80%; margin: auto; height: 400px;">
-    <canvas id="divergenciaColorChart"></canvas>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {{
-    var ctx = document.getElementById('divergenciaColorChart').getContext('2d');
-
-    var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
-    var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
-
-    var minPrecio = Math.min(...preciosOriginales);
-    var maxPrecio = Math.max(...preciosOriginales);
-
-    var preciosNormalizados = [];
-    if (minPrecio === maxPrecio) {{
-        // Si todos los precios son iguales, normalizarlos a un punto medio (ej. 5)
-        preciosNormalizados = preciosOriginales.map(function() {{ return 5; }});
-    }} else {{
-        preciosNormalizados = preciosOriginales.map(function(p) {{
-            return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
-        }});
-    }}
-
-    // Calcular la divergencia (Nota - Precio Normalizado)
-    var divergenciaData = [];
-    var backgroundColors = [];
-    for (var i = 0; i < notasOriginales.length; i++) {{
-        var diff = notasOriginales[i] - preciosNormalizados[i];
-        divergenciaData.push(diff);
-        if (diff >= 0) {{
-            backgroundColors.push('rgba(0, 150, 0, 0.7)'); // Verde para divergencia alcista o neutra
-        }} else {{
-            backgroundColors.push('rgba(255, 0, 0, 0.7)'); // Rojo para divergencia bajista
-        }}
-    }}
-
-    var labels = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
-
-    new Chart(ctx, {{
-        type: 'bar', // Usamos un gráfico de barras para visualizar mejor la divergencia
-        data: {{
-            labels: labels,
-            datasets: [
-                {{
-                    label: 'Divergencia (Nota - Precio Normalizado)',
-                    data: divergenciaData,
-                    backgroundColor: backgroundColors,
-                    borderColor: backgroundColors.map(color => color.replace('0.7', '1')), // Border más oscuro
-                    borderWidth: 1,
-                    yAxisID: 'y'
-                }}
-            ]
-        }},
-        options: {{
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {{
-                tooltip: {{
-                    mode: 'index',
-                    intersect: false,
-                    callbacks: {{
-                        label: function(context) {{
-                            return 'Divergencia: ' + context.parsed.y.toFixed(2);
-                        }}
-                    }}
-                }},
-                legend: {{
-                    display: true
-                }},
-                annotation: {{
-                    annotations: {{
-                        zeroLine: {{
-                            type: 'line',
-                            yMin: 0,
-                            yMax: 0,
-                            borderColor: 'rgba(0, 0, 0, 0.5)',
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            label: {{
-                                enabled: true,
-                                content: 'Sin Divergencia (0)',
-                                position: 'end',
-                                backgroundColor: 'rgba(0, 0, 0, 0.6)'
-                            }}
-                        }}
-                    }}
-                }}
-            }},
-            scales: {{
-                y: {{
-                    beginAtZero: false, // Permitir valores negativos para la divergencia
-                    title: {{
-                        display: true,
-                        text: 'Divergencia (Nota - Precio Normalizado)'
-                    }}
-                }},
-                x: {{
-                    title: {{
-                        display: true,
-                        text: 'Últimos 30 Días'
-                    }}
-                }}
-            }}
-        }}
-    }});
-}});
-</script>
-"""
-
-        
-
     
     # Pre-procesamiento de soportes para agruparlos si son muy cercanos
     soportes_unicos = []
@@ -954,7 +838,6 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 Es importante recordar que esta nota técnica que IBEXIA otorga es puramente un reflejo del **análisis del gráfico y sus indicadores técnicos**</p>
 {chart_html}
 
-<h2>Tabla resumen</h2>
 {tabla_resumen}
 
 <h2>Comparativa Financiera: EBITDA vs Deuda</h2>
