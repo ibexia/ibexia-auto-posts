@@ -268,17 +268,18 @@ def obtener_datos_yfinance(ticker):
         hist = hist.loc[common_dates]
         ibex_hist = ibex_hist.loc[common_dates]
 
-        # --- Normalizar precios para el gráfico comparativo ---
-        # Obtener los precios de cierre en la fecha de inicio
-        company_start_price = hist['Close'].loc[common_dates.min()]
-        ibex_start_price = ibex_hist['Close'].loc[common_dates.min()]
+        # --- Calcular el cambio porcentual desde el origen para el gráfico comparativo ---
+        # Obtener los precios de cierre en la fecha de inicio. Usamos .iloc[0] para asegurar el primer dato.
+        company_start_price = hist['Close'].iloc[0]
+        ibex_start_price = ibex_hist['Close'].iloc[0]
 
-        # Normalizar series a un valor inicial de 100
-        normalized_company_prices = (hist['Close'] / company_start_price * 100).round(2).tolist()
-        normalized_ibex_prices = (ibex_hist['Close'] / ibex_start_price * 100).round(2).tolist()
+        # Calcular el cambio porcentual: (Precio Actual - Precio Inicial) / Precio Inicial * 100
+        # Esto hará que el punto de inicio sea 0% y los movimientos sean +/- porcentajes reales
+        percentage_company_changes = ((hist['Close'] - company_start_price) / company_start_price * 100).round(2).tolist()
+        percentage_ibex_changes = ((ibex_hist['Close'] - ibex_start_price) / ibex_start_price * 100).round(2).tolist()
 
-        datos["NORMALIZED_COMPANY_PRICES"] = normalized_company_prices
-        datos["NORMALIZED_IBEX_PRICES"] = normalized_ibex_prices
+        datos["NORMALIZED_COMPANY_PRICES"] = percentage_company_changes
+        datos["NORMALIZED_IBEX_PRICES"] = percentage_ibex_changes
         datos["GRAPH_LABELS"] = [d.strftime("%d/%m") for d in common_dates] # Formatear fechas para las etiquetas del gráfico
 
 
@@ -537,10 +538,10 @@ def construir_prompt_formateado(data):
                 }},
                 scales: {{
                     y: {{
-                        beginAtZero: true, // Asegura que el origen sea 0 para la comparación
+                        // beginAtZero: true, // ¡ELIMINA ESTA LÍNEA para que la escala se ajuste automáticamente!
                         title: {{
                             display: true,
-                            text: 'Rendimiento Normalizado (%)'
+                            text: 'Rendimiento Porcentual (%)' // Cambiado el texto a "Rendimiento Porcentual"
                         }},
                         ticks: {{
                             callback: function(value) {{
