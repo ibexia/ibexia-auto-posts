@@ -475,7 +475,11 @@ def construir_prompt_formateado(data):
 """
 
     # Nuevo gráfico comparativo con el IBEX 35
-    if normalized_company_prices and normalized_ibex_prices: # Asegúrate de que estas variables existen
+    normalized_company_prices = data.get('NORMALIZED_COMPANY_PRICES', [])
+    normalized_ibex_prices = data.get('NORMALIZED_IBEX_PRICES', [])
+
+    # Nuevo gráfico comparativo con el IBEX 35
+    if normalized_company_prices and normalized_ibex_prices:
         chart_html += f"""
 <h2>Comparativa de Rendimiento: {data['NOMBRE_EMPRESA']} vs. IBEX 35</h2>
 <p>Este gráfico compara la evolución del precio de <strong>{data['NOMBRE_EMPRESA']}</strong> con el rendimiento del índice <strong>IBEX 35</strong>. Ambos han sido normalizados a un valor inicial de 100 para permitir una comparación directa de su evolución porcentual desde el origen del gráfico.</p>
