@@ -251,6 +251,37 @@ def obtener_datos_yfinance(ticker):
         cierres_ultimos_30_dias = hist['Close'].dropna().tail(30).tolist()
         datos["CIERRES_30_DIAS"] = [round(float(c), 2) for c in cierres_ultimos_30_dias]
 
+        # Obtener datos históricos del IBEX 35
+        ibex_ticker = yf.Ticker("^IBEX") # Ticker para el IBEX 35
+        # Asegúrate de que el periodo sea al menos igual al de la empresa
+        ibex_hist = ibex_ticker.history(period="90d", interval="1d")
+        if ibex_hist.empty:
+            print(f"❌ No se pudieron obtener datos históricos para el IBEX 35.")
+            return None
+
+        # Asegurarse de que ambos DataFrames comparten el mismo rango de fechas
+        common_dates = pd.Index.intersection(hist.index, ibex_hist.index)
+        if common_dates.empty:
+            print(f"❌ No hay fechas comunes entre los datos de {ticker} y el IBEX 35.")
+            return None
+
+        hist = hist.loc[common_dates]
+        ibex_hist = ibex_hist.loc[common_dates]
+
+        # --- Normalizar precios para el gráfico comparativo ---
+        # Obtener los precios de cierre en la fecha de inicio
+        company_start_price = hist['Close'].loc[common_dates.min()]
+        ibex_start_price = ibex_hist['Close'].loc[common_dates.min()]
+
+        # Normalizar series a un valor inicial de 100
+        normalized_company_prices = (hist['Close'] / company_start_price * 100).round(2).tolist()
+        normalized_ibex_prices = (ibex_hist['Close'] / ibex_start_price * 100).round(2).tolist()
+
+        datos["NORMALIZED_COMPANY_PRICES"] = normalized_company_prices
+        datos["NORMALIZED_IBEX_PRICES"] = normalized_ibex_prices
+        datos["GRAPH_LABELS"] = [d.strftime("%d/%m") for d in common_dates] # Formatear fechas para las etiquetas del gráfico
+
+
         return datos
 
     except Exception as e:
@@ -442,6 +473,94 @@ def construir_prompt_formateado(data):
 </script>
 <br/>
 """
+
+    # Nuevo gráfico comparativo con el IBEX 35
+    if normalized_company_prices and normalized_ibex_prices: # Asegúrate de que estas variables existen
+        chart_html += f"""
+<h2>Comparativa de Rendimiento: {data['NOMBRE_EMPRESA']} vs. IBEX 35</h2>
+<p>Este gráfico compara la evolución del precio de <strong>{data['NOMBRE_EMPRESA']}</strong> con el rendimiento del índice <strong>IBEX 35</strong>. Ambos han sido normalizados a un valor inicial de 100 para permitir una comparación directa de su evolución porcentual desde el origen del gráfico.</p>
+<div style="width: 80%; margin: auto; height: 400px;">
+    <canvas id="comparativeChart"></canvas>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {{
+        var ctxComparative = document.getElementById('comparativeChart').getContext('2d');
+        var comparativeChart = new Chart(ctxComparative, {{
+            type: 'line',
+            data: {{
+                labels: {json.dumps(data.get('GRAPH_LABELS', []))},
+                datasets: [
+                    {{
+                        label: '{data['NOMBRE_EMPRESA']}',
+                        data: {json.dumps(data.get('NORMALIZED_COMPANY_PRICES', []))},
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.2
+                    }},
+                    {{
+                        label: 'IBEX 35',
+                        data: {json.dumps(data.get('NORMALIZED_IBEX_PRICES', []))},
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.2
+                    }}
+                ]
+            }},
+            options: {{
+                plugins: {{
+                    tooltip: {{
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {{
+                            label: function(context) {{
+                                let label = context.dataset.label || '';
+                                if (label) {{
+                                    label += ': ';
+                                }}
+                                label += context.parsed.y.toFixed(2) + '%'; // Muestra el porcentaje
+                                return label;
+                            }}
+                        }}
+                    }},
+                    legend: {{
+                        display: true
+                    }}
+                }},
+                scales: {{
+                    y: {{
+                        beginAtZero: true, // Asegura que el origen sea 0 para la comparación
+                        title: {{
+                            display: true,
+                            text: 'Rendimiento Normalizado (%)'
+                        }},
+                        ticks: {{
+                            callback: function(value) {{
+                                return value + '%';
+                            }}
+                        }}
+                    }},
+                    x: {{
+                        title: {{
+                            display: true,
+                            text: 'Fecha'
+                        }}
+                    }}
+                }},
+                responsive: true,
+                maintainAspectRatio: false
+            }}
+        }});
+    }});
+</script>
+<br/>
+"""
+
+        
         # Cálculo dinámico de la descripción del gráfico
                   
         descripcion_grafico = ""
