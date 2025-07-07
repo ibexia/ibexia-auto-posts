@@ -251,6 +251,38 @@ def obtener_datos_yfinance(ticker):
         cierres_ultimos_30_dias = hist['Close'].dropna().tail(30).tolist()
         datos["CIERRES_30_DIAS"] = [round(float(c), 2) for c in cierres_ultimos_30_dias]
 
+        # Obtener datos históricos del IBEX 35
+        ibex_ticker = yf.Ticker("^IBEX") # Ticker para el IBEX 35
+        # Asegúrate de que el periodo sea al menos igual al de la empresa
+        ibex_hist = ibex_ticker.history(period="90d", interval="1d")
+        if ibex_hist.empty:
+            print(f"❌ No se pudieron obtener datos históricos para el IBEX 35.")
+            return None
+
+        # Asegurarse de que ambos DataFrames comparten el mismo rango de fechas
+        common_dates = pd.Index.intersection(hist.index, ibex_hist.index)
+        if common_dates.empty:
+            print(f"❌ No hay fechas comunes entre los datos de {ticker} y el IBEX 35.")
+            return None
+
+        hist = hist.loc[common_dates]
+        ibex_hist = ibex_hist.loc[common_dates]
+
+        # --- Calcular el cambio porcentual desde el origen para el gráfico comparativo ---
+        # Obtener los precios de cierre en la fecha de inicio. Usamos .iloc[0] para asegurar el primer dato.
+        company_start_price = hist['Close'].iloc[0]
+        ibex_start_price = ibex_hist['Close'].iloc[0]
+
+        # Calcular el cambio porcentual: (Precio Actual - Precio Inicial) / Precio Inicial * 100
+        # Esto hará que el punto de inicio sea 0% y los movimientos sean +/- porcentajes reales
+        percentage_company_changes = ((hist['Close'] - company_start_price) / company_start_price * 100).round(2).tolist()
+        percentage_ibex_changes = ((ibex_hist['Close'] - ibex_start_price) / ibex_start_price * 100).round(2).tolist()
+
+        datos["NORMALIZED_COMPANY_PRICES"] = percentage_company_changes
+        datos["NORMALIZED_IBEX_PRICES"] = percentage_ibex_changes
+        datos["GRAPH_LABELS"] = [d.strftime("%d/%m") for d in common_dates] # Formatear fechas para las etiquetas del gráfico
+
+
         return datos
 
     except Exception as e:
@@ -266,7 +298,12 @@ def formatear_numero(valor):
         return "No disponible"
         
 def construir_prompt_formateado(data):
-    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']}"
+        # Calcula el nombre de la empresa para el hashtag, eliminando caracteres especiales y pasando a minúsculas.
+    company_name_for_hashtag = re.sub(r'[^a-zA-Z0-9]', '', data['NOMBRE_EMPRESA']).lower()
+    
+    # Construye el título completo, incluyendo los hashtags.
+    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']} #{company_name_for_hashtag} #{data['TICKER'].replace('.MC', '').lower()}"
+    
     inversion_base = 10000.0
     comision_por_operacion_porcentual = 0.001
 
@@ -437,6 +474,98 @@ def construir_prompt_formateado(data):
 </script>
 <br/>
 """
+
+    # Nuevo gráfico comparativo con el IBEX 35
+    normalized_company_prices = data.get('NORMALIZED_COMPANY_PRICES', [])
+    normalized_ibex_prices = data.get('NORMALIZED_IBEX_PRICES', [])
+
+    # Nuevo gráfico comparativo con el IBEX 35
+    if normalized_company_prices and normalized_ibex_prices:
+        chart_html += f"""
+<h2>Comparativa de Rendimiento: {data['NOMBRE_EMPRESA']} vs. IBEX 35</h2>
+<p>Este gráfico compara la evolución del precio de <strong>{data['NOMBRE_EMPRESA']}</strong> con el rendimiento del índice <strong>IBEX 35</strong>. Ambos han sido normalizados a un valor inicial de 100 para permitir una comparación directa de su evolución porcentual desde el origen del gráfico.</p>
+<div style="width: 80%; margin: auto; height: 400px;">
+    <canvas id="comparativeChart"></canvas>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {{
+        var ctxComparative = document.getElementById('comparativeChart').getContext('2d');
+        var comparativeChart = new Chart(ctxComparative, {{
+            type: 'line',
+            data: {{
+                labels: {json.dumps(data.get('GRAPH_LABELS', []))},
+                datasets: [
+                    {{
+                        label: '{data['NOMBRE_EMPRESA']}',
+                        data: {json.dumps(data.get('NORMALIZED_COMPANY_PRICES', []))},
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.2
+                    }},
+                    {{
+                        label: 'IBEX 35',
+                        data: {json.dumps(data.get('NORMALIZED_IBEX_PRICES', []))},
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.2
+                    }}
+                ]
+            }},
+            options: {{
+                plugins: {{
+                    tooltip: {{
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {{
+                            label: function(context) {{
+                                let label = context.dataset.label || '';
+                                if (label) {{
+                                    label += ': ';
+                                }}
+                                label += context.parsed.y.toFixed(2) + '%'; // Muestra el porcentaje
+                                return label;
+                            }}
+                        }}
+                    }},
+                    legend: {{
+                        display: true
+                    }}
+                }},
+                scales: {{
+                    y: {{
+                        // beginAtZero: true, // ¡ELIMINA ESTA LÍNEA para que la escala se ajuste automáticamente!
+                        title: {{
+                            display: true,
+                            text: 'Rendimiento Porcentual (%)' // Cambiado el texto a "Rendimiento Porcentual"
+                        }},
+                        ticks: {{
+                            callback: function(value) {{
+                                return value + '%';
+                            }}
+                        }}
+                    }},
+                    x: {{
+                        title: {{
+                            display: true,
+                            text: 'Fecha'
+                        }}
+                    }}
+                }},
+                responsive: true,
+                maintainAspectRatio: false
+            }}
+        }});
+    }});
+</script>
+<br/>
+"""
+
+        
         # Cálculo dinámico de la descripción del gráfico
                   
         descripcion_grafico = ""
@@ -1157,6 +1286,8 @@ def generar_contenido_con_gemini(tickers):
         # --- PAUSA DE 3 MINUTO DESPUÉS DE CADA TICKER ---
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180) # Pausa de 180 segundos entre cada ticker
+
+
 
 
 def main():
