@@ -134,7 +134,7 @@ def obtener_datos_yfinance(ticker):
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
-        hist = stock.history(period="30d", interval="1d")
+        hist = stock.history(period="60d", interval="1d")
 
         hist = calculate_smi_tv(hist)
 
@@ -251,38 +251,6 @@ def obtener_datos_yfinance(ticker):
         cierres_ultimos_30_dias = hist['Close'].dropna().tail(30).tolist()
         datos["CIERRES_30_DIAS"] = [round(float(c), 2) for c in cierres_ultimos_30_dias]
 
-        # Obtener datos históricos del IBEX 35
-        ibex_ticker = yf.Ticker("^IBEX") # Ticker para el IBEX 35
-        # Asegúrate de que el periodo sea al menos igual al de la empresa
-        ibex_hist = ibex_ticker.history(period="30d", interval="1d")
-        if ibex_hist.empty:
-            print(f"❌ No se pudieron obtener datos históricos para el IBEX 35.")
-            return None
-
-        # Asegurarse de que ambos DataFrames comparten el mismo rango de fechas
-        common_dates = pd.Index.intersection(hist.index, ibex_hist.index)
-        if common_dates.empty:
-            print(f"❌ No hay fechas comunes entre los datos de {ticker} y el IBEX 35.")
-            return None
-
-        hist = hist.loc[common_dates]
-        ibex_hist = ibex_hist.loc[common_dates]
-
-        # --- Calcular el cambio porcentual desde el origen para el gráfico comparativo ---
-        # Obtener los precios de cierre en la fecha de inicio. Usamos .iloc[0] para asegurar el primer dato.
-        company_start_price = hist['Close'].iloc[0]
-        ibex_start_price = ibex_hist['Close'].iloc[0]
-
-        # Calcular el cambio porcentual: (Precio Actual - Precio Inicial) / Precio Inicial * 100
-        # Esto hará que el punto de inicio sea 0% y los movimientos sean +/- porcentajes reales
-        percentage_company_changes = ((hist['Close'] - company_start_price) / company_start_price * 100).round(2).tolist()
-        percentage_ibex_changes = ((ibex_hist['Close'] - ibex_start_price) / ibex_start_price * 100).round(2).tolist()
-
-        datos["NORMALIZED_COMPANY_PRICES"] = percentage_company_changes
-        datos["NORMALIZED_IBEX_PRICES"] = percentage_ibex_changes
-        datos["GRAPH_LABELS"] = [d.strftime("%d/%m") for d in common_dates] # Formatear fechas para las etiquetas del gráfico
-
-
         return datos
 
     except Exception as e:
@@ -298,12 +266,7 @@ def formatear_numero(valor):
         return "No disponible"
         
 def construir_prompt_formateado(data):
-        # Calcula el nombre de la empresa para el hashtag, eliminando caracteres especiales y pasando a minúsculas.
-    company_name_for_hashtag = re.sub(r'[^a-zA-Z0-9]', '', data['NOMBRE_EMPRESA']).lower()
-    
-    # Construye el título completo, incluyendo los hashtags.
-    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']} #{company_name_for_hashtag} #{data['TICKER'].replace('.MC', '').lower()}"
-    
+    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']}"
     inversion_base = 10000.0
     comision_por_operacion_porcentual = 0.001
 
@@ -334,7 +297,8 @@ def construir_prompt_formateado(data):
 
         chart_html = f"""
 <h2>Evolución de la Nota Técnica</h2>
-<p>Gráfico de la Nota Técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, (barras azules) y precio de cotización (linea roja) de los últimos 30 dias. Nota técnia de 0 (mucho riesgo de entrada) a 10 (oportunidad de compra). Exclusivo de ibexia.es</p>
+<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
+<p>Esta deja constancia clara de nuestras valoraciones y su grado de acierto con el paso del tiempo. Así, no solo anticipamos movimientos, sino que también construimos una trazabilidad transparente de nuestras decisiones técnicas.</p>
 <div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="notasChart"></canvas>
 </div>
@@ -473,98 +437,6 @@ def construir_prompt_formateado(data):
 </script>
 <br/>
 """
-
-    # Nuevo gráfico comparativo con el IBEX 35
-    normalized_company_prices = data.get('NORMALIZED_COMPANY_PRICES', [])
-    normalized_ibex_prices = data.get('NORMALIZED_IBEX_PRICES', [])
-
-    # Nuevo gráfico comparativo con el IBEX 35
-    if normalized_company_prices and normalized_ibex_prices:
-        chart_html += f"""
-<h2>Comparativa de Rendimiento: {data['NOMBRE_EMPRESA']} vs. IBEX 35</h2>
-<p>Este gráfico compara la evolución del precio de <strong>{data['NOMBRE_EMPRESA']}</strong> con el rendimiento del índice <strong>IBEX 35</strong>. Ambos han sido normalizados a un valor inicial de 100 para permitir una comparación directa de su evolución porcentual desde el origen del gráfico.</p>
-<div style="width: 80%; margin: auto; height: 400px;">
-    <canvas id="comparativeChart"></canvas>
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {{
-        var ctxComparative = document.getElementById('comparativeChart').getContext('2d');
-        var comparativeChart = new Chart(ctxComparative, {{
-            type: 'line',
-            data: {{
-                labels: {json.dumps(data.get('GRAPH_LABELS', []))},
-                datasets: [
-                    {{
-                        label: '{data['NOMBRE_EMPRESA']}',
-                        data: {json.dumps(data.get('NORMALIZED_COMPANY_PRICES', []))},
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.2
-                    }},
-                    {{
-                        label: 'IBEX 35',
-                        data: {json.dumps(data.get('NORMALIZED_IBEX_PRICES', []))},
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.2
-                    }}
-                ]
-            }},
-            options: {{
-                plugins: {{
-                    tooltip: {{
-                        mode: 'index',
-                        intersect: false,
-                        callbacks: {{
-                            label: function(context) {{
-                                let label = context.dataset.label || '';
-                                if (label) {{
-                                    label += ': ';
-                                }}
-                                label += context.parsed.y.toFixed(2) + '%'; // Muestra el porcentaje
-                                return label;
-                            }}
-                        }}
-                    }},
-                    legend: {{
-                        display: true
-                    }}
-                }},
-                scales: {{
-                    y: {{
-                        // beginAtZero: true, // ¡ELIMINA ESTA LÍNEA para que la escala se ajuste automáticamente!
-                        title: {{
-                            display: true,
-                            text: 'Rendimiento Porcentual (%)' // Cambiado el texto a "Rendimiento Porcentual"
-                        }},
-                        ticks: {{
-                            callback: function(value) {{
-                                return value + '%';
-                            }}
-                        }}
-                    }},
-                    x: {{
-                        title: {{
-                            display: true,
-                            text: 'Fecha'
-                        }}
-                    }}
-                }},
-                responsive: true,
-                maintainAspectRatio: false
-            }}
-        }});
-    }});
-</script>
-<br/>
-"""
-
-        
         # Cálculo dinámico de la descripción del gráfico
                   
         descripcion_grafico = ""
@@ -1037,7 +909,7 @@ Actúa como un trader profesional con amplia experiencia en análisis técnico y
 
 Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
 
-Genera un análisis técnico completo de aproximadamente 800 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
+Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
 
 **Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
@@ -1155,16 +1027,23 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
-<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
+<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
 {tabla_resumen}
 
+<h3>¿Qué analizaremos mañana? ¡No te lo pierdas!</h3>
+<p>Mañana, pondremos bajo la lupa a otros 10 valores más. ¿Será el próximo candidato para una oportunidad de compra o venta? ¡Vuelve mañana a la misma hora para descubrirlo y seguir ampliando tu conocimiento de mercado!</p>
 
 <h3>Tu Opinión Importa: ¡Participa!</h3>
-
+<p>¿Considerarías comprar acciones de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> con este análisis?</p>
+<ul>
+    <li>Sí, la oportunidad es clara.</li>
+    <li>No, prefiero esperar más datos.</li>
+    <li>Ya las tengo en cartera.</li>
+</ul>
 <p>¡Déjanos tu voto y tu comentario sobre tu visión de <strong>{data['NOMBRE_EMPRESA']}</strong> en la sección de comentarios! Queremos saber qué piensas y fomentar una comunidad de inversores informada.</p>
 
 <h2>Descargo de Responsabilidad</h2>
-<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. </p>
+<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. La inversión en mercados financieros conlleva riesgos, incluyendo la pérdida total del capital invertido. Se recomienda encarecidamente a cada inversor realizar su propia investigación exhaustiva (due diligence), consultar con un asesor financiero cualificado y analizar cada decisión de forma individual, teniendo en cuenta su perfil de riesgo personal, sus objetivos financieros y su situación económica antes de tomar cualquier decisión de inversión. El rendimiento pasado no es indicativo de resultados futuros.</p>
 
 
 """
