@@ -13,6 +13,7 @@ import numpy as np
 import time
 import re
 import random
+import math
 
 def leer_google_sheets():
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
@@ -313,19 +314,40 @@ def construir_prompt_formateado(data):
         nota_variacion_data = []
         if notas_historicas_display:
             # El primer día no tiene variación respecto a un día anterior, se pone 0 o None.
-            # 0 es útil si quieres que haya una barra, None si quieres que no aparezca nada para ese día.
-            # Usaremos 0 por claridad de inicio.
-            nota_variacion_data.append(0) 
+            # Usaremos 0 si es posible, si no, None.
+            # Se inicializa con 0 o None según el primer valor de la nota histórica
+            if isinstance(notas_historicas_display[0], (int, float)) and not math.isnan(notas_historicas_display[0]):
+                nota_variacion_data.append(0) 
+            else:
+                nota_variacion_data.append(None) # Si el primer punto es inválido, la variación también lo es
+
             for i in range(1, len(notas_historicas_display)):
                 val_actual = notas_historicas_display[i]
                 val_anterior = notas_historicas_display[i-1]
 
-                # Asegurarse de que ambos valores son numéricos antes de calcular la diferencia
-                if isinstance(val_actual, (int, float)) and isinstance(val_anterior, (int, float)):
-                    diff = val_actual - val_anterior
+                val_actual_float = None
+                val_anterior_float = None
+
+                # Convertir a float y manejar NaN o valores no numéricos
+                try:
+                    temp_actual = float(val_actual)
+                    if not math.isnan(temp_actual):
+                        val_actual_float = temp_actual
+                except (ValueError, TypeError):
+                    pass # val_actual_float remains None
+
+                try:
+                    temp_anterior = float(val_anterior)
+                    if not math.isnan(temp_anterior):
+                        val_anterior_float = temp_anterior
+                except (ValueError, TypeError):
+                    pass # val_anterior_float remains None
+                
+                if val_actual_float is not None and val_anterior_float is not None:
+                    diff = val_actual_float - val_anterior_float
                     nota_variacion_data.append(round(diff, 2))
                 else:
-                    # Si no son numéricos, añadir None para que Chart.js omita el punto.
+                    # Si alguno de los valores es no numérico o NaN, la variación es None
                     nota_variacion_data.append(None) 
 
 
