@@ -310,19 +310,24 @@ def construir_prompt_formateado(data):
         notas_historicas_display = notas_historicas
 
         chart_html = f"""
-<h2>Evolución de la Nota Técnica y Divergencia</h2>
-<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
+<h2>Análisis Combinado: Evolución de la Nota Técnica, Precio y Divergencia</h2>
+<p>Este gráfico presenta una visión integrada de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong> y su precio de cotización. En la parte superior, se muestra la Nota Técnica (barras azules) y el Precio de Cierre (línea roja), con un rango de 0 a 10 para la nota. En la parte inferior, se visualiza la divergencia entre nuestra Nota Técnica y el precio normalizado, donde las barras verdes indican una fortaleza técnica superior al precio actual (posible señal alcista) y las barras rojas sugieren lo contrario (posible señal bajista).</p>
 
-<div style="width: 80%; margin: auto; height: 400px;">
-    <canvas id="notasChart"></canvas>
+<div style="width: 80%; margin: auto;">
+    <div style="height: 400px;">
+        <canvas id="notasChart"></canvas>
+    </div>
+    <div style="height: 300px; margin-top: 20px;">
+        <canvas id="divergenciaColorChart"></canvas>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
-        var ctx = document.getElementById('notasChart').getContext('2d');
-        var notasChart = new Chart(ctx, {{
+        var ctxNotas = document.getElementById('notasChart').getContext('2d');
+        var notasChart = new Chart(ctxNotas, {{
             type: 'bar',
             data: {{
                 labels: {json.dumps(labels)},
@@ -371,7 +376,6 @@ def construir_prompt_formateado(data):
                                 yMax: 8,
                                 borderColor: 'rgba(0, 200, 0, 1)',
                                 borderWidth: 2
-                                // Se eliminó el label para quitar el texto "Zona de Compra (8)"
                             }},
                             lineaVenta: {{
                                 type: 'line',
@@ -379,7 +383,6 @@ def construir_prompt_formateado(data):
                                 yMax: 2,
                                 borderColor: 'rgba(200, 0, 0, 1)',
                                 borderWidth: 2
-                                // Se eliminó el label para quitar el texto "Zona de Venta (2)"
                             }}
                         }}
                     }},
@@ -429,7 +432,7 @@ def construir_prompt_formateado(data):
                     x: {{
                         title: {{
                             display: true,
-                            text: 'Últimos 30 Días (ibexia.es)'
+                            text: 'Últimos 30 Días'
                         }}
                     }}
                 }},
@@ -437,120 +440,110 @@ def construir_prompt_formateado(data):
                 maintainAspectRatio: false
             }}
         }});
-    }});
-</script>
 
-<div style="width: 80%; margin: auto; height: 300px; margin-top: 20px;">
-    <h2>Divergencia: Nota Técnica vs Precio Normalizado</h2>
-    <p>Este gráfico muestra las **divergencias entre nuestra Nota Técnica y el precio normalizado**. Las barras verdes indican que nuestra nota técnica está por encima de lo esperado por el precio (posible señal alcista), mientras que las barras rojas sugieren que la nota es más débil (posible señal bajista).</p>
-    <canvas id="divergenciaColorChart"></canvas>
-</div>
+        // Código para el gráfico de divergencia
+        var ctxDivergencia = document.getElementById('divergenciaColorChart').getContext('2d');
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {{
-    var ctx = document.getElementById('divergenciaColorChart').getContext('2d');
+        var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
+        var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
 
-    var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
-    var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
+        var minPrecio = Math.min(...preciosOriginales);
+        var maxPrecio = Math.max(...preciosOriginales);
 
-    var minPrecio = Math.min(...preciosOriginales);
-    var maxPrecio = Math.max(...preciosOriginales);
-
-    var preciosNormalizados = [];
-    if (minPrecio === maxPrecio) {{
-        // Si todos los precios son iguales, normalizarlos a un punto medio (ej. 5)
-        preciosNormalizados = preciosOriginales.map(function() {{ return 5; }});
-    }} else {{
-        preciosNormalizados = preciosOriginales.map(function(p) {{
-            return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
-        }});
-    }}
-
-    // Calcular la divergencia (Nota - Precio Normalizado)
-    var divergenciaData = [];
-    var backgroundColors = [];
-    for (var i = 0; i < notasOriginales.length; i++) {{
-        var diff = notasOriginales[i] - preciosNormalizados[i];
-        divergenciaData.push(diff);
-        if (diff >= 0) {{
-            backgroundColors.push('rgba(0, 150, 0, 0.7)'); // Verde para divergencia alcista o neutra
+        var preciosNormalizados = [];
+        if (minPrecio === maxPrecio) {{
+            // Si todos los precios son iguales, normalizarlos a un punto medio (ej. 5)
+            preciosNormalizados = preciosOriginales.map(function() {{ return 5; }});
         }} else {{
-            backgroundColors.push('rgba(255, 0, 0, 0.7)'); // Rojo para divergencia bajista
+            preciosNormalizados = preciosOriginales.map(function(p) {{
+                return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
+            }});
         }}
-    }}
 
-    var labels = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
+        // Calcular la divergencia (Nota - Precio Normalizado)
+        var divergenciaData = [];
+        var backgroundColors = [];
+        for (var i = 0; i < notasOriginales.length; i++) {{
+            var diff = notasOriginales[i] - preciosNormalizados[i];
+            divergenciaData.push(diff);
+            if (diff >= 0) {{
+                backgroundColors.push('rgba(0, 150, 0, 0.7)'); // Verde para divergencia alcista o neutra
+            }} else {{
+                backgroundColors.push('rgba(255, 0, 0, 0.7)'); // Rojo para divergencia bajista
+            }}
+        }}
 
-    new Chart(ctx, {{
-        type: 'bar', // Usamos un gráfico de barras para visualizar mejor la divergencia
-        data: {{
-            labels: labels,
-            datasets: [
-                {{
-                    label: 'Divergencia (Nota - Precio Normalizado)',
-                    data: divergenciaData,
-                    backgroundColor: backgroundColors,
-                    borderColor: backgroundColors.map(color => color.replace('0.7', '1')), // Border más oscuro
-                    borderWidth: 1,
-                    yAxisID: 'y'
-                }}
-            ]
-        }},
-        options: {{
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {{
-                tooltip: {{
-                    mode: 'index',
-                    intersect: false,
-                    callbacks: {{
-                        label: function(context) {{
-                            return 'Divergencia: ' + context.parsed.y.toFixed(2);
-                        }}
+        var labelsDivergencia = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
+
+        new Chart(ctxDivergencia, {{
+            type: 'bar', // Usamos un gráfico de barras para visualizar mejor la divergencia
+            data: {{
+                labels: labelsDivergencia,
+                datasets: [
+                    {{
+                        label: 'Divergencia (Nota - Precio Normalizado)',
+                        data: divergenciaData,
+                        backgroundColor: backgroundColors,
+                        borderColor: backgroundColors.map(color => color.replace('0.7', '1')), // Border más oscuro
+                        borderWidth: 1,
+                        yAxisID: 'y'
                     }}
-                }},
-                legend: {{
-                    display: true
-                }},
-                annotation: {{
-                    annotations: {{
-                        zeroLine: {{
-                            type: 'line',
-                            yMin: 0,
-                            yMax: 0,
-                            borderColor: 'rgba(0, 0, 0, 0.5)',
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            label: {{
-                                enabled: true,
-                                content: 'Sin Divergencia (0)',
-                                position: 'end',
-                                backgroundColor: 'rgba(0, 0, 0, 0.6)'
+                ]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {{
+                    tooltip: {{
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {{
+                            label: function(context) {{
+                                return 'Divergencia: ' + context.parsed.y.toFixed(2);
+                            }}
+                        }}
+                    }},
+                    legend: {{
+                        display: true
+                    }},
+                    annotation: {{
+                        annotations: {{
+                            zeroLine: {{
+                                type: 'line',
+                                yMin: 0,
+                                yMax: 0,
+                                borderColor: 'rgba(0, 0, 0, 0.5)',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                label: {{
+                                    enabled: true,
+                                    content: 'Sin Divergencia (0)',
+                                    position: 'end',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.6)'
+                                }}
                             }}
                         }}
                     }}
                 }}
-            }},
-            scales: {{
-                y: {{
-                    beginAtZero: false, // Permitir valores negativos para la divergencia
-                    title: {{
-                        display: true,
-                        text: 'Divergencia (Nota - Precio Normalizado)'
-                    }}
-                }},
-                x: {{
-                    title: {{
-                        display: true,
-                        text: 'Últimos 30 Días'
+                ,scales: {{
+                    y: {{
+                        beginAtZero: false, // Permitir valores negativos para la divergencia
+                        title: {{
+                            display: true,
+                            text: 'Divergencia (Nota - Precio Normalizado)'
+                        }}
+                    }},
+                    x: {{
+                        title: {{
+                            display: true,
+                            text: 'Últimos 30 Días'
+                        }}
                     }}
                 }}
             }}
-        }}
+        }});
     }});
-}});
 </script>
-
 """
         # Cálculo dinámico de la descripción del gráfico
                   
