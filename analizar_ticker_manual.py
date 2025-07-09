@@ -302,7 +302,7 @@ def construir_prompt_formateado(data):
     
     # ... (el resto de tu código para soportes_unicos y tabla_resumen) ...
 
-    # COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
+    # COPIA Y PEGA ESTE BLOQUE EXACTO EN TU CÓDIGO
     chart_html = ""
     if notas_historicas:
         labels = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
@@ -314,9 +314,8 @@ def construir_prompt_formateado(data):
         nota_variacion_data = []
         if notas_historicas_display:
             # El primer día no tiene variación respecto a un día anterior, se pone 0 o None.
-            # Usaremos 0 si es posible, si no, None.
-            # Se inicializa con 0 o None según el primer valor de la nota histórica
-            if isinstance(notas_historicas_display[0], (int, float)) and not math.isnan(notas_historicas_display[0]):
+            # Se inicializa con 0 si el primer valor es válido, si no, None.
+            if notas_historicas_display and isinstance(notas_historicas_display[0], (int, float)) and not math.isnan(notas_historicas_display[0]):
                 nota_variacion_data.append(0) 
             else:
                 nota_variacion_data.append(None) # Si el primer punto es inválido, la variación también lo es
@@ -657,7 +656,10 @@ def construir_prompt_formateado(data):
                         title: {{
                             display: true,
                             text: 'Variación'
-                        }}
+                        }},
+                        // FORZAMOS UN RANGO VISIBLE PARA EL EJE Y
+                        min: -5, 
+                        max: 5
                     }},
                     x: {{
                         title: {{
