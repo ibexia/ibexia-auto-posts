@@ -301,7 +301,7 @@ def construir_prompt_formateado(data):
     
     # ... (el resto de tu código para soportes_unicos y tabla_resumen) ...
 
-# COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
+    # COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
     chart_html = ""
     if notas_historicas:
         labels = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
@@ -309,13 +309,24 @@ def construir_prompt_formateado(data):
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
         notas_historicas_display = notas_historicas
 
-        # Calcular la variación de la Nota Técnica
+        # Calcular la variación de la Nota Técnica de forma más robusta
         nota_variacion_data = []
         if notas_historicas_display:
-            nota_variacion_data.append(0) # El primer día no tiene variación respecto a un día anterior
+            # El primer día no tiene variación respecto a un día anterior, se pone 0 o None.
+            # 0 es útil si quieres que haya una barra, None si quieres que no aparezca nada para ese día.
+            # Usaremos 0 por claridad de inicio.
+            nota_variacion_data.append(0) 
             for i in range(1, len(notas_historicas_display)):
-                diff = notas_historicas_display[i] - notas_historicas_display[i-1]
-                nota_variacion_data.append(round(diff, 2)) # Redondear para la visualización
+                val_actual = notas_historicas_display[i]
+                val_anterior = notas_historicas_display[i-1]
+
+                # Asegurarse de que ambos valores son numéricos antes de calcular la diferencia
+                if isinstance(val_actual, (int, float)) and isinstance(val_anterior, (int, float)):
+                    diff = val_actual - val_anterior
+                    nota_variacion_data.append(round(diff, 2))
+                else:
+                    # Si no son numéricos, añadir None para que Chart.js omita el punto.
+                    nota_variacion_data.append(None) 
 
 
         chart_html = f"""
@@ -559,12 +570,15 @@ def construir_prompt_formateado(data):
         var notaVariacionData = {json.dumps(nota_variacion_data)};
         var variacionColors = [];
         for (var i = 0; i < notaVariacionData.length; i++) {{
-            if (notaVariacionData[i] > 0) {{
+            // Manejar valores nulos (None de Python) para evitar errores en JS
+            if (notaVariacionData[i] === null) {{
+                variacionColors.push('rgba(150, 150, 150, 0.3)'); // Color muy tenue para datos no válidos
+            }} else if (notaVariacionData[i] > 0) {{
                 variacionColors.push('rgba(0, 150, 0, 0.7)'); // Verde si la nota sube
             }} else if (notaVariacionData[i] < 0) {{
                 variacionColors.push('rgba(255, 0, 0, 0.7)'); // Rojo si la nota baja
             }} else {{
-                variacionColors.push('rgba(150, 150, 150, 0.7)'); // Gris si no hay variación
+                variacionColors.push('rgba(150, 150, 150, 0.7)'); // Gris si no hay variación (cero)
             }}
         }}
 
@@ -592,6 +606,9 @@ def construir_prompt_formateado(data):
                         intersect: false,
                         callbacks: {{
                             label: function(context) {{
+                                if (context.parsed.y === null) {{
+                                    return 'Variación: N/A'; // Mostrar N/A si el dato es null
+                                }}
                                 return 'Variación: ' + context.parsed.y.toFixed(2);
                             }}
                         }}
