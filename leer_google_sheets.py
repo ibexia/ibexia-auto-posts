@@ -140,7 +140,15 @@ def obtener_datos_yfinance(ticker):
 
         smi_actual = round(hist['SMI_signal'].iloc[-1], 2)
         current_price = round(info["currentPrice"], 2)
-        current_volume = info.get("volume", 0)
+        # Asegurarse de que haya al menos dos días de datos para obtener el volumen del día anterior completo
+        if len(hist) >= 2:
+            current_volume = hist['Volume'].iloc[-2]
+        elif len(hist) == 1:
+            # Si solo hay un día de historial, usa el volumen de ese día
+            current_volume = hist['Volume'].iloc[-1]
+        else:
+            # Si no hay datos históricos, el volumen es 0
+            current_volume = 0
 
         soportes = find_significant_supports(hist, current_price)
         soporte_1, soporte_2, soporte_3 = soportes
@@ -302,19 +310,25 @@ def construir_prompt_formateado(data):
         notas_historicas_display = notas_historicas
 
         chart_html = f"""
-<h2>Evolución de la Nota Técnica</h2>
-<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
+<h2>Análisis Combinado: Evolución de la Nota Técnica, Precio y Divergencia</h2>
+<p>Este gráfico presenta una visión integrada de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong> y su precio de cotización. En la parte superior, se muestra la Nota Técnica (barras azules) y el Precio de Cierre (línea roja), con un rango de 0 a 10 para la nota. En la parte inferior, se visualiza la divergencia entre nuestra Nota Técnica y el precio normalizado, donde las barras verdes indican una fortaleza técnica superior al precio actual (posible señal alcista) y las barras rojas sugieren lo contrario (posible señal bajista).</p>
 
-<div style="width: 80%; margin: auto; height: 400px;">
-    <canvas id="notasChart"></canvas>
+<div style="width: 80%; margin: auto;">
+    <div style="height: 400px;">
+        <canvas id="notasChart"></canvas>
+    </div>
+    <div style="height: 300px; margin-top: 20px;">
+        <canvas id="divergenciaColorChart"></canvas>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 <script>
+    // Unique ID for this chart block: {random.random()} - {datetime.now().timestamp()}
     document.addEventListener('DOMContentLoaded', function() {{
-        var ctx = document.getElementById('notasChart').getContext('2d');
-        var notasChart = new Chart(ctx, {{
+        var ctxNotas = document.getElementById('notasChart').getContext('2d');
+        var notasChart = new Chart(ctxNotas, {{
             type: 'bar',
             data: {{
                 labels: {json.dumps(labels)},
@@ -362,26 +376,14 @@ def construir_prompt_formateado(data):
                                 yMin: 8,
                                 yMax: 8,
                                 borderColor: 'rgba(0, 200, 0, 1)',
-                                borderWidth: 2,
-                                label: {{
-                                    enabled: true,
-                                    content: 'Zona de Compra (8)',
-                                    position: 'end',
-                                    backgroundColor: 'rgba(0, 200, 0, 0.8)'
-                                }}
+                                borderWidth: 2
                             }},
                             lineaVenta: {{
                                 type: 'line',
                                 yMin: 2,
                                 yMax: 2,
                                 borderColor: 'rgba(200, 0, 0, 1)',
-                                borderWidth: 2,
-                                label: {{
-                                    enabled: true,
-                                    content: 'Zona de Venta (2)',
-                                    position: 'end',
-                                    backgroundColor: 'rgba(200, 0, 0, 0.8)'
-                                }}
+                                borderWidth: 2
                             }}
                         }}
                     }},
@@ -431,7 +433,7 @@ def construir_prompt_formateado(data):
                     x: {{
                         title: {{
                             display: true,
-                            text: 'Últimos 30 Días (ibexia.es)'
+                            text: 'Últimos 30 Días'
                         }}
                     }}
                 }},
@@ -439,254 +441,109 @@ def construir_prompt_formateado(data):
                 maintainAspectRatio: false
             }}
         }});
-    }});
-</script>
-<br/>
-"""
-        # Cálculo dinámico de la descripción del gráfico
-                  
-        descripcion_grafico = ""
-        cierres = data.get("CIERRES_30_DIAS", [])
-        notas = data.get("NOTAS_HISTORICAS_30_DIAS", [])
 
-        mejor_compra = None
-        mejor_venta = None
-        ganancia_neta_compra = 0.0
-        ganancia_neta_venta = 0.0
-        
-        if cierres and notas and len(cierres) == len(notas):
-            for i in range(len(notas)):
-                nota = notas[i]
-                cierre = cierres[i]
-        
-                if nota >= 8:
-                    max_post = max(cierres[i:], default=cierre)
-                    pct = ((max_post - cierre) / cierre) * 100
-                    
-                    if (not mejor_compra) or (pct > mejor_compra[3]):
-                        ganancia_bruta = (max_post - cierre) * (inversion_base / cierre)
-                        comision_compra = inversion_base * comision_por_operacion_porcentual
-                        comision_venta = (inversion_base + ganancia_bruta) * comision_por_operacion_porcentual
-                        comision_total = comision_compra + comision_venta
-                        
-                        ganancia_neta_compra_actual = ganancia_bruta - comision_total
-                        
-                        mejor_compra = (i, cierre, max_post, pct, ganancia_neta_compra_actual)
-                        ganancia_neta_compra = ganancia_neta_compra_actual
-        
-                elif nota <= 2:
-                    min_post = min(cierres[i:], default=cierre)
-                    pct = ((min_post - cierre) / cierre) * 100
-                    
-                    if (not mejor_venta) or (pct < mejor_venta[3]):
-                        perdida_bruta_evitada = (cierre - min_post) * (inversion_base / cierre)
-                        comision_compra_imaginaria = inversion_base * comision_por_operacion_porcentual
-                        comision_venta_real = (inversion_base - (inversion_base * abs(pct)/100)) * comision_por_operacion_porcentual
-                        comision_total_simulada = comision_compra_imaginaria + comision_venta_real
-                        
-                        perdida_evitada_neta_actual = perdida_bruta_evitada - comision_total_simulada
-                        
-                        mejor_venta = (i, cierre, min_post, pct, perdida_evitada_neta_actual)
-                        ganancia_neta_venta = perdida_evitada_neta_actual
+        // Código para el gráfico de divergencia
+        var ctxDivergencia = document.getElementById('divergenciaColorChart').getContext('2d');
 
+        var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
+        var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
 
+        var minPrecio = Math.min(...preciosOriginales);
+        var maxPrecio = Math.max(...preciosOriginales);
 
+        var preciosNormalizados = [];
+        if (minPrecio === maxPrecio) {{
+            // Si todos los precios son iguales, normalizarlos a un punto medio (ej. 5)
+            preciosNormalizados = preciosOriginales.map(function() {{ return 5; }});
+        }} else {{
+            preciosNormalizados = preciosOriginales.map(function(p) {{
+                return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
+            }});
+        }}
 
-        # Generar el párrafo explicativo
-        ganancia_compra_texto = ""
-        ganancia_venta_texto = ""
-        
-        if mejor_compra:
-            idx, inicio, maximo, pct, ganancia_neta = mejor_compra
-            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            ganancia_compra_texto = f"<p>En nuestra mejor recomendación de <strong>compra</strong>, el día {fecha}, con el precio a <strong>{inicio:.2f}€</strong>, el valor alcanzó un máximo de <strong>{maximo:.2f}€</strong>. Con una inversión de <strong>{inversion_base:,.2f}€</strong>, esto habría generado una ganancia neta estimada de <strong>{ganancia_neta:,.2f}€</strong> (tras descontar las comisiones del {comision_por_operacion_porcentual*100:.1f}% por operación). Este acierto demuestra la potencia de nuestras señales para capturar el potencial alcista del mercado.</p>"
+        // Calcular la divergencia (Nota - Precio Normalizado)
+        var divergenciaData = [];
+        var backgroundColors = [];
+        for (var i = 0; i < notasOriginales.length; i++) {{
+            var diff = notasOriginales[i] - preciosNormalizados[i];
+            divergenciaData.push(diff);
+            if (diff >= 0) {{
+                backgroundColors.push('rgba(0, 150, 0, 0.7)'); // Verde para divergencia alcista o neutra
+            }} else {{
+                backgroundColors.push('rgba(255, 0, 0, 0.7)'); // Rojo para divergencia bajista
+            }}
+        }}
 
-        if mejor_venta:
-            idx, inicio, minimo, pct, perdida_evitada_neta = mejor_venta
-            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            ganancia_venta_texto = f"<p>En cuanto a nuestras señales de <strong>venta</strong>, la más destacada ocurrió el día {fecha}, con un precio de <strong>{inicio:.2f}€</strong>. Si hubiéramos invertido <strong>{inversion_base:,.2f}€</strong> y seguido nuestra señal para evitar la caída hasta <strong>{minimo:.2f}€</strong>, habríamos evitado una pérdida neta estimada de <strong>{abs(perdida_evitada_neta):,.2f}€</strong> (tras descontar comisiones). Esto subraya la capacidad de nuestros análisis para proteger tu capital en momentos de debilidad del mercado.</p>"
+        var labelsDivergencia = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
 
-        ganancia_seccion_contenido = ""
-        if ganancia_compra_texto:
-            ganancia_seccion_contenido += ganancia_compra_texto
-        if ganancia_venta_texto:
-            ganancia_seccion_contenido += ganancia_venta_texto
-        
-        if not ganancia_seccion_contenido:
-            ganancia_seccion_contenido = f"<p>En este análisis no se detectaron señales de compra o venta lo suficientemente claras en el histórico reciente para proyectar ganancias o pérdidas evitadas significativas con una inversión de {inversion_base:,.2f}€.</p>"
-
-
-        mejor_punto_giro_compra = None
-        mejor_punto_giro_venta = None
-
-        if cierres and notas and len(cierres) == len(notas) and len(notas) > 1:
-            for i in range(1, len(notas) - 1): # Empezar desde el segundo elemento para comparar con el anterior y mirar el siguiente
-                nota_anterior = notas[i-1]
-                nota_actual = notas[i]
-                nota_siguiente = notas[i+1]
-                cierre_actual = cierres[i]
-
-                # Detección de giro de tendencia bajista a alcista (posible punto de compra)
-                if nota_anterior > nota_actual and nota_siguiente > nota_actual:
-                    # Si la nota venía bajando o plana y empieza a subir, es un posible punto de compra
-                    max_post = max(cierres[i:], default=cierre_actual)
-                    pct = ((max_post - cierre_actual) / cierre_actual) * 100
-                    if (not mejor_punto_giro_compra) or (pct > mejor_punto_giro_compra[3]):
-                        ganancia_bruta = (max_post - cierre_actual) * (inversion_base / cierre_actual)
-                        comision_compra = inversion_base * comision_por_operacion_porcentual
-                        comision_venta = (inversion_base + ganancia_bruta) * comision_por_operacion_porcentual
-                        comision_total = comision_compra + comision_venta
-                        ganancia_neta_actual = ganancia_bruta - comision_total
-                        mejor_punto_giro_compra = (i, cierre_actual, max_post, pct, ganancia_neta_actual)
-
-                # Detección de giro de tendencia alcista a bajista (posible punto de venta para evitar pérdida)
-                if nota_anterior < nota_actual and nota_siguiente < nota_actual:
-                    # Si la nota venía subiendo o plana y empieza a bajar, es un posible punto de venta
-                    min_post = min(cierres[i:], default=cierre_actual)
-                    pct = ((min_post - cierre_actual) / cierre_actual) * 100 # Será un porcentaje negativo
-                    if (not mejor_punto_giro_venta) or (pct < mejor_punto_giro_venta[3]):
-                        perdida_bruta_evitada = (cierre_actual - min_post) * (inversion_base / cierre_actual)
-                        comision_compra_imaginaria = inversion_base * comision_por_operacion_porcentual
-                        comision_venta_real = (inversion_base - (inversion_base * abs(pct)/100)) * comision_por_operacion_porcentual
-                        comision_total_simulada = comision_compra_imaginaria + comision_venta_real
-                        perdida_evitada_neta_actual = perdida_bruta_evitada - comision_total_simulada
-                        mejor_punto_giro_venta = (i, cierre_actual, min_post, pct, perdida_evitada_neta_actual)
-
-        punto_giro_texto = ""
-        if mejor_punto_giro_compra:
-            idx, inicio, maximo, pct, ganancia_neta = mejor_punto_giro_compra
-            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            punto_giro_texto += f"<p>También, identificamos un punto de inflexión alcista el día {fecha}, cuando el precio era de <strong>{inicio:.2f}€</strong>. Si hubiéramos aprovechado este giro de la nota técnica, el valor alcanzó <strong>{maximo:.2f}€</strong>, lo que podría haber generado una ganancia neta estimada de <strong>{ganancia_neta:,.2f}€</strong> con una inversión de {inversion_base:,.2f}€.</p>"
-        
-        if mejor_punto_giro_venta:
-            idx, inicio, minimo, pct, perdida_evitada_neta = mejor_punto_giro_venta
-            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            punto_giro_texto += f"<p>De manera similar, un punto de inflexión bajista se observó el día {fecha} con el precio a <strong>{inicio:.2f}€</strong>. Al anticipar esta caída hasta <strong>{minimo:.2f}€</strong>, se habría podido evitar una pérdida neta estimada de <strong>{abs(perdida_evitada_neta):,.2f}€</strong> con una inversión de {inversion_base:,.2f}€.</p>"
-
-        if punto_giro_texto:
-            ganancia_seccion_contenido += punto_giro_texto
-            
-        chart_html += f"""
-        <div style="margin-top:20px;">
-            <h2>Ganaríamos {(ganancia_neta_compra + ganancia_neta_venta):,.2f}€ con nuestra inversión</h2>
-            {ganancia_seccion_contenido}
-        </div>
-        """
-
-        
-        chart_html += f"""
-<h2>Evolución del Precio con Soportes y Resistencias</h2>
-<p>A continuación, muestro un gráfico de precios de cierre de los últimos 30 días para <strong>{data['NOMBRE_EMPRESA']}</strong>, con las zonas clave de soporte, resistencia y el precio objetivo de compra claramente marcadas.</p>
-
-<div style="width: 80%; margin: auto; height: 400px;">
-    <canvas id="preciosChart"></canvas>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {{
-    var ctx = document.getElementById('preciosChart').getContext('2d');
-    var preciosChart = new Chart(ctx, {{
-        type: 'line',
-        data: {{
-            labels: {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])},
-            datasets: [{{
-                label: 'Precio de Cierre',
-                data: {json.dumps(data['CIERRES_30_DIAS'])},
-                borderColor: 'rgba(54, 162, 235, 1)',
-                backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                fill: false,
-                tension: 0.2
-            }}]
-        }},
-        options: {{
-            plugins: {{
-                annotation: {{
-                    annotations: {{
-                        soporte1: {{
-                            type: 'line',
-                            yMin: {data['SOPORTE_1']},
-                            yMax: {data['SOPORTE_1']},
-                            borderColor: 'rgba(0, 255, 0, 0.8)',
-                            borderWidth: 2,
-                            label: {{
-                                enabled: true,
-                                content: 'Soporte 1 ({data['SOPORTE_1']}€)',
-                                position: 'end'
+        new Chart(ctxDivergencia, {{
+            type: 'bar', // Usamos un gráfico de barras para visualizar mejor la divergencia
+            data: {{
+                labels: labelsDivergencia,
+                datasets: [
+                    {{
+                        label: 'Divergencia (Nota - Precio Normalizado)',
+                        data: divergenciaData,
+                        backgroundColor: backgroundColors,
+                        borderColor: backgroundColors.map(color => color.replace('0.7', '1')), // Border más oscuro
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    }}
+                ]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {{
+                    tooltip: {{
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {{
+                            label: function(context) {{
+                                return 'Divergencia: ' + context.parsed.y.toFixed(2);
                             }}
-                        }},
-                        soporte2: {{
-                            type: 'line',
-                            yMin: {data['SOPORTE_2']},
-                            yMax: {data['SOPORTE_2']},
-                            borderColor: 'rgba(0, 200, 0, 0.6)',
-                            borderWidth: 2,
-                            label: {{
-                                enabled: true,
-                                content: 'Soporte 2 ({data['SOPORTE_2']}€)',
-                                position: 'end'
-                            }}
-                        }},
-                        soporte3: {{
-                            type: 'line',
-                            yMin: {data['SOPORTE_3']},
-                            yMax: {data['SOPORTE_3']},
-                            borderColor: 'rgba(0, 150, 0, 0.6)',
-                            borderWidth: 2,
-                            label: {{
-                                enabled: true,
-                                content: 'Soporte 3 ({data['SOPORTE_3']}€)',
-                                position: 'end'
-                            }}
-                        }},
-                        resistencia: {{
-                            type: 'line',
-                            yMin: {data['RESISTENCIA']},
-                            yMax: {data['RESISTENCIA']},
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 2,
-                            label: {{
-                                enabled: true,
-                                content: 'Resistencia ({data['RESISTENCIA']}€)',
-                                position: 'end'
-                            }}
-                        }},
-                        objetivo: {{
-                            type: 'line',
-                            yMin: {data['PRECIO_OBJETIVO_COMPRA']},
-                            yMax: {data['PRECIO_OBJETIVO_COMPRA']},
-                            borderColor: 'rgba(255, 206, 86, 1)',
-                            borderWidth: 2,
-                            borderDash: [6, 6],
-                            label: {{
-                                enabled: true,
-                                content: 'Objetivo ({data['PRECIO_OBJETIVO_COMPRA']}€)',
-                                position: 'end',
-                                backgroundColor: 'rgba(255, 206, 86, 0.8)'
+                        }}
+                    }},
+                    legend: {{
+                        display: true
+                    }},
+                    annotation: {{
+                        annotations: {{
+                            zeroLine: {{
+                                type: 'line',
+                                yMin: 0,
+                                yMax: 0,
+                                borderColor: 'rgba(0, 0, 0, 0.5)',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                label: {{
+                                    enabled: true,
+                                    content: 'Sin Divergencia (0)',
+                                    position: 'end',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.6)'
+                                }}
                             }}
                         }}
                     }}
                 }}
-            }},
-            scales: {{
-                y: {{
-                    beginAtZero: false,
-                    title: {{
-                        display: true,
-                        text: 'Precio de Cierre (€)'
-                    }}
-                }},
-                x: {{
-                    title: {{
-                        display: true,
-                        text: 'Últimos 30 Días'
+                ,scales: {{
+                    y: {{
+                        beginAtZero: false, // Permitir valores negativos para la divergencia
+                        title: {{
+                            display: true,
+                            text: 'Divergencia (Nota - Precio Normalizado)'
+                        }}
+                    }},
+                    x: {{
+                        title: {{
+                            display: true,
+                            text: 'Últimos 30 Días'
+                        }}
                     }}
                 }}
-            }},
-            responsive: true,
-            maintainAspectRatio: false
-        }}
+            }}
+        }});
     }});
-}});
 </script>
 """
 
@@ -917,6 +774,8 @@ Destaca los datos importantes como precios, notas de la empresa, cifras financie
 
 Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
 
+IMPORTANTE: Regenera SIEMPRE el código JavaScript COMPLETO para cada gráfico, incluso si la estructura parece repetitiva. NO uses marcadores de texto como '... (código JavaScript - idéntico al anterior) ...'.
+
 **Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
 - Volumen del último día completo: {data['VOLUMEN']}
@@ -961,15 +820,8 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 <p>{volumen_analisis_text}</p>
 
-
-
-<h2>Visión a Largo Plazo y Fundamentales</h2>
-
-<p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. 
-En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
-
 <h2>Comparativa Financiera: EBITDA vs Deuda</h2>
-<p>Para evaluar de forma visual la salud financiera de <strong>{data['NOMBRE_EMPRESA']}</strong>, a continuación muestro un gráfico de barras horizontales centradas que compara el <strong>EBITDA</strong> (capacidad operativa de generación de beneficios) frente a la <strong>Deuda total</strong>. Un EBITDA superior a la deuda es generalmente una señal positiva de solvencia. En cambio, una deuda que excede al EBITDA requiere análisis adicional sobre su sostenibilidad.</p>
+<p>Para evaluar de forma visual la salud financiera de <strong>{data['NOMBRE_EMPRESA']}</strong>, a continuación muestro un gráfico de barras horizontales centradas que compara el <strong>EBITDA</strong> (capacidad operativa de generación de beneficios) frente a la <strong>Deuda total</strong>. </p>
 
 <div style="width: 80%; margin: auto; height: 300px;">
     <canvas id="ebitdaVsDeudaChart"></canvas>
@@ -1033,8 +885,8 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 {tabla_resumen}
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
-<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
-<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. </p>
+<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. </p>
+<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa. No constituye ni debe interpretarse como una recomendación de inversión o una invitación a comprar o vender. </p>
 
 
 """
