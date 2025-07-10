@@ -305,7 +305,7 @@ def construir_prompt_formateado(data):
 # COPIA Y PEGA ESTE BLOQUE EXACTO EN TU CÓDIGO
     chart_html = ""
     if notas_historicas:
-        labels = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
+         = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
         
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
         notas_historicas_display = notas_historicas
@@ -376,7 +376,7 @@ def construir_prompt_formateado(data):
             var notasChart = new Chart(ctxNotas, {{
                 type: 'bar',
                 data: {{
-                    labels: {json.dumps(labels)},
+                    : {json.dumps()},
                     datasets: [
                         {{
                             label: 'Nota Técnica',
@@ -495,7 +495,7 @@ def construir_prompt_formateado(data):
             var ctxDivergencia = document.getElementById('divergenciaColorChart').getContext('2d');
 
             var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
-            var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
+            sOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
 
             var minPrecio = Math.min(...preciosOriginales);
             var maxPrecio = Math.max(...preciosOriginales);
@@ -521,12 +521,12 @@ def construir_prompt_formateado(data):
                 }}
             }}
 
-            var labelsDivergencia = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
+            var Divergencia = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
 
             new Chart(ctxDivergencia, {{
                 type: 'bar',
                 data: {{
-                    labels: labelsDivergencia,
+                    : labelsDivergencia,
                     datasets: [
                         {{
                             label: 'Divergencia (Nota - Precio Normalizado)',
@@ -601,27 +601,30 @@ def construir_prompt_formateado(data):
             return v !== null && !isNaN(v);
         }});
 
+        // --- ESTA ES LA LÍNEA CLAVE A AÑADIR/VERIFICAR ---
+        // Asegura que la variable 'labels' esté definida en este ámbito de JavaScript.
+        var labels = {json.dumps(fechas)};
+
         if (tieneDatosValidosVariacion) {{
             try {{
                 var ctxVariacion = document.getElementById('notaVariacionChart').getContext('2d');
                 var variacionColors = [];
                 for (var i = 0; i < notaVariacionData.length; i++) {{
-                    // Manejar valores nulos (None de Python) para evitar errores en JS
                     if (notaVariacionData[i] === null || isNaN(notaVariacionData[i])) {{
-                        variacionColors.push('rgba(150, 150, 150, 0.3)'); // Color muy tenue para datos no válidos
+                        variacionColors.push('rgba(150, 150, 150, 0.3)');
                     }} else if (notaVariacionData[i] > 0) {{
-                        variacionColors.push('rgba(0, 150, 0, 0.7)'); // Verde si la nota sube
+                        variacionColors.push('rgba(0, 150, 0, 0.7)');
                     }} else if (notaVariacionData[i] < 0) {{
-                        variacionColors.push('rgba(255, 0, 0, 0.7)'); // Rojo si la nota baja
+                        variacionColors.push('rgba(255, 0, 0, 0.7)');
                     }} else {{
-                        variacionColors.push('rgba(150, 150, 150, 0.7)'); // Gris si no hay variación (cero)
+                        variacionColors.push('rgba(150, 150, 150, 0.7)');
                     }}
                 }}
 
                 new Chart(ctxVariacion, {{
                     type: 'bar',
                     data: {{
-                        labels: labels, // Mismas etiquetas de fecha
+                        labels: labels, // Esto ahora referirá a la variable 'labels' definida justo arriba
                         datasets: [
                             {{
                                 label: 'Variación de Nota Técnica',
@@ -643,7 +646,7 @@ def construir_prompt_formateado(data):
                                 callbacks: {{
                                     label: function(context) {{
                                         if (context.parsed.y === null) {{
-                                            return 'Variación: N/A'; // Mostrar N/A si el dato es null
+                                            return 'Variación: N/A';
                                         }}
                                         return 'Variación: ' + context.parsed.y.toFixed(2);
                                     }}
@@ -672,8 +675,7 @@ def construir_prompt_formateado(data):
                                     display: true,
                                     text: 'Variación'
                                 }},
-                                // FORZAMOS UN RANGO VISIBLE PARA EL EJE Y
-                                min: -5, 
+                                min: -5,
                                 max: 5
                             }},
                             x: {{
@@ -689,9 +691,7 @@ def construir_prompt_formateado(data):
                 console.error("Error al renderizar notaVariacionChart:", e);
             }}
         }} else {{
-            chart_html += `
-            <p style="color: gray; font-style: italic; text-align: center;">No hay suficientes datos válidos para mostrar la variación de la nota técnica.</p>
-            `;
+            chart_html += `<p style=\"color: gray; font-style: italic; text-align: center;\">No hay suficientes datos válidos para mostrar la variación de la nota técnica.</p>`;
         }}
     }});
 </script>
