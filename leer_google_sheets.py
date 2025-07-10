@@ -369,6 +369,7 @@ def construir_prompt_formateado(data):
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 <script>
+    // Unique ID for this chart block: {random.random()} - {datetime.now().timestamp()}
     document.addEventListener('DOMContentLoaded', function() {{
         // Gráfico de Nota Técnica y Precio (Superior)
         try {{
@@ -836,6 +837,7 @@ def construir_prompt_formateado(data):
 </div>
 
 <script>
+// Unique ID for this chart block: {random.random()} - {datetime.now().timestamp()}
 document.addEventListener('DOMContentLoaded', function () {{
     var ctx = document.getElementById('preciosChart').getContext('2d');
     var preciosChart = new Chart(ctx, {{
@@ -1054,6 +1056,8 @@ Actúa como un trader profesional con amplia experiencia en análisis técnico y
 Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
 
 Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
+
+IMPORTANTE: Regenera SIEMPRE el código JavaScript COMPLETO para cada gráfico, incluso si la estructura parece repetitiva. NO uses marcadores de texto como '... (código JavaScript - idéntico al anterior) ...'.
 
 **Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
