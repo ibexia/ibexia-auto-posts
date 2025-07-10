@@ -1240,7 +1240,7 @@ def generar_contenido_con_gemini(tickers):
         
         prompt, titulo_post = construir_prompt_formateado(data)
 
-        max_retries = 3
+        max_retries = 1
         initial_delay = 10  
         retries = 0
         delay = initial_delay
@@ -1248,6 +1248,7 @@ def generar_contenido_con_gemini(tickers):
         while retries < max_retries:
             try:
                 response = model.generate_content(prompt)
+                time.sleep(60)  # Espera 60 segundos para evitar saturar la cuota
                 print(f"\n🧠 Contenido generado para {ticker}:\n")
                 print(response.text)
                 asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
@@ -1257,26 +1258,19 @@ def generar_contenido_con_gemini(tickers):
                 break  
             except Exception as e:
                 if "429 You exceeded your current quota" in str(e):
-                    server_suggested_delay = 0 # Inicializamos a 0
-                    try:
-                        match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
-                        if match:
-                            server_suggested_delay = int(match.group(1))
-                    except:
-                        pass
-
-                    # Calcula el retraso actual basado en la retirada exponencial o el sugerido por el servidor
-                    current_delay = max(initial_delay * (2 ** retries), server_suggested_delay + 1)
-
-                    # Añade jitter (aleatoriedad) para evitar colisiones con otras solicitudes
-                    jitter = random.uniform(0.5, 1.5) # Factor aleatorio entre 0.5 y 1.5
-                    delay_with_jitter = current_delay * jitter
-
-                    print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay_with_jitter:.2f} segundos... (Intento {retries + 1}/{max_retries})")
-                    time.sleep(delay_with_jitter) # Usa el retraso con jitter
-                    retries += 1
-                    # La variable 'delay' ya no se necesita mantener persistente ni multiplicar
-                    # porque 'current_delay' se calcula de nuevo en cada intento
+                    # Verificamos si Gemini sugiere un tiempo de espera
+                    match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
+                    if match:
+                        server_suggested_delay = int(match.group(1))
+                        current_delay = server_suggested_delay + 1  # Esperamos lo sugerido + 1s
+                        jitter = random.uniform(0.5, 1.5)
+                        delay_with_jitter = current_delay * jitter
+                        print(f"❌ Cuota excedida. Esperando {delay_with_jitter:.2f} segundos... (Intento {retries + 1}/{max_retries})")
+                        time.sleep(delay_with_jitter)
+                        retries += 1
+                    else:
+                        print("❌ Cuota excedida pero sin 'retry_delay' sugerido. No se reintentará.")
+                        break
                 else:
                     print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
                     break
