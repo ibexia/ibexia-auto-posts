@@ -305,7 +305,7 @@ def construir_prompt_formateado(data):
 # COPIA Y PEGA ESTE BLOQUE EXACTO EN TU CÓDIGO
     chart_html = ""
     if notas_historicas:
-         = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
+        labels = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
         
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
         notas_historicas_display = notas_historicas
