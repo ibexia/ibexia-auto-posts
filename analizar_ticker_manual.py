@@ -13,7 +13,6 @@ import numpy as np
 import time
 import re
 import random
-import math
 
 def leer_google_sheets():
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
@@ -141,15 +140,7 @@ def obtener_datos_yfinance(ticker):
 
         smi_actual = round(hist['SMI_signal'].iloc[-1], 2)
         current_price = round(info["currentPrice"], 2)
-        # Asegurarse de que haya al menos dos días de datos para obtener el volumen del día anterior completo
-        if len(hist) >= 2:
-            current_volume = hist['Volume'].iloc[-2]
-        elif len(hist) == 1:
-            # Si solo hay un día de historial, usa el volumen de ese día
-            current_volume = hist['Volume'].iloc[-1]
-        else:
-            # Si no hay datos históricos, el volumen es 0
-            current_volume = 0
+        current_volume = info.get("volume", 0)
 
         soportes = find_significant_supports(hist, current_price)
         soporte_1, soporte_2, soporte_3 = soportes
@@ -302,7 +293,7 @@ def construir_prompt_formateado(data):
     
     # ... (el resto de tu código para soportes_unicos y tabla_resumen) ...
 
-# COPIA Y PEGA ESTE BLOQUE EXACTO EN TU CÓDIGO
+    # COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
     chart_html = ""
     if notas_historicas:
         labels = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
@@ -310,391 +301,147 @@ def construir_prompt_formateado(data):
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
         notas_historicas_display = notas_historicas
 
-        # Calcular la variación de la Nota Técnica de forma más robusta
-        nota_variacion_data = []
-        if notas_historicas_display:
-            # El primer día no tiene variación respecto a un día anterior, se pone 0 o None.
-            # Se inicializa con 0 si el primer valor es válido, si no, None.
-            if notas_historicas_display and isinstance(notas_historicas_display[0], (int, float)) and not math.isnan(notas_historicas_display[0]):
-                nota_variacion_data.append(0) 
-            else:
-                nota_variacion_data.append(None) # Si el primer punto es inválido, la variación también lo es
-
-            for i in range(1, len(notas_historicas_display)):
-                val_actual = notas_historicas_display[i]
-                val_anterior = notas_historicas_display[i-1]
-
-                val_actual_float = None
-                val_anterior_float = None
-
-                # Convertir a float y manejar NaN o valores no numéricos
-                try:
-                    temp_actual = float(val_actual)
-                    if not math.isnan(temp_actual):
-                        val_actual_float = temp_actual
-                except (ValueError, TypeError):
-                    pass # val_actual_float remains None
-
-                try:
-                    temp_anterior = float(val_anterior)
-                    if not math.isnan(temp_anterior):
-                        val_anterior_float = temp_anterior
-                except (ValueError, TypeError):
-                    pass # val_anterior_float remains None
-                
-                if val_actual_float is not None and val_anterior_float is not None:
-                    diff = val_actual_float - val_anterior_float
-                    nota_variacion_data.append(round(diff, 2))
-                else:
-                    # Si alguno de los valores es no numérico o NaN, la variación es None
-                    nota_variacion_data.append(None) 
-
-
         chart_html = f"""
-<h2>Análisis Combinado: Evolución de la Nota Técnica, Precio, Divergencia y Variación de Nota</h2>
-<p>Este gráfico presenta una visión integrada del análisis técnico de <strong>{data['NOMBRE_EMPRESA']}</strong>. El panel superior muestra la Nota Técnica (barras azules) y el Precio de Cierre (línea roja), con un rango de 0 a 10 para la nota. El panel central visualiza la divergencia entre la Nota Técnica y el precio normalizado, indicando fortaleza (verde) o debilidad (roja) de nuestra valoración respecto al movimiento del precio. El panel inferior, "Variación de Nota", muestra el cambio diario de la Nota Técnica, donde una barra positiva (verde) indica una mejora de la oportunidad de compra, una negativa (roja) una disminución de la misma, y una gris que no ha habido variación. Este último gráfico es clave para identificar posibles puntos de reversión en función de tu estrategia.</p>
+<h2>Evolución de la Nota Técnica</h2>
+<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
 
-<div style="width: 80%; margin: auto;">
-    <div style="height: 400px;">
-        <canvas id="notasChart"></canvas>
-    </div>
-    <div style="height: 300px; margin-top: 20px;">
-        <canvas id="divergenciaColorChart"></canvas>
-    </div>
-    <div style="height: 250px; margin-top: 20px;">
-        <canvas id="notaVariacionChart"></canvas>
-    </div>
+<div style="width: 80%; margin: auto; height: 400px;">
+    <canvas id="notasChart"></canvas>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {{
-        // Gráfico de Nota Técnica y Precio (Superior)
-        try {{
-            var ctxNotas = document.getElementById('notasChart').getContext('2d');
-            var notasChart = new Chart(ctxNotas, {{
-                type: 'bar',
-                data: {{
-                    labels: {json.dumps(labels)},
-                    datasets: [
-                        {{
-                            label: 'Nota Técnica',
-                            data: {json.dumps(notas_historicas_display)},
-                            backgroundColor: 'rgba(0, 128, 255, 0.4)',
-                            borderColor: 'rgba(0, 128, 255, 1)',
-                            borderWidth: 1,
-                            type: 'bar',
-                            yAxisID: 'y'
-                        }},
-                        {{
-                            label: 'Precio de Cierre',
-                            data: {json.dumps(cierres_historicos)},
-                            type: 'line',
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 2,
-                            fill: false,
-                            yAxisID: 'y1'
-                        }}
-                    ]
-                }},
-                options: {{
-                    plugins: {{
-                        annotation: {{
-                            annotations: {{
-                                zonaVerde: {{
-                                    type: 'box',
-                                    yMin: 8,
-                                    yMax: 10,
-                                    backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                                    borderWidth: 0
-                                }},
-                                zonaRoja: {{
-                                    type: 'box',
-                                    yMin: 0,
-                                    yMax: 2,
-                                    backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                                    borderWidth: 0
-                                }},
-                                lineaCompra: {{
-                                    type: 'line',
-                                    yMin: 8,
-                                    yMax: 8,
-                                    borderColor: 'rgba(0, 200, 0, 1)',
-                                    borderWidth: 2
-                                }},
-                                lineaVenta: {{
-                                    type: 'line',
-                                    yMin: 2,
-                                    yMax: 2,
-                                    borderColor: 'rgba(200, 0, 0, 1)',
-                                    borderWidth: 2
+        var ctx = document.getElementById('notasChart').getContext('2d');
+        var notasChart = new Chart(ctx, {{
+            type: 'bar',
+            data: {{
+                labels: {json.dumps(labels)},
+                datasets: [
+                    {{
+                        label: 'Nota Técnica',
+                        data: {json.dumps(notas_historicas_display)},
+                        backgroundColor: 'rgba(0, 128, 255, 0.4)',
+                        borderColor: 'rgba(0, 128, 255, 1)',
+                        borderWidth: 1,
+                        type: 'bar',
+                        yAxisID: 'y'
+                    }},
+                    {{
+                        label: 'Precio de Cierre',
+                        data: {json.dumps(cierres_historicos)},
+                        type: 'line',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2,
+                        fill: false,
+                        yAxisID: 'y1'
+                    }}
+                ]
+            }},
+            options: {{
+                plugins: {{
+                    annotation: {{
+                        annotations: {{
+                            zonaVerde: {{
+                                type: 'box',
+                                yMin: 8,
+                                yMax: 10,
+                                backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                                borderWidth: 0
+                            }},
+                            zonaRoja: {{
+                                type: 'box',
+                                yMin: 0,
+                                yMax: 2,
+                                backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                                borderWidth: 0
+                            }},
+                            lineaCompra: {{
+                                type: 'line',
+                                yMin: 8,
+                                yMax: 8,
+                                borderColor: 'rgba(0, 200, 0, 1)',
+                                borderWidth: 2,
+                                label: {{
+                                    enabled: true,
+                                    content: 'Zona de Compra (8)',
+                                    position: 'end',
+                                    backgroundColor: 'rgba(0, 200, 0, 0.8)'
                                 }}
-                            }}
-                        }},
-                        legend: {{
-                            display: true
-                        }},
-                        tooltip: {{
-                            mode: 'index',
-                            intersect: false,
-                            callbacks: {{
-                                label: function(context) {{
-                                    let label = context.dataset.label || '';
-                                    if (label) {{
-                                        label += ': ';
-                                    }}
-                                    label += context.parsed.y.toFixed(2);
-                                    return label;
+                            }},
+                            lineaVenta: {{
+                                type: 'line',
+                                yMin: 2,
+                                yMax: 2,
+                                borderColor: 'rgba(200, 0, 0, 1)',
+                                borderWidth: 2,
+                                label: {{
+                                    enabled: true,
+                                    content: 'Zona de Venta (2)',
+                                    position: 'end',
+                                    backgroundColor: 'rgba(200, 0, 0, 0.8)'
                                 }}
                             }}
                         }}
                     }},
-                    scales: {{
-                        y: {{
-                            beginAtZero: true,
-                            max: 10,
-                            title: {{
-                                display: true,
-                                text: 'Nota Técnica (0-10)'
+                    legend: {{
+                        display: true
+                    }},
+                    tooltip: {{
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {{
+                            label: function(context) {{
+                                let label = context.dataset.label || '';
+                                if (label) {{
+                                    label += ': ';
+                                }}
+                                label += context.parsed.y.toFixed(2);
+                                return label;
                             }}
-                        }},
-                        y1: {{
-                            position: 'right',
-                            beginAtZero: false,
-                            title: {{
-                                display: true,
-                                text: 'Precio de Cierre (€)'
-                            }},
-                            grid: {{
-                                drawOnChartArea: false
-                            }},
-                            ticks: {{
-                                padding: 5
-                            }},
-                            suggestedMin: Math.min(...{json.dumps(cierres_historicos)}) * 0.98,
-                            suggestedMax: Math.max(...{json.dumps(cierres_historicos)}) * 1.02
-                        }},
-                        x: {{
-                            title: {{
-                                display: true,
-                                text: 'Últimos 30 Días'
-                            }}
+                        }}
+                    }}
+                }},
+                scales: {{
+                    y: {{
+                        beginAtZero: true,
+                        max: 10,
+                        title: {{
+                            display: true,
+                            text: 'Nota Técnica (0-10)'
                         }}
                     }},
-                    responsive: true,
-                    maintainAspectRatio: false
-                }}
-            }});
-        }} catch (e) {{
-            console.error("Error al renderizar notasChart:", e);
-        }}
-
-        // Gráfico de Divergencia (Central)
-        try {{
-            var ctxDivergencia = document.getElementById('divergenciaColorChart').getContext('2d');
-
-            var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
-            var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
-
-            var minPrecio = Math.min(...preciosOriginales);
-            var maxPrecio = Math.max(...preciosOriginales);
-
-            var preciosNormalizados = [];
-            if (minPrecio === maxPrecio) {{
-                preciosNormalizados = preciosOriginales.map(function() {{ return 5; }});
-            }} else {{
-                preciosNormalizados = preciosOriginales.map(function(p) {{
-                    return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
-                }});
-            }}
-
-            var divergenciaData = [];
-            var divergenciaColors = [];
-            for (var i = 0; i < notasOriginales.length; i++) {{
-                var diff = notasOriginales[i] - preciosNormalizados[i];
-                divergenciaData.push(diff);
-                if (diff >= 0) {{
-                    divergenciaColors.push('rgba(0, 150, 0, 0.7)'); // Verde para divergencia alcista o neutra
-                }} else {{
-                    divergenciaColors.push('rgba(255, 0, 0, 0.7)'); // Rojo para divergencia bajista
-                }}
-            }}
-
-            var labelsDivergencia = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
-
-            new Chart(ctxDivergencia, {{
-                type: 'bar',
-                data: {{
-                    labels: labelsDivergencia,
-                    datasets: [
-                        {{
-                            label: 'Divergencia (Nota - Precio Normalizado)',
-                            data: divergenciaData,
-                            backgroundColor: divergenciaColors,
-                            borderColor: divergenciaColors.map(color => color.replace('0.7', '1')),
-                            borderWidth: 1,
-                            yAxisID: 'y'
+                    y1: {{
+                        position: 'right',
+                        beginAtZero: false,
+                        title: {{
+                            display: true,
+                            text: 'Precio de Cierre (€)'
+                        }},
+                        grid: {{
+                            drawOnChartArea: false
+                        }},
+                        ticks: {{
+                            padding: 5
+                        }},
+                        suggestedMin: Math.min(...{json.dumps(cierres_historicos)}) * 0.98,
+                        suggestedMax: Math.max(...{json.dumps(cierres_historicos)}) * 1.02
+                    }},
+                    x: {{
+                        title: {{
+                            display: true,
+                            text: 'Últimos 30 Días (ibexia.es)'
                         }}
-                    ]
+                    }}
                 }},
-                options: {{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {{
-                        tooltip: {{
-                            mode: 'index',
-                            intersect: false,
-                            callbacks: {{
-                                label: function(context) {{
-                                    return 'Divergencia: ' + context.parsed.y.toFixed(2);
-                                }}
-                            }}
-                        }},
-                        legend: {{
-                            display: true
-                        }},
-                        annotation: {{
-                            annotations: {{
-                                zeroLine: {{
-                                    type: 'line',
-                                    yMin: 0,
-                                    yMax: 0,
-                                    borderColor: 'rgba(0, 0, 0, 0.5)',
-                                    borderWidth: 2,
-                                    borderDash: [5, 5],
-                                    label: {{
-                                        enabled: true,
-                                        content: 'Sin Divergencia (0)',
-                                        position: 'end',
-                                        backgroundColor: 'rgba(0, 0, 0, 0.6)'
-                                    }}
-                                }}
-                            }}
-                        }}
-                    }}
-                    ,scales: {{
-                        y: {{
-                            beginAtZero: false,
-                            title: {{
-                                display: true,
-                                text: 'Divergencia (Nota - Precio Normalizado)'
-                            }}
-                        }},
-                        x: {{
-                            title: {{
-                                display: true,
-                                text: 'Últimos 30 Días'
-                            }}
-                        }}
-                    }}
-                }}
-            }});
-        }} catch (e) {{
-            console.error("Error al renderizar divergenciaColorChart:", e);
-        }}
-        
-        // Gráfico de Variación de Nota (Inferior)
-        // Validación antes de generar el gráfico del tercero
-        var notaVariacionData = {json.dumps(nota_variacion_data)};
-        var tieneDatosValidosVariacion = notaVariacionData.some(function(v) {{
-            return v !== null && !isNaN(v);
+                responsive: true,
+                maintainAspectRatio: false
+            }}
         }});
-
-        if (tieneDatosValidosVariacion) {{
-            try {{
-                var ctxVariacion = document.getElementById('notaVariacionChart').getContext('2d');
-                var variacionColors = [];
-                for (var i = 0; i < notaVariacionData.length; i++) {{
-                    // Manejar valores nulos (None de Python) para evitar errores en JS
-                    if (notaVariacionData[i] === null || isNaN(notaVariacionData[i])) {{
-                        variacionColors.push('rgba(150, 150, 150, 0.3)'); // Color muy tenue para datos no válidos
-                    }} else if (notaVariacionData[i] > 0) {{
-                        variacionColors.push('rgba(0, 150, 0, 0.7)'); // Verde si la nota sube
-                    }} else if (notaVariacionData[i] < 0) {{
-                        variacionColors.push('rgba(255, 0, 0, 0.7)'); // Rojo si la nota baja
-                    }} else {{
-                        variacionColors.push('rgba(150, 150, 150, 0.7)'); // Gris si no hay variación (cero)
-                    }}
-                }}
-
-                new Chart(ctxVariacion, {{
-                    type: 'bar',
-                    data: {{
-                        labels: labels, // Mismas etiquetas de fecha
-                        datasets: [
-                            {{
-                                label: 'Variación de Nota Técnica',
-                                data: notaVariacionData,
-                                backgroundColor: variacionColors,
-                                borderColor: variacionColors.map(color => color.replace('0.7', '1')),
-                                borderWidth: 1,
-                                yAxisID: 'y'
-                            }}
-                        ]
-                    }},
-                    options: {{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {{
-                            tooltip: {{
-                                mode: 'index',
-                                intersect: false,
-                                callbacks: {{
-                                    label: function(context) {{
-                                        if (context.parsed.y === null) {{
-                                            return 'Variación: N/A'; // Mostrar N/A si el dato es null
-                                        }}
-                                        return 'Variación: ' + context.parsed.y.toFixed(2);
-                                    }}
-                                }}
-                            }},
-                            legend: {{
-                                display: true
-                            }},
-                            annotation: {{
-                                annotations: {{
-                                    zeroLine: {{
-                                        type: 'line',
-                                        yMin: 0,
-                                        yMax: 0,
-                                        borderColor: 'rgba(0, 0, 0, 0.5)',
-                                        borderWidth: 2,
-                                        borderDash: [5, 5]
-                                    }}
-                                }}
-                            }}
-                        }},
-                        scales: {{
-                            y: {{
-                                beginAtZero: false,
-                                title: {{
-                                    display: true,
-                                    text: 'Variación'
-                                }},
-                                // FORZAMOS UN RANGO VISIBLE PARA EL EJE Y
-                                min: -5, 
-                                max: 5
-                            }},
-                            x: {{
-                                title: {{
-                                    display: true,
-                                    text: 'Últimos 30 Días'
-                                }}
-                            }}
-                        }}
-                    }}
-                }});
-            }} catch (e) {{
-                console.error("Error al renderizar notaVariacionChart:", e);
-            }}
-        }} else {{
-            chart_html += `
-            <p style="color: gray; font-style: italic; text-align: center;">No hay suficientes datos válidos para mostrar la variación de la nota técnica.</p>
-            `;
-        }}
     }});
 </script>
+<br/>
 """
         # Cálculo dinámico de la descripción del gráfico
                   
@@ -943,6 +690,121 @@ document.addEventListener('DOMContentLoaded', function () {{
 </script>
 """
 
+        chart_html += f"""
+<h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
+<p>Este gráfico es crucial para identificar **divergencias significativas** entre nuestra valoración técnica (la Nota Técnica) y el movimiento real del precio de la acción. Una divergencia positiva (barras verdes) sugiere que nuestra nota está indicando una fortaleza técnica mayor de lo que el precio actual refleja, lo que podría anticipar un movimiento alcista. Por el contrario, una divergencia negativa (barras rojas) indica que la nota técnica es más débil que el precio, lo que podría ser una señal de advertencia o anticipar una corrección.</p>
+
+<div style="width: 80%; margin: auto; height: 400px;">
+    <canvas id="divergenciaColorChart"></canvas>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {{
+    var ctx = document.getElementById('divergenciaColorChart').getContext('2d');
+
+    var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
+    var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
+
+    var minPrecio = Math.min(...preciosOriginales);
+    var maxPrecio = Math.max(...preciosOriginales);
+
+    var preciosNormalizados = [];
+    if (minPrecio === maxPrecio) {{
+        // Si todos los precios son iguales, normalizarlos a un punto medio (ej. 5)
+        preciosNormalizados = preciosOriginales.map(function() {{ return 5; }});
+    }} else {{
+        preciosNormalizados = preciosOriginales.map(function(p) {{
+            return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
+        }});
+    }}
+
+    // Calcular la divergencia (Nota - Precio Normalizado)
+    var divergenciaData = [];
+    var backgroundColors = [];
+    for (var i = 0; i < notasOriginales.length; i++) {{
+        var diff = notasOriginales[i] - preciosNormalizados[i];
+        divergenciaData.push(diff);
+        if (diff >= 0) {{
+            backgroundColors.push('rgba(0, 150, 0, 0.7)'); // Verde para divergencia alcista o neutra
+        }} else {{
+            backgroundColors.push('rgba(255, 0, 0, 0.7)'); // Rojo para divergencia bajista
+        }}
+    }}
+
+    var labels = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
+
+    new Chart(ctx, {{
+        type: 'bar', // Usamos un gráfico de barras para visualizar mejor la divergencia
+        data: {{
+            labels: labels,
+            datasets: [
+                {{
+                    label: 'Divergencia (Nota - Precio Normalizado)',
+                    data: divergenciaData,
+                    backgroundColor: backgroundColors,
+                    borderColor: backgroundColors.map(color => color.replace('0.7', '1')), // Border más oscuro
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                }}
+            ]
+        }},
+        options: {{
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {{
+                tooltip: {{
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {{
+                        label: function(context) {{
+                            return 'Divergencia: ' + context.parsed.y.toFixed(2);
+                        }}
+                    }}
+                }},
+                legend: {{
+                    display: true
+                }},
+                annotation: {{
+                    annotations: {{
+                        zeroLine: {{
+                            type: 'line',
+                            yMin: 0,
+                            yMax: 0,
+                            borderColor: 'rgba(0, 0, 0, 0.5)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            label: {{
+                                enabled: true,
+                                content: 'Sin Divergencia (0)',
+                                position: 'end',
+                                backgroundColor: 'rgba(0, 0, 0, 0.6)'
+                            }}
+                        }}
+                    }}
+                }}
+            }},
+            scales: {{
+                y: {{
+                    beginAtZero: false, // Permitir valores negativos para la divergencia
+                    title: {{
+                        display: true,
+                        text: 'Divergencia (Nota - Precio Normalizado)'
+                    }}
+                }},
+                x: {{
+                    title: {{
+                        display: true,
+                        text: 'Últimos 30 Días'
+                    }}
+                }}
+            }}
+        }}
+    }});
+}});
+</script>
+"""
+
+        
 
     
     # Pre-procesamiento de soportes para agruparlos si son muy cercanos
