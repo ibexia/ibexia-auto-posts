@@ -148,28 +148,28 @@ def obtener_datos_yfinance(ticker):
         nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
 
         if nota_empresa <= 2:
-            recomendacion = "Vender"
+            recomendacion = "Riesgo muy elevado. No entres"
             condicion_rsi = "muy sobrecomprado"
         elif 2 < nota_empresa <= 4:
-            recomendacion = "Vigilar posible venta"
+            recomendacion = "Riesgo elevado. No entres"
             condicion_rsi = "algo sobrecomprado"
         elif 4 < nota_empresa <= 5:
-            recomendacion = "Cuidado. Revisar soportes y resistencias"
+            recomendacion = "Riesgo moderado. Revisar soportes y resistencias"
             condicion_rsi = "muy poca sobrecompra"
         elif 5 < nota_empresa < 6:
-            recomendacion = "Mantener (Neutro)"
+            recomendacion = "Riesgo controlado (Neutral)"
             condicion_rsi = "neutral"
         elif 6 <= nota_empresa < 7:
-            recomendacion = "Posible compra. Revisar soportes y resistencias"
+            recomendacion = "Riesgo moderado a la baja. Revisar soportes y resistencias"
             condicion_rsi = "muy poca sobreventa"
         elif 7 <= nota_empresa < 8:
-            recomendacion = "Considerar posible compra"
+            recomendacion = "Riesgo bajo, pero aún con precaución"
             condicion_rsi = "algo de sobreventa"
         elif 8 <= nota_empresa < 9:
-            recomendacion = "Se acerca la hora de comprar"
+            recomendacion = "Invierte. Riesgo muy bajo"
             condicion_rsi = "sobreventa"
         elif nota_empresa >= 9:
-            recomendacion = "Comprar"
+            recomendacion = "Puedes invertir. Sin riesgo aparente"
             condicion_rsi = "extremadamente sobrevendido"
         else:
             recomendacion = "Indefinido"
@@ -266,8 +266,16 @@ def formatear_numero(valor):
         return "No disponible"
         
 def construir_prompt_formateado(data):
-    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']}"
+        # Calcula el nombre de la empresa para el hashtag, eliminando caracteres especiales y pasando a minúsculas.
+    company_name_for_hashtag = re.sub(r'[^a-zA-Z0-9]', '', data['NOMBRE_EMPRESA']).lower()
     
+    # Construye el título completo, incluyendo los hashtags.
+    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']} #{company_name_for_hashtag} #{data['TICKER'].replace('.MC', '').lower()}"
+    
+    inversion_base = 10000.0
+    inversion_base = 10000.0
+    comision_por_operacion_porcentual = 0.001
+
        # NUEVO: Obtener las notas históricas para el gráfico
     notas_historicas = data.get('NOTAS_HISTORICAS_30_DIAS', [])
     cierres_historicos = data.get('CIERRES_30_DIAS', [])
@@ -296,7 +304,7 @@ def construir_prompt_formateado(data):
         chart_html = f"""
 <h2>Evolución de la Nota Técnica</h2>
 <p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
-<p>Esta deja constancia clara de nuestras valoraciones y su grado de acierto con el paso del tiempo. Así, no solo anticipamos movimientos, sino que también construimos una trazabilidad transparente de nuestras decisiones técnicas.</p>
+
 <div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="notasChart"></canvas>
 </div>
@@ -441,50 +449,134 @@ def construir_prompt_formateado(data):
         cierres = data.get("CIERRES_30_DIAS", [])
         notas = data.get("NOTAS_HISTORICAS_30_DIAS", [])
 
-        mejor_compra = None  # (nota_idx, cierre_inicial, cierre_maximo, porcentaje)
-        mejor_venta = None   # (nota_idx, cierre_inicial, cierre_minimo, porcentaje)
-
+        mejor_compra = None
+        mejor_venta = None
+        ganancia_neta_compra = 0.0
+        ganancia_neta_venta = 0.0
+        
         if cierres and notas and len(cierres) == len(notas):
             for i in range(len(notas)):
                 nota = notas[i]
                 cierre = cierres[i]
         
                 if nota >= 8:
-                    # Buscar el máximo después de la recomendación de compra
                     max_post = max(cierres[i:], default=cierre)
                     pct = ((max_post - cierre) / cierre) * 100
+                    
                     if (not mejor_compra) or (pct > mejor_compra[3]):
-                        mejor_compra = (i, cierre, max_post, pct)
+                        ganancia_bruta = (max_post - cierre) * (inversion_base / cierre)
+                        comision_compra = inversion_base * comision_por_operacion_porcentual
+                        comision_venta = (inversion_base + ganancia_bruta) * comision_por_operacion_porcentual
+                        comision_total = comision_compra + comision_venta
+                        
+                        ganancia_neta_compra_actual = ganancia_bruta - comision_total
+                        
+                        mejor_compra = (i, cierre, max_post, pct, ganancia_neta_compra_actual)
+                        ganancia_neta_compra = ganancia_neta_compra_actual
         
                 elif nota <= 2:
-                    # Buscar el mínimo después de la recomendación de venta
                     min_post = min(cierres[i:], default=cierre)
                     pct = ((min_post - cierre) / cierre) * 100
+                    
                     if (not mejor_venta) or (pct < mejor_venta[3]):
-                        mejor_venta = (i, cierre, min_post, pct)
+                        perdida_bruta_evitada = (cierre - min_post) * (inversion_base / cierre)
+                        comision_compra_imaginaria = inversion_base * comision_por_operacion_porcentual
+                        comision_venta_real = (inversion_base - (inversion_base * abs(pct)/100)) * comision_por_operacion_porcentual
+                        comision_total_simulada = comision_compra_imaginaria + comision_venta_real
+                        
+                        perdida_evitada_neta_actual = perdida_bruta_evitada - comision_total_simulada
+                        
+                        mejor_venta = (i, cierre, min_post, pct, perdida_evitada_neta_actual)
+                        ganancia_neta_venta = perdida_evitada_neta_actual
+
+
+
 
         # Generar el párrafo explicativo
+        ganancia_compra_texto = ""
+        ganancia_venta_texto = ""
+        
         if mejor_compra:
-            idx, inicio, maximo, pct = mejor_compra
+            idx, inicio, maximo, pct, ganancia_neta = mejor_compra
             fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            descripcion_grafico += f"<p>Destacamos especialmente nuestra recomendación de <strong>compra</strong> el día {fecha}, cuando el precio era de <strong>{inicio:.2f}€</strong>. A partir de ese momento, el valor alcanzó un máximo de <strong>{maximo:.2f}€</strong>, lo que representó una revalorización del <strong>{pct:.2f}%</strong>. Este acierto muestra cómo nuestras señales pueden anticipar movimientos significativos en el mercado.</p>"
+            ganancia_compra_texto = f"<p>En nuestra mejor recomendación de <strong>compra</strong>, el día {fecha}, con el precio a <strong>{inicio:.2f}€</strong>, el valor alcanzó un máximo de <strong>{maximo:.2f}€</strong>. Con una inversión de <strong>{inversion_base:,.2f}€</strong>, esto habría generado una ganancia neta estimada de <strong>{ganancia_neta:,.2f}€</strong> (tras descontar las comisiones del {comision_por_operacion_porcentual*100:.1f}% por operación). Este acierto demuestra la potencia de nuestras señales para capturar el potencial alcista del mercado.</p>"
 
         if mejor_venta:
-            idx, inicio, minimo, pct = mejor_venta
+            idx, inicio, minimo, pct, perdida_evitada_neta = mejor_venta
             fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            descripcion_grafico += f"<p>En el lado de las <strong>ventas</strong>, subrayamos nuestra señal del {fecha}, con un precio inicial de <strong>{inicio:.2f}€</strong>. Posteriormente, la acción cayó hasta un mínimo de <strong>{minimo:.2f}€</strong>, registrando un descenso del <strong>{-pct:.2f}%</strong>. Esto refuerza la efectividad de nuestras alertas para proteger el capital en momentos de debilidad del mercado.</p>"
+            ganancia_venta_texto = f"<p>En cuanto a nuestras señales de <strong>venta</strong>, la más destacada ocurrió el día {fecha}, con un precio de <strong>{inicio:.2f}€</strong>. Si hubiéramos invertido <strong>{inversion_base:,.2f}€</strong> y seguido nuestra señal para evitar la caída hasta <strong>{minimo:.2f}€</strong>, habríamos evitado una pérdida neta estimada de <strong>{abs(perdida_evitada_neta):,.2f}€</strong> (tras descontar comisiones). Esto subraya la capacidad de nuestros análisis para proteger tu capital en momentos de debilidad del mercado.</p>"
+
+        ganancia_seccion_contenido = ""
+        if ganancia_compra_texto:
+            ganancia_seccion_contenido += ganancia_compra_texto
+        if ganancia_venta_texto:
+            ganancia_seccion_contenido += ganancia_venta_texto
+        
+        if not ganancia_seccion_contenido:
+            ganancia_seccion_contenido = f"<p>En este análisis no se detectaron señales de compra o venta lo suficientemente claras en el histórico reciente para proyectar ganancias o pérdidas evitadas significativas con una inversión de {inversion_base:,.2f}€.</p>"
 
 
+        mejor_punto_giro_compra = None
+        mejor_punto_giro_venta = None
+
+        if cierres and notas and len(cierres) == len(notas) and len(notas) > 1:
+            for i in range(1, len(notas) - 1): # Empezar desde el segundo elemento para comparar con el anterior y mirar el siguiente
+                nota_anterior = notas[i-1]
+                nota_actual = notas[i]
+                nota_siguiente = notas[i+1]
+                cierre_actual = cierres[i]
+
+                # Detección de giro de tendencia bajista a alcista (posible punto de compra)
+                if nota_anterior > nota_actual and nota_siguiente > nota_actual:
+                    # Si la nota venía bajando o plana y empieza a subir, es un posible punto de compra
+                    max_post = max(cierres[i:], default=cierre_actual)
+                    pct = ((max_post - cierre_actual) / cierre_actual) * 100
+                    if (not mejor_punto_giro_compra) or (pct > mejor_punto_giro_compra[3]):
+                        ganancia_bruta = (max_post - cierre_actual) * (inversion_base / cierre_actual)
+                        comision_compra = inversion_base * comision_por_operacion_porcentual
+                        comision_venta = (inversion_base + ganancia_bruta) * comision_por_operacion_porcentual
+                        comision_total = comision_compra + comision_venta
+                        ganancia_neta_actual = ganancia_bruta - comision_total
+                        mejor_punto_giro_compra = (i, cierre_actual, max_post, pct, ganancia_neta_actual)
+
+                # Detección de giro de tendencia alcista a bajista (posible punto de venta para evitar pérdida)
+                if nota_anterior < nota_actual and nota_siguiente < nota_actual:
+                    # Si la nota venía subiendo o plana y empieza a bajar, es un posible punto de venta
+                    min_post = min(cierres[i:], default=cierre_actual)
+                    pct = ((min_post - cierre_actual) / cierre_actual) * 100 # Será un porcentaje negativo
+                    if (not mejor_punto_giro_venta) or (pct < mejor_punto_giro_venta[3]):
+                        perdida_bruta_evitada = (cierre_actual - min_post) * (inversion_base / cierre_actual)
+                        comision_compra_imaginaria = inversion_base * comision_por_operacion_porcentual
+                        comision_venta_real = (inversion_base - (inversion_base * abs(pct)/100)) * comision_por_operacion_porcentual
+                        comision_total_simulada = comision_compra_imaginaria + comision_venta_real
+                        perdida_evitada_neta_actual = perdida_bruta_evitada - comision_total_simulada
+                        mejor_punto_giro_venta = (i, cierre_actual, min_post, pct, perdida_evitada_neta_actual)
+
+        punto_giro_texto = ""
+        if mejor_punto_giro_compra:
+            idx, inicio, maximo, pct, ganancia_neta = mejor_punto_giro_compra
+            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
+            punto_giro_texto += f"<p>También, identificamos un punto de inflexión alcista el día {fecha}, cuando el precio era de <strong>{inicio:.2f}€</strong>. Si hubiéramos aprovechado este giro de la nota técnica, el valor alcanzó <strong>{maximo:.2f}€</strong>, lo que podría haber generado una ganancia neta estimada de <strong>{ganancia_neta:,.2f}€</strong> con una inversión de {inversion_base:,.2f}€.</p>"
+        
+        if mejor_punto_giro_venta:
+            idx, inicio, minimo, pct, perdida_evitada_neta = mejor_punto_giro_venta
+            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
+            punto_giro_texto += f"<p>De manera similar, un punto de inflexión bajista se observó el día {fecha} con el precio a <strong>{inicio:.2f}€</strong>. Al anticipar esta caída hasta <strong>{minimo:.2f}€</strong>, se habría podido evitar una pérdida neta estimada de <strong>{abs(perdida_evitada_neta):,.2f}€</strong> con una inversión de {inversion_base:,.2f}€.</p>"
+
+        if punto_giro_texto:
+            ganancia_seccion_contenido += punto_giro_texto
+            
         chart_html += f"""
         <div style="margin-top:20px;">
-            <h3>Resumen de nuestro mejor acierto</h3>
-            {descripcion_grafico}
+            <h2>Ganaríamos {(ganancia_neta_compra + ganancia_neta_venta):,.2f}€ con nuestra inversión</h2>
+            {ganancia_seccion_contenido}
         </div>
         """
+
         
         chart_html += f"""
 <h2>Evolución del Precio con Soportes y Resistencias</h2>
-<p>A continuación, muestro un gráfico de precios de cierre de los últimos 30 días para <strong>{data['NOMBRE_EMPRESA']}</strong>, con las zonas clave de soporte, resistencia y el precio objetivo de compra claramente marcadas. Estas líneas permiten identificar visualmente los puntos más relevantes para la toma de decisiones estratégicas.</p>
+<p>A continuación, muestro un gráfico de precios de cierre de los últimos 30 días para <strong>{data['NOMBRE_EMPRESA']}</strong>, con las zonas clave de soporte, resistencia y el precio objetivo de compra claramente marcadas.</p>
 
 <div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="preciosChart"></canvas>
@@ -598,6 +690,119 @@ document.addEventListener('DOMContentLoaded', function () {{
 </script>
 """
 
+        chart_html += f"""
+<h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
+<p>Este gráfico es crucial para identificar **divergencias significativas** entre nuestra valoración técnica (la Nota Técnica) y el movimiento real del precio de la acción. Una divergencia positiva (barras verdes) sugiere que nuestra nota está indicando una fortaleza técnica mayor de lo que el precio actual refleja, lo que podría anticipar un movimiento alcista. Por el contrario, una divergencia negativa (barras rojas) indica que la nota técnica es más débil que el precio, lo que podría ser una señal de advertencia o anticipar una corrección.</p>
+
+<div style="width: 80%; margin: auto; height: 400px;">
+    <canvas id="divergenciaColorChart"></canvas>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {{
+    var ctx = document.getElementById('divergenciaColorChart').getContext('2d');
+
+    var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
+    var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
+
+    var minPrecio = Math.min(...preciosOriginales);
+    var maxPrecio = Math.max(...preciosOriginales);
+
+    var preciosNormalizados = [];
+    if (minPrecio === maxPrecio) {{
+        // Si todos los precios son iguales, normalizarlos a un punto medio (ej. 5)
+        preciosNormalizados = preciosOriginales.map(function() {{ return 5; }});
+    }} else {{
+        preciosNormalizados = preciosOriginales.map(function(p) {{
+            return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
+        }});
+    }}
+
+    // Calcular la divergencia (Nota - Precio Normalizado)
+    var divergenciaData = [];
+    var backgroundColors = [];
+    for (var i = 0; i < notasOriginales.length; i++) {{
+        var diff = notasOriginales[i] - preciosNormalizados[i];
+        divergenciaData.push(diff);
+        if (diff >= 0) {{
+            backgroundColors.push('rgba(0, 150, 0, 0.7)'); // Verde para divergencia alcista o neutra
+        }} else {{
+            backgroundColors.push('rgba(255, 0, 0, 0.7)'); // Rojo para divergencia bajista
+        }}
+    }}
+
+    var labels = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
+
+    new Chart(ctx, {{
+        type: 'bar', // Usamos un gráfico de barras para visualizar mejor la divergencia
+        data: {{
+            labels: labels,
+            datasets: [
+                {{
+                    label: 'Divergencia (Nota - Precio Normalizado)',
+                    data: divergenciaData,
+                    backgroundColor: backgroundColors,
+                    borderColor: backgroundColors.map(color => color.replace('0.7', '1')), // Border más oscuro
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                }}
+            ]
+        }},
+        options: {{
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {{
+                tooltip: {{
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {{
+                        label: function(context) {{
+                            return 'Divergencia: ' + context.parsed.y.toFixed(2);
+                        }}
+                    }}
+                }},
+                legend: {{
+                    display: true
+                }},
+                annotation: {{
+                    annotations: {{
+                        zeroLine: {{
+                            type: 'line',
+                            yMin: 0,
+                            yMax: 0,
+                            borderColor: 'rgba(0, 0, 0, 0.5)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            label: {{
+                                enabled: true,
+                                content: 'Sin Divergencia (0)',
+                                position: 'end',
+                                backgroundColor: 'rgba(0, 0, 0, 0.6)'
+                            }}
+                        }}
+                    }}
+                }}
+            }},
+            scales: {{
+                y: {{
+                    beginAtZero: false, // Permitir valores negativos para la divergencia
+                    title: {{
+                        display: true,
+                        text: 'Divergencia (Nota - Precio Normalizado)'
+                    }}
+                }},
+                x: {{
+                    title: {{
+                        display: true,
+                        text: 'Últimos 30 Días'
+                    }}
+                }}
+            }}
+        }}
+    }});
+}});
+</script>
+"""
 
         
 
@@ -745,8 +950,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
     {"una fortaleza técnica moderada, con un equilibrio entre potencial y riesgo. Se basa en el comportamiento del gráfico, soportes, resistencias e impulso, sugiriendo una oportunidad que requiere seguimiento." if 6 <= data['NOTA_EMPRESA'] < 8 else ""}
     {"una situación técnica neutral, donde el gráfico no muestra un patrón direccional claro. La puntuación se deriva del análisis de los movimientos de precio y volumen, indicando que es un momento para la observación y no para la acción inmediata." if 5 <= data['NOTA_EMPRESA'] < 6 else ""}
     {"cierta debilidad técnica, con posibles señales de corrección o continuación bajista. La puntuación se basa en los indicadores del gráfico, que muestran una pérdida de impulso alcista y un aumento de la presión vendedora." if 3 <= data['NOTA_EMPRESA'] < 5 else ""}
-    {"una debilidad técnica significativa y una posible sobrecompra en el gráfico, lo que sugiere un alto riesgo de corrección. La puntuación se basa en el análisis de los patrones de precio y volumen, indicando que es un momento para la cautela extrema." if data['NOTA_EMPRESA'] < 3 else ""}
-Es importante recordar que esta nota técnica que IBEXIA otorga es puramente un reflejo del **análisis del gráfico y sus indicadores técnicos**, y no obedece a la situación financiera o de otro tipo de la empresa. Como profesional, esta nota es mi valoración experta al interpretar el comportamiento del precio y los indicadores.</p>
+    {"una debilidad técnica significativa y una posible sobrecompra en el gráfico, lo que sugiere un alto riesgo de corrección." if data['NOTA_EMPRESA'] < 3 else ""} </p>
 {chart_html}
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
@@ -757,7 +961,7 @@ Es importante recordar que esta nota técnica que IBEXIA otorga es puramente un 
 
 <p>{volumen_analisis_text}</p>
 
-<p>Basado en nuestro análisis, una posible estrategia de entrada sería considerar una compra cerca {f"del soporte de <strong>{soportes_unicos[0]:,.2f}€</strong>" if len(soportes_unicos) > 0 else ""} o, idealmente, en {f"los <strong>{soportes_unicos[1]:,.2f}€</strong>." if len(soportes_unicos) > 1 else "."} Estos niveles ofrecen una relación riesgo/recompensa atractiva, permitiendo una entrada con mayor margen de seguridad. Para gestionar el riesgo de forma efectiva, se recomienda establecer un stop loss ajustado justo por debajo del soporte más bajo que hemos identificado, por ejemplo, en {f"<strong>{soportes_unicos[-1]:,.2f}€</strong>." if len(soportes_unicos) > 0 else "un nivel apropiado de invalidación."} Este punto actuaría como un nivel de invalidez de nuestra tesis de inversión. Nuestro objetivo de beneficio (Take Profit) a corto plazo se sitúa en la resistencia clave de <strong>{data['RESISTENCIA']:,}€</strong>, lo que representa un potencial de revalorización significativo. Esta configuración de entrada, stop loss y objetivo permite una relación riesgo/recompensa favorable para el inversor, buscando maximizar el beneficio mientras se protege el capital.</p>
+
 
 <h2>Visión a Largo Plazo y Fundamentales</h2>
 
@@ -826,25 +1030,11 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
     }});
 </script>
 
+{tabla_resumen}
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
 <p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
-{tabla_resumen}
-
-<h3>¿Qué analizaremos mañana? ¡No te lo pierdas!</h3>
-<p>Mañana, pondremos bajo la lupa a otros 10 valores más. ¿Será el próximo candidato para una oportunidad de compra o venta? ¡Vuelve mañana a la misma hora para descubrirlo y seguir ampliando tu conocimiento de mercado!</p>
-
-<h3>Tu Opinión Importa: ¡Participa!</h3>
-<p>¿Considerarías comprar acciones de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> con este análisis?</p>
-<ul>
-    <li>Sí, la oportunidad es clara.</li>
-    <li>No, prefiero esperar más datos.</li>
-    <li>Ya las tengo en cartera.</li>
-</ul>
-<p>¡Déjanos tu voto y tu comentario sobre tu visión de <strong>{data['NOMBRE_EMPRESA']}</strong> en la sección de comentarios! Queremos saber qué piensas y fomentar una comunidad de inversores informada.</p>
-
-<h2>Descargo de Responsabilidad</h2>
-<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. La inversión en mercados financieros conlleva riesgos, incluyendo la pérdida total del capital invertido. Se recomienda encarecidamente a cada inversor realizar su propia investigación exhaustiva (due diligence), consultar con un asesor financiero cualificado y analizar cada decisión de forma individual, teniendo en cuenta su perfil de riesgo personal, sus objetivos financieros y su situación económica antes de tomar cualquier decisión de inversión. El rendimiento pasado no es indicativo de resultados futuros.</p>
+<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. </p>
 
 
 """
@@ -912,7 +1102,7 @@ def generar_contenido_con_gemini(tickers):
         
         prompt, titulo_post = construir_prompt_formateado(data)
 
-        max_retries = 3
+        max_retries = 1
         initial_delay = 10  
         retries = 0
         delay = initial_delay
@@ -958,6 +1148,8 @@ def generar_contenido_con_gemini(tickers):
         # --- PAUSA DE 3 MINUTO DESPUÉS DE CADA TICKER ---
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180) # Pausa de 180 segundos entre cada ticker
+
+
 
 def main():
     try:
