@@ -603,7 +603,7 @@ def construir_prompt_formateado(data):
 
         // --- ESTA ES LA LÍNEA CLAVE A AÑADIR/VERIFICAR ---
         // Asegura que la variable 'labels' esté definida en este ámbito de JavaScript.
-        var labels = {json.dumps(fechas)};
+        var labels = {json.dumps(labels)};
 
         if (tieneDatosValidosVariacion) {{
             try {{
