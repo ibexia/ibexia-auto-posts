@@ -358,6 +358,7 @@ def construir_prompt_formateado(data):
                                 type: 'line',
                                 yMin: {{data['SOPORTE_1']}},
                                 yMax: {{data['SOPORTE_1']}},
+                                yScaleID: 'y1',
                                 borderColor: 'rgba(0, 255, 0, 0.8)',
                                 borderWidth: 2,
                                 label: {{
@@ -370,6 +371,7 @@ def construir_prompt_formateado(data):
                                 type: 'line',
                                 yMin: {{data['SOPORTE_2']}},
                                 yMax: {{data['SOPORTE_2']}},
+                                yScaleID: 'y1',
                                 borderColor: 'rgba(0, 200, 0, 0.6)',
                                 borderWidth: 2,
                                 label: {{
@@ -382,6 +384,7 @@ def construir_prompt_formateado(data):
                                 type: 'line',
                                 yMin: {{data['SOPORTE_3']}},
                                 yMax: {{data['SOPORTE_3']}},
+                                yScaleID: 'y1',
                                 borderColor: 'rgba(0, 150, 0, 0.6)',
                                 borderWidth: 2,
                                 label: {{
@@ -394,6 +397,7 @@ def construir_prompt_formateado(data):
                                 type: 'line',
                                 yMin: {{data['RESISTENCIA']}},
                                 yMax: {{data['RESISTENCIA']}},
+                                yScaleID: 'y1',
                                 borderColor: 'rgba(255, 99, 132, 1)',
                                 borderWidth: 2,
                                 label: {{
@@ -406,6 +410,7 @@ def construir_prompt_formateado(data):
                                 type: 'line',
                                 yMin: {{data['PRECIO_OBJETIVO_COMPRA']}},
                                 yMax: {{data['PRECIO_OBJETIVO_COMPRA']}},
+                                yScaleID: 'y1',
                                 borderColor: 'rgba(255, 206, 86, 1)',
                                 borderWidth: 2,
                                 borderDash: [6, 6],
