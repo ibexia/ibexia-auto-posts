@@ -299,19 +299,37 @@ def construir_prompt_formateado(data):
     elif not notas_historicas:
         notas_historicas = [0.0] * 30 # Si no hay datos, rellenar con ceros
         
-    # 🔴 NUEVA LÓGICA PARA AJUSTAR LOS LÍMITES DEL EJE Y1
-    all_y1_values = cierres_historicos + [data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3'], data['RESISTENCIA'], data['PRECIO_OBJETIVO_COMPRA']]
-    # Asegurarse de que todos los valores sean numéricos y no None o cadenas
-    all_y1_values = [v for v in all_y1_values if isinstance(v, (int, float))]
+    # 🔴 LÓGICA PARA AJUSTAR LOS LÍMITES DEL EJE Y1 (PRECIOS)
+    all_y1_values = list(cierres_historicos)
+    # Añadir los valores de soporte, resistencia y precio objetivo si existen y son numéricos
+    if 'SOPORTE_1' in data and data['SOPORTE_1'] is not None:
+        all_y1_values.append(float(data['SOPORTE_1']))
+    if 'SOPORTE_2' in data and data['SOPORTE_2'] is not None:
+        all_y1_values.append(float(data['SOPORTE_2']))
+    if 'SOPORTE_3' in data and data['SOPORTE_3'] is not None:
+        all_y1_values.append(float(data['SOPORTE_3']))
+    if 'RESISTENCIA' in data and data['RESISTENCIA'] is not None:
+        all_y1_values.append(float(data['RESISTENCIA']))
+    if 'PRECIO_OBJETIVO_COMPRA' in data and data['PRECIO_OBJETIVO_COMPRA'] is not None:
+        all_y1_values.append(float(data['PRECIO_OBJETIVO_COMPRA']))
 
     if all_y1_values:
         min_val = min(all_y1_values)
         max_val = max(all_y1_values)
         
         # Añadir un buffer del 5% al mínimo y máximo
+        # Redondear para evitar decimales muy largos en el HTML/JS
         buffer = (max_val - min_val) * 0.05
         min_y1_buffered = round(min_val - buffer, 2)
         max_y1_buffered = round(max_val + buffer, 2)
+        
+        # Asegurarse de que el rango no sea cero si min y max son iguales
+        if min_y1_buffered == max_y1_buffered:
+            if min_y1_buffered == 0:
+                max_y1_buffered = 1 # Pequeño rango si el valor es 0
+            else:
+                min_y1_buffered = round(min_val * 0.95, 2)
+                max_y1_buffered = round(max_val * 1.05, 2)
     else:
         # Valores por defecto si no hay datos de precios
         min_y1_buffered = 0
