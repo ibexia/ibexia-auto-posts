@@ -311,10 +311,10 @@ def construir_prompt_formateado(data):
         notas_historicas_display = notas_historicas
 
         chart_html = f"""
-<h2>Evolución de la Nota Técnica y Niveles Clave</h2>
-<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong> y los niveles de precio importantes, mostramos un gráfico que combina los valores de los últimos treinta días de nuestra valoración técnica (barras azules) con el precio de cotización (linea roja), además de los niveles de soporte, resistencia y precio objetivo.</p>
+<h2>Evolución de la Nota Técnica</h2>
+<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
 
-<div style="width: 100%; height: 500px;">
+<div style="width: 80%; margin: auto; height: 400px;">
     <canvas id="notasChart"></canvas>
 </div>
 
@@ -368,71 +368,30 @@ def construir_prompt_formateado(data):
                                 backgroundColor: 'rgba(255, 0, 0, 0.1)',
                                 borderWidth: 0
                             }},
-                            soporte1: {{
+                            lineaCompra: {{
                                 type: 'line',
-                                yMin: {data['SOPORTE_1']},
-                                yMax: {data['SOPORTE_1']},
-                                borderColor: 'rgba(0, 255, 0, 0.8)',
+                                yMin: 8,
+                                yMax: 8,
+                                borderColor: 'rgba(0, 200, 0, 1)',
                                 borderWidth: 2,
-                                yAxisID: 'y1',
                                 label: {{
                                     enabled: true,
-                                    content: 'Soporte 1 ({data['SOPORTE_1']}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            soporte2: {{
-                                type: 'line',
-                                yMin: {data['SOPORTE_2']},
-                                yMax: {data['SOPORTE_2']},
-                                borderColor: 'rgba(0, 200, 0, 0.6)',
-                                borderWidth: 2,
-                                yAxisID: 'y1',
-                                label: {{
-                                    enabled: true,
-                                    content: 'Soporte 2 ({data['SOPORTE_2']}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            soporte3: {{
-                                type: 'line',
-                                yMin: {data['SOPORTE_3']},
-                                yMax: {data['SOPORTE_3']},
-                                borderColor: 'rgba(0, 150, 0, 0.6)',
-                                borderWidth: 2,
-                                yAxisID: 'y1',
-                                label: {{
-                                    enabled: true,
-                                    content: 'Soporte 3 ({data['SOPORTE_3']}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            resistencia: {{
-                                type: 'line',
-                                yMin: {data['RESISTENCIA']},
-                                yMax: {data['RESISTENCIA']},
-                                borderColor: 'rgba(255, 99, 132, 1)',
-                                borderWidth: 2,
-                                yAxisID: 'y1',
-                                label: {{
-                                    enabled: true,
-                                    content: 'Resistencia ({data['RESISTENCIA']}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            objetivo: {{
-                                type: 'line',
-                                yMin: {data['PRECIO_OBJETIVO_COMPRA']},
-                                yMax: {data['PRECIO_OBJETIVO_COMPRA']},
-                                borderColor: 'rgba(255, 206, 86, 1)',
-                                borderWidth: 2,
-                                borderDash: [6, 6],
-                                yAxisID: 'y1',
-                                label: {{
-                                    enabled: true,
-                                    content: 'Objetivo ({data['PRECIO_OBJETIVO_COMPRA']}€)',
+                                    content: 'Zona de Compra (8)',
                                     position: 'end',
-                                    backgroundColor: 'rgba(255, 206, 86, 0.8)'
+                                    backgroundColor: 'rgba(0, 200, 0, 0.8)'
+                                }}
+                            }},
+                            lineaVenta: {{
+                                type: 'line',
+                                yMin: 2,
+                                yMax: 2,
+                                borderColor: 'rgba(200, 0, 0, 1)',
+                                borderWidth: 2,
+                                label: {{
+                                    enabled: true,
+                                    content: 'Zona de Venta (2)',
+                                    position: 'end',
+                                    backgroundColor: 'rgba(200, 0, 0, 0.8)'
                                 }}
                             }}
                         }}
@@ -627,6 +586,121 @@ def construir_prompt_formateado(data):
 
         
         chart_html += f"""
+
+
+<div style="width: 80%; margin: auto; height: 400px;">
+    <canvas id="preciosChart"></canvas>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {{
+    var ctx = document.getElementById('preciosChart').getContext('2d');
+    var preciosChart = new Chart(ctx, {{
+        type: 'line',
+        data: {{
+            labels: {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])},
+            datasets: [{{
+                label: 'Precio de Cierre',
+                data: {json.dumps(data['CIERRES_30_DIAS'])},
+                borderColor: 'rgba(54, 162, 235, 1)',
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                fill: false,
+                tension: 0.2
+            }}]
+        }},
+        options: {{
+            plugins: {{
+                annotation: {{
+                    annotations: {{
+                        soporte1: {{
+                            type: 'line',
+                            yMin: {data['SOPORTE_1']},
+                            yMax: {data['SOPORTE_1']},
+                            borderColor: 'rgba(0, 255, 0, 0.8)',
+                            borderWidth: 2,
+                            label: {{
+                                enabled: true,
+                                content: 'Soporte 1 ({data['SOPORTE_1']}€)',
+                                position: 'end'
+                            }}
+                        }},
+                        soporte2: {{
+                            type: 'line',
+                            yMin: {data['SOPORTE_2']},
+                            yMax: {data['SOPORTE_2']},
+                            borderColor: 'rgba(0, 200, 0, 0.6)',
+                            borderWidth: 2,
+                            label: {{
+                                enabled: true,
+                                content: 'Soporte 2 ({data['SOPORTE_2']}€)',
+                                position: 'end'
+                            }}
+                        }},
+                        soporte3: {{
+                            type: 'line',
+                            yMin: {data['SOPORTE_3']},
+                            yMax: {data['SOPORTE_3']},
+                            borderColor: 'rgba(0, 150, 0, 0.6)',
+                            borderWidth: 2,
+                            label: {{
+                                enabled: true,
+                                content: 'Soporte 3 ({data['SOPORTE_3']}€)',
+                                position: 'end'
+                            }}
+                        }},
+                        resistencia: {{
+                            type: 'line',
+                            yMin: {data['RESISTENCIA']},
+                            yMax: {data['RESISTENCIA']},
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2,
+                            label: {{
+                                enabled: true,
+                                content: 'Resistencia ({data['RESISTENCIA']}€)',
+                                position: 'end'
+                            }}
+                        }},
+                        objetivo: {{
+                            type: 'line',
+                            yMin: {data['PRECIO_OBJETIVO_COMPRA']},
+                            yMax: {data['PRECIO_OBJETIVO_COMPRA']},
+                            borderColor: 'rgba(255, 206, 86, 1)',
+                            borderWidth: 2,
+                            borderDash: [6, 6],
+                            label: {{
+                                enabled: true,
+                                content: 'Objetivo ({data['PRECIO_OBJETIVO_COMPRA']}€)',
+                                position: 'end',
+                                backgroundColor: 'rgba(255, 206, 86, 0.8)'
+                            }}
+                        }}
+                    }}
+                }}
+            }},
+            scales: {{
+                y: {{
+                    beginAtZero: false,
+                    title: {{
+                        display: true,
+                        text: 'Precio de Cierre (€)'
+                    }}
+                }},
+                x: {{
+                    title: {{
+                        display: true,
+                        text: 'Últimos 30 Días'
+                    }}
+                }}
+            }},
+            responsive: true,
+            maintainAspectRatio: false
+        }}
+    }});
+}});
+</script>
+"""
+
+        chart_html += f"""
 <h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
 <p>Este gráfico es crucial para identificar **divergencias significativas** entre nuestra valoración técnica (la Nota Técnica) y el movimiento real del precio de la acción. Una divergencia positiva (barras verdes) sugiere que nuestra nota está indicando una fortaleza técnica mayor de lo que el precio actual refleja, lo que podría anticipar un movimiento alcista. Por el contrario, una divergencia negativa (barras rojas) indica que la nota técnica es más débil que el precio, lo que podría ser una señal de advertencia o anticipar una corrección.</p>
 
@@ -738,6 +812,7 @@ document.addEventListener('DOMContentLoaded', function () {{
     }});
 }});
 </script>
+"""
 
         
 
@@ -778,7 +853,7 @@ document.addEventListener('DOMContentLoaded', function () {{
     </tr>
     <tr>
         <td style="padding: 8px;">Precio Actual</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}</strong></td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}€</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Volumen</td>
@@ -786,11 +861,11 @@ document.addEventListener('DOMContentLoaded', function () {{
     </tr>
     <tr>
         <td style="padding: 8px;">Soporte Clave</td>
-        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.2f}</strong></td>
+        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.2f}€</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Resistencia Clave</td>
-        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}</strong></td>
+        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Recomendación</td>
@@ -802,7 +877,7 @@ document.addEventListener('DOMContentLoaded', function () {{
     </tr>
     <tr>
         <td style="padding: 8px;">Precio Objetivo de Compra</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}</strong></td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Tendencia de la Nota</td>
