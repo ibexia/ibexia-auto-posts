@@ -463,8 +463,8 @@ def construir_prompt_formateado(data):
                         ticks: {{
                             padding: 5
                         }},
-                        suggestedMin: Math.min(...{{json.dumps(cierres_historicos)}}) * 0.98,
-                        suggestedMax: Math.max(...{{json.dumps(cierres_historicos)}}) * 1.02
+                        suggestedMin: Math.min(...{{json.dumps(cierres_historicos)}}, {{data['PRECIO_OBJETIVO_COMPRA']}}) * 0.98,
+                        suggestedMax: Math.max(...{{json.dumps(cierres_historicos)}}, {{data['PRECIO_OBJETIVO_COMPRA']}}) * 1.02
                     }},
                     x: {{
                         title: {{
