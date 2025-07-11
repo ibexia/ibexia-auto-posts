@@ -1111,7 +1111,7 @@ def generar_contenido_con_gemini(tickers):
         
         prompt, titulo_post = construir_prompt_formateado(data)
 
-        max_retries = 3
+        max_retries = 1
         initial_delay = 10  
         retries = 0
         delay = initial_delay
