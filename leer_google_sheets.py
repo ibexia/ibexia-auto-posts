@@ -362,8 +362,10 @@ def construir_prompt_formateado(data):
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.3.2"></script>
 <script>
+    Chart.register(window['chartjs-plugin-annotation']); // Registro explícito del plugin
+
     // Unique ID for this chart block: {random.random()} - {datetime.now().timestamp()}
     document.addEventListener('DOMContentLoaded', function() {{
 
