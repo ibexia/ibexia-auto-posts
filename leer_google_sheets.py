@@ -348,6 +348,7 @@ def construir_prompt_formateado(data):
     # COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
     chart_html = ""
     if notas_historicas:
+        chart_id = f"notasChart_{data['TICKER'].replace('.', '').lower()}"
         labels = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
         
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
@@ -358,18 +359,18 @@ def construir_prompt_formateado(data):
 <p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que combina los valores de los últimos treinta días de nuestra valoración técnica (barras azules) sobre el precio de cotización (línea roja). La escala de la nota va de 0 (venta o cautela) a 10 (oportunidad de compra). Además, este gráfico integra los niveles clave de soporte, resistencia y nuestro precio objetivo de compra para una visión completa.</p>
 
 <div style="width: 100%; margin: 0; height: 500px;">
-    <canvas id="notasChart"></canvas>
+    <canvas id="{chart_id}"></canvas>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.3.2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.3.2/dist/chartjs-plugin-annotation.min.js"></script>
 <script>
-    Chart.register(ChartjsAnnotation); // Registro explícito del plugin (usando su nombre global estándar)
+    Chart.register(window['chartjs-plugin-annotation']);
 
     // Unique ID for this chart block: {random.random()} - {datetime.now().timestamp()}
     document.addEventListener('DOMContentLoaded', function() {{
 
-        var ctx = document.getElementById('notasChart').getContext('2d');
+        var ctx = document.getElementById('{chart_id}').getContext('2d');
         var notasChart = new Chart(ctx, {{
             type: 'bar',
             data: {{
