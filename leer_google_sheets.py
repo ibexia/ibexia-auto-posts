@@ -321,7 +321,9 @@ def construir_prompt_formateado(data):
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 <script>
+    // Unique ID for this chart block: {random.random()} - {datetime.now().timestamp()}
     document.addEventListener('DOMContentLoaded', function() {{
+
         var ctx = document.getElementById('notasChart').getContext('2d');
         var notasChart = new Chart(ctx, {{
             type: 'bar',
