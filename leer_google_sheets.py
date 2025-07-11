@@ -293,92 +293,46 @@ def construir_prompt_formateado(data):
     elif not cierres_historicos:
         cierres_historicos = [0.0] * 30
 
-    # Asegurar que los valores de precios son flotantes para JavaScript
-    for key in ['SOPORTE_1', 'SOPORTE_2', 'SOPORTE_3', 'RESISTENCIA', 'PRECIO_OBJETIVO_COMPRA']:
-        if key in data and data[key] is not None:
-            try:
-                data[key] = float(data[key])
-            except (ValueError, TypeError):
-                data[key] = 0.0 # Valor por defecto si la conversión falla
-    
     # Ajustar para asegurar que siempre haya 7 elementos, rellenando con el último valor si hay menos
     if len(notas_historicas) < 30 and notas_historicas:
         notas_historicas = [notas_historicas[0]] * (30 - len(notas_historicas)) + notas_historicas
     elif not notas_historicas:
         notas_historicas = [0.0] * 30 # Si no hay datos, rellenar con ceros
-        
-    # 🔴 LÓGICA PARA AJUSTAR LOS LÍMITES DEL EJE Y1 (PRECIOS)
-    all_y1_values = list(cierres_historicos)
-    # Añadir los valores de soporte, resistencia y precio objetivo si existen y son numéricos
-    if 'SOPORTE_1' in data and data['SOPORTE_1'] is not None:
-        all_y1_values.append(float(data['SOPORTE_1']))
-    if 'SOPORTE_2' in data and data['SOPORTE_2'] is not None:
-        all_y1_values.append(float(data['SOPORTE_2']))
-    if 'SOPORTE_3' in data and data['SOPORTE_3'] is not None:
-        all_y1_values.append(float(data['SOPORTE_3']))
-    if 'RESISTENCIA' in data and data['RESISTENCIA'] is not None:
-        all_y1_values.append(float(data['RESISTENCIA']))
-    if 'PRECIO_OBJETIVO_COMPRA' in data and data['PRECIO_OBJETIVO_COMPRA'] is not None:
-        all_y1_values.append(float(data['PRECIO_OBJETIVO_COMPRA']))
-
-    if all_y1_values:
-        min_val = min(all_y1_values)
-        max_val = max(all_y1_values)
-        
-        # Añadir un buffer del 5% al mínimo y máximo
-        # Redondear para evitar decimales muy largos en el HTML/JS
-        buffer = (max_val - min_val) * 0.05
-        min_y1_buffered = round(min_val - buffer, 2)
-        max_y1_buffered = round(max_val + buffer, 2)
-        
-        # Asegurarse de que el rango no sea cero si min y max son iguales
-        if min_y1_buffered == max_y1_buffered:
-            if min_y1_buffered == 0:
-                max_y1_buffered = 1 # Pequeño rango si el valor es 0
-            else:
-                min_y1_buffered = round(min_val * 0.95, 2)
-                max_y1_buffered = round(max_val * 1.05, 2)
-    else:
-        # Valores por defecto si no hay datos de precios
-        min_y1_buffered = 0
-        max_y1_buffered = 100
+    
     
     # ... (el resto de tu código para soportes_unicos y tabla_resumen) ...
 
     # COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
     chart_html = ""
     if notas_historicas:
-        chart_id = f"notasChart_{data['TICKER'].replace('.', '').lower()}"
         labels = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
         
         # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
         notas_historicas_display = notas_historicas
 
         chart_html = f"""
-<h2>Evolución de la Nota Técnica y Niveles Clave</h2>
-<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que combina los valores de los últimos treinta días de nuestra valoración técnica (barras azules) sobre el precio de cotización (línea roja). La escala de la nota va de 0 (venta o cautela) a 10 (oportunidad de compra). Además, este gráfico integra los niveles clave de soporte, resistencia y nuestro precio objetivo de compra para una visión completa.</p>
+<h2>Evolución de la Nota Técnica</h2>
+<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
 
-<div style="width: 100%; margin: 0; height: 500px;">
-    <canvas id="{chart_id}"></canvas>
+<div style="width: 100%; height: 100%;">
+    <canvas id="notasChart"></canvas>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.3.2/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 <script>
-    Chart.register(window['chartjs-plugin-annotation']);
-
-    // Unique ID for this chart block: {random.random()} - {datetime.now().timestamp()}
+    // Unique ID for this chart block: {{random.random()}} - {{datetime.now().timestamp()}}
     document.addEventListener('DOMContentLoaded', function() {{
 
-        var ctx = document.getElementById('{chart_id}').getContext('2d');
+        var ctx = document.getElementById('notasChart').getContext('2d');
         var notasChart = new Chart(ctx, {{
             type: 'bar',
             data: {{
-                labels: {json.dumps(labels)},
+                labels: {{json.dumps(labels)}},
                 datasets: [
                     {{
                         label: 'Nota Técnica',
-                        data: {json.dumps(notas_historicas_display)},
+                        data: {{json.dumps(notas_historicas_display)}},
                         backgroundColor: 'rgba(0, 128, 255, 0.4)',
                         borderColor: 'rgba(0, 128, 255, 1)',
                         borderWidth: 1,
@@ -387,7 +341,7 @@ def construir_prompt_formateado(data):
                     }},
                     {{
                         label: 'Precio de Cierre',
-                        data: {json.dumps(cierres_historicos)},
+                        data: {{json.dumps(cierres_historicos)}},
                         type: 'line',
                         borderColor: 'rgba(255, 99, 132, 1)',
                         borderWidth: 2,
@@ -400,90 +354,67 @@ def construir_prompt_formateado(data):
                 plugins: {{
                     annotation: {{
                         annotations: {{
-                            zonaVerde: {{
-                                type: 'box',
-                                yMin: 8,
-                                yMax: 10,
-                                backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                                borderWidth: 0
-                            }},
-                            zonaRoja: {{
-                                type: 'box',
-                                yMin: 0,
-                                yMax: 2,
-                                backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                                borderWidth: 0
-                            }},
                             soporte1: {{
                                 type: 'line',
-                                yMin: {data['SOPORTE_1']},
-                                yMax: {data['SOPORTE_1']},
+                                yMin: {{data['SOPORTE_1']}},
+                                yMax: {{data['SOPORTE_1']}},
                                 borderColor: 'rgba(0, 255, 0, 0.8)',
                                 borderWidth: 2,
                                 label: {{
                                     enabled: true,
-                                    content: 'Soporte 1 ({data['SOPORTE_1']}€)',
-                                    position: 'end',
-                                    backgroundColor: 'rgba(0, 255, 0, 0.8)'
-                                }},
-                                yAxisID: 'y1'
+                                    content: 'Soporte 1 ({{data["SOPORTE_1"]}}€)',
+                                    position: 'end'
+                                }}
                             }},
                             soporte2: {{
                                 type: 'line',
-                                yMin: {data['SOPORTE_2']},
-                                yMax: {data['SOPORTE_2']},
+                                yMin: {{data['SOPORTE_2']}},
+                                yMax: {{data['SOPORTE_2']}},
                                 borderColor: 'rgba(0, 200, 0, 0.6)',
                                 borderWidth: 2,
                                 label: {{
                                     enabled: true,
-                                    content: 'Soporte 2 ({data['SOPORTE_2']}€)',
-                                    position: 'end',
-                                    backgroundColor: 'rgba(0, 200, 0, 0.8)'
-                                }},
-                                yAxisID: 'y1'
+                                    content: 'Soporte 2 ({{data["SOPORTE_2"]}}€)',
+                                    position: 'end'
+                                }}
                             }},
                             soporte3: {{
                                 type: 'line',
-                                yMin: {data['SOPORTE_3']},
-                                yMax: {data['SOPORTE_3']},
+                                yMin: {{data['SOPORTE_3']}},
+                                yMax: {{data['SOPORTE_3']}},
                                 borderColor: 'rgba(0, 150, 0, 0.6)',
                                 borderWidth: 2,
                                 label: {{
                                     enabled: true,
-                                    content: 'Soporte 3 ({data['SOPORTE_3']}€)',
-                                    position: 'end',
-                                    backgroundColor: 'rgba(0, 150, 0, 0.8)'
-                                }},
-                                yAxisID: 'y1'
+                                    content: 'Soporte 3 ({{data["SOPORTE_3"]}}€)',
+                                    position: 'end'
+                                }}
                             }},
                             resistencia: {{
                                 type: 'line',
-                                yMin: {data['RESISTENCIA']},
-                                yMax: {data['RESISTENCIA']},
+                                yMin: {{data['RESISTENCIA']}},
+                                yMax: {{data['RESISTENCIA']}},
                                 borderColor: 'rgba(255, 99, 132, 1)',
                                 borderWidth: 2,
                                 label: {{
                                     enabled: true,
-                                    content: 'Resistencia ({data['RESISTENCIA']}€)',
-                                    position: 'end',
-                                    backgroundColor: 'rgba(255, 99, 132, 0.8)'
-                                }},
-                                yAxisID: 'y1'
+                                    content: 'Resistencia ({{data["RESISTENCIA"]}}€)',
+                                    position: 'end'
+                                }}
                             }},
                             objetivo: {{
                                 type: 'line',
-                                yMin: {data['PRECIO_OBJETIVO_COMPRA']},
-                                yMax: {data['PRECIO_OBJETIVO_COMPRA']},
+                                yMin: {{data['PRECIO_OBJETIVO_COMPRA']}},
+                                yMax: {{data['PRECIO_OBJETIVO_COMPRA']}},
                                 borderColor: 'rgba(255, 206, 86, 1)',
                                 borderWidth: 2,
                                 borderDash: [6, 6],
                                 label: {{
                                     enabled: true,
-                                    content: 'Objetivo ({data['PRECIO_OBJETIVO_COMPRA']}€)',
+                                    content: 'Objetivo ({{data["PRECIO_OBJETIVO_COMPRA"]}}€)',
                                     position: 'end',
                                     backgroundColor: 'rgba(255, 206, 86, 0.8)'
-                                }},
-                                yAxisID: 'y1'
+                                }}
                             }}
                         }}
                     }},
@@ -527,8 +458,8 @@ def construir_prompt_formateado(data):
                         ticks: {{
                             padding: 5
                         }},
-                        suggestedMin: {min_y1_buffered},
-                        suggestedMax: {max_y1_buffered}
+                        suggestedMin: Math.min(...{{json.dumps(cierres_historicos)}}) * 0.98,
+                        suggestedMax: Math.max(...{{json.dumps(cierres_historicos)}}) * 1.02
                     }},
                     x: {{
                         title: {{
@@ -674,6 +605,122 @@ def construir_prompt_formateado(data):
             {ganancia_seccion_contenido}
         </div>
         """
+
+        
+        chart_html += f"""
+
+
+<div style="width: 80%; margin: auto; height: 400px;">
+    <canvas id="preciosChart"></canvas>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {{
+    var ctx = document.getElementById('preciosChart').getContext('2d');
+    var preciosChart = new Chart(ctx, {{
+        type: 'line',
+        data: {{
+            labels: {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])},
+            datasets: [{{
+                label: 'Precio de Cierre',
+                data: {json.dumps(data['CIERRES_30_DIAS'])},
+                borderColor: 'rgba(54, 162, 235, 1)',
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                fill: false,
+                tension: 0.2
+            }}]
+        }},
+        options: {{
+            plugins: {{
+                annotation: {{
+                    annotations: {{
+                        soporte1: {{
+                            type: 'line',
+                            yMin: {data['SOPORTE_1']},
+                            yMax: {data['SOPORTE_1']},
+                            borderColor: 'rgba(0, 255, 0, 0.8)',
+                            borderWidth: 2,
+                            label: {{
+                                enabled: true,
+                                content: 'Soporte 1 ({data['SOPORTE_1']}€)',
+                                position: 'end'
+                            }}
+                        }},
+                        soporte2: {{
+                            type: 'line',
+                            yMin: {data['SOPORTE_2']},
+                            yMax: {data['SOPORTE_2']},
+                            borderColor: 'rgba(0, 200, 0, 0.6)',
+                            borderWidth: 2,
+                            label: {{
+                                enabled: true,
+                                content: 'Soporte 2 ({data['SOPORTE_2']}€)',
+                                position: 'end'
+                            }}
+                        }},
+                        soporte3: {{
+                            type: 'line',
+                            yMin: {data['SOPORTE_3']},
+                            yMax: {data['SOPORTE_3']},
+                            borderColor: 'rgba(0, 150, 0, 0.6)',
+                            borderWidth: 2,
+                            label: {{
+                                enabled: true,
+                                content: 'Soporte 3 ({data['SOPORTE_3']}€)',
+                                position: 'end'
+                            }}
+                        }},
+                        resistencia: {{
+                            type: 'line',
+                            yMin: {data['RESISTENCIA']},
+                            yMax: {data['RESISTENCIA']},
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2,
+                            label: {{
+                                enabled: true,
+                                content: 'Resistencia ({data['RESISTENCIA']}€)',
+                                position: 'end'
+                            }}
+                        }},
+                        objetivo: {{
+                            type: 'line',
+                            yMin: {data['PRECIO_OBJETIVO_COMPRA']},
+                            yMax: {data['PRECIO_OBJETIVO_COMPRA']},
+                            borderColor: 'rgba(255, 206, 86, 1)',
+                            borderWidth: 2,
+                            borderDash: [6, 6],
+                            label: {{
+                                enabled: true,
+                                content: 'Objetivo ({data['PRECIO_OBJETIVO_COMPRA']}€)',
+                                position: 'end',
+                                backgroundColor: 'rgba(255, 206, 86, 0.8)'
+                            }}
+                        }}
+                    }}
+                }}
+            }},
+            scales: {{
+                y: {{
+                    beginAtZero: false,
+                    title: {{
+                        display: true,
+                        text: 'Precio de Cierre (€)'
+                    }}
+                }},
+                x: {{
+                    title: {{
+                        display: true,
+                        text: 'Últimos 30 Días'
+                    }}
+                }}
+            }},
+            responsive: true,
+            maintainAspectRatio: false
+        }}
+    }});
+}});
+</script>
+"""
 
         chart_html += f"""
 <h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
