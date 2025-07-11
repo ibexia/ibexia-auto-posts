@@ -298,7 +298,24 @@ def construir_prompt_formateado(data):
         notas_historicas = [notas_historicas[0]] * (30 - len(notas_historicas)) + notas_historicas
     elif not notas_historicas:
         notas_historicas = [0.0] * 30 # Si no hay datos, rellenar con ceros
-    
+        
+    # 🔴 NUEVA LÓGICA PARA AJUSTAR LOS LÍMITES DEL EJE Y1
+    all_y1_values = cierres_historicos + [data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3'], data['RESISTENCIA'], data['PRECIO_OBJETIVO_COMPRA']]
+    # Asegurarse de que todos los valores sean numéricos y no None o cadenas
+    all_y1_values = [v for v in all_y1_values if isinstance(v, (int, float))]
+
+    if all_y1_values:
+        min_val = min(all_y1_values)
+        max_val = max(all_y1_values)
+        
+        # Añadir un buffer del 5% al mínimo y máximo
+        buffer = (max_val - min_val) * 0.05
+        min_y1_buffered = round(min_val - buffer, 2)
+        max_y1_buffered = round(max_val + buffer, 2)
+    else:
+        # Valores por defecto si no hay datos de precios
+        min_y1_buffered = 0
+        max_y1_buffered = 100
     
     # ... (el resto de tu código para soportes_unicos y tabla_resumen) ...
 
@@ -481,8 +498,8 @@ def construir_prompt_formateado(data):
                         ticks: {{
                             padding: 5
                         }},
-                        suggestedMin: Math.min(...{json.dumps(cierres_historicos)}) * 0.98,
-                        suggestedMax: Math.max(...{json.dumps(cierres_historicos)}) * 1.02
+                        suggestedMin: {min_y1_buffered},
+                        suggestedMax: {max_y1_buffered}
                     }},
                     x: {{
                         title: {{
