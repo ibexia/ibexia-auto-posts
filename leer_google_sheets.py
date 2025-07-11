@@ -324,6 +324,20 @@ def construir_prompt_formateado(data):
     // Unique ID for this chart block: {{random.random()}} - {{datetime.now().timestamp()}}
     document.addEventListener('DOMContentLoaded', function() {{
 
+        var cierres = {{json.dumps(cierres_historicos)}};
+        var objetivo = {{data['PRECIO_OBJETIVO_COMPRA']}};
+
+        var minPrecio = Math.min(...cierres, objetivo);
+        var maxPrecio = Math.max(...cierres, objetivo);
+
+        if (minPrecio === maxPrecio) {{
+            minPrecio *= 0.95;
+            maxPrecio *= 1.05;
+        }} else {{
+            minPrecio *= 0.98;
+            maxPrecio *= 1.02;
+        }}
+
         var ctx = document.getElementById('notasChart').getContext('2d');
         var notasChart = new Chart(ctx, {{
             type: 'bar',
@@ -463,8 +477,8 @@ def construir_prompt_formateado(data):
                         ticks: {{
                             padding: 5
                         }},
-                        suggestedMin: Math.min(...{{json.dumps(cierres_historicos)}}, {{data['PRECIO_OBJETIVO_COMPRA']}}) * 0.98,
-                        suggestedMax: Math.max(...{{json.dumps(cierres_historicos)}}, {{data['PRECIO_OBJETIVO_COMPRA']}}) * 1.02
+                        suggestedMin: minPrecio,
+                        suggestedMax: maxPrecio
                     }},
                     x: {{
                         title: {{
