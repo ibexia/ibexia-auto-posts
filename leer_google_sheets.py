@@ -293,6 +293,14 @@ def construir_prompt_formateado(data):
     elif not cierres_historicos:
         cierres_historicos = [0.0] * 30
 
+    # Asegurar que los valores de precios son flotantes para JavaScript
+    for key in ['SOPORTE_1', 'SOPORTE_2', 'SOPORTE_3', 'RESISTENCIA', 'PRECIO_OBJETIVO_COMPRA']:
+        if key in data and data[key] is not None:
+            try:
+                data[key] = float(data[key])
+            except (ValueError, TypeError):
+                data[key] = 0.0 # Valor por defecto si la conversión falla
+    
     # Ajustar para asegurar que siempre haya 7 elementos, rellenando con el último valor si hay menos
     if len(notas_historicas) < 30 and notas_historicas:
         notas_historicas = [notas_historicas[0]] * (30 - len(notas_historicas)) + notas_historicas
