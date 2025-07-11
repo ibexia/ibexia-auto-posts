@@ -778,7 +778,7 @@ document.addEventListener('DOMContentLoaded', function () {{
     </tr>
     <tr>
         <td style="padding: 8px;">Precio Actual</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}€</strong></td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Volumen</td>
@@ -786,11 +786,11 @@ document.addEventListener('DOMContentLoaded', function () {{
     </tr>
     <tr>
         <td style="padding: 8px;">Soporte Clave</td>
-        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.2f}€</strong></td>
+        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.2f}</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Resistencia Clave</td>
-        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
+        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Recomendación</td>
@@ -802,7 +802,7 @@ document.addEventListener('DOMContentLoaded', function () {{
     </tr>
     <tr>
         <td style="padding: 8px;">Precio Objetivo de Compra</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Tendencia de la Nota</td>
