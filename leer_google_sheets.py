@@ -558,7 +558,7 @@ def construir_prompt_formateado(data):
         mejor_punto_giro_venta = None
 
         if cierres and notas and len(cierres) == len(notas) and len(notas) > 1:
-            for i in range(1, len(notas) - 1): # Empezar desde el segundo elemento para comparar con el anterior y mirar el siguiente
+            for i in range(1, len(notas) - 1): # Empezar desde el segundo elemento para ar con el anterior y mirar el siguiente
                 nota_anterior = notas[i-1]
                 nota_actual = notas[i]
                 nota_siguiente = notas[i+1]
@@ -856,7 +856,7 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 - Nivel de deuda y flujo de caja: {data['DEUDA']}, {data['FLUJO_CAJA']}
 - Información estratégica: {data['EXPANSION_PLANES']}, {data['ACUERDOS']}
 - Sentimiento del mercado: {data['SENTIMIENTO_ANALISTAS']}, {data['TENDENCIA_SOCIAL']}
-- Comparativa sectorial: {data['EMPRESAS_SIMILARES']}
+- ativa sectorial: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 - Tendencia de la nota: {data['TENDENCIA_NOTA']}
 - Días estimados para acción: {data['DIAS_ESTIMADOS_ACCION']}
@@ -892,68 +892,6 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 <p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. 
 En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
-
-<h2>Comparativa Financiera: EBITDA vs Deuda</h2>
-<p>Para evaluar de forma visual la salud financiera de <strong>{data['NOMBRE_EMPRESA']}</strong>, a continuación muestro un gráfico de barras horizontales centradas que compara el <strong>EBITDA</strong> (capacidad operativa de generación de beneficios) frente a la <strong>Deuda total</strong>. </p>
-
-<div style="width: 80%; margin: auto; height: 300px;">
-    <canvas id="ebitdaVsDeudaChart"></canvas>
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {{
-        var ctx = document.getElementById('ebitdaVsDeudaChart').getContext('2d');
-        new Chart(ctx, {{
-            type: 'bar',
-            data: {{
-                labels: ['EBITDA', 'Deuda'],
-                datasets: [{{
-                    label: 'Millones de Euros',
-                    data: [{float(data['EBITDA']) if data['EBITDA'] != 'N/A' else 0}, {-float(data['DEUDA']) if data['DEUDA'] != 'N/A' else 0}],
-                    backgroundColor: ['#2e86de', '#c0392b']
-                }}]
-            }},
-            options: {{
-                indexAxis: 'y',
-                responsive: true,
-                plugins: {{
-                    tooltip: {{
-                        callbacks: {{
-                            label: function(context) {{
-                                let val = Math.abs(context.parsed.x);
-                                return context.label + ': ' + val.toLocaleString() + ' €';
-                            }}
-                        }}
-                    }},
-                    legend: {{
-                        display: false
-                    }}
-                }},
-                scales: {{
-                    x: {{
-                        stacked: false,
-                        title: {{
-                            display: true,
-                            text: 'Millones de Euros'
-                        }},
-                        ticks: {{
-                            callback: function(value) {{
-                                return Math.abs(value);
-                            }}
-                        }},
-                        min: -Math.max({float(data['EBITDA']) if data['EBITDA'] != 'N/A' else 0}, {float(data['DEUDA']) if data['DEUDA'] != 'N/A' else 0}) * 1.2,
-                        max: Math.max({float(data['EBITDA']) if data['EBITDA'] != 'N/A' else 0}, {float(data['DEUDA']) if data['DEUDA'] != 'N/A' else 0}) * 1.2
-                    }},
-                    y: {{
-                        title: {{
-                            display: false
-                        }}
-                    }}
-                }}
-            }}
-        }});
-    }});
-</script>
 
 {tabla_resumen}
 
