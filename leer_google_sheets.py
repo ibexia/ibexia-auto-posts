@@ -140,7 +140,16 @@ def obtener_datos_yfinance(ticker):
 
         smi_actual = round(hist['SMI_signal'].iloc[-1], 2)
         current_price = round(info["currentPrice"], 2)
-        current_volume = info.get("volume", 0)
+        # Asegurarse de que haya al menos dos días de datos para obtener el volumen del día anterior completo
+        if len(hist) >= 2:
+            current_volume = hist['Volume'].iloc[-2]
+        elif len(hist) == 1:
+            # Si solo hay un día de historial, usa el volumen de ese día
+            current_volume = hist['Volume'].iloc[-1]
+        else:
+            # Si no hay datos históricos, el volumen es 0
+            current_volume = 0
+
 
         soportes = find_significant_supports(hist, current_price)
         soporte_1, soporte_2, soporte_3 = soportes
