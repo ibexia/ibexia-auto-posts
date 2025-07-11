@@ -140,7 +140,16 @@ def obtener_datos_yfinance(ticker):
 
         smi_actual = round(hist['SMI_signal'].iloc[-1], 2)
         current_price = round(info["currentPrice"], 2)
-        current_volume = info.get("volume", 0)
+        # Asegurarse de que haya al menos dos días de datos para obtener el volumen del día anterior completo
+        if len(hist) >= 2:
+            current_volume = hist['Volume'].iloc[-2]
+        elif len(hist) == 1:
+            # Si solo hay un día de historial, usa el volumen de ese día
+            current_volume = hist['Volume'].iloc[-1]
+        else:
+            # Si no hay datos históricos, el volumen es 0
+            current_volume = 0
+
 
         soportes = find_significant_supports(hist, current_price)
         soporte_1, soporte_2, soporte_3 = soportes
@@ -305,23 +314,25 @@ def construir_prompt_formateado(data):
 <h2>Evolución de la Nota Técnica</h2>
 <p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
 
-<div style="width: 80%; margin: auto; height: 400px;">
+<div style="width: 100%; height: 100%;">
     <canvas id="notasChart"></canvas>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 <script>
+    // Unique ID for this chart block: {{random.random()}} - {{datetime.now().timestamp()}}
     document.addEventListener('DOMContentLoaded', function() {{
+
         var ctx = document.getElementById('notasChart').getContext('2d');
         var notasChart = new Chart(ctx, {{
             type: 'bar',
             data: {{
-                labels: {json.dumps(labels)},
+                labels: {{json.dumps(labels)}},
                 datasets: [
                     {{
                         label: 'Nota Técnica',
-                        data: {json.dumps(notas_historicas_display)},
+                        data: {{json.dumps(notas_historicas_display)}},
                         backgroundColor: 'rgba(0, 128, 255, 0.4)',
                         borderColor: 'rgba(0, 128, 255, 1)',
                         borderWidth: 1,
@@ -330,7 +341,7 @@ def construir_prompt_formateado(data):
                     }},
                     {{
                         label: 'Precio de Cierre',
-                        data: {json.dumps(cierres_historicos)},
+                        data: {{json.dumps(cierres_historicos)}},
                         type: 'line',
                         borderColor: 'rgba(255, 99, 132, 1)',
                         borderWidth: 2,
@@ -343,44 +354,71 @@ def construir_prompt_formateado(data):
                 plugins: {{
                     annotation: {{
                         annotations: {{
-                            zonaVerde: {{
-                                type: 'box',
-                                yMin: 8,
-                                yMax: 10,
-                                backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                                borderWidth: 0
-                            }},
-                            zonaRoja: {{
-                                type: 'box',
-                                yMin: 0,
-                                yMax: 2,
-                                backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                                borderWidth: 0
-                            }},
-                            lineaCompra: {{
+                            soporte1: {{
                                 type: 'line',
-                                yMin: 8,
-                                yMax: 8,
-                                borderColor: 'rgba(0, 200, 0, 1)',
+                                yMin: {{data['SOPORTE_1']}},
+                                yMax: {{data['SOPORTE_1']}},
+                                yScaleID: 'y1',
+                                borderColor: 'rgba(0, 255, 0, 0.8)',
                                 borderWidth: 2,
                                 label: {{
                                     enabled: true,
-                                    content: 'Zona de Compra (8)',
-                                    position: 'end',
-                                    backgroundColor: 'rgba(0, 200, 0, 0.8)'
+                                    content: 'Soporte 1 ({{data["SOPORTE_1"]}}€)',
+                                    position: 'end'
                                 }}
                             }},
-                            lineaVenta: {{
+                            soporte2: {{
                                 type: 'line',
-                                yMin: 2,
-                                yMax: 2,
-                                borderColor: 'rgba(200, 0, 0, 1)',
+                                yMin: {{data['SOPORTE_2']}},
+                                yMax: {{data['SOPORTE_2']}},
+                                yScaleID: 'y1',
+                                borderColor: 'rgba(0, 200, 0, 0.6)',
                                 borderWidth: 2,
                                 label: {{
                                     enabled: true,
-                                    content: 'Zona de Venta (2)',
+                                    content: 'Soporte 2 ({{data["SOPORTE_2"]}}€)',
+                                    position: 'end'
+                                }}
+                            }},
+                            soporte3: {{
+                                type: 'line',
+                                yMin: {{data['SOPORTE_3']}},
+                                yMax: {{data['SOPORTE_3']}},
+                                yScaleID: 'y1',
+                                borderColor: 'rgba(0, 150, 0, 0.6)',
+                                borderWidth: 2,
+                                label: {{
+                                    enabled: true,
+                                    content: 'Soporte 3 ({{data["SOPORTE_3"]}}€)',
+                                    position: 'end'
+                                }}
+                            }},
+                            resistencia: {{
+                                type: 'line',
+                                yMin: {{data['RESISTENCIA']}},
+                                yMax: {{data['RESISTENCIA']}},
+                                yScaleID: 'y1',
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                borderWidth: 2,
+                                label: {{
+                                    enabled: true,
+                                    content: 'Resistencia ({{data["RESISTENCIA"]}}€)',
+                                    position: 'end'
+                                }}
+                            }},
+                            objetivo: {{
+                                type: 'line',
+                                yMin: {{data['PRECIO_OBJETIVO_COMPRA']}},
+                                yMax: {{data['PRECIO_OBJETIVO_COMPRA']}},
+                                yScaleID: 'y1',
+                                borderColor: 'rgba(255, 206, 86, 1)',
+                                borderWidth: 2,
+                                borderDash: [6, 6],
+                                label: {{
+                                    enabled: true,
+                                    content: 'Objetivo ({{data["PRECIO_OBJETIVO_COMPRA"]}}€)',
                                     position: 'end',
-                                    backgroundColor: 'rgba(200, 0, 0, 0.8)'
+                                    backgroundColor: 'rgba(255, 206, 86, 0.8)'
                                 }}
                             }}
                         }}
@@ -425,8 +463,8 @@ def construir_prompt_formateado(data):
                         ticks: {{
                             padding: 5
                         }},
-                        suggestedMin: Math.min(...{json.dumps(cierres_historicos)}) * 0.98,
-                        suggestedMax: Math.max(...{json.dumps(cierres_historicos)}) * 1.02
+                        suggestedMin: Math.min(...{{json.dumps(cierres_historicos)}}, {{data['PRECIO_OBJETIVO_COMPRA']}}) * 0.98,
+                        suggestedMax: Math.max(...{{json.dumps(cierres_historicos)}}, {{data['PRECIO_OBJETIVO_COMPRA']}}) * 1.02
                     }},
                     x: {{
                         title: {{
@@ -520,7 +558,7 @@ def construir_prompt_formateado(data):
         mejor_punto_giro_venta = None
 
         if cierres and notas and len(cierres) == len(notas) and len(notas) > 1:
-            for i in range(1, len(notas) - 1): # Empezar desde el segundo elemento para comparar con el anterior y mirar el siguiente
+            for i in range(1, len(notas) - 1): # Empezar desde el segundo elemento para ar con el anterior y mirar el siguiente
                 nota_anterior = notas[i-1]
                 nota_actual = notas[i]
                 nota_siguiente = notas[i+1]
@@ -573,128 +611,13 @@ def construir_prompt_formateado(data):
         </div>
         """
 
-        
-        chart_html += f"""
-<h2>Evolución del Precio con Soportes y Resistencias</h2>
-<p>A continuación, muestro un gráfico de precios de cierre de los últimos 30 días para <strong>{data['NOMBRE_EMPRESA']}</strong>, con las zonas clave de soporte, resistencia y el precio objetivo de compra claramente marcadas.</p>
-
-<div style="width: 80%; margin: auto; height: 400px;">
-    <canvas id="preciosChart"></canvas>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {{
-    var ctx = document.getElementById('preciosChart').getContext('2d');
-    var preciosChart = new Chart(ctx, {{
-        type: 'line',
-        data: {{
-            labels: {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])},
-            datasets: [{{
-                label: 'Precio de Cierre',
-                data: {json.dumps(data['CIERRES_30_DIAS'])},
-                borderColor: 'rgba(54, 162, 235, 1)',
-                backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                fill: false,
-                tension: 0.2
-            }}]
-        }},
-        options: {{
-            plugins: {{
-                annotation: {{
-                    annotations: {{
-                        soporte1: {{
-                            type: 'line',
-                            yMin: {data['SOPORTE_1']},
-                            yMax: {data['SOPORTE_1']},
-                            borderColor: 'rgba(0, 255, 0, 0.8)',
-                            borderWidth: 2,
-                            label: {{
-                                enabled: true,
-                                content: 'Soporte 1 ({data['SOPORTE_1']}€)',
-                                position: 'end'
-                            }}
-                        }},
-                        soporte2: {{
-                            type: 'line',
-                            yMin: {data['SOPORTE_2']},
-                            yMax: {data['SOPORTE_2']},
-                            borderColor: 'rgba(0, 200, 0, 0.6)',
-                            borderWidth: 2,
-                            label: {{
-                                enabled: true,
-                                content: 'Soporte 2 ({data['SOPORTE_2']}€)',
-                                position: 'end'
-                            }}
-                        }},
-                        soporte3: {{
-                            type: 'line',
-                            yMin: {data['SOPORTE_3']},
-                            yMax: {data['SOPORTE_3']},
-                            borderColor: 'rgba(0, 150, 0, 0.6)',
-                            borderWidth: 2,
-                            label: {{
-                                enabled: true,
-                                content: 'Soporte 3 ({data['SOPORTE_3']}€)',
-                                position: 'end'
-                            }}
-                        }},
-                        resistencia: {{
-                            type: 'line',
-                            yMin: {data['RESISTENCIA']},
-                            yMax: {data['RESISTENCIA']},
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 2,
-                            label: {{
-                                enabled: true,
-                                content: 'Resistencia ({data['RESISTENCIA']}€)',
-                                position: 'end'
-                            }}
-                        }},
-                        objetivo: {{
-                            type: 'line',
-                            yMin: {data['PRECIO_OBJETIVO_COMPRA']},
-                            yMax: {data['PRECIO_OBJETIVO_COMPRA']},
-                            borderColor: 'rgba(255, 206, 86, 1)',
-                            borderWidth: 2,
-                            borderDash: [6, 6],
-                            label: {{
-                                enabled: true,
-                                content: 'Objetivo ({data['PRECIO_OBJETIVO_COMPRA']}€)',
-                                position: 'end',
-                                backgroundColor: 'rgba(255, 206, 86, 0.8)'
-                            }}
-                        }}
-                    }}
-                }}
-            }},
-            scales: {{
-                y: {{
-                    beginAtZero: false,
-                    title: {{
-                        display: true,
-                        text: 'Precio de Cierre (€)'
-                    }}
-                }},
-                x: {{
-                    title: {{
-                        display: true,
-                        text: 'Últimos 30 Días'
-                    }}
-                }}
-            }},
-            responsive: true,
-            maintainAspectRatio: false
-        }}
-    }});
-}});
-</script>
-"""
+    
 
         chart_html += f"""
 <h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
 <p>Este gráfico es crucial para identificar **divergencias significativas** entre nuestra valoración técnica (la Nota Técnica) y el movimiento real del precio de la acción. Una divergencia positiva (barras verdes) sugiere que nuestra nota está indicando una fortaleza técnica mayor de lo que el precio actual refleja, lo que podría anticipar un movimiento alcista. Por el contrario, una divergencia negativa (barras rojas) indica que la nota técnica es más débil que el precio, lo que podría ser una señal de advertencia o anticipar una corrección.</p>
 
-<div style="width: 80%; margin: auto; height: 400px;">
+<div style="width: 100%; height: 400px;">
     <canvas id="divergenciaColorChart"></canvas>
 </div>
 
@@ -710,7 +633,6 @@ document.addEventListener('DOMContentLoaded', function () {{
 
     var preciosNormalizados = [];
     if (minPrecio === maxPrecio) {{
-        // Si todos los precios son iguales, normalizarlos a un punto medio (ej. 5)
         preciosNormalizados = preciosOriginales.map(function() {{ return 5; }});
     }} else {{
         preciosNormalizados = preciosOriginales.map(function(p) {{
@@ -718,33 +640,44 @@ document.addEventListener('DOMContentLoaded', function () {{
         }});
     }}
 
-    // Calcular la divergencia (Nota - Precio Normalizado)
     var divergenciaData = [];
-    var backgroundColors = [];
+    var colores = [];
     for (var i = 0; i < notasOriginales.length; i++) {{
         var diff = notasOriginales[i] - preciosNormalizados[i];
         divergenciaData.push(diff);
-        if (diff >= 0) {{
-            backgroundColors.push('rgba(0, 150, 0, 0.7)'); // Verde para divergencia alcista o neutra
-        }} else {{
-            backgroundColors.push('rgba(255, 0, 0, 0.7)'); // Rojo para divergencia bajista
-        }}
+        colores.push(diff >= 0 ? 'rgba(0, 150, 0, 0.7)' : 'rgba(255, 0, 0, 0.7)');
+    }}
+
+    // Variación diaria de la nota
+    var variacionNotas = [0];
+    for (var i = 1; i < notasOriginales.length; i++) {{
+        variacionNotas.push(parseFloat((notasOriginales[i] - notasOriginales[i - 1]).toFixed(2)));
     }}
 
     var labels = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
 
     new Chart(ctx, {{
-        type: 'bar', // Usamos un gráfico de barras para visualizar mejor la divergencia
+        type: 'bar',
         data: {{
             labels: labels,
             datasets: [
                 {{
                     label: 'Divergencia (Nota - Precio Normalizado)',
                     data: divergenciaData,
-                    backgroundColor: backgroundColors,
-                    borderColor: backgroundColors.map(color => color.replace('0.7', '1')), // Border más oscuro
+                    backgroundColor: colores,
+                    borderColor: colores.map(c => c.replace('0.7', '1')),
                     borderWidth: 1,
                     yAxisID: 'y'
+                }},
+                {{
+                    label: 'Variación Diaria de Nota',
+                    data: variacionNotas,
+                    type: 'line',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    borderWidth: 2,
+                    fill: false,
+                    yAxisID: 'y1'
                 }}
             ]
         }},
@@ -757,7 +690,7 @@ document.addEventListener('DOMContentLoaded', function () {{
                     intersect: false,
                     callbacks: {{
                         label: function(context) {{
-                            return 'Divergencia: ' + context.parsed.y.toFixed(2);
+                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2);
                         }}
                     }}
                 }},
@@ -773,6 +706,7 @@ document.addEventListener('DOMContentLoaded', function () {{
                             borderColor: 'rgba(0, 0, 0, 0.5)',
                             borderWidth: 2,
                             borderDash: [5, 5],
+                            yScaleID: 'y',
                             label: {{
                                 enabled: true,
                                 content: 'Sin Divergencia (0)',
@@ -785,10 +719,24 @@ document.addEventListener('DOMContentLoaded', function () {{
             }},
             scales: {{
                 y: {{
-                    beginAtZero: false, // Permitir valores negativos para la divergencia
+                    beginAtZero: false,
                     title: {{
                         display: true,
                         text: 'Divergencia (Nota - Precio Normalizado)'
+                    }},
+                    position: 'left'
+                }},
+                y1: {{
+                    beginAtZero: true,
+                    suggestedMin: -2,
+                    suggestedMax: 2,
+                    title: {{
+                        display: true,
+                        text: 'Δ Nota Técnica'
+                    }},
+                    position: 'right',
+                    grid: {{
+                        drawOnChartArea: false
                     }}
                 }},
                 x: {{
@@ -802,6 +750,7 @@ document.addEventListener('DOMContentLoaded', function () {{
     }});
 }});
 </script>
+
 """
 
         
@@ -905,7 +854,7 @@ document.addEventListener('DOMContentLoaded', function () {{
     volumen_analisis_text = ""
     # Corrección: Eliminar los asteriscos de formato de Markdown dentro de la f-string
     if data['VOLUMEN'] is not None:
-        volumen_analisis_text = f"Analizando el volumen de {data['VOLUMEN']:,} acciones, este volumen [El modelo debe decidir si es alto/bajo/normal en relación al historial y la tendencia. Por ejemplo: 'es consistente con la fase de acumulación que observo en el gráfico, y refuerza la validez de los niveles de soporte detectados.' o 'es ligeramente inferior al promedio reciente, lo que podría indicar una falta de convicción en el movimiento actual.']. Un incremento del volumen en la ruptura de la resistencia, por ejemplo, sería una señal inequívoca de fuerza para la tendencia alcista que preveo. La consolidación actual en torno a los soportes identificados, combinada con el volumen, sugiere [interpreta la combinación de volumen y soportes, como acumulación de posiciones, debilidad de la venta, etc.]. El hecho de que no haya un volumen explosivo en este momento refuerza la idea de un movimiento gradual y menos arriesgado, en contraste con una rápida subida impulsada por especulación."
+        volumen_analisis_text = f"Analizando el volumen de {data['VOLUMEN']:,} acciones, este volumen [El modelo debe decidir si es alto/bajo/normal en relación al historial y la tendencia. Por ejemplo: 'es consistente con la fase de acumulación que observo en el gráfico, y refuerza la validez de los niveles de soporte detectados.' o 'es ligeramente inferior al promedio reciente, lo que podría indicar una falta de convicción en el movimiento actual.']. "
     else:
         volumen_analisis_text = "Actualmente, no dispongo de datos de volumen reciente para realizar un análisis en profundidad. Sin embargo, en cualquier estrategia de inversión, el volumen es un indicador crucial que valida los movimientos de precio y la fuerza de las tendencias. Un volumen significativo en rupturas de niveles clave o en cambios de tendencia es una señal potente a tener en cuenta."
 
@@ -916,6 +865,8 @@ Actúa como un trader profesional con amplia experiencia en análisis técnico y
 Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
 
 Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
+
+¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y ÚNICO para TODOS sus gráficos solicitados (Notas Chart, Divergencia Color Chart, Nota Variación Chart y Precios Chart). Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
 
 **Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
@@ -931,7 +882,7 @@ Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la 
 - Nivel de deuda y flujo de caja: {data['DEUDA']}, {data['FLUJO_CAJA']}
 - Información estratégica: {data['EXPANSION_PLANES']}, {data['ACUERDOS']}
 - Sentimiento del mercado: {data['SENTIMIENTO_ANALISTAS']}, {data['TENDENCIA_SOCIAL']}
-- Comparativa sectorial: {data['EMPRESAS_SIMILARES']}
+- ativa sectorial: {data['EMPRESAS_SIMILARES']}
 - Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 - Tendencia de la nota: {data['TENDENCIA_NOTA']}
 - Días estimados para acción: {data['DIAS_ESTIMADOS_ACCION']}
@@ -943,7 +894,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 
 <h2>Análisis Inicial y Recomendación</h2>
-<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>, un nivel que considero estratégico. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. Este último representa el nivel más atractivo para una entrada conservadora. El volumen negociado recientemente, que alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>, es un factor clave que valida estos movimientos, y será crucial monitorearlo para confirmar la fuerza de cualquier tendencia emergente.</p>
+<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente, alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
 
 <p>Asignamos una <strong>nota técnica de {data['NOTA_EMPRESA']} sobre 10</strong>. Esta puntuación refleja [elige una de las siguientes opciones basadas en la nota, manteniendo el foco en el análisis técnico]:
     {"una excelente fortaleza técnica y baja volatilidad esperada a corto plazo. La sólida puntuación se basa en la evaluación de indicadores clave de impulso, soporte y resistencia, lo que indica un bajo riesgo técnico en relación con el potencial de crecimiento a corto plazo." if data['NOTA_EMPRESA'] >= 8 else ""}
@@ -954,7 +905,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 {chart_html}
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
-<p>Un aspecto crucial en el análisis de corto plazo es la dinámica del impulso de la empresa. Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**. Esto sugiere {('un rebote inminente, dado que los indicadores muestran una sobreventa extrema, lo que significa que la acción ha sido \'castigada\' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio al alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo.' if data['TENDENCIA_NOTA'] == 'mejorando' and data['NOTA_EMPRESA'] < 6 else '')}
+<p>Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**. Esto sugiere {('un rebote inminente, dado que los indicadores muestran una sobreventa extrema, lo que significa que la acción ha sido \'castigada\' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio al alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo.' if data['TENDENCIA_NOTA'] == 'mejorando' and data['NOTA_EMPRESA'] < 6 else '')}
 {('una potencial continuación bajista, con los indicadores técnicos mostrando una sobrecompra significativa o una pérdida de impulso alcista. Esto sugiere que la acción podría experimentar una corrección. Es un momento para la cautela y la vigilancia de los niveles de soporte.' if data['TENDENCIA_NOTA'] == 'empeorando' and data['NOTA_EMPRESA'] > 4 else '')}
 {('una fase de consolidación o lateralidad, donde los indicadores técnicos no muestran una dirección clara. Es un momento para esperar la confirmación de una nueva tendencia antes de tomar decisiones.' if data['TENDENCIA_NOTA'] == 'estable' else '')}
 {f" Calculamos que este impulso podría llevarnos a una potencial zona de {('toma de beneficios o venta' if data['NOTA_EMPRESA'] >= 8 else 'entrada o compra')} en aproximadamente **{data['DIAS_ESTIMADOS_ACCION']}**." if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else ("La nota ya se encuentra en una zona de acción clara, lo que sugiere una oportunidad {('de compra' if data['NOTA_EMPRESA'] >= 8 else 'de venta')} inmediata, y por tanto, no se estima un plazo de días adicional." if "Ya en zona" in data['DIAS_ESTIMADOS_ACCION'] else "")}</p>
@@ -968,72 +919,10 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. 
 En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
 
-<h2>Comparativa Financiera: EBITDA vs Deuda</h2>
-<p>Para evaluar de forma visual la salud financiera de <strong>{data['NOMBRE_EMPRESA']}</strong>, a continuación muestro un gráfico de barras horizontales centradas que compara el <strong>EBITDA</strong> (capacidad operativa de generación de beneficios) frente a la <strong>Deuda total</strong>. Un EBITDA superior a la deuda es generalmente una señal positiva de solvencia. En cambio, una deuda que excede al EBITDA requiere análisis adicional sobre su sostenibilidad.</p>
-
-<div style="width: 80%; margin: auto; height: 300px;">
-    <canvas id="ebitdaVsDeudaChart"></canvas>
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {{
-        var ctx = document.getElementById('ebitdaVsDeudaChart').getContext('2d');
-        new Chart(ctx, {{
-            type: 'bar',
-            data: {{
-                labels: ['EBITDA', 'Deuda'],
-                datasets: [{{
-                    label: 'Millones de Euros',
-                    data: [{float(data['EBITDA']) if data['EBITDA'] != 'N/A' else 0}, {-float(data['DEUDA']) if data['DEUDA'] != 'N/A' else 0}],
-                    backgroundColor: ['#2e86de', '#c0392b']
-                }}]
-            }},
-            options: {{
-                indexAxis: 'y',
-                responsive: true,
-                plugins: {{
-                    tooltip: {{
-                        callbacks: {{
-                            label: function(context) {{
-                                let val = Math.abs(context.parsed.x);
-                                return context.label + ': ' + val.toLocaleString() + ' €';
-                            }}
-                        }}
-                    }},
-                    legend: {{
-                        display: false
-                    }}
-                }},
-                scales: {{
-                    x: {{
-                        stacked: false,
-                        title: {{
-                            display: true,
-                            text: 'Millones de Euros'
-                        }},
-                        ticks: {{
-                            callback: function(value) {{
-                                return Math.abs(value);
-                            }}
-                        }},
-                        min: -Math.max({float(data['EBITDA']) if data['EBITDA'] != 'N/A' else 0}, {float(data['DEUDA']) if data['DEUDA'] != 'N/A' else 0}) * 1.2,
-                        max: Math.max({float(data['EBITDA']) if data['EBITDA'] != 'N/A' else 0}, {float(data['DEUDA']) if data['DEUDA'] != 'N/A' else 0}) * 1.2
-                    }},
-                    y: {{
-                        title: {{
-                            display: false
-                        }}
-                    }}
-                }}
-            }}
-        }});
-    }});
-</script>
-
 {tabla_resumen}
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
-<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, resumo mi visión actual basada en una integración de datos técnicos, financieros y estratégicos. Considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. La expectativa es que {f"en los próximos {data['DIAS_ESTIMADOS_ACCION']}" if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else "en el corto plazo"}, se presente una oportunidad {('de compra con una relación riesgo-recompensa favorable' if data['NOTA_EMPRESA'] >= 7 else 'de observación o de potencial venta, si los indicadores confirman la debilidad')}. Mantendremos una estrecha vigilancia sobre el comportamiento del precio y el volumen para confirmar esta hipótesis.</p>
+<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. </p>
 <p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. </p>
 
 
@@ -1102,7 +991,7 @@ def generar_contenido_con_gemini(tickers):
         
         prompt, titulo_post = construir_prompt_formateado(data)
 
-        max_retries = 3
+        max_retries = 1
         initial_delay = 10  
         retries = 0
         delay = initial_delay
@@ -1148,6 +1037,7 @@ def generar_contenido_con_gemini(tickers):
         # --- PAUSA DE 3 MINUTO DESPUÉS DE CADA TICKER ---
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180) # Pausa de 180 segundos entre cada ticker
+
 
 
 
