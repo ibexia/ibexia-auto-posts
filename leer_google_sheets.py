@@ -617,7 +617,7 @@ def construir_prompt_formateado(data):
 <h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
 <p>Este gráfico es crucial para identificar **divergencias significativas** entre nuestra valoración técnica (la Nota Técnica) y el movimiento real del precio de la acción. Una divergencia positiva (barras verdes) sugiere que nuestra nota está indicando una fortaleza técnica mayor de lo que el precio actual refleja, lo que podría anticipar un movimiento alcista. Por el contrario, una divergencia negativa (barras rojas) indica que la nota técnica es más débil que el precio, lo que podría ser una señal de advertencia o anticipar una corrección.</p>
 
-<div style="width: 80%; margin: auto; height: 400px;">
+<div style="width: 100%; height: 400px;">
     <canvas id="divergenciaColorChart"></canvas>
 </div>
 
@@ -633,7 +633,6 @@ document.addEventListener('DOMContentLoaded', function () {{
 
     var preciosNormalizados = [];
     if (minPrecio === maxPrecio) {{
-        // Si todos los precios son iguales, normalizarlos a un punto medio (ej. 5)
         preciosNormalizados = preciosOriginales.map(function() {{ return 5; }});
     }} else {{
         preciosNormalizados = preciosOriginales.map(function(p) {{
@@ -641,33 +640,44 @@ document.addEventListener('DOMContentLoaded', function () {{
         }});
     }}
 
-    // Calcular la divergencia (Nota - Precio Normalizado)
     var divergenciaData = [];
-    var backgroundColors = [];
+    var colores = [];
     for (var i = 0; i < notasOriginales.length; i++) {{
         var diff = notasOriginales[i] - preciosNormalizados[i];
         divergenciaData.push(diff);
-        if (diff >= 0) {{
-            backgroundColors.push('rgba(0, 150, 0, 0.7)'); // Verde para divergencia alcista o neutra
-        }} else {{
-            backgroundColors.push('rgba(255, 0, 0, 0.7)'); // Rojo para divergencia bajista
-        }}
+        colores.push(diff >= 0 ? 'rgba(0, 150, 0, 0.7)' : 'rgba(255, 0, 0, 0.7)');
+    }}
+
+    // Variación diaria de la nota
+    var variacionNotas = [0];
+    for (var i = 1; i < notasOriginales.length; i++) {{
+        variacionNotas.push(parseFloat((notasOriginales[i] - notasOriginales[i - 1]).toFixed(2)));
     }}
 
     var labels = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
 
     new Chart(ctx, {{
-        type: 'bar', // Usamos un gráfico de barras para visualizar mejor la divergencia
+        type: 'bar',
         data: {{
             labels: labels,
             datasets: [
                 {{
                     label: 'Divergencia (Nota - Precio Normalizado)',
                     data: divergenciaData,
-                    backgroundColor: backgroundColors,
-                    borderColor: backgroundColors.map(color => color.replace('0.7', '1')), // Border más oscuro
+                    backgroundColor: colores,
+                    borderColor: colores.map(c => c.replace('0.7', '1')),
                     borderWidth: 1,
                     yAxisID: 'y'
+                }},
+                {{
+                    label: 'Variación Diaria de Nota',
+                    data: variacionNotas,
+                    type: 'line',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    borderWidth: 2,
+                    fill: false,
+                    yAxisID: 'y1'
                 }}
             ]
         }},
@@ -680,7 +690,7 @@ document.addEventListener('DOMContentLoaded', function () {{
                     intersect: false,
                     callbacks: {{
                         label: function(context) {{
-                            return 'Divergencia: ' + context.parsed.y.toFixed(2);
+                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2);
                         }}
                     }}
                 }},
@@ -696,6 +706,7 @@ document.addEventListener('DOMContentLoaded', function () {{
                             borderColor: 'rgba(0, 0, 0, 0.5)',
                             borderWidth: 2,
                             borderDash: [5, 5],
+                            yScaleID: 'y',
                             label: {{
                                 enabled: true,
                                 content: 'Sin Divergencia (0)',
@@ -708,10 +719,24 @@ document.addEventListener('DOMContentLoaded', function () {{
             }},
             scales: {{
                 y: {{
-                    beginAtZero: false, // Permitir valores negativos para la divergencia
+                    beginAtZero: false,
                     title: {{
                         display: true,
                         text: 'Divergencia (Nota - Precio Normalizado)'
+                    }},
+                    position: 'left'
+                }},
+                y1: {{
+                    beginAtZero: true,
+                    suggestedMin: -2,
+                    suggestedMax: 2,
+                    title: {{
+                        display: true,
+                        text: 'Δ Nota Técnica'
+                    }},
+                    position: 'right',
+                    grid: {{
+                        drawOnChartArea: false
                     }}
                 }},
                 x: {{
@@ -725,6 +750,7 @@ document.addEventListener('DOMContentLoaded', function () {{
     }});
 }});
 </script>
+
 """
 
         
