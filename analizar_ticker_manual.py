@@ -257,8 +257,22 @@ def obtener_datos_yfinance(ticker):
         }
 
         # 🔴 Esta parte debe ir aquí, después de crear 'datos'
-        cierres_ultimos_30_dias = hist['Close'].dropna().tail(30).tolist()
+        # 🔴 Mejorado: asegurarse de tener precios válidos
+        cierres_ultimos_30_dias = hist['Close'].fillna(method='ffill').dropna().tail(30).tolist()
+
+        # Rellenar si hay menos de 30
+        if len(cierres_ultimos_30_dias) < 30 and cierres_ultimos_30_dias:
+            primer_valor = cierres_ultimos_30_dias[0]
+            cierres_ultimos_30_dias = [primer_valor] * (30 - len(cierres_ultimos_30_dias)) + cierres_ultimos_30_dias
+        elif not cierres_ultimos_30_dias:
+            cierres_ultimos_30_dias = [0.0] * 30
+
+        # Validación adicional para evitar todos ceros
+        if all(c == 0.0 for c in cierres_ultimos_30_dias):
+            print(f"⚠️ Advertencia: Todos los cierres para {ticker} son 0. No se mostrará el gráfico correctamente.")
+
         datos["CIERRES_30_DIAS"] = [round(float(c), 2) for c in cierres_ultimos_30_dias]
+
 
         return datos
 
