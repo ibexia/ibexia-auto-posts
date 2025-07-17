@@ -316,7 +316,7 @@ def construir_prompt_formateado(data):
 <p>Para comprender mejor cómo interpretar estos gráficos y tomar decisiones informadas, visita nuestro enlace explicativo: <a href="https://ibexia.es/como-interpretar-los-graficos-para-comprar-o-vender/" target="_blank">Cómo interpretar los gráficos para comprar o vender</a>. </p>
 
 
-<div style="width: 100%; height: 100%;">
+<div style="width: 100%; height: 500px;">
     <canvas id="notasChart"></canvas>
 </div>
 
