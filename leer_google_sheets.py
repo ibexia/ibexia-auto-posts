@@ -257,8 +257,22 @@ def obtener_datos_yfinance(ticker):
         }
 
         # 🔴 Esta parte debe ir aquí, después de crear 'datos'
-        cierres_ultimos_30_dias = hist['Close'].dropna().tail(30).tolist()
+        # 🔴 Mejorado: asegurarse de tener precios válidos
+        cierres_ultimos_30_dias = hist['Close'].fillna(method='ffill').dropna().tail(30).tolist()
+
+        # Rellenar si hay menos de 30
+        if len(cierres_ultimos_30_dias) < 30 and cierres_ultimos_30_dias:
+            primer_valor = cierres_ultimos_30_dias[0]
+            cierres_ultimos_30_dias = [primer_valor] * (30 - len(cierres_ultimos_30_dias)) + cierres_ultimos_30_dias
+        elif not cierres_ultimos_30_dias:
+            cierres_ultimos_30_dias = [0.0] * 30
+
+        # Validación adicional para evitar todos ceros
+        if all(c == 0.0 for c in cierres_ultimos_30_dias):
+            print(f"⚠️ Advertencia: Todos los cierres para {ticker} son 0. No se mostrará el gráfico correctamente.")
+
         datos["CIERRES_30_DIAS"] = [round(float(c), 2) for c in cierres_ultimos_30_dias]
+
 
         return datos
 
@@ -312,10 +326,11 @@ def construir_prompt_formateado(data):
 
         chart_html = f"""
 <h2>Evolución de la Nota Técnica</h2>
-<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra). </p>
+<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
 <p>Para comprender mejor cómo interpretar estos gráficos y tomar decisiones informadas, visita nuestro enlace explicativo: <a href="https://ibexia.es/como-interpretar-los-graficos-para-comprar-o-vender/" target="_blank">Cómo interpretar los gráficos para comprar o vender</a>. </p>
 
-<div style="width: 100%; height: 100%;">
+
+<div style="width: 100%; height: 500px;">
     <canvas id="notasChart"></canvas>
 </div>
 
@@ -495,6 +510,7 @@ def construir_prompt_formateado(data):
     }});
 </script>
 <br/>
+
 """
         # Cálculo dinámico de la descripción del gráfico
                   
@@ -632,6 +648,7 @@ def construir_prompt_formateado(data):
 <h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
 <p>Este gráfico es crucial para identificar **divergencias significativas** entre nuestra valoración técnica (la Nota Técnica) y el movimiento real del precio de la acción. Una divergencia positiva (barras verdes) sugiere que nuestra nota está indicando una fortaleza técnica mayor de lo que el precio actual refleja, lo que podría anticipar un movimiento alcista. Por el contrario, una divergencia negativa (barras rojas) indica que la nota técnica es más débil que el precio, lo que podría ser una señal de advertencia o anticipar una corrección.</p>
 <p>Para comprender mejor cómo interpretar estos gráficos y tomar decisiones informadas, visita nuestro enlace explicativo: <a href="https://ibexia.es/como-interpretar-los-graficos-para-comprar-o-vender/" target="_blank">Cómo interpretar los gráficos para comprar o vender</a>. </p>
+
 <div style="width: 100%; height: 400px;">
     <canvas id="divergenciaColorChart"></canvas>
 </div>
@@ -879,14 +896,9 @@ Actúa como un trader profesional con amplia experiencia en análisis técnico y
 
 Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
 
-Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
+Genera un análisis técnico completo de aproximadamente 800 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
 
---- CRÍTICO Y OBLIGATORIO: INSTRUCCIONES PARA LA GENERACIÓN DE GRÁFICOS ---
-¡ATENCIÓN EXTREMA! Para CADA EMPRESA analizada, DEBES GENERAR EL CÓDIGO HTML Y JAVASCRIPT COMPLETO Y ÚNICO para TODOS sus gráficos solicitados (Notas Chart, Divergencia Color Chart). NO DEBES OMITIR NINGÚN SCRIPT, RESUMIR BLOQUES DE CÓDIGO O UTILIZAR FRASES COMO 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros.
-**ES IMPRESCINDIBLE QUE UTILICES EXCLUSIVAMENTE LOS DATOS REALES YA PROPORCIONADOS EN LAS VARIABLES DE PYTHON (como `cierres_historicos`, `notas_historicas`, `data['CIERRES_30_DIAS']`, `data['NOTAS_HISTORICAS_30_DIAS']`) PARA CONSTRUIR LOS GRÁFICOS. NO DEBES GENERAR DATOS DE EJEMPLO NI ASUMIR QUE FALTA NINGUNA INFORMACIÓN, PORQUE LOS DATOS YA ESTÁN AQUÍ.**
-BAJO NINGUNA CIRCUNSTANCIA INVENTES DATOS DE EJEMPLO, USA SIEMPRE LOS REALES Y LOS QUE TE HE PROPORCIONADO.
-**FINALMENTE, Y ESTO ES CRÍTICO, NO AÑADAS NINGUNA NOTA, DESCARGO DE RESPONSABILIDAD O EXPLICACIÓN (como "Este código HTML incluye datos de ejemplo...", "No se ha incluido la generación de datos en Python...", "Debes reemplazar estos datos de ejemplo...", etc.) AL FINAL DEL HTML NI EN NINGÚN OTRO LUGAR. TODA LA INFORMACIÓN NECESARIA YA HA SIDO SUMINISTRADA EN LAS VARIABLES. NO HAGAS NINGÚN COMENTARIO AL RESPECTO.** ESTA INFORMACIÓN ES FUNDAMENTAL PARA LA VALIDEZ DEL ANÁLISIS.
---- FIN DE INSTRUCCIONES CRÍTICAS ---
+¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y ÚNICO para TODOS sus gráficos solicitados (Notas Chart, Divergencia Color Chart, Nota Variación Chart y Precios Chart). Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
 
 **Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
