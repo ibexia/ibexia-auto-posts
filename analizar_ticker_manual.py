@@ -313,6 +313,8 @@ def construir_prompt_formateado(data):
         chart_html = f"""
 <h2>Evolución de la Nota Técnica</h2>
 <p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
+<p>Para comprender mejor cómo interpretar estos gráficos y tomar decisiones informadas, visita nuestro enlace explicativo: <a href="https://ibexia.es/como-interpretar-los-graficos-para-comprar-o-vender/" target="_blank">Cómo interpretar los gráficos para comprar o vender</a>. </p>
+
 
 <div style="width: 100%; height: 100%;">
     <canvas id="notasChart"></canvas>
@@ -631,6 +633,7 @@ def construir_prompt_formateado(data):
         chart_html += f"""
 <h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
 <p>Este gráfico es crucial para identificar **divergencias significativas** entre nuestra valoración técnica (la Nota Técnica) y el movimiento real del precio de la acción. Una divergencia positiva (barras verdes) sugiere que nuestra nota está indicando una fortaleza técnica mayor de lo que el precio actual refleja, lo que podría anticipar un movimiento alcista. Por el contrario, una divergencia negativa (barras rojas) indica que la nota técnica es más débil que el precio, lo que podría ser una señal de advertencia o anticipar una corrección.</p>
+<p>Para comprender mejor cómo interpretar estos gráficos y tomar decisiones informadas, visita nuestro enlace explicativo: <a href="https://ibexia.es/como-interpretar-los-graficos-para-comprar-o-vender/" target="_blank">Cómo interpretar los gráficos para comprar o vender</a>. </p>
 
 <div style="width: 100%; height: 400px;">
     <canvas id="divergenciaColorChart"></canvas>
@@ -1058,7 +1061,7 @@ def generar_contenido_con_gemini(tickers):
 
 def main():
     # Define el ticker que quieres analizar
-    ticker_deseado = "MRL.MC"  # <-- ¡CAMBIA "BBVA.MC" por el Ticker que quieras analizar!
+    ticker_deseado = "IBE.MC"  # <-- ¡CAMBIA "BBVA.MC" por el Ticker que quieras analizar!
                                 # Por ejemplo: "REP.MC", "TSLA", etc.
 
     # Prepara la lista de tickers para la función generar_contenido_con_gemini
