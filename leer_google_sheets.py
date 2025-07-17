@@ -881,7 +881,9 @@ Destaca los datos importantes como precios, notas de la empresa, cifras financie
 
 Genera un análisis técnico completo de aproximadamente 1200 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
 
-¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y ÚNICO para TODOS sus gráficos solicitados (Notas Chart, Divergencia Color Chart, Nota Variación Chart y Precios Chart). Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
+--- CRÍTICO Y OBLIGATORIO: INSTRUCCIONES PARA LA GENERACIÓN DE GRÁFICOS ---
+¡ATENCIÓN EXTREMA! Para CADA EMPRESA analizada, DEBES GENERAR EL CÓDIGO HTML Y JAVASCRIPT COMPLETO Y ÚNICO para TODOS sus gráficos solicitados (Notas Chart, Divergencia Color Chart). NO DEBES OMITIR NINGÚN SCRIPT, RESUMIR BLOQUES DE CÓDIGO O UTILIZAR FRASES COMO 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. ASEGÚRATE DE QUE LOS DATOS DE CADA GRÁFICO CORRESPONDEN SIEMPRE A LA EMPRESA QUE SE ESTÁ ANALIZANDO EN ESE MOMENTO Y QUE LOS DATOS SON LOS PROPORCIONADOS POR LAS VARIABLES EN PYTHON. BAJO NINGUNA CIRCUNSTANCIA INVENTES DATOS DE EJEMPLO, USA SIEMPRE LOS REALES Y LOS QUE TE HE PROPORCIONADO. FINALMENTE, NO AÑADAS ABSOLUTAMENTE NINGUNA NOTA AL FINAL DEL HTML SOBRE CÓDIGO FALTANTE O DATOS DE EJEMPLO. ESTA INFORMACIÓN ES FUNDAMENTAL PARA LA VALIDEZ DEL ANÁLISIS.
+--- FIN DE INSTRUCCIONES CRÍTICAS ---
 
 **Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
