@@ -120,12 +120,21 @@ def obtener_datos_yfinance(ticker):
         # Calcular soportes y resistencia
         # Asegurarse de tener al menos 30 días para un cálculo significativo
         if len(hist) < 30:
-            # print(f"Advertencia: Menos de 30 días de historial para {ticker}. Los soportes pueden ser menos precisos.")
             highs_lows = hist[['High', 'Low', 'Close']].values.flatten()
         else:
             highs_lows = hist[['High', 'Low', 'Close']].iloc[-30:].values.flatten()
 
-        soportes = np.sort(np.unique(highs_lows))
+        # Calculamos soportes y resistencias como listas ordenadas
+        # Soportes: de menor a mayor
+        soportes_raw = np.unique(highs_lows)
+        soportes = np.sort(soportes_raw).tolist()
+
+        # Resistencias: de mayor a menor
+        resistencias_raw = np.unique(highs_lows)
+        resistencias = np.sort(resistencias_raw)[::-1].tolist() # Orden inverso para tener las más altas primero
+
+
+        # Definir los 3 soportes
         if len(soportes) >= 3:
             soporte_1 = round(soportes[0], 2)
             soporte_2 = round(soportes[1], 2)
@@ -139,9 +148,48 @@ def obtener_datos_yfinance(ticker):
             soporte_2 = soporte_1
             soporte_3 = soporte_1
         else:
-            soporte_1, soporte_2, soporte_3 = current_price * 0.95, current_price * 0.9, current_price * 0.85 # Default si no hay datos
+            soporte_1, soporte_2, soporte_3 = round(current_price * 0.95, 2), round(current_price * 0.9, 2), round(current_price * 0.85, 2) # Default si no hay datos
+
+        # Definir las 3 resistencias (similar a soportes)
+        if len(resistencias) >= 3:
+            resistencia_1 = round(resistencias[0], 2)
+            resistencia_2 = round(resistencias[1], 2)
+            resistencia_3 = round(resistencias[2], 2)
+        elif len(resistencias) == 2:
+            resistencia_1 = round(resistencias[0], 2)
+            resistencia_2 = round(resistencias[1], 2)
+            resistencia_3 = resistencia_2
+        elif len(resistencias) == 1:
+            resistencia_1 = round(resistencias[0], 2)
+            resistencia_2 = resistencia_1
+            resistencia_3 = resistencia_1
+        else:
+            resistencia_1, resistencia_2, resistencia_3 = round(current_price * 1.05, 2), round(current_price * 1.1, 2), round(current_price * 1.15, 2) # Default si no hay datos
+
+        # Cálculo del Precio Objetivo (AQUÍ ESTÁ LA LÓGICA MEJORADA)
+        if nota_empresa == 0: # Si la nota es 0, el precio objetivo es un soporte más bajo
+            if len(soportes) >= 3:
+                precio_objetivo = soportes[2] # El tercer soporte (más bajo)
+            elif len(soportes) >= 2:
+                precio_objetivo = soportes[1] # El segundo soporte
+            elif len(soportes) >= 1:
+                precio_objetivo = soportes[0] # El primer soporte
+            else:
+                precio_objetivo = round(current_price * 0.9, 2) # Un 10% por debajo si no hay soportes
+        elif nota_empresa == 10: # Si la nota es 10, el precio objetivo es una resistencia más alta
+            if len(resistencias) >= 3:
+                precio_objetivo = resistencias[2] # La tercera resistencia (más alta)
+            elif len(resistencias) >= 2:
+                precio_objetivo = resistencias[1] # La segunda resistencia
+            elif len(resistencias) >= 1:
+                precio_objetivo = resistencias[0] # La primera resistencia
+            else:
+                precio_objetivo = round(current_price * 1.1, 2) # Un 10% por encima si no hay resistencias
+        else: # Para notas entre 1 y 9, el precio objetivo es el precio actual (o se podría interpolar)
+            precio_objetivo = current_price
 
         # Precio objetivo de compra (ejemplo simple, puedes refinarlo)
+        # Este 'precio_objetivo_compra' es diferente al 'precio_objetivo' general
         precio_objetivo_compra = round(current_price * 0.98, 2) # Un 2% por debajo del precio actual como ejemplo
 
         # Calculamos la nota técnica actual
@@ -303,6 +351,10 @@ def obtener_datos_yfinance(ticker):
             "NOTAS_HISTORICAS_PARA_GRAFICO": notas_historicas_para_grafico, # Solo los 30 días para el gráfico
             "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total, # 30 días reales + 5 días proyectados
             "OFFSET_DIAS_GRAFICO": OFFSET_DIAS,
+            "RESISTENCIA_1": resistencia_1, # Ahora usamos resistencia_1
+            "RESISTENCIA_2": resistencia_2,
+            "RESISTENCIA_3": resistencia_3,
+            "PRECIO_OBJETIVO": precio_objetivo, # Añadimos el precio objetivo calculado
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
 
@@ -569,225 +621,138 @@ def construir_prompt_formateado(data):
 
         # Precios históricos reales para el gráfico (son los últimos 30 días, ya desplazados)
         precios_reales_grafico = cierres_para_grafico_total[:30]
+
         # Precios proyectados (dashed line)
         # Esto asegura que la parte de los precios proyectados empiece en el día 30 del dataset
         # y que el resto del array esté relleno con None hasta el punto de inicio de la proyección real.
         data_proyectada = [None] * 30 + cierres_para_grafico_total[30:]
 
-
         # Las notas históricas ya están calculadas para los 30 días
         # Para la visualización de "nota D vs precio D+4", las líneas se desplazan visualmente, no los datos.
         # Insertamos Nones al principio de la nota para desplazarla visualmente 4 días a la derecha.
         notas_desplazadas_para_grafico = [None] * OFFSET_DIAS + notas_historicas_para_grafico
-
         # La longitud del array de notas desplazadas debe coincidir con la de labels_total
         # Si notas_desplazadas_para_grafico es más corto que labels_total, rellenar con None
         if len(notas_desplazadas_para_grafico) < len(labels_total):
             notas_desplazadas_para_grafico.extend([None] * (len(labels_total) - len(notas_desplazadas_para_grafico)))
 
-
         chart_html += f"""
-<h2>Evolución de la Nota Técnica y Precio</h2>
-<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong> y su relación con el precio, mostramos un gráfico que **desplaza nuestra nota técnica {OFFSET_DIAS} días hacia el futuro** en relación al precio. Esto significa que la nota que observas hoy (día D) se alinea con el precio que esperamos ver en el día D+{OFFSET_DIAS}. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (línea azul) sobre el precio de cotización (línea roja). La escala de la nota va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
-<p>Además, hemos extendido la línea de precio con una **proyección punteada para los próximos {PROYECCION_FUTURA_DIAS} días**, basada en el último precio real. Esto te ofrece una estimación visual del futuro inmediato del valor.</p>
-<p>Para comprender mejor cómo interpretar estos gráficos y tomar decisiones informadas, visita nuestro enlace explicativo: <a href="https://ibexia.es/como-interpretar-los-graficos-para-comprar-o-vender/" target="_blank">Cómo interpretar los gráficos para comprar o vender</a>. </p>
+        <h2>Evolución de la Nota Técnica y Precio</h2>
+        <p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica...
+        Es importante recordar que la nota de hoy (D) se alinea con el precio de D+4,
+        lo que significa que la reacción del mercado a la nota SMI generalmente se observa
+        unos pocos días después de su formación.
+        </p>
+        <div style="width: 100%; max-width: 800px; margin: auto;">
+            <canvas id="notaPrecioChart"></canvas>
+        </div>
 
-<div style="width: 100%; height: 500px;">
-    <canvas id="notasChart"></canvas>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {{
-
-        var cierres = {json.dumps(precios_reales_grafico)}; // Solo la parte real
-        var cierresProyectados = {json.dumps(cierres_para_grafico_total)}; // Real + Proyectado (para la línea completa y luego dashed)
-        var objetivo = {data['PRECIO_OBJETIVO_COMPRA']};
-        var notas = {json.dumps(notas_desplazadas_para_grafico)}; // Notas ya desplazadas con Nones
-        var labels = {json.dumps(labels_total)}; // Labels con días futuros
-
-        var minPrecio = Math.min(...cierres.filter(n => n !== null), objetivo);
-        var maxPrecio = Math.max(...cierres.filter(n => n !== null), objetivo);
-
-        if (cierres.length > 0) {{
-             minPrecio = Math.min(minPrecio, ...cierres.filter(n => n !== null));
-             maxPrecio = Math.max(maxPrecio, ...cierres.filter(n => n !== null));
-        }}
-
-        if (minPrecio === maxPrecio) {{
-            minPrecio *= 0.95;
-            maxPrecio *= 1.05;
-        }} else {{
-            minPrecio *= 0.98;
-            maxPrecio *= 1.02;
-        }}
-
-        var ctx = document.getElementById('notasChart').getContext('2d');
-        var notasChart = new Chart(ctx, {{
-            type: 'line', // CAMBIADO A LINE
-            data: {{
-                labels: labels,
-                datasets: [
-                    {{
-                        label: 'Nota Técnica (Desplazada {OFFSET_DIAS} días)',
-                        data: notas, // Usamos las notas ya desplazadas
-                        backgroundColor: 'rgba(0, 128, 255, 0.2)', // Área bajo la línea
-                        borderColor: 'rgba(0, 128, 255, 1)',
-                        borderWidth: 2,
-                        type: 'line',
-                        fill: false, // Ahora es una línea
-                        yAxisID: 'y'
-                    }},
-                    {{
-                        label: 'Precio de Cierre',
-                        data: cierresProyectados, // Datos completos (reales + proyectados)
-                        type: 'line',
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 2,
-                        fill: false,
-                        yAxisID: 'y1',
-                        segment: {{ // Para la línea punteada futura
-                            borderDash: ctx => {{(ctx.p1DataIndex >= {30 - 1}) ? [6, 6] : undefined}}
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {{
+            const ctx = document.getElementById('notaPrecioChart').getContext('2d');
+            const notaPrecioChart = new Chart(ctx, {{
+                type: 'line',
+                data: {{
+                    labels: {json.dumps(labels_total)},
+                    datasets: [
+                        {{
+                            label: 'Nota Técnica SMI',
+                            data: {json.dumps(notas_desplazadas_para_grafico)},
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            yAxisID: 'y',
+                            tension: 0.1,
+                            fill: false
+                        }},
+                        {{
+                            label: 'Precio Actual',
+                            data: {json.dumps(precios_reales_grafico)},
+                            borderColor: 'rgba(153, 102, 255, 1)',
+                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                            yAxisID: 'y1',
+                            tension: 0.1,
+                            fill: false
+                        }},
+                        {{
+                            label: 'Precio Proyectado',
+                            data: {json.dumps(data_proyectada)},
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            yAxisID: 'y1',
+                            tension: 0.1,
+                            fill: false,
+                            borderDash: [5, 5] // <<--- LÍNEA A TRAZOS AQUÍ
                         }}
-                    }}
-                ]
-            }},
-            options: {{
-                plugins: {{
-                    annotation: {{
-                        annotations: {{
-                            soporte1: {{
-                                type: 'line',
-                                yMin: {data['SOPORTE_1']},
-                                yMax: {data['SOPORTE_1']},
-                                yScaleID: 'y1',
-                                borderColor: 'rgba(0, 255, 0, 0.8)',
-                                borderWidth: 2,
-                                label: {{
-                                    enabled: true,
-                                    content: 'Soporte 1 ({data["SOPORTE_1"]}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            soporte2: {{
-                                type: 'line',
-                                yMin: {data['SOPORTE_2']},
-                                yMax: {data['SOPORTE_2']},
-                                yScaleID: 'y1',
-                                borderColor: 'rgba(0, 200, 0, 0.6)',
-                                borderWidth: 2,
-                                label: {{
-                                    enabled: true,
-                                    content: 'Soporte 2 ({data["SOPORTE_2"]}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            soporte3: {{
-                                type: 'line',
-                                yMin: {data['SOPORTE_3']},
-                                yMax: {data['SOPORTE_3']},
-                                yScaleID: 'y1',
-                                borderColor: 'rgba(0, 150, 0, 0.6)',
-                                borderWidth: 2,
-                                label: {{
-                                    enabled: true,
-                                    content: 'Soporte 3 ({data["SOPORTE_3"]}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            resistencia: {{
-                                type: 'line',
-                                yMin: {data['RESISTENCIA']},
-                                yMax: {data['RESISTENCIA']},
-                                yScaleID: 'y1',
-                                borderColor: 'rgba(255, 99, 132, 1)',
-                                borderWidth: 2,
-                                label: {{
-                                    enabled: true,
-                                    content: 'Resistencia ({data["RESISTENCIA"]}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            objetivo: {{
-                                type: 'line',
-                                yMin: {data['PRECIO_OBJETIVO_COMPRA']},
-                                yMax: {data['PRECIO_OBJETIVO_COMPRA']},
-                                yScaleID: 'y1',
-                                borderColor: 'rgba(255, 206, 86, 1)',
-                                borderWidth: 2,
-                                borderDash: [6, 6],
-                                label: {{
-                                    enabled: true,
-                                    content: 'Objetivo ({data["PRECIO_OBJETIVO_COMPRA"]}€)',
-                                    position: 'end',
-                                    backgroundColor: 'rgba(255, 206, 86, 0.8)'
-                                }}
-                            }}
-                        }}
-                    }},
-                    legend: {{
-                        display: true
-                    }},
-                    tooltip: {{
+                    ]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {{
                         mode: 'index',
                         intersect: false,
-                        callbacks: {{
-                            label: function(context) {{
-                                let label = context.dataset.label || '';
-                                if (label) {{
-                                    label += ': ';
+                    }},
+                    stacked: false,
+                    plugins: {{
+                        title: {{
+                            display: true,
+                            text: 'Evolución de Nota Técnica y Precio'
+                        }},
+                        annotation: {{ // <<--- ZONA SOMBREADA AQUÍ
+                            annotations: {{
+                                futureZone: {{
+                                    type: 'box',
+                                    xMin: {30}, // Empieza después de los 30 días de historial
+                                    xMax: {30 + PROYECCION_FUTURA_DIAS},
+                                    backgroundColor: 'rgba(0, 123, 255, 0.1)', // Color azul claro transparente
+                                    borderColor: 'rgba(0, 123, 255, 0.3)',
+                                    borderWidth: 1,
+                                    label: {{
+                                        content: 'Zona Futuro',
+                                        enabled: true,
+                                        position: 'start',
+                                        color: 'rgba(0, 123, 255, 0.7)',
+                                        font: {{
+                                            size: 10,
+                                            weight: 'bold'
+                                        }}
+                                    }}
                                 }}
-                                // Si es un punto futuro proyectado, no mostrar valor para la nota
-                                if (context.dataset.label.includes('Nota Técnica') && context.parsed.y === null) {{
-                                    return label + 'N/A (Proyectado)';
-                                }}
-                                label += context.parsed.y !== null ? context.parsed.y.toFixed(2) : 'N/A';
-                                return label;
                             }}
                         }}
-                    }}
-                }},
-                scales: {{
-                    y: {{
-                        beginAtZero: true,
-                        max: 10,
-                        title: {{
-                            display: true,
-                            text: 'Nota Técnica (0-10)'
-                        }}
                     }},
-                    y1: {{
-                        position: 'right',
-                        beginAtZero: false,
-                        title: {{
+                    scales: {{
+                        y: {{
+                            type: 'linear',
                             display: true,
-                            text: 'Precio de Cierre (€)'
+                            position: 'left',
+                            title: {{
+                                display: true,
+                                text: 'Nota Técnica (0-10)'
+                            }},
+                            min: 0,
+                            max: 10
                         }},
-                        grid: {{
-                            drawOnChartArea: false
-                        }},
-                        ticks: {{
-                            padding: 5
-                        }},
-                        suggestedMin: minPrecio,
-                        suggestedMax: maxPrecio
-                    }},
-                    x: {{
-                        title: {{
+                        y1: {{
+                            type: 'linear',
                             display: true,
-                            text: 'Historial y Proyección de {PROYECCION_FUTURA_DIAS} Días (ibexia.es)'
+                            position: 'right',
+                            title: {{
+                                display: true,
+                                text: 'Precio'
+                            }},
+                            grid: {{
+                                drawOnChartArea: false, // Solo dibujar la cuadrícula para el eje Y principal
+                            }},
                         }}
                     }}
-                }},
-                responsive: true,
-                maintainAspectRatio: false
-            }}
+                }}
+            }});
         }});
-    }});
-</script>
-<br/>
-"""
+        </script>
+        """
 
     # Pre-procesamiento de soportes para agruparlos si son muy cercanos
     soportes_unicos = []
