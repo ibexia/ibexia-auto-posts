@@ -190,9 +190,44 @@ def obtener_datos_yfinance(ticker):
         else: # Muy pocos datos históricos
              precios_reales_para_grafico = [current_price] * 30 # Default to current price if no historical data
 
-        # Proyección para los próximos 5 días (ej. usando el último precio real)
+        # Determinar si la nota ha sido estable en 0 o 10 en la ventana de estabilidad
+        NOTE_STABILITY_WINDOW = 5 # Días para considerar la estabilidad de la nota
+        
+        is_note_stable_at_zero = False
+        is_note_stable_at_ten = False
+
+        # Usamos 'notas_historicas_ultimos_30_dias_tendencia' porque contiene los valores numéricos de las notas.
+        if len(notas_historicas_ultimos_30_dias_tendencia) >= NOTE_STABILITY_WINDOW:
+            # Tomamos las últimas 5 notas
+            last_n_notes = notas_historicas_ultimos_30_dias_tendencia[-NOTE_STABILITY_WINDOW:]
+            # Verificamos si todas las notas en esa ventana son 0.0 (o muy cercanas)
+            if all(abs(note - 0.0) < 0.1 for note in last_n_notes): # Tolerancia de 0.1 para notas muy cercanas a 0
+                is_note_stable_at_zero = True
+            # Verificamos si todas las notas en esa ventana son 10.0 (o muy cercanas)
+            elif all(abs(note - 10.0) < 0.1 for note in last_n_notes): # Tolerancia de 0.1 para notas muy cercanas a 10
+                is_note_stable_at_ten = True
+        # Si no hay suficientes datos históricos para la ventana, pero la nota actual es 0 o 10
+        elif abs(nota_empresa - 0.0) < 0.1:
+             is_note_stable_at_zero = True
+        elif abs(nota_empresa - 10.0) < 0.1:
+             is_note_stable_at_ten = True
+
+
+        # Proyección para los próximos N días
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
-        precios_proyectados = [ultimo_precio_conocido] * PROYECCION_FUTURA_DIAS
+        precios_proyectados = []
+        
+        if is_note_stable_at_ten:
+            for _ in range(PROYECCION_FUTURA_DIAS):
+                ultimo_precio_conocido *= (1 + 0.015) # 1.5% de aumento diario
+                precios_proyectados.append(round(ultimo_precio_conocido, 2))
+        elif is_note_stable_at_zero:
+            for _ in range(PROYECCION_FUTURA_DIAS):
+                ultimo_precio_conocido *= (1 - 0.015) # 1.5% de reducción diario
+                precios_proyectados.append(round(ultimo_precio_conocido, 2))
+        else:
+            # Lógica original: proyección de precio estable
+            precios_proyectados = [ultimo_precio_conocido] * PROYECCION_FUTURA_DIAS
 
         # Unir precios reales y proyectados
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
@@ -1054,7 +1089,7 @@ def generar_contenido_con_gemini(tickers):
 
 def main():
     # Define el ticker que quieres analizar
-    ticker_deseado = "MSFT"  # <-- ¡CAMBIA "BBVA.MC" por el Ticker que quieras analizar!
+    ticker_deseado = "ADX.MC"  # <-- ¡CAMBIA "BBVA.MC" por el Ticker que quieras analizar!
                                 # Por ejemplo: "REP.MC", "TSLA", etc.
 
     # Prepara la lista de tickers para la función generar_contenido_con_gemini
