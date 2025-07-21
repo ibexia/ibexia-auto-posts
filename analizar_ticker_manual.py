@@ -310,43 +310,38 @@ def obtener_datos_yfinance(ticker):
         elif abs(nota_empresa - 10.0) < 0.1:
              is_note_stable_at_ten = True
 
-        # Proyección para los próximos N días, respetando soportes y resistencias con margen del 2%
-        TOLERANCIA_CRUCE = 0.02
+        # Versión con LÍMITE ABSOLUTO: no puede perforar resistencias ni soportes
         precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
-        for _ in range(PROYECCION_FUTURA_DIAS):
-            siguiente_precio_proyectado = ultimo_precio_conocido
+        # Determinar techo y suelo absoluto para la proyección
+        resistencias_ordenadas = sorted([r for r in resistencias if r > ultimo_precio_conocido])
+        soportes_ordenados = sorted([s for s in soportes if s < ultimo_precio_conocido], reverse=True)
 
-            # Movimiento según la nota
+        # Elegimos la más próxima como límite duro
+        limite_resistencia = resistencias_ordenadas[0] if resistencias_ordenadas else None
+        limite_soporte = soportes_ordenados[0] if soportes_ordenados else None
+
+        for _ in range(PROYECCION_FUTURA_DIAS):
+            # Calcular intento de movimiento
             if nota_empresa < 2.1:
-                siguiente_precio_proyectado *= (1 - 0.015)
+                siguiente_precio = ultimo_precio_conocido * (1 - 0.015)
             elif nota_empresa > 7.9:
-                siguiente_precio_proyectado *= (1 + 0.015)
+                siguiente_precio = ultimo_precio_conocido * (1 + 0.015)
             else:
                 daily_rate_of_change = (nota_empresa - 5.0) * (0.005 / 2.9)
-                siguiente_precio_proyectado *= (1 + daily_rate_of_change)
+                siguiente_precio = ultimo_precio_conocido * (1 + daily_rate_of_change)
 
-            # Evitar perforar resistencias (si distancia > 2%)
-            if siguiente_precio_proyectado > ultimo_precio_conocido:
-                for r in sorted(resistencias):
-                    if ultimo_precio_conocido <= r < siguiente_precio_proyectado:
-                        distancia = abs(siguiente_precio_proyectado - r) / r
-                        if distancia > TOLERANCIA_CRUCE:
-                            siguiente_precio_proyectado = round(r * (1 - 0.001), 2)
-                        break
+            # 🔒 Aplicar LÍMITE DURO
+            if limite_resistencia and siguiente_precio > limite_resistencia:
+                siguiente_precio = limite_resistencia * (1 - 0.001)
+            elif limite_soporte and siguiente_precio < limite_soporte:
+                siguiente_precio = limite_soporte * (1 + 0.001)
 
-            # Evitar perforar soportes (si distancia > 2%)
-            elif siguiente_precio_proyectado < ultimo_precio_conocido:
-                for s in sorted(soportes, reverse=True):
-                    if ultimo_precio_conocido >= s > siguiente_precio_proyectado:
-                        distancia = abs(siguiente_precio_proyectado - s) / s
-                        if distancia > TOLERANCIA_CRUCE:
-                            siguiente_precio_proyectado = round(s * (1 + 0.001), 2)
-                        break
+            siguiente_precio = round(siguiente_precio, 2)
+            precios_proyectados.append(siguiente_precio)
+            ultimo_precio_conocido = siguiente_precio
 
-            precios_proyectados.append(round(siguiente_precio_proyectado, 2))
-            ultimo_precio_conocido = siguiente_precio_proyectado
 
 
         # Unir precios reales y proyectados
