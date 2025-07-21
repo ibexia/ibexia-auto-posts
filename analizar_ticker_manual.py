@@ -223,9 +223,9 @@ def obtener_datos_yfinance(ticker):
         
         # Asegurarse de que el precio objetivo no sea irracionalmente bajo si la nota es 0
         # y referencia_min es muy alto por falta de soportes.
-        if nota_empresa == 0 and precio_objetivo > current_price * 0.9:
+        _empresa == 0 and precio_objetivo > current_price * 0.9:
             precio_objetivo = round(min(precio_objetivo, current_price * 0.85), 2) # Limitar a un 15% de caída
-        elif nota_empresa == 10 and precio_objetivo < current_price * 1.1:
+        el_empresa == 10 and precio_objetivo < current_price * 1.1:
             precio_objetivo = round(max(precio_objetivo, current_price * 1.15), 2) # Limitar a un 15% de subida
 
 
@@ -311,30 +311,70 @@ def obtener_datos_yfinance(ticker):
              is_note_stable_at_ten = True
 
 
-        # Proyección para los próximos N días
+
+
+        # Proyección para los próximos N días, respetando soportes y resistencias
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
         precios_proyectados = []
 
-        if nota_empresa < 2.1: # Si la nota está por debajo de 2 (0.0 a 2.0)
-            for _ in range(PROYECCION_FUTURA_DIAS):
-                ultimo_precio_conocido *= (1 - 0.015) # Cae un 1.5% diario
-                precios_proyectados.append(round(ultimo_precio_conocido, 2))
-        elif nota_empresa > 7.9: # Si la nota está por encima de 8 (8.0 a 10.0)
-            for _ in range(PROYECCION_FUTURA_DIAS):
-                ultimo_precio_conocido *= (1 + 0.015) # Sube un 1.5% diario
-                precios_proyectados.append(round(ultimo_precio_conocido, 2))
-        else: # Si la nota está entre 2.1 y 7.9: el precio sigue el movimiento de la nota
-            # Calcula un factor de cambio diario proporcional a la nota, con 5.0 como punto neutral (sin cambio).
-            # El factor (0.005 / 2.9) escala el cambio para que el máximo sea 0.5% diario
-            # cuando la nota es 2.1 o 7.9 (desviación de 2.9 puntos desde 5.0).
-            daily_rate_of_change = (nota_empresa - 5.0) * (0.005 / 2.9)
-            
-            for _ in range(PROYECCION_FUTURA_DIAS):
-                ultimo_precio_conocido *= (1 + daily_rate_of_change)
-                precios_proyectados.append(round(ultimo_precio_conocido, 2))
+        # Asegúrate de que los soportes y resistencias están ordenados y son únicos para la lógica.
+        # Ya tienes soportes y resistencias calculados en tu código.
+        # Los usaré directamente.
+
+        TOLERANCIA_PROYECCION = 0.02 # 2% de tolerancia para cruzar soportes/resistencias
+
+        for _ in range(PROYECCION_FUTURA_DIAS):
+            siguiente_precio_proyectado = ultimo_precio_conocido
+
+            if nota_empresa < 2.1: # Proyección a la baja
+                siguiente_precio_proyectado *= (1 - 0.015) # Intento inicial de caída
+
+                # Verificar si cruza un soporte (del más alto al más bajo)
+                for s in sorted(soportes, reverse=True): # Iterar soportes de mayor a menor
+                    # Si el precio actual está por encima del soporte y la proyección lo cruza
+                    if ultimo_precio_conocido >= s and siguiente_precio_proyectado < s:
+                        # Si la nota es 0 o está muy cerca de 0, o si el cruce es dentro de la tolerancia, permite cruzar
+                        if nota_empresa == 0 or (abs(s - siguiente_precio_proyectado) / s <= TOLERANCIA_PROYECCION):
+                            # Permitir el cruce
+                            pass
+                        else:
+                            # Frenar la caída en el soporte - TOLERANCIA
+                            # Esto es para que no lo cruce a no ser que la nota o la tolerancia lo permitan
+                            siguiente_precio_proyectado = s * (1 + TOLERANCIA_PROYECCION) # Se queda justo por encima del soporte con tolerancia
+                            break # No necesitamos comprobar más soportes si ya frenamos aquí
+                
+            elif nota_empresa > 7.9: # Proyección al alza
+                siguiente_precio_proyectado *= (1 + 0.015) # Intento inicial de subida
+
+                # Verificar si cruza una resistencia (del más bajo al más alto)
+                for r in sorted(resistencias): # Iterar resistencias de menor a mayor
+                    # Si el precio actual está por debajo de la resistencia y la proyección lo cruza
+                    if ultimo_precio_conocido <= r and siguiente_precio_proyectado > r:
+                        # Si la nota es 10 o está muy cerca de 10, o si el cruce es dentro de la tolerancia, permite cruzar
+                        if nota_empresa == 10 or (abs(r - siguiente_precio_proyectado) / r <= TOLERANCIA_PROYECCION):
+                            # Permitir el cruce
+                            pass
+                        else:
+                            # Frenar la subida en la resistencia + TOLERANCIA
+                            # Esto es para que no la cruce a no ser que la nota o la tolerancia lo permitan
+                            siguiente_precio_proyectado = r * (1 - TOLERANCIA_PROYECCION) # Se queda justo por debajo de la resistencia con tolerancia
+                            break # No necesitamos comprobar más resistencias si ya frenamos aquí
+
+            else: # Si la nota está entre 2.1 y 7.9: el precio sigue el movimiento de la nota
+                daily_rate_of_change = (nota_empresa - 5.0) * (0.005 / 2.9)
+                siguiente_precio_proyectado *= (1 + daily_rate_of_change)
+                
+                # Para notas intermedias, también podríamos querer respetar soportes/resistencias,
+                # pero la lógica de tu pregunta se enfoca en los extremos (subida/bajada).
+                # Si quieres que también respeten los soportes/resistencias, puedes duplicar
+                # la lógica de "if nota_empresa < 2.1" y "elif nota_empresa > 7.9" aquí,
+                # pero ajustando la condición de la nota. Por ahora, lo dejaré solo en los extremos.
+
+            precios_proyectados.append(round(siguiente_precio_proyectado, 2))
+            ultimo_precio_conocido = siguiente_precio_proyectado # Actualizar para el siguiente día de proyección
 
         # Unir precios reales y proyectados
-        cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
+        cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados        
 
 
 
