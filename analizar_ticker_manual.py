@@ -310,17 +310,10 @@ def obtener_datos_yfinance(ticker):
         elif abs(nota_empresa - 10.0) < 0.1:
              is_note_stable_at_ten = True
 
-        # Versión con LÍMITE ABSOLUTO: no puede perforar resistencias ni soportes
+        # Proyección con subida libre hasta resistencia, pero sin perforarla si está lejos (>2%)
+        TOLERANCIA_CRUCE = 0.02
         precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
-
-        # Determinar techo y suelo absoluto para la proyección
-        resistencias_ordenadas = sorted([r for r in resistencias if r > ultimo_precio_conocido])
-        soportes_ordenados = sorted([s for s in soportes if s < ultimo_precio_conocido], reverse=True)
-
-        # Elegimos la más próxima como límite duro
-        limite_resistencia = resistencias_ordenadas[0] if resistencias_ordenadas else None
-        limite_soporte = soportes_ordenados[0] if soportes_ordenados else None
 
         for _ in range(PROYECCION_FUTURA_DIAS):
             # Calcular intento de movimiento
@@ -332,15 +325,28 @@ def obtener_datos_yfinance(ticker):
                 daily_rate_of_change = (nota_empresa - 5.0) * (0.005 / 2.9)
                 siguiente_precio = ultimo_precio_conocido * (1 + daily_rate_of_change)
 
-            # 🔒 Aplicar LÍMITE DURO
-            if limite_resistencia and siguiente_precio > limite_resistencia:
-                siguiente_precio = limite_resistencia * (1 - 0.001)
-            elif limite_soporte and siguiente_precio < limite_soporte:
-                siguiente_precio = limite_soporte * (1 + 0.001)
+            # Si va subiendo, comprobar resistencias
+            if siguiente_precio > ultimo_precio_conocido:
+                for r in sorted(resistencias):
+                    if ultimo_precio_conocido < r < siguiente_precio:
+                        distancia_relativa = abs(siguiente_precio - r) / r
+                        if distancia_relativa > TOLERANCIA_CRUCE:
+                            siguiente_precio = round(r * (1 - 0.001), 2)
+                        break  # Solo considerar la primera que se interponga
+
+            # Si va bajando, comprobar soportes
+            elif siguiente_precio < ultimo_precio_conocido:
+                for s in sorted(soportes, reverse=True):
+                    if siguiente_precio < s < ultimo_precio_conocido:
+                        distancia_relativa = abs(siguiente_precio - s) / s
+                        if distancia_relativa > TOLERANCIA_CRUCE:
+                            siguiente_precio = round(s * (1 + 0.001), 2)
+                        break
 
             siguiente_precio = round(siguiente_precio, 2)
             precios_proyectados.append(siguiente_precio)
             ultimo_precio_conocido = siguiente_precio
+     
 
 
 
