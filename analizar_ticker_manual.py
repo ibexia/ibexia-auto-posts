@@ -744,7 +744,7 @@ def construir_prompt_formateado(data):
                                     borderWidth: 1,
                                     label: {{
                                         content: 'Zona de Compra',
-                                        enabled: true,
+                                        enabled: false,
                                         position: 'end',
                                         color: 'rgba(0, 150, 0, 0.7)',
                                         font: {{ size: 12, weight: 'bold' }}
@@ -760,7 +760,7 @@ def construir_prompt_formateado(data):
                                     borderWidth: 1,
                                     label: {{
                                         content: 'Zona Neutral',
-                                        enabled: true,
+                                        enabled: false,
                                         position: 'center',
                                         color: 'rgba(150, 150, 0, 0.7)',
                                         font: {{ size: 12, weight: 'bold' }}
@@ -776,7 +776,7 @@ def construir_prompt_formateado(data):
                                     borderWidth: 1,
                                     label: {{
                                         content: 'Zona de Venta',
-                                        enabled: true,
+                                        enabled: false,
                                         position: 'start',
                                         color: 'rgba(150, 0, 0, 0.7)',
                                         font: {{ size: 12, weight: 'bold' }}
