@@ -706,7 +706,7 @@ def construir_prompt_formateado(data):
                             yAxisID: 'y1',
                             tension: 0.1,
                             fill: false,
-                            borderDash: [5, 5] // <<--- LÍNEA A TRAZOS AQUÍ
+                            borderDash: [5, 5]
                         }}
                     ]
                 }},
@@ -723,13 +723,13 @@ def construir_prompt_formateado(data):
                             display: true,
                             text: 'Evolución de Nota Técnica y Precio'
                         }},
-                        annotation: {{ // <<--- ZONA SOMBREADA AQUÍ
+                        annotation: {{
                             annotations: {{
                                 futureZone: {{
                                     type: 'box',
-                                    xMin: {30}, // Empieza después de los 30 días de historial
+                                    xMin: {30},
                                     xMax: {30 + PROYECCION_FUTURA_DIAS},
-                                    backgroundColor: 'rgba(0, 123, 255, 0.1)', // Color azul claro transparente
+                                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
                                     borderColor: 'rgba(0, 123, 255, 0.3)',
                                     borderWidth: 1,
                                     label: {{
@@ -741,6 +741,147 @@ def construir_prompt_formateado(data):
                                             size: 10,
                                             weight: 'bold'
                                         }}
+                                    }}
+                                }},
+                                // Zonas de color en el eje Y de la Nota Técnica (0-10)
+                                zonaCompra: {{
+                                    type: 'box',
+                                    yScaleID: 'y',
+                                    yMin: 8,
+                                    yMax: 10,
+                                    backgroundColor: 'rgba(0, 255, 0, 0.1)', // Verde claro para compra
+                                    borderColor: 'rgba(0, 255, 0, 0.2)',
+                                    borderWidth: 1,
+                                    label: {{
+                                        content: 'Zona de Compra',
+                                        enabled: true,
+                                        position: 'end',
+                                        color: 'rgba(0, 150, 0, 0.7)',
+                                        font: {{ size: 12, weight: 'bold' }}
+                                    }}
+                                }},
+                                zonaNeutral: {{
+                                    type: 'box',
+                                    yScaleID: 'y',
+                                    yMin: 4,
+                                    yMax: 8,
+                                    backgroundColor: 'rgba(255, 255, 0, 0.1)', // Amarillo claro para neutral
+                                    borderColor: 'rgba(255, 255, 0, 0.2)',
+                                    borderWidth: 1,
+                                    label: {{
+                                        content: 'Zona Neutral',
+                                        enabled: true,
+                                        position: 'center',
+                                        color: 'rgba(150, 150, 0, 0.7)',
+                                        font: {{ size: 12, weight: 'bold' }}
+                                    }}
+                                }},
+                                zonaVenta: {{
+                                    type: 'box',
+                                    yScaleID: 'y',
+                                    yMin: 0,
+                                    yMax: 4,
+                                    backgroundColor: 'rgba(255, 0, 0, 0.1)', // Rojo claro para venta
+                                    borderColor: 'rgba(255, 0, 0, 0.2)',
+                                    borderWidth: 1,
+                                    label: {{
+                                        content: 'Zona de Venta',
+                                        enabled: true,
+                                        position: 'start',
+                                        color: 'rgba(150, 0, 0, 0.7)',
+                                        font: {{ size: 12, weight: 'bold' }}
+                                    }}
+                                }},
+                                // Líneas de soporte
+                                soporte1Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['SOPORTE_1']},
+                                    yMax: {data['SOPORTE_1']},
+                                    borderColor: 'rgba(75, 192, 192, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Soporte 1',
+                                        enabled: true,
+                                        position: 'start',
+                                        font: {{ size: 10 }}
+                                    }}
+                                }},
+                                soporte2Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['SOPORTE_2']},
+                                    yMax: {data['SOPORTE_2']},
+                                    borderColor: 'rgba(75, 192, 192, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Soporte 2',
+                                        enabled: true,
+                                        position: 'start',
+                                        font: {{ size: 10 }}
+                                    }}
+                                }},
+                                soporte3Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['SOPORTE_3']},
+                                    yMax: {data['SOPORTE_3']},
+                                    borderColor: 'rgba(75, 192, 192, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Soporte 3',
+                                        enabled: true,
+                                        position: 'start',
+                                        font: {{ size: 10 }}
+                                    }}
+                                }},
+                                // Líneas de resistencia
+                                resistencia1Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['RESISTENCIA_1']},
+                                    yMax: {data['RESISTENCIA_1']},
+                                    borderColor: 'rgba(255, 99, 132, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Resistencia 1',
+                                        enabled: true,
+                                        position: 'end',
+                                        font: {{ size: 10 }}
+                                    }}
+                                }},
+                                resistencia2Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['RESISTENCIA_2']},
+                                    yMax: {data['RESISTENCIA_2']},
+                                    borderColor: 'rgba(255, 99, 132, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Resistencia 2',
+                                        enabled: true,
+                                        position: 'end',
+                                        font: {{ size: 10 }}
+                                    }}
+                                }},
+                                resistencia3Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['RESISTENCIA_3']},
+                                    yMax: {data['RESISTENCIA_3']},
+                                    borderColor: 'rgba(255, 99, 132, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Resistencia 3',
+                                        enabled: true,
+                                        position: 'end',
+                                        font: {{ size: 10 }}
                                     }}
                                 }}
                             }}
@@ -767,7 +908,7 @@ def construir_prompt_formateado(data):
                                 text: 'Precio'
                             }},
                             grid: {{
-                                drawOnChartArea: false, // Solo dibujar la cuadrícula para el eje Y principal
+                                drawOnChartArea: false,
                             }},
                         }}
                     }}
