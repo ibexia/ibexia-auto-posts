@@ -660,7 +660,7 @@ def construir_prompt_formateado(data):
                                 zonaNeutral: {{
                                     type: 'box',
                                     yScaleID: 'y',
-                                    yMin: 4,
+                                    yMin: 2,
                                     yMax: 8,
                                     backgroundColor: 'rgba(255, 255, 0, 0.1)', // Amarillo claro para neutral
                                     borderColor: 'rgba(255, 255, 0, 0.2)',
