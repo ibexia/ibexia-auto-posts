@@ -283,7 +283,7 @@ def generar_recomendacion_avanzada(data):
     soporte_1 = data['SOPORTE_1']
     resistencia = data['RESISTENCIA']
     volumen = data['VOLUMEN']
-    notas_historicas = data['NOTAS_HISTORICAS_30_DIAS_ANALISIS'] # Usar las notas para análisis de tendencia
+    notas_historicas = data['NOTAS_HISTORICAS_30_DIAS_ANALISIS'] # Usar las notas para análisis
     cierres_historicos_analisis = data['CIERRES_30_DIAS'] # Para comparar volumen con histórico
 
     # Calcular volumen promedio (simplificado, puedes mejorarlo con un periodo más largo)
@@ -656,7 +656,7 @@ def construir_prompt_formateado(data):
                                 borderWidth: 2,
                                 label: {{
                                     enabled: true,
-                                    content: 'Soporte 3 ({data["SOPORTE_3']}€)',
+                                    content: 'Soporte 3 ({data["SOPORTE_3"]}€)',
                                     position: 'end'
                                 }}
                             }},
