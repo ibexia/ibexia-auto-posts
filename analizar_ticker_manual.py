@@ -762,7 +762,7 @@ def construir_prompt_formateado(data):
                                     type: 'box',
                                     yScaleID: 'y',
                                     yMin: 0,
-                                    yMax: 4,
+                                    yMax: 2,
                                     backgroundColor: 'rgba(255, 0, 0, 0.1)', // Rojo claro para venta
                                     borderColor: 'rgba(255, 0, 0, 0.2)',
                                     borderWidth: 1,
