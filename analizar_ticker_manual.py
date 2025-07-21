@@ -360,17 +360,6 @@ def obtener_datos_yfinance(ticker):
             "SMI": smi_actual,
             "NOTA_EMPRESA": nota_empresa,
             "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
-            "INGRESOS": info.get("totalRevenue", "N/A"),
-            "EBITDA": info.get("ebitda", "N/A"),
-            "BENEFICIOS": info.get("grossProfits", "N/A"),
-            "DEUDA": info.get("totalDebt", "N/A"),
-            "FLUJO_CAJA": info.get("freeCashflow", "N/A"),
-            "EXPANSION_PLANES": "Información de planes de expansión no disponible o no traducible en este momento.",
-            "ACUERDOS": "Información sobre acuerdos no disponible o no traducible en este momento.",
-            "SENTIMIENTO_ANALISTAS": "Sentimiento de analistas no disponible o no traducible.",
-            "TENDENCIA_SOCIAL": "No disponible",
-            "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
-            "RIESGOS_OPORTUNIDADES": "No disponibles",
             "TENDENCIA_NOTA": tendencia_smi,            
             "NOTAS_HISTORICAS_30_DIAS_ANALISIS": notas_historicas_ultimos_30_dias_tendencia, # Para cálculo de la nueva recomendación
             "CIERRES_30_DIAS": hist['Close'].dropna().tail(30).tolist(), # Cierres reales de los últimos 30 días para análisis histórico
@@ -1064,12 +1053,6 @@ Genera un análisis técnico completo de aproximadamente 800 palabras sobre la e
 - Recomendación general: {data['RECOMENDACION']}
 - Nota de la empresa (0-10): {data['NOTA_EMPRESA']}
 - Precio objetivo de compra: {data['PRECIO_OBJETIVO_COMPRA']}€
-- Resultados financieros recientes: {data['INGRESOS']}, {data['EBITDA']}, {data['BENEFICIOS']}
-- Nivel de deuda y flujo de caja: {data['DEUDA']}, {data['FLUJO_CAJA']}
-- Información estratégica: {data['EXPANSION_PLANES']}, {data['ACUERDOS']}
-- Sentimiento del mercado: {data['SENTIMIENTO_ANALISTAS']}, {data['TENDENCIA_SOCIAL']}
-- ativa sectorial: {data['EMPRESAS_SIMILARES']}
-- Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
 - Tendencia de la nota: {data['TENDENCIA_NOTA']}
 
 
@@ -1089,10 +1072,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 {'una debilidad técnica significativa y una posible sobrecompra en el gráfico, lo que sugiere un alto riesgo de corrección.' if "Venta Fuerte" in data['RECOMENDACION'] or data['NOTA_EMPRESA'] < 3 else ''} </p>
 {chart_html}
 
-<h2>Visión a Largo Plazo y Fundamentales</h2>
 
-<p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>.
-En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
 
 {tabla_resumen}
 
@@ -1109,7 +1089,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 {("pesimista. La debilidad técnica persistente y los factores de riesgo sugieren que la empresa podría experimentar una presión bajista considerable. Se recomienda extrema cautela y considerar estrategias de protección de capital." if data['NOTA_EMPRESA'] < 4 else "")}.</p>
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
-<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. </p>
+<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con aspectos fundamentales que requieren mayor claridad, hacen de esta empresa un activo para mantener bajo estricta vigilancia. </p>
 <p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. </p>
 
 """
