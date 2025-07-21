@@ -667,7 +667,7 @@ def construir_prompt_formateado(data):
         unos pocos días después de su formación.
         </p>
         <div style="width: 100%; max-width: 800px; margin: auto;">
-            <canvas id="notaPrecioChart"></canvas>
+            <canvas id="notaPrecioChart" style="height: 600px;"></canvas>
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
