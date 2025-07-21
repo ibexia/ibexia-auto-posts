@@ -1171,7 +1171,7 @@ def generar_contenido_con_gemini(tickers):
             continue
         
         # LLAMADAS A LAS NUEVAS FUNCIONES DE RECOMENDACIÓN Y ANÁLISIS HISTÓRICO
-        data = generar_recomendacion_avanzada(data)
+        data = generar_recomendacion_avanzada(data, cierres_para_grafico_total, notas_historicas_para_grafico)
         data = analizar_oportunidades_historicas(data)
 
         prompt, titulo_post = construir_prompt_formateado(data)
