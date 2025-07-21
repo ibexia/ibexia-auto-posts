@@ -420,7 +420,7 @@ def obtener_datos_yfinance(ticker):
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
-            "RESISTENCIA": round(hist_extended["High"].max(), 2), # Usar el high máximo de todo el historial extendido
+            "RESISTENCIA": resistencia_1,
             "CONDICION_RSI": condicion_rsi, # Se llenará en la nueva función
             "RECOMENDACION": recomendacion, # Se llenará en la nueva función
             "SMI": smi_actual,
