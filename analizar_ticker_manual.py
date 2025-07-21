@@ -326,55 +326,47 @@ def obtener_datos_yfinance(ticker):
         for _ in range(PROYECCION_FUTURA_DIAS):
             siguiente_precio_proyectado = ultimo_precio_conocido
 
-            if nota_empresa < 2.1: # Proyección a la baja
-                siguiente_precio_proyectado *= (1 - 0.015) # Intento inicial de caída
-
-                # Verificar si cruza un soporte (del más alto al más bajo)
-                for s in sorted(soportes, reverse=True): # Iterar soportes de mayor a menor
-                    # Si el precio actual está por encima del soporte y la proyección lo cruza
-                    if ultimo_precio_conocido >= s and siguiente_precio_proyectado < s:
-                        # Si la nota es 0 o está muy cerca de 0, o si el cruce es dentro de la tolerancia, permite cruzar
-                        if nota_empresa == 0 or (abs(s - siguiente_precio_proyectado) / s <= TOLERANCIA_PROYECCION):
-                            # Permitir el cruce
-                            pass
-                        else:
-                            # Frenar la caída en el soporte - TOLERANCIA
-                            # Esto es para que no lo cruce a no ser que la nota o la tolerancia lo permitan
-                            siguiente_precio_proyectado = s * (1 + TOLERANCIA_PROYECCION) # Se queda justo por encima del soporte con tolerancia
-                            break # No necesitamos comprobar más soportes si ya frenamos aquí
-                
-            elif nota_empresa > 7.9: # Proyección al alza
-                siguiente_precio_proyectado *= (1 + 0.015) # Intento inicial de subida
-
-                # Verificar si cruza una resistencia (del más bajo al más alto)
-                for r in sorted(resistencias): # Iterar resistencias de menor a mayor
-                    # Si el precio actual está por debajo de la resistencia y la proyección lo cruza
-                    if ultimo_precio_conocido <= r and siguiente_precio_proyectado > r:
-                        # Si la nota es 10 o está muy cerca de 10, o si el cruce es dentro de la tolerancia, permite cruzar
-                        if nota_empresa == 10 or (abs(r - siguiente_precio_proyectado) / r <= TOLERANCIA_PROYECCION):
-                            # Permitir el cruce
-                            pass
-                        else:
-                            # Frenar la subida en la resistencia + TOLERANCIA
-                            # Esto es para que no la cruce a no ser que la nota o la tolerancia lo permitan
-                            siguiente_precio_proyectado = r * (1 - TOLERANCIA_PROYECCION) # Se queda justo por debajo de la resistencia con tolerancia
-                            break # No necesitamos comprobar más resistencias si ya frenamos aquí
-
-            else: # Si la nota está entre 2.1 y 7.9: el precio sigue el movimiento de la nota
+            # 1. Calcular el intento de movimiento del precio basado en la nota
+            if nota_empresa < 2.1: # Proyección a la baja fuerte
+                siguiente_precio_proyectado *= (1 - 0.015) 
+            elif nota_empresa > 7.9: # Proyección al alza fuerte
+                siguiente_precio_proyectado *= (1 + 0.015) 
+            else: # Nota intermedia, sigue el movimiento de la nota (puede ser alza o baja)
                 daily_rate_of_change = (nota_empresa - 5.0) * (0.005 / 2.9)
                 siguiente_precio_proyectado *= (1 + daily_rate_of_change)
-                
-                # Para notas intermedias, también podríamos querer respetar soportes/resistencias,
-                # pero la lógica de tu pregunta se enfoca en los extremos (subida/bajada).
-                # Si quieres que también respeten los soportes/resistencias, puedes duplicar
-                # la lógica de "if nota_empresa < 2.1" y "elif nota_empresa > 7.9" aquí,
-                # pero ajustando la condición de la nota. Por ahora, lo dejaré solo en los extremos.
+            
+            # 2. Aplicar las restricciones de soportes y resistencias
+            # Lógica para no cruzar resistencias al subir
+            if siguiente_precio_proyectado > ultimo_precio_conocido: # Si el precio está intentando subir
+                for r in sorted(resistencias): # Iterar resistencias de menor a mayor
+                    # Si el precio_conocido está por debajo de la resistencia Y la proyección intenta cruzarla
+                    if ultimo_precio_conocido < r and siguiente_precio_proyectado > r:
+                        # ***** CAMBIO CLAVE AQUÍ: SOLO PERMITE CRUZAR SI ESTÁ DENTRO DE LA TOLERANCIA *****
+                        if (abs(r - siguiente_precio_proyectado) / r <= TOLERANCIA_PROYECCION):
+                            pass # Se permite el cruce
+                        else:
+                            # Frenar la subida justo por debajo de la resistencia con la tolerancia
+                            siguiente_precio_proyectado = r * (1 - (TOLERANCIA_PROYECCION / 2)) 
+                            break # Ya hemos ajustado por esta resistencia, no hace falta comprobar más
+
+            # Lógica para no cruzar soportes al bajar
+            elif siguiente_precio_proyectado < ultimo_precio_conocido: # Si el precio está intentando bajar
+                for s in sorted(soportes, reverse=True): # Iterar soportes de mayor a menor
+                    # Si el precio_conocido está por encima del soporte Y la proyección intenta cruzarlo
+                    if ultimo_precio_conocido > s and siguiente_precio_proyectado < s:
+                        # ***** CAMBIO CLAVE AQUÍ: SOLO PERMITE CRUZAR SI ESTÁ DENTRO DE LA TOLERANCIA *****
+                        if (abs(s - siguiente_precio_proyectado) / s <= TOLERANCIA_PROYECCION):
+                            pass # Se permite el cruce
+                        else:
+                            # Frenar la caída justo por encima del soporte con la tolerancia
+                            siguiente_precio_proyectado = s * (1 + (TOLERANCIA_PROYECCION / 2)) 
+                            break # Ya hemos ajustado por este soporte, no hace falta comprobar más
 
             precios_proyectados.append(round(siguiente_precio_proyectado, 2))
             ultimo_precio_conocido = siguiente_precio_proyectado # Actualizar para el siguiente día de proyección
 
         # Unir precios reales y proyectados
-        cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados        
+        cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
 
 
 
