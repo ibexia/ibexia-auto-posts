@@ -493,98 +493,7 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, notas_histo
 
     return data
 
-def analizar_oportunidades_historicas(data):
-    inversion_base = 10000.0
-    comision_por_operacion_porcentual = 0.001
-    
-    cierres = data.get("CIERRES_30_DIAS", []) # Usar los cierres reales de los últimos 30 días
-    notas = data.get("NOTAS_HISTORICAS_30_DIAS_ANALISIS", []) # Usar las notas para análisis
 
-    mejor_compra = None
-    mejor_venta = None
-    mejor_punto_giro_compra = None
-    mejor_punto_giro_venta = None
-
-    if cierres and notas and len(cierres) == len(notas):
-        for i in range(len(notas)):
-            nota = notas[i]
-            cierre = cierres[i]
-
-            # Lógica de "Mejor Compra" (nota alta)
-            if nota >= 8: # Umbral de compra fuerte
-                # Asegurarse de que el índice no exceda el límite al calcular max_post
-                max_post = max(cierres[i:], default=cierre)
-                if max_post > cierre: # Solo considerar si hubo ganancia
-                    pct = ((max_post - cierre) / cierre) * 100
-                    ganancia_bruta = (max_post - cierre) * (inversion_base / cierre)
-                    comision_compra = inversion_base * comision_por_operacion_porcentual
-                    comision_venta = (inversion_base + ganancia_bruta) * comision_por_operacion_porcentual
-                    ganancia_neta_compra_actual = ganancia_bruta - (comision_compra + comision_venta)
-
-                    if (not mejor_compra) or (ganancia_neta_compra_actual > (mejor_compra[4] if mejor_compra else -float('inf'))):
-                        mejor_compra = (i, cierre, max_post, pct, ganancia_neta_compra_actual)
-
-            # Lógica de "Mejor Venta" (nota baja)
-            elif nota <= 2: # Umbral de venta fuerte
-                min_post = min(cierres[i:], default=cierre)
-                if min_post < cierre: # Solo considerar si hubo caída (pérdida evitada)
-                    pct = ((min_post - cierre) / cierre) * 100 # Será negativo
-                    perdida_bruta_evitada = (cierre - min_post) * (inversion_base / cierre)
-                    comision_compra_imaginaria = inversion_base * comision_por_operacion_porcentual
-                    comision_venta_simulada = (inversion_base - (inversion_base * abs(pct)/100)) * comision_por_operacion_porcentual
-                    perdida_evitada_neta_actual = perdida_bruta_evitada - (comision_compra_imaginaria + comision_venta_simulada)
-
-                    if (not mejor_venta) or (perdida_evitada_neta_actual > (mejor_venta[4] if mejor_venta else -float('inf'))):
-                        mejor_venta = (i, cierre, min_post, pct, perdida_evitada_neta_actual)
-
-        # Lógica de Puntos de Giro (debe ocurrir para al menos 3 puntos en notas históricas)
-        if len(notas) >= 3:
-            for i in range(1, len(notas) - 1):
-                nota_anterior = notas[i-1]
-                nota_actual = notas[i]
-                nota_siguiente = notas[i+1]
-                cierre_actual = cierres[i] if i < len(cierres) else None # Ensure cierre_actual exists
-
-                if cierre_actual is None: continue # Skip if no price data
-
-                # Giro Alcista (Nota disminuye y luego aumenta - posible compra)
-                # nota_anterior > nota_actual (baja), nota_siguiente > nota_actual (luego sube)
-                # Y nota_actual está en zona baja (sobrecompra o neutral hacia sobrecompra)
-                if nota_anterior > nota_actual and nota_siguiente > nota_actual and nota_actual <= 4: # Nota baja y gira hacia arriba
-                    max_post = max(cierres[i:], default=cierre_actual)
-                    if max_post > cierre_actual:
-                        pct_giro = ((max_post - cierre_actual) / cierre_actual) * 100
-                        ganancia_bruta = (max_post - cierre_actual) * (inversion_base / cierre_actual)
-                        comision_compra = inversion_base * comision_por_operacion_porcentual
-                        comision_venta = (inversion_base + ganancia_bruta) * comision_por_operacion_porcentual
-                        ganancia_neta_actual = ganancia_bruta - (comision_compra + comision_venta)
-
-                        if (not mejor_punto_giro_compra) or (ganancia_neta_actual > (mejor_punto_giro_compra[4] if mejor_punto_giro_compra else -float('inf'))):
-                            mejor_punto_giro_compra = (i, cierre_actual, max_post, pct_giro, ganancia_neta_actual)
-
-                # Giro Bajista (Nota aumenta y luego disminuye - posible venta)
-                # nota_anterior < nota_actual (sube), nota_siguiente < nota_actual (luego baja)
-                # Y nota_actual está en zona alta (sobreventa o neutral hacia sobreventa)
-                if nota_anterior < nota_actual and nota_siguiente < nota_actual and nota_actual >= 6: # Nota alta y gira hacia abajo
-                    min_post = min(cierres[i:], default=cierre_actual)
-                    if min_post < cierre_actual:
-                        pct_giro = ((min_post - cierre_actual) / cierre_actual) * 100 # Será negativo
-                        perdida_bruta_evitada = (cierre_actual - min_post) * (inversion_base / cierre_actual)
-                        comision_compra_imaginaria = inversion_base * comision_por_operacion_porcentual
-                        comision_venta_simulada = (inversion_base - (inversion_base * abs(pct_giro)/100)) * comision_por_operacion_porcentual
-                        perdida_evitada_neta_actual = perdida_bruta_evitada - (comision_compra_imaginaria + comision_venta_simulada)
-
-                        if (not mejor_punto_giro_venta) or (perdida_evitada_neta_actual > (mejor_punto_giro_venta[4] if mejor_punto_giro_venta else -float('inf'))):
-                            mejor_punto_giro_venta = (i, cierre_actual, min_post, pct_giro, perdida_evitada_neta_actual)
-
-    data['mejor_compra_historica'] = mejor_compra
-    data['mejor_venta_historica'] = mejor_venta
-    data['mejor_punto_giro_compra_historica'] = mejor_punto_giro_compra
-    data['mejor_punto_giro_venta_historica'] = mejor_punto_giro_venta
-    data['inversion_base'] = inversion_base
-    data['comision_por_operacion_porcentual'] = comision_por_operacion_porcentual
-
-    return data
 
 
 def construir_prompt_formateado(data):
@@ -1001,45 +910,6 @@ def construir_prompt_formateado(data):
 <br/>
 """
 
-    # Lógica Condicional para la Sección "Ganaríamos"
-    ganancia_seccion_contenido = ""
-    inversion_base = data.get('inversion_base', 10000.0)
-    comision_por_operacion_porcentual = data.get('comision_por_operacion_porcentual', 0.001)
-
-    mejor_compra = data.get('mejor_compra_historica')
-    mejor_venta = data.get('mejor_venta_historica')
-    mejor_punto_giro_compra = data.get('mejor_punto_giro_compra_historica')
-    mejor_punto_giro_venta = data.get('mejor_punto_giro_venta_historica')
-
-    if mejor_compra:
-        idx, inicio, maximo, pct, ganancia_neta = mejor_compra
-        fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-        ganancia_seccion_contenido += f"<p>En nuestra mejor recomendación de <strong>compra</strong>, el día {fecha}, con el precio a <strong>{inicio:.2f}€</strong>, el valor alcanzó un máximo de <strong>{maximo:.2f}€</strong>. Con una inversión de <strong>{inversion_base:,.2f}€</strong>, esto habría generado una ganancia neta estimada de <strong>{ganancia_neta:,.2f}€</strong> (tras descontar las comisiones del {comision_por_operacion_porcentual*100:.1f}% por operación). Este acierto demuestra la potencia de nuestras señales para capturar el potencial alcista del mercado.</p>"
-
-    if mejor_venta:
-        idx, inicio, minimo, pct, perdida_evitada_neta = mejor_venta
-        fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-        ganancia_seccion_contenido += f"<p>En cuanto a nuestras señales de <strong>venta</strong>, la más destacada ocurrió el día {fecha}, con un precio de <strong>{inicio:.2f}€</strong>. Si hubiéramos invertido <strong>{inversion_base:,.2f}€</strong> y seguido nuestra señal para evitar la caída hasta <strong>{minimo:.2f}€</strong>, habríamos evitado una pérdida neta estimada de <strong>{abs(perdida_evitada_neta):,.2f}€</strong> (tras descontar comisiones). Esto subraya la capacidad de nuestros análisis para proteger tu capital en momentos de debilidad del mercado.</p>"
-
-    if mejor_punto_giro_compra:
-        idx, inicio, maximo, pct, ganancia_neta = mejor_punto_giro_compra
-        fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-        ganancia_seccion_contenido += f"<p>También, identificamos un punto de inflexión alcista el día {fecha}, cuando el precio era de <strong>{inicio:.2f}€</strong>. Si hubiéramos aprovechado este giro de la nota técnica, el valor alcanzó <strong>{maximo:.2f}€</strong>, lo que podría haber generado una ganancia neta estimada de <strong>{ganancia_neta:,.2f}€</strong> con una inversión de {inversion_base:,.2f}€.</p>"
-
-    if mejor_punto_giro_venta:
-        idx, inicio, minimo, pct, perdida_evitada_neta = mejor_punto_giro_venta
-        fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-        ganancia_seccion_contenido += f"<p>De manera similar, un punto de inflexión bajista se observó el día {fecha} con el precio a <strong>{inicio:.2f}€</strong>. Al anticipar esta caída hasta <strong>{minimo:.2f}€</strong>, se habría podido evitar una pérdida neta estimada de <strong>{abs(perdida_evitada_neta):,.2f}€</strong> con una inversión de {inversion_base:,.2f}€.</p>"
-
-    # Solo añadir la sección si hay contenido de ganancia/pérdida
-    if ganancia_seccion_contenido:
-        chart_html += f"""
-        <div style="margin-top:20px;">
-            <h2>Impacto de Nuestras Señales Históricas (Inversión Base: {inversion_base:,.2f}€)</h2>
-            {ganancia_seccion_contenido}
-        </div>
-        """
-
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio.
 
@@ -1165,7 +1035,7 @@ def generar_contenido_con_gemini(tickers):
 
         # Ahora pasa estas variables a la función generar_recomendacion_avanzada
         data = generar_recomendacion_avanzada(data, cierres_para_grafico_total, notas_historicas_para_grafico)
-        data = analizar_oportunidades_historicas(data)
+        
 
         prompt, titulo_post = construir_prompt_formateado(data)
 
