@@ -294,18 +294,24 @@ def obtener_datos_yfinance(ticker):
         # Proyección para los próximos N días
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
         precios_proyectados = []
-        
-        if is_note_stable_at_ten:
+
+        if nota_empresa < 2.1: # Si la nota está por debajo de 2 (0.0 a 2.0)
             for _ in range(PROYECCION_FUTURA_DIAS):
-                ultimo_precio_conocido *= (1 + 0.015) # 1.5% de aumento diario
+                ultimo_precio_conocido *= (1 - 0.015) # Cae un 1.5% diario
                 precios_proyectados.append(round(ultimo_precio_conocido, 2))
-        elif is_note_stable_at_zero:
+        elif nota_empresa > 7.9: # Si la nota está por encima de 8 (8.0 a 10.0)
             for _ in range(PROYECCION_FUTURA_DIAS):
-                ultimo_precio_conocido *= (1 - 0.015) # 1.5% de reducción diario
+                ultimo_precio_conocido *= (1 + 0.015) # Sube un 1.5% diario
                 precios_proyectados.append(round(ultimo_precio_conocido, 2))
-        else:
-            # Lógica original: proyección de precio estable
-            precios_proyectados = [ultimo_precio_conocido] * PROYECCION_FUTURA_DIAS
+        else: # Si la nota está entre 2.1 y 7.9: el precio sigue el movimiento de la nota
+            # Calcula un factor de cambio diario proporcional a la nota, con 5.0 como punto neutral (sin cambio).
+            # El factor (0.005 / 2.9) escala el cambio para que el máximo sea 0.5% diario
+            # cuando la nota es 2.1 o 7.9 (desviación de 2.9 puntos desde 5.0).
+            daily_rate_of_change = (nota_empresa - 5.0) * (0.005 / 2.9)
+            
+            for _ in range(PROYECCION_FUTURA_DIAS):
+                ultimo_precio_conocido *= (1 + daily_rate_of_change)
+                precios_proyectados.append(round(ultimo_precio_conocido, 2))
 
         # Unir precios reales y proyectados
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
