@@ -545,7 +545,7 @@ def construir_prompt_formateado(data):
         # Precios proyectados (dashed line)
         # Esto asegura que la parte de los precios proyectados empiece en el día 30 del dataset
         # y que el resto del array esté relleno con None hasta el punto de inicio de la proyección real.
-        data_proyectada = [None] * 30 + cierres_para_grafico_total[30:]
+        data_proyectada = [None] * (len(labels_historial) - 1) + [precios_reales_grafico[-1]] + cierres_para_grafico_total[len(labels_historial):]
 
         # Las notas históricas ya están calculadas para los 30 días
         # Para la visualización de "nota D vs precio D+4", las líneas se desplazan visualmente, no los datos.
