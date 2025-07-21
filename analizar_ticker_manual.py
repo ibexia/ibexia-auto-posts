@@ -329,33 +329,25 @@ def obtener_datos_yfinance(ticker):
                 siguiente_precio_proyectado *= (1 + daily_rate_of_change)
             
             # 2. Aplicar las restricciones de soportes y resistencias
-            # Lógica para no cruzar resistencias al subir
-            if siguiente_precio_proyectado > ultimo_precio_conocido: # Si el precio está intentando subir
-                for r in sorted(resistencias): # Iterar resistencias de menor a mayor
-                    # Si el precio_conocido está por debajo de la resistencia Y la proyección intenta cruzarla
-                    if ultimo_precio_conocido < r and siguiente_precio_proyectado > r:
-                        # ***** CAMBIO CLAVE AQUÍ: Lógica revisada para respetar la tolerancia *****
-                        # Si el cruce es MAYOR que la tolerancia, frenar
-                        if (siguiente_precio_proyectado - r) / r > TOLERANCIA_PROYECCION:
-                            siguiente_precio_proyectado = r * (1 - (TOLERANCIA_PROYECCION / 2)) # Se queda justo por debajo de la resistencia con holgura
-                            break # Ya hemos ajustado por esta resistencia, no hace falta comprobar más
-                        # Si el cruce es MENOR o IGUAL que la tolerancia, se permite el cruce.
-                        # No necesitamos un 'else' aquí, simplemente el valor de siguiente_precio_proyectado
-                        # se mantiene como está si el 'if' no se cumple.
+            # Tolerancia para permitir cruce si está a menos del 2%
+            TOLERANCIA_CRUCE = 0.02
+            # Lógica para resistencias al subir
+            if siguiente_precio_proyectado > ultimo_precio_conocido:
+                for r in sorted(resistencias):
+                    if ultimo_precio_conocido <= r < siguiente_precio_proyectado:
+                        distancia_resistencia = abs(siguiente_precio_proyectado - r) / r
+                        if distancia_resistencia > TOLERANCIA_CRUCE:
+                            siguiente_precio_proyectado = r * (1 - 0.001)
+                        break
 
-            # Lógica para no cruzar soportes al bajar
-            elif siguiente_precio_proyectado < ultimo_precio_conocido: # Si el precio está intentando bajar
-                for s in sorted(soportes, reverse=True): # Iterar soportes de mayor a menor
-                    # Si el precio_conocido está por encima del soporte Y la proyección intenta cruzarlo
-                    if ultimo_precio_conocido > s and siguiente_precio_proyectado < s:
-                        # ***** CAMBIO CLAVE AQUÍ: Lógica revisada para respetar la tolerancia *****
-                        # Si el cruce es MAYOR que la tolerancia, frenar
-                        if (s - siguiente_precio_proyectado) / s > TOLERANCIA_PROYECCION:
-                            siguiente_precio_proyectado = s * (1 + (TOLERANCIA_PROYECCION / 2)) # Se queda justo por encima del soporte con holgura
-                            break # Ya hemos ajustado por este soporte, no hace falta comprobar más
-                        # Si el cruce es MENOR o IGUAL que la tolerancia, se permite el cruce.
-                        # No necesitamos un 'else' aquí, simplemente el valor de siguiente_precio_proyectado
-                        # se mantiene como está si el 'if' no se cumple.
+            # Lógica para soportes al bajar
+            elif siguiente_precio_proyectado < ultimo_precio_conocido:
+                for s in sorted(soportes, reverse=True):
+                    if ultimo_precio_conocido >= s > siguiente_precio_proyectado:
+                        distancia_soporte = abs(siguiente_precio_proyectado - s) / s
+                        if distancia_soporte > TOLERANCIA_CRUCE:
+                            siguiente_precio_proyectado = s * (1 + 0.001)
+                        break
 
             precios_proyectados.append(round(siguiente_precio_proyectado, 2))
             ultimo_precio_conocido = siguiente_precio_proyectado # Actualizar para el siguiente día de proyección
