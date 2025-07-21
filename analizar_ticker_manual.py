@@ -310,47 +310,44 @@ def obtener_datos_yfinance(ticker):
         elif abs(nota_empresa - 10.0) < 0.1:
              is_note_stable_at_ten = True
 
-        # Proyección para los próximos N días, respetando soportes y resistencias
-        ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
+        # Proyección para los próximos N días, respetando soportes y resistencias con margen del 2%
+        TOLERANCIA_CRUCE = 0.02
         precios_proyectados = []
-
-        TOLERANCIA_PROYECCION = 0.02 # 2% de tolerancia para cruzar soportes/resistencias
+        ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
         for _ in range(PROYECCION_FUTURA_DIAS):
             siguiente_precio_proyectado = ultimo_precio_conocido
 
-            # 1. Calcular el intento de movimiento del precio basado en la nota
-            if nota_empresa < 2.1: # Proyección a la baja fuerte
-                siguiente_precio_proyectado *= (1 - 0.015) 
-            elif nota_empresa > 7.9: # Proyección al alza fuerte
-                siguiente_precio_proyectado *= (1 + 0.015) 
-            else: # Nota intermedia, sigue el movimiento de la nota (puede ser alza o baja)
+            # Movimiento según la nota
+            if nota_empresa < 2.1:
+                siguiente_precio_proyectado *= (1 - 0.015)
+            elif nota_empresa > 7.9:
+                siguiente_precio_proyectado *= (1 + 0.015)
+            else:
                 daily_rate_of_change = (nota_empresa - 5.0) * (0.005 / 2.9)
                 siguiente_precio_proyectado *= (1 + daily_rate_of_change)
-            
-            # 2. Aplicar las restricciones de soportes y resistencias
-            # Tolerancia para permitir cruce si está a menos del 2%
-            TOLERANCIA_CRUCE = 0.02
-            # Lógica para resistencias al subir
+
+            # Evitar perforar resistencias (si distancia > 2%)
             if siguiente_precio_proyectado > ultimo_precio_conocido:
                 for r in sorted(resistencias):
                     if ultimo_precio_conocido <= r < siguiente_precio_proyectado:
-                        distancia_resistencia = abs(siguiente_precio_proyectado - r) / r
-                        if distancia_resistencia > TOLERANCIA_CRUCE:
-                            siguiente_precio_proyectado = r * (1 - 0.001)
+                        distancia = abs(siguiente_precio_proyectado - r) / r
+                        if distancia > TOLERANCIA_CRUCE:
+                            siguiente_precio_proyectado = round(r * (1 - 0.001), 2)
                         break
 
-            # Lógica para soportes al bajar
+            # Evitar perforar soportes (si distancia > 2%)
             elif siguiente_precio_proyectado < ultimo_precio_conocido:
                 for s in sorted(soportes, reverse=True):
                     if ultimo_precio_conocido >= s > siguiente_precio_proyectado:
-                        distancia_soporte = abs(siguiente_precio_proyectado - s) / s
-                        if distancia_soporte > TOLERANCIA_CRUCE:
-                            siguiente_precio_proyectado = s * (1 + 0.001)
+                        distancia = abs(siguiente_precio_proyectado - s) / s
+                        if distancia > TOLERANCIA_CRUCE:
+                            siguiente_precio_proyectado = round(s * (1 + 0.001), 2)
                         break
 
             precios_proyectados.append(round(siguiente_precio_proyectado, 2))
-            ultimo_precio_conocido = siguiente_precio_proyectado # Actualizar para el siguiente día de proyección
+            ultimo_precio_conocido = siguiente_precio_proyectado
+
 
         # Unir precios reales y proyectados
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
