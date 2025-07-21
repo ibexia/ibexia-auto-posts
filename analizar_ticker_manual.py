@@ -367,8 +367,7 @@ def obtener_datos_yfinance(ticker):
             "TENDENCIA_SOCIAL": "No disponible",
             "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
             "RIESGOS_OPORTUNIDADES": "No disponibles",
-            "TENDENCIA_NOTA": tendencia_smi,
-            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion, # Se ajustará en la nueva función
+            "TENDENCIA_NOTA": tendencia_smi,            
             "NOTAS_HISTORICAS_30_DIAS_ANALISIS": notas_historicas_ultimos_30_dias_tendencia, # Para cálculo de la nueva recomendación
             "CIERRES_30_DIAS": hist['Close'].dropna().tail(30).tolist(), # Cierres reales de los últimos 30 días para análisis histórico
             "NOTAS_HISTORICAS_PARA_GRAFICO": notas_historicas_para_grafico, # Solo los 30 días para el gráfico
@@ -416,7 +415,7 @@ def generar_recomendacion_avanzada(data):
 
     recomendacion = "Neutral"
     condicion_mercado = "En observación"
-    dias_accion = data['DIAS_ESTIMADOS_ACCION'] # Valor inicial
+    
 
     # Distancia a soportes y resistencias
     distancia_soporte = abs(current_price - soporte_1) / soporte_1 if soporte_1 else float('inf')
@@ -430,11 +429,7 @@ def generar_recomendacion_avanzada(data):
     if tendencia_nota == "mejorando" and nota_empresa >= 5 and volumen_alto:
         recomendacion = "Fuerte Compra"
         condicion_mercado = "Impulso alcista con confirmación de volumen"
-        if "aprox." in dias_accion: # Ajustar si la nota ya es alta y la tendencia la lleva a compra
-             if nota_empresa >= 7: # Si ya estamos en zona buena, la acción es "inmediata"
-                 dias_accion = "Acción de compra inminente o ya activa"
-        elif nota_empresa < 8 and ("Ya en zona de posible compra" in dias_accion or "inminente" in dias_accion):
-            dias_accion = "Acción de compra inminente o ya activa" # Sobreescribir si el giro es muy fuerte
+        
 
     # Lógica de Giro Bajista (Venta Condicional)
     # Si la nota está empeorando significativamente Y el volumen es alto (confirmación de debilidad)
@@ -442,11 +437,6 @@ def generar_recomendacion_avanzada(data):
         if not proximidad_soporte: # No vender si ya estamos en soporte fuerte
             recomendacion = "Venta Condicional / Alerta"
             condicion_mercado = "Debilidad confirmada por volumen, considerar salida"
-            if "aprox." in dias_accion: # Ajustar si la nota ya es baja y la tendencia la lleva a venta
-                 if nota_empresa <= 3: # Si ya estamos en zona mala, la acción es "inmediata"
-                     dias_accion = "Acción de venta inminente o ya activa"
-            elif nota_empresa > 2 and ("Ya en zona de posible venta" in dias_accion or "inminente" in dias_accion):
-                dias_accion = "Acción de venta inminente o ya activa" # Sobreescribir si el giro es muy fuerte
         else:
             recomendacion = "Neutral / Cautela"
             condicion_mercado = "Debilidad pero cerca de soporte clave, observar rebote"
@@ -460,7 +450,7 @@ def generar_recomendacion_avanzada(data):
            notas_historicas[-2] >= 9 and notas_historicas[-1] >= 8: # Bajando de 9/10 a 8/9
             recomendacion = "Oportunidad de Compra (Reversión)"
             condicion_mercado = "Posible inicio de corrección tras sobreventa extrema, punto de entrada"
-            dias_accion = "Acción de compra (reversión) inminente"
+            
 
         # Reversión de Venta (Nota bajó a extremo, empieza a subir desde sobrecompra)
         # Por ejemplo: ...0, 1, 1.5 (giro hacia arriba desde sobrecompra)
@@ -469,7 +459,7 @@ def generar_recomendacion_avanzada(data):
              notas_historicas[-2] <= 1 and notas_historicas[-1] <= 2: # Subiendo de 0/1 a 1/2
             recomendacion = "Señal de Venta (Reversión)"
             condicion_mercado = "Posible inicio de corrección tras sobrecompra extrema, punto de salida"
-            dias_accion = "Acción de venta (reversión) inminente"
+            
 
     # Lógica basada en Nivel Absoluto de la Nota (como fallback o refuerzo)
     if recomendacion == "Neutral" or recomendacion == "En observación" or recomendacion == "Pendiente de análisis avanzado": # Si no se activó una señal fuerte por giros/reversiones
@@ -501,7 +491,7 @@ def generar_recomendacion_avanzada(data):
 
     data['RECOMENDACION'] = recomendacion
     data['CONDICION_RSI'] = condicion_mercado # Renombramos a condición_mercado para ser más general
-    data['DIAS_ESTIMADOS_ACCION'] = dias_accion # Actualizar con la nueva lógica
+   
 
     return data
 
@@ -984,10 +974,6 @@ def construir_prompt_formateado(data):
         <td style="padding: 8px;">Tendencia de la Nota</td>
         <td style="padding: 8px;"><strong>{data['TENDENCIA_NOTA']}</strong></td>
     </tr>
-    <tr>
-        <td style="padding: 8px;">Días Estimados para Acción</td>
-        <td style="padding: 8px;"><strong>{data['DIAS_ESTIMADOS_ACCION']}</strong></td>
-    </tr>
 </table>
 <br/>
 """
@@ -1086,8 +1072,7 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 <p>Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**, lo que, en combinación con el resto de nuestros indicadores, se alinea con una recomendación de <strong>{data['RECOMENDACION']}</strong>.
 Esto sugiere {('un rebote inminente, dado que los indicadores muestran una sobreventa extrema, lo que significa que la acción ha sido \'castigada\' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo.' if "Compra" in data['RECOMENDACION'] and data['TENDENCIA_NOTA'] == 'mejorando' else '')}
 {('una potencial continuación bajista, con los indicadores técnicos mostrando una sobrecompra significativa o una pérdida de impulso alcista. Esto sugiere que la acción podría experimentar una corrección. Es un momento para la cautela y la vigilancia de los niveles de soporte.' if "Venta" in data['RECOMENDACION'] and data['TENDENCIA_NOTA'] == 'empeorando' else '')}
-{('una fase de consolidación o lateralidad, donde los indicadores técnicos no muestran una dirección clara. Es un momento para esperar la confirmación de una nueva tendencia antes de tomar decisiones.' if "Neutral" in data['RECOMENDACION'] else '')}
-{f" Estimamos que el punto de acción óptimo se encuentra en aproximadamente **{data['DIAS_ESTIMADOS_ACCION']}**." if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] and "inminente" not in data['DIAS_ESTIMADOS_ACCION'] else ("La nota ya se encuentra en una zona de acción clara, lo que sugiere una oportunidad {('de compra' if 'Compra' in data['RECOMENDACION'] else 'de venta')} inmediata, y por tanto, no se estima un plazo de días adicional, o la acción es inminente." if "Ya en zona" in data['DIAS_ESTIMADOS_ACCION'] or "inminente" in data['DIAS_ESTIMADOS_ACCION'] else "")}</p>
+{('una fase de consolidación o lateralidad, donde los indicadores técnicos no muestran una dirección clara. Es un momento para esperar la confirmación de una nueva tendencia antes de tomar decisiones.' if "Neutral" in data['RECOMENDACION'] else '')}</p>
 
 <p>{volumen_analisis_text}</p>
 
