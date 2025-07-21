@@ -223,9 +223,9 @@ def obtener_datos_yfinance(ticker):
         
         # Asegurarse de que el precio objetivo no sea irracionalmente bajo si la nota es 0
         # y referencia_min es muy alto por falta de soportes.
-        _empresa == 0 and precio_objetivo > current_price * 0.9:
+        if nota_empresa == 0 and precio_objetivo > current_price * 0.9:
             precio_objetivo = round(min(precio_objetivo, current_price * 0.85), 2) # Limitar a un 15% de caída
-        el_empresa == 10 and precio_objetivo < current_price * 1.1:
+        elif nota_empresa == 10 and precio_objetivo < current_price * 1.1:
             precio_objetivo = round(max(precio_objetivo, current_price * 1.15), 2) # Limitar a un 15% de subida
 
 
