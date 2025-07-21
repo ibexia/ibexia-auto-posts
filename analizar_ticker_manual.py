@@ -1154,13 +1154,11 @@ def enviar_email(texto_generado, asunto_email, nombre_archivo):
     except Exception as e:
         print("❌ Error al enviar el correo:", e)
 
-
 def generar_contenido_con_gemini(tickers):
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key:
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
-    
     model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")  
 
     for ticker in tickers:
@@ -1170,7 +1168,12 @@ def generar_contenido_con_gemini(tickers):
             print(f"⏩ Saltando {ticker} debido a un error al obtener datos.")
             continue
         
-        # LLAMADAS A LAS NUEVAS FUNCIONES DE RECOMENDACIÓN Y ANÁLISIS HISTÓRICO
+        # ACCESO A LAS VARIABLES DESDE EL DICCIONARIO 'data'
+        # ANTES ERAN INDEFINIDAS, AHORA SE OBTIENEN DE 'data'
+        cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
+        notas_historicas_para_grafico = data.get('NOTAS_HISTORICAS_PARA_GRAFICO', [])
+
+        # Ahora pasa estas variables a la función generar_recomendacion_avanzada
         data = generar_recomendacion_avanzada(data, cierres_para_grafico_total, notas_historicas_para_grafico)
         data = analizar_oportunidades_historicas(data)
 
@@ -1193,7 +1196,7 @@ def generar_contenido_con_gemini(tickers):
                 break  
             except Exception as e:
                 if "429 You exceeded your current quota" in str(e):
-                    server_suggested_delay = 0 # Inicializamos a 0
+                    server_suggested_delay = 0 
                     try:
                         match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
                         if match:
@@ -1201,27 +1204,23 @@ def generar_contenido_con_gemini(tickers):
                     except:
                         pass
 
-                    # Calcula el retraso actual basado en la retirada exponencial o el sugerido por el servidor
                     current_delay = max(initial_delay * (2 ** retries), server_suggested_delay + 1)
 
-                    # Añade jitter (aleatoriedad) para evitar colisiones con otras solicitudes
-                    jitter = random.uniform(0.5, 1.5) # Factor aleatorio entre 0.5 y 1.5
+                    jitter = random.uniform(0.5, 1.5)
                     delay_with_jitter = current_delay * jitter
 
                     print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay_with_jitter:.2f} segundos... (Intento {retries + 1}/{max_retries})")
-                    time.sleep(delay_with_jitter) # Usa el retraso con jitter
+                    time.sleep(delay_with_jitter)
                     retries += 1
-                    # La variable 'delay' ya no se necesita mantener persistente ni multiplicar
-                    # porque 'current_delay' se calcula de nuevo en cada intento
                 else:
                     print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
                     break
         else:  
             print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
             
-        # --- PAUSA DE 3 MINUTO DESPUÉS DE CADA TICKER ---
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
-        time.sleep(180) # Pausa de 180 segundos entre cada ticker
+        time.sleep(180)
+
 
 
 def main():
