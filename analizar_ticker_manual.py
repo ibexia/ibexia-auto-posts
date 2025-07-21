@@ -231,6 +231,9 @@ def obtener_datos_yfinance(ticker):
         smi_history_full = hist_extended['SMI_signal'].dropna()
         cierres_history_full = hist_extended['Close'].dropna()
 
+        # Calcula el volumen promedio de los últimos 30 días usando hist_extended
+        volumen_promedio_30d = hist_extended['Volume'].tail(30).mean()
+
         # Notas para los 30 días del gráfico (serán las que se visualicen)
         # Serán las 30 notas más recientes disponibles
         notas_historicas_para_grafico = []
@@ -347,6 +350,7 @@ def obtener_datos_yfinance(ticker):
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
             "VOLUMEN": current_volume,
+            "VOLUMEN_MEDIO": round(volumen_promedio_30d, 2) if not pd.isna(volumen_promedio_30d) else "N/A", # <-- AÑADE ESTA LÍNEA
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
