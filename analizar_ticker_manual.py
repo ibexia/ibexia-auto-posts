@@ -189,7 +189,11 @@ def obtener_datos_yfinance(ticker):
             precios_reales_para_grafico = [first_price_val] * (30 - len(temp_prices)) + temp_prices
         else: # Muy pocos datos históricos
              precios_reales_para_grafico = [current_price] * 30 # Default to current price if no historical data
-
+            
+        # Asegúrate de mantener la misma indentación (los espacios) que las líneas de arriba.
+        smi_history_last_30 = hist['SMI_signal'].dropna().tail(30).tolist()
+        notas_historicas_ultimos_30_dias_tendencia = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_30]
+        
         # Determinar si la nota ha sido estable en 0 o 10 en la ventana de estabilidad
         NOTE_STABILITY_WINDOW = 5 # Días para considerar la estabilidad de la nota
         
@@ -232,10 +236,7 @@ def obtener_datos_yfinance(ticker):
         # Unir precios reales y proyectados
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
 
-        # La tendencia de la nota y días estimados (para la explicación)
-        # Esto se mantiene igual, calculada sobre los 30 días más recientes del 'hist'
-        smi_history_last_30 = hist['SMI_signal'].dropna().tail(30).tolist()
-        notas_historicas_ultimos_30_dias_tendencia = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_30]
+
 
         tendencia_smi = "No disponible"
         dias_estimados_accion = "No disponible"
