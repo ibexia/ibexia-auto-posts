@@ -190,27 +190,47 @@ def obtener_datos_yfinance(ticker):
         else:
             resistencia_1, resistencia_2, resistencia_3 = round(current_price * 1.05, 2), round(current_price * 1.1, 2), round(current_price * 1.15, 2) # Default si no hay datos
 
-        # Cálculo del Precio Objetivo (AQUÍ ESTÁ LA LÓGICA MEJORADA)
-        if nota_empresa == 0: # Si la nota es 0, el precio objetivo es un soporte más bajo
-            if len(soportes) >= 3:
-                precio_objetivo = soportes[2] # El tercer soporte (más bajo)
-            elif len(soportes) >= 2:
-                precio_objetivo = soportes[1] # El segundo soporte
-            elif len(soportes) >= 1:
-                precio_objetivo = soportes[0] # El primer soporte
-            else:
-                precio_objetivo = round(current_price * 0.9, 2) # Un 10% por debajo si no hay soportes
-        elif nota_empresa == 10: # Si la nota es 10, el precio objetivo es una resistencia más alta
-            if len(resistencias) >= 3:
-                precio_objetivo = resistencias[2] # La tercera resistencia (más alta)
-            elif len(resistencias) >= 2:
-                precio_objetivo = resistencias[1] # La segunda resistencia
-            elif len(resistencias) >= 1:
-                precio_objetivo = resistencias[0] # La primera resistencia
-            else:
-                precio_objetivo = round(current_price * 1.1, 2) # Un 10% por encima si no hay resistencias
-        else: # Para notas entre 1 y 9, el precio objetivo es el precio actual (o se podría interpolar)
-            precio_objetivo = current_price
+        # --- LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
+        # Primero, asegurarnos de que tenemos soportes y resistencias válidos para la interpolación
+        # Si no hay 3 soportes/resistencias, usaremos los disponibles o un porcentaje del precio actual.
+
+        # Puntos de referencia para la interpolación del precio objetivo
+        # Puedes ajustar estos porcentajes o la selección de soportes/resistencias
+        # para que se adapten mejor a tu estrategia.
+        
+        # Extremo inferior: Un soporte más bajo o un porcentaje de caída
+        # Se podría usar el soporte 3, o un valor más agresivo si la nota es muy baja.
+        referencia_min = soportes[2] if len(soportes) >= 3 else (soportes[1] if len(soportes) >= 2 else (soportes[0] if len(soportes) >= 1 else round(current_price * 0.80, 2)))
+        
+        # Extremo superior: Una resistencia más alta o un porcentaje de subida
+        # Se podría usar la resistencia 3, o un valor más agresivo si la nota es muy alta.
+        referencia_max = resistencias[2] if len(resistencias) >= 3 else (resistencias[1] if len(resistencias) >= 2 else (resistencias[0] if len(resistencias) >= 1 else round(current_price * 1.20, 2)))
+
+        # Asegurarse de que referencia_min sea menor que referencia_max
+        if referencia_min >= referencia_max:
+            # Si los soportes/resistencias están muy juntos o son incorrectos,
+            # usamos un rango por defecto alrededor del precio actual
+            referencia_min = round(current_price * 0.85, 2)
+            referencia_max = round(current_price * 1.15, 2)
+        
+        # Interpolación lineal del precio objetivo basada en la nota_empresa (escalada de 0 a 10)
+        # La nota se normaliza de 0 a 1.
+        normalised_nota = nota_empresa / 10.0
+        
+        # El precio objetivo se calcula como una interpolación entre referencia_min y referencia_max
+        # Un normalised_nota de 0 daría referencia_min, y un normalised_nota de 1 daría referencia_max.
+        precio_objetivo = referencia_min + (referencia_max - referencia_min) * normalised_nota
+        
+        # Asegurarse de que el precio objetivo no sea irracionalmente bajo si la nota es 0
+        # y referencia_min es muy alto por falta de soportes.
+        if nota_empresa == 0 and precio_objetivo > current_price * 0.9:
+            precio_objetivo = round(min(precio_objetivo, current_price * 0.85), 2) # Limitar a un 15% de caída
+        elif nota_empresa == 10 and precio_objetivo < current_price * 1.1:
+            precio_objetivo = round(max(precio_objetivo, current_price * 1.15), 2) # Limitar a un 15% de subida
+
+
+        precio_objetivo = round(precio_objetivo, 2)
+        # --- FIN DE LA LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
 
         # Precio objetivo de compra (ejemplo simple, puedes refinarlo)
         # Este 'precio_objetivo_compra' es diferente al 'precio_objetivo' general
