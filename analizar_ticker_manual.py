@@ -386,112 +386,111 @@ def obtener_datos_yfinance(ticker):
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
-def generar_recomendacion_avanzada(data):
-    nota_empresa = data['NOTA_EMPRESA']
-    tendencia_nota = data['TENDENCIA_NOTA']
-    current_price = data['PRECIO_ACTUAL']
-    soporte_1 = data['SOPORTE_1']
-    resistencia = data['RESISTENCIA']
-    volumen = data['VOLUMEN']
-    notas_historicas = data['NOTAS_HISTORICAS_30_DIAS_ANALISIS'] # Usar las notas para análisis
-    cierres_historicos_analisis = data['CIERRES_30_DIAS'] # Para comparar volumen con histórico
+def generar_recomendacion_avanzada(data, cierres_para_grafico_total, notas_historicas_para_grafico):
+    # Asegúrate de que notas_historicas_para_grafico y cierres_para_grafico_total son listas válidas.
+    # Si no lo son, o están vacías, esto podría causar errores.
+    # Se asume que data['NOTA_TECNICA'], data['VOLUMEN'], data['VOLUMEN_MEDIO'],
+    # data['PRECIO_ACTUAL'], data['SOPORTE_1'], data['RESISTENCIA_1'] ya están poblados.
 
-    # Calcular volumen promedio (simplificado, puedes mejorarlo con un periodo más largo)
-    # Asegurarse de que hay suficientes datos para calcular el volumen_historico_reciente
-    volumen_historico_reciente = 0
-    if cierres_historicos_analisis and len(cierres_historicos_analisis) > 1:
-        try:
-            # Obtener el volumen histórico directamente de yfinance para un periodo más largo para el promedio
-            ticker_obj = yf.Ticker(data['TICKER'])
-            hist_vol = ticker_obj.history(period="90d")
-            if not hist_vol.empty and 'Volume' in hist_vol.columns:
-                volumen_historico_reciente = hist_vol['Volume'].tail(30).mean()
-        except Exception as e:
-            print(f"Advertencia: No se pudo obtener volumen histórico para promedio: {e}")
-            volumen_historico_reciente = 0 # Fallback
+    # Extraer los últimos 30 días de notas para el análisis de tendencias
+    notas_historicas = notas_historicas_para_grafico[-30:] if len(notas_historicas_para_grafico) >= 30 else notas_historicas_para_grafico
 
-    volumen_alto = volumen > (volumen_historico_reciente * 1.2) if volumen_historico_reciente else False # 20% por encima del promedio
-    volumen_bajo = volumen < (volumen_historico_reciente * 0.8) if volumen_historico_reciente else False # 20% por debajo del promedio
+    # Calcular la pendiente de las últimas N notas para la tendencia
+    n_trend = min(7, len(notas_historicas)) # Últimos 7 días o menos si no hay tantos
+    if n_trend > 1:
+        x_trend = np.arange(n_trend)
+        y_trend = np.array(notas_historicas[-n_trend:])
+        # Filtrar NaN para calcular la pendiente
+        valid_indices = ~np.isnan(y_trend)
+        if np.any(valid_indices): # Solo calcular si hay datos válidos
+            slope, _ = np.polyfit(x_trend[valid_indices], y_trend[valid_indices], 1)
+        else:
+            slope = 0 # No hay datos válidos para la pendiente
+    else:
+        slope = 0 # No hay suficientes datos para calcular la pendiente
+
+    if slope > 0.1:
+        tendencia_nota = "mejorando"
+    elif slope < -0.1:
+        tendencia_nota = "empeorando"
+    else:
+        tendencia_nota = "neutral"
+
+    # Determinar si el volumen es alto (ej. > 1.5 veces el volumen medio de los últimos 20 días)
+    volumen_alto = False
+    if data['VOLUMEN_MEDIO'] and data['VOLUMEN'] is not None and data['VOLUMEN_MEDIO'] > 0: # Añadida verificación para evitar división por cero
+        if data['VOLUMEN'] > (data['VOLUMEN_MEDIO'] * 1.5):
+            volumen_alto = True
+
+    # Determinar proximidad a soportes y resistencias
+    proximidad_soporte = False
+    proximidad_resistencia = False
+    # Asegurarse de que los valores existen y no son None para evitar errores
+    if data['PRECIO_ACTUAL'] is not None:
+        if data['SOPORTE_1'] is not None and data['PRECIO_ACTUAL'] != 0:
+            if abs(data['PRECIO_ACTUAL'] - data['SOPORTE_1']) / data['PRECIO_ACTUAL'] < 0.02: # 2% de proximidad
+                proximidad_soporte = True
+        if data['RESISTENCIA_1'] is not None and data['PRECIO_ACTUAL'] != 0:
+            if abs(data['PRECIO_ACTUAL'] - data['RESISTENCIA_1']) / data['PRECIO_ACTUAL'] < 0.02: # 2% de proximidad
+                proximidad_resistencia = True
 
     recomendacion = "Neutral"
     condicion_mercado = "En observación"
-    
-
-    # Distancia a soportes y resistencias
-    distancia_soporte = abs(current_price - soporte_1) / soporte_1 if soporte_1 else float('inf')
-    distancia_resistencia = abs(current_price - resistencia) / resistencia if resistencia else float('inf')
-    proximidad_soporte = distancia_soporte < 0.03 # A menos del 3% del soporte
-    proximidad_resistencia = distancia_resistencia < 0.03 # A menos del 3% de la resistencia
-
+    motivo_recomendacion = "La situación actual no presenta señales claras de compra ni venta." # NUEVA VARIABLE: Motivo por defecto
 
     # Lógica de Giro Alcista (Compra)
-    # Si la nota está mejorando significativamente Y el volumen lo acompaña
-    if tendencia_nota == "mejorando" and nota_empresa >= 5 and volumen_alto:
+    if tendencia_nota == "mejorando" and data['NOTA_TECNICA'] >= 5 and volumen_alto:
         recomendacion = "Fuerte Compra"
         condicion_mercado = "Impulso alcista con confirmación de volumen"
-        
+        motivo_recomendacion = "La nota técnica está mejorando con un volumen significativo, indicando un fuerte impulso alcista."
 
     # Lógica de Giro Bajista (Venta Condicional)
-    # Si la nota está empeorando significativamente Y el volumen es alto (confirmación de debilidad)
-    elif tendencia_nota == "empeorando" and nota_empresa <= 6 and volumen_alto:
-        if not proximidad_soporte: # No vender si ya estamos en soporte fuerte
+    elif tendencia_nota == "empeorando" and data['NOTA_TECNICA'] <= 6 and volumen_alto:
+        if not proximidad_soporte:
             recomendacion = "Venta Condicional / Alerta"
             condicion_mercado = "Debilidad confirmada por volumen, considerar salida"
+            motivo_recomendacion = "La nota técnica está empeorando con volumen alto y sin soporte cercano, sugiriendo debilidad."
         else:
             recomendacion = "Neutral / Cautela"
             condicion_mercado = "Debilidad pero cerca de soporte clave, observar rebote"
+            motivo_recomendacion = "La nota técnica está empeorando, pero la proximidad a un soporte clave sugiere cautela antes de vender."
 
-    # Detección de Patrones de Reversión desde Extremos (histórico reciente)
-    if len(notas_historicas) >= 3:
-        # Reversión de Compra (Nota subió a extremo, empieza a descender desde sobreventa)
-        # Por ejemplo: ...10, 9, 8.5 (giro hacia abajo desde sobreventa)
-        # Si la nota actual ha bajado un poco desde un pico extremo de sobreventa (nota alta)
-        if notas_historicas[-1] < notas_historicas[-2] and \
-           notas_historicas[-2] >= 9 and notas_historicas[-1] >= 8: # Bajando de 9/10 a 8/9
+    # Detección de Patrones de Reversión desde Extremos:
+    # Reversión de Compra
+    if len(notas_historicas) >= 2 and notas_historicas[-1] < notas_historicas[-2] and \
+       notas_historicas[-2] >= 9 and notas_historicas[-1] >= 8:
+        if recomendacion not in ["Fuerte Compra", "Oportunidad de Compra (Reversión)"]: # No sobrescribir si ya es una compra fuerte
             recomendacion = "Oportunidad de Compra (Reversión)"
             condicion_mercado = "Posible inicio de corrección tras sobreventa extrema, punto de entrada"
-            
+            motivo_recomendacion = "Reversión de compra: La nota técnica está descendiendo desde una zona de sobreventa extrema (cerca de 10), indicando una oportunidad de entrada."
 
-        # Reversión de Venta (Nota bajó a extremo, empieza a subir desde sobrecompra)
-        # Por ejemplo: ...0, 1, 1.5 (giro hacia arriba desde sobrecompra)
-        # Si la nota actual ha subido un poco desde un valle extremo de sobrecompra (nota baja)
-        elif notas_historicas[-1] > notas_historicas[-2] and \
-             notas_historicas[-2] <= 1 and notas_historicas[-1] <= 2: # Subiendo de 0/1 a 1/2
+    # Reversión de Venta
+    elif len(notas_historicas) >= 2 and notas_historicas[-1] > notas_historicas[-2] and \
+         notas_historicas[-2] <= 1 and notas_historicas[-1] <= 2:
+        if recomendacion not in ["Venta Condicional / Alerta", "Señal de Venta (Reversión)"]: # No sobrescribir si ya es una venta fuerte
             recomendacion = "Señal de Venta (Reversión)"
             condicion_mercado = "Posible inicio de corrección tras sobrecompra extrema, punto de salida"
-            
-
-    # Lógica basada en Nivel Absoluto de la Nota (como fallback o refuerzo)
-    if recomendacion == "Neutral" or recomendacion == "En observación" or recomendacion == "Pendiente de análisis avanzado": # Si no se activó una señal fuerte por giros/reversiones
-        if nota_empresa >= 8:
-            recomendacion = "Compra Fuerte"
-            condicion_mercado = "Nota técnica muy sólida"
-        elif 6 <= nota_empresa < 8:
-            recomendacion = "Compra Moderada"
-            condicion_mercado = "Nota técnica favorable"
-        elif 4 <= nota_empresa < 6:
-            recomendacion = "Neutral"
-            condicion_mercado = "Nota técnica balanceada"
-        elif 2 < nota_empresa < 4:
-            recomendacion = "Evitar / Venta Moderada"
-            condicion_mercado = "Nota técnica débil"
-        elif nota_empresa <= 2:
-            recomendacion = "Venta Fuerte"
-            condicion_mercado = "Nota técnica muy débil / sobrecompra"
+            motivo_recomendacion = "Señal de venta: La nota técnica está ascendiendo desde una zona de sobrecompra extrema (cerca de 0), indicando un punto de salida."
 
 
-    # Consideraciones de proximidad a soportes/resistencias para ajustar la recomendación
-    if proximidad_soporte and ("Venta" in recomendacion or "Alerta" in recomendacion):
-        recomendacion = "Neutral / Observar Soporte"
-        condicion_mercado = "Cerca de soporte clave, no forzar venta. Posible rebote."
-    elif proximidad_resistencia and ("Compra" in recomendacion):
-        recomendacion = "Neutral / Observar Resistencia"
-        condicion_mercado = "Cerca de resistencia clave, observar posible reversión."
-
+    # Lógica para "Neutral" si ninguna de las condiciones anteriores se cumple con fuerza
+    # Esta lógica se ejecuta si no se ha establecido una recomendación más fuerte
+    if recomendacion == "Neutral":
+        if tendencia_nota == "neutral":
+            condicion_mercado = "Consolidación o lateralidad sin dirección clara."
+            motivo_recomendacion = "La nota técnica se mantiene neutral, indicando una fase de consolidación o lateralidad sin dirección clara."
+        elif data['NOTA_TECNICA'] >= 7 and tendencia_nota == "mejorando" and not volumen_alto:
+            recomendacion = "Neutral / Observación"
+            condicion_mercado = "Nota alta con mejora, pero falta confirmación de volumen."
+            motivo_recomendacion = "La nota técnica es alta y muestra una mejora, pero la falta de volumen significativo sugiere una fase de observación."
+        elif data['NOTA_TECNICA'] <= 4 and tendencia_nota == "empeorando" and not volumen_alto:
+            recomendacion = "Neutral / Observación"
+            condicion_mercado = "Nota baja con empeoramiento, pero falta confirmación de volumen."
+            motivo_recomendacion = "La nota técnica es baja y empeora, pero la falta de volumen significativo sugiere una fase de observación."
 
     data['RECOMENDACION'] = recomendacion
-    data['CONDICION_RSI'] = condicion_mercado # Renombramos a condición_mercado para ser más general
-   
+    data['CONDICION_RSI'] = condicion_mercado
+    data['MOTIVO_RECOMENDACION'] = motivo_recomendacion # AÑADIR ESTA LÍNEA
 
     return data
 
@@ -874,6 +873,31 @@ def construir_prompt_formateado(data):
                                         font: {{ size: 10 }}
                                     }}
                                 }}
+                                // Icono de Entrada/Salida en el último día de historial
+                                // (último día del dataset de precios reales)
+                                signalPoint:{{
+                                    type: 'point',
+                                    xValue: {len(labels_historial) - 1}, // Último día del historial real
+                                    yValue: {precios_reales_grafico[-1] if precios_reales_grafico else 'null'}, // Precio del último día real
+                                    yScaleID: 'y1', // En el eje del precio
+                                    radius: 10,
+                                    pointStyle: {'"triangle"' if 'Compra' in data['RECOMENDACION'] else ('"triangle"' if 'Venta' in data['RECOMENDACION'] else '"circle"')}, // Triángulo para compra/venta
+                                    rotation: {{0 if 'Compra' in data['RECOMENDACION'] else (180 if 'Venta' in data['RECOMENDACION'] else 0)}}, // Girar para venta
+                                    backgroundColor: {'"rgba(0, 200, 0, 0.8)"' if 'Compra' in data['RECOMENDACION'] else ('"rgba(200, 0, 0, 0.8)"' if 'Venta' in data['RECOMENDACION'] else '"rgba(100, 100, 100, 0.8)"')}, // Verde para compra, Rojo para venta, Gris para neutral
+                                    borderColor: 'white',
+                                    borderWidth: 2,
+                                    display: {('true' if 'Compra' in data['RECOMENDACION'] or 'Venta' in data['RECOMENDACION'] else 'false')}, // Mostrar solo si es compra o venta
+                                    label: {{
+                                        content: '{data["RECOMENDACION"]}',
+                                        enabled: true,
+                                        position: 'top', // O 'bottom'
+                                        font: {{ size: 10, weight: 'bold' }},
+                                        color: {'"rgba(0, 200, 0, 0.8)"' if 'Compra' in data['RECOMENDACION'] else ('"rgba(200, 0, 0, 0.8)"' if 'Venta' in data['RECOMENDACION'] else '"rgba(100, 100, 100, 0.8)"')},
+                                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                                        borderRadius: 4,
+                                        padding: 4
+                                    }}
+                                }}                                
                             }}
                         }}
                     }},
@@ -1069,10 +1093,8 @@ En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_nume
 {tabla_resumen}
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
-<p>Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**, lo que, en combinación con el resto de nuestros indicadores, se alinea con una recomendación de <strong>{data['RECOMENDACION']}</strong>.
-Esto sugiere {('un rebote inminente, dado que los indicadores muestran una sobreventa extrema, lo que significa que la acción ha sido \'castigada\' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo.' if "Compra" in data['RECOMENDACION'] and data['TENDENCIA_NOTA'] == 'mejorando' else '')}
-{('una potencial continuación bajista, con los indicadores técnicos mostrando una sobrecompra significativa o una pérdida de impulso alcista. Esto sugiere que la acción podría experimentar una corrección. Es un momento para la cautela y la vigilancia de los niveles de soporte.' if "Venta" in data['RECOMENDACION'] and data['TENDENCIA_NOTA'] == 'empeorando' else '')}
-{('una fase de consolidación o lateralidad, donde los indicadores técnicos no muestran una dirección clara. Es un momento para esperar la confirmación de una nueva tendencia antes de tomar decisiones.' if "Neutral" in data['RECOMENDACION'] else '')}</p>
+<p>Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**, lo que, en combinación con el resto de nuestros indicadores, se alinea con una recomendación de <strong>{data['RECOMENDACION']}</strong>.</p>
+<p><strong>Motivo de la Recomendación:</strong> {data['MOTIVO_RECOMENDACION']}</p>
 
 <p>{volumen_analisis_text}</p>
 
