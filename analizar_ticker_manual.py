@@ -111,10 +111,33 @@ def obtener_datos_yfinance(ticker):
         hist = stock.history(period="30d", interval="1d")
         hist = calculate_smi_tv(hist)
 
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # Ampliar periodo si es necesario para el retraso y proyecciones
+        hist_extended = stock.history(period="90d", interval="1d")
+        hist_extended = calculate_smi_tv(hist_extended)
 
-        smi_actual = round(hist['SMI_signal'].iloc[-1], 2)
+        # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
+        hist = stock.history(period="30d", interval="1d")
+        hist = calculate_smi_tv(hist)
+
+        # Obtener el precio actual y volumen
         current_price = round(info["currentPrice"], 2)
         current_volume = info.get("volume", "N/A")
+
+        # Get last valid SMI signal and calculate nota_empresa safely
+        smi_actual_series = hist['SMI_signal'].dropna() # Obtener las señales SMI sin NaN
+
+        if not smi_actual_series.empty:
+            smi_actual = round(smi_actual_series.iloc[-1], 2)
+            # La nota técnica actual de la empresa
+            nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
+        else:
+            # Si no hay datos SMI válidos, asignar un valor por defecto
+            print(f"⚠️ Advertencia: No hay datos de SMI válidos para calcular la nota de {ticker}. Asignando nota neutral.")
+            smi_actual = 0  # Un valor por defecto para smi_actual
+            nota_empresa = 5.0 # Nota neutral por defecto (entre 0 y 10)
 
 
         # Calcular soportes y resistencia
@@ -123,6 +146,7 @@ def obtener_datos_yfinance(ticker):
             highs_lows = hist[['High', 'Low', 'Close']].values.flatten()
         else:
             highs_lows = hist[['High', 'Low', 'Close']].iloc[-30:].values.flatten()
+        
 
         # Calculamos soportes y resistencias como listas ordenadas
         # Soportes: de menor a mayor
@@ -192,8 +216,7 @@ def obtener_datos_yfinance(ticker):
         # Este 'precio_objetivo_compra' es diferente al 'precio_objetivo' general
         precio_objetivo_compra = round(current_price * 0.98, 2) # Un 2% por debajo del precio actual como ejemplo
 
-        # Calculamos la nota técnica actual
-        nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
+        
 
         # Inicializar recomendacion y condicion_rsi como temporales, se recalcularán después
         recomendacion = "Pendiente de análisis avanzado"
