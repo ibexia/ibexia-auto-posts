@@ -72,21 +72,22 @@ def calculate_smi_tv(df, window=20, smooth_window=5):
         df['TV'] = np.nan
         return df
 
-    # Calcular SMI
-    highest_high = df['High'].rolling(window=window).max()
-    lowest_low = df['Low'].rolling(window=window).min()
+    # Calcular SMI al estilo TradingView
+    hh = df['High'].rolling(window=window).max()
+    ll = df['Low'].rolling(window=window).min()
 
-    range_hl = highest_high - lowest_low
-    # Evitar división por cero
-    range_hl = range_hl.replace(0, np.nan)
+    diff = hh - ll
+    rdiff = df['Close'] - (hh + ll) / 2
 
-    relative_close = df['Close'] - lowest_low
+    avgrel = rdiff.ewm(span=3, adjust=False).mean()
+    avgdiff = diff.ewm(span=3, adjust=False).mean()
 
-    smi = ((relative_close - (range_hl / 2)) / (range_hl / 2)) * 100
-    smi = smi.fillna(0) # Rellenar NaN que puedan quedar por división por cero o datos insuficientes
+    smi = np.where(avgdiff != 0, (avgrel / (avgdiff / 2)) * 100, 0)
+    smi_smoothed = pd.Series(smi, index=df.index).rolling(window=smooth_window).mean()
+    smi_signal = smi_smoothed.ewm(span=10, adjust=False).mean()
 
-    df['SMI'] = smi
-    df['SMI_signal'] = df['SMI'].ewm(span=smooth_window, adjust=False).mean()
+    df['SMI'] = smi_smoothed
+    df['SMI_signal'] = smi_signal
 
     # Calcular True Value (TV) para el volumen
     df['TR'] = np.maximum(df['High'] - df['Low'],
