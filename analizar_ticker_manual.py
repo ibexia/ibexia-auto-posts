@@ -100,272 +100,205 @@ def calculate_smi_tv(df, window=20, smooth_window=5):
     return df
 
 def obtener_datos_yfinance(ticker):
+    print(f"Buscando datos para el ticker: {ticker}")
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        # Ampliar periodo si es necesario para el retraso y proyecciones
-        hist_extended = stock.history(period="90d", interval="1d")
+        data = yf.Ticker(ticker)
+        hist = data.history(period="60d") # Suficientes datos para SMI y un historial de 30 días + proyección
+        hist_extended = data.history(period="1y") # Más datos para cálculos si es necesario
+
+        if hist.empty or hist_extended.empty:
+            print(f"⚠️ Advertencia: No se encontraron datos históricos para {ticker}.")
+            return None
+
+        # --- Cálculo del SMI (basado en TradingView) ---
+        def calculate_smi_tv(df, length=20, ema_length=5, signal_length=5):
+            # Calcular el rango más bajo y más alto de 'length' períodos
+            low_min = df['Low'].rolling(window=length).min()
+            high_max = df['High'].rolling(window=length).max()
+
+            # Calcular el cambio en el cierre y el rango total
+            range_diff = df['Close'] - ((high_max + low_min) / 2)
+            total_range = high_max - low_min
+
+            # Evitar división por cero
+            smi = pd.Series(np.where(total_range == 0, 0, range_diff / (total_range / 2)))
+
+            # Primera EMA (smi_raw)
+            df['SMI_raw'] = smi.ewm(span=ema_length, adjust=False).mean()
+
+            # Segunda EMA (smi_smoothed, que es el SMI principal)
+            df['SMI'] = df['SMI_raw'].ewm(span=ema_length, adjust=False).mean()
+
+            # EMA de la señal (signal_line)
+            df['SMI_signal'] = df['SMI'].ewm(span=signal_length, adjust=False).mean()
+            return df
+
         hist_extended = calculate_smi_tv(hist_extended)
+        hist = calculate_smi_tv(hist) # Aplicar a los datos de 60 días también para los valores actuales
 
-        # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
-        hist = stock.history(period="30d", interval="1d")
-        hist = calculate_smi_tv(hist)
+        if 'Close' not in hist.columns or hist['Close'].empty:
+            print(f"⚠️ Advertencia: No hay datos de cierre disponibles para {ticker}.")
+            return None
 
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        # Ampliar periodo si es necesario para el retraso y proyecciones
-        hist_extended = stock.history(period="90d", interval="1d")
-        hist_extended = calculate_smi_tv(hist_extended)
+        current_price = hist['Close'].iloc[-1]
+        volume = hist['Volume'].iloc[-1]
+        average_volume = hist['Volume'].tail(30).mean()
 
-        # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
-        hist = stock.history(period="30d", interval="1d")
-        hist = calculate_smi_tv(hist)
+        # Obtener valores actuales de SMI
+        smi_actual_series = hist['SMI'].dropna() # smoothed SMI (main one)
+        smi_raw_actual_series = hist['SMI_raw'].dropna() # raw SMI
 
-        # Obtener el precio actual y volumen
-        current_price = round(info["currentPrice"], 2)
-        current_volume = info.get("volume", "N/A")
-
-        # Get last valid SMI signal
-        smi_actual_series = hist['SMI_signal'].dropna() # Obtener las señales SMI sin NaN
-
+        smi_actual = 0
         if not smi_actual_series.empty:
             smi_actual = round(smi_actual_series.iloc[-1], 2)
         else:
-            # Si no hay datos SMI válidos, asignar un valor por defecto
-            print(f"⚠️ Advertencia: No hay datos de SMI válidos para {ticker}. Asignando SMI neutral.")
-            smi_actual = 0  # Un valor por defecto para smi_actual
+            print(f"⚠️ Advertencia: No hay datos de SMI suavizado válidos para {ticker}. Asignando SMI neutral.")
 
-
-        # Calcular soportes y resistencia
-        # Asegurarse de tener al menos 30 días para un cálculo significativo
-        if len(hist) < 30:
-            highs_lows = hist[['High', 'Low', 'Close']].values.flatten()
+        smi_raw_actual = 0
+        if not smi_raw_actual_series.empty:
+            smi_raw_actual = round(smi_raw_actual_series.iloc[-1], 2)
         else:
-            highs_lows = hist[['High', 'Low', 'Close']].iloc[-30:].values.flatten()
-        
-
-        # Calculamos soportes y resistencias como listas ordenadas
-        # Soportes: de menor a mayor
-        soportes_raw = np.unique(highs_lows)
-        soportes = np.sort(soportes_raw).tolist()
-
-        # Resistencias: de mayor a menor
-        resistencias_raw = np.unique(highs_lows)
-        resistencias = np.sort(resistencias_raw)[::-1].tolist() # Orden inverso para tener las más altas primero
+            smi_raw_actual = smi_actual # Fallback to smoothed if raw not available
+            print(f"⚠️ Advertencia: No hay datos de SMI RAW válidos para {ticker}. Usando SMI suavizado como fallback.")
 
 
-        # Definir los 3 soportes
-        if len(soportes) >= 3:
-            soporte_1 = round(soportes[0], 2)
-            soporte_2 = round(soportes[1], 2)
-            soporte_3 = round(soportes[2], 2)
-        elif len(soportes) == 2:
-            soporte_1 = round(soportes[0], 2)
-            soporte_2 = round(soportes[1], 2)
-            soporte_3 = soporte_2 # Usar el mismo si no hay 3 distintos
-        elif len(soportes) == 1:
-            soporte_1 = round(soportes[0], 2)
-            soporte_2 = soporte_1
-            soporte_3 = soporte_1
+        # Determinar tendencia del SMI
+        tendencia_smi = "Neutral"
+        if len(smi_actual_series) >= 5: # Necesitamos al menos 5 puntos para una pequeña tendencia
+            smi_last_5 = smi_actual_series.tail(5)
+            if smi_last_5.iloc[-1] > smi_last_5.iloc[0]:
+                tendencia_smi = "Ascendente"
+            elif smi_last_5.iloc[-1] < smi_last_5.iloc[0]:
+                tendencia_smi = "Descendente"
+
+        # Calcular RSI (ejemplo básico, ajustar según necesidad)
+        delta = hist['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).ewm(com=13, adjust=False).mean()
+        loss = (-delta.where(delta < 0, 0)).ewm(com=13, adjust=False).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        rsi_actual = rsi.iloc[-1] if not rsi.empty else 50
+
+        condicion_rsi = "Indeterminada"
+        if rsi_actual >= 70:
+            condicion_rsi = "Sobrecompra"
+        elif rsi_actual <= 30:
+            condicion_rsi = "Sobreventa"
         else:
-            soporte_1, soporte_2, soporte_3 = round(current_price * 0.95, 2), round(current_price * 0.9, 2), round(current_price * 0.85, 2) # Default si no hay datos
+            condicion_rsi = "Neutral"
 
-        # Definir las 3 resistencias (similar a soportes)
-        if len(resistencias) >= 3:
-            resistencia_1 = round(resistencias[0], 2)
-            resistencia_2 = round(resistencias[1], 2)
-            resistencia_3 = round(resistencias[2], 2)
-        elif len(resistencias) == 2:
-            resistencia_1 = round(resistencias[0], 2)
-            resistencia_2 = round(resistencias[1], 2)
-            resistencia_3 = resistencia_2
-        elif len(resistencias) == 1:
-            resistencia_1 = round(resistencias[0], 2)
-            resistencia_2 = resistencia_1
-            resistencia_3 = resistencia_1
+        # Precios históricos para el gráfico
+        cierres_para_grafico_full = hist['Close'].dropna().tolist()
+
+        smi_history_full = hist['SMI'].dropna()
+        smi_raw_history_full = hist['SMI_raw'].dropna()
+
+
+        # Datos para los últimos 30 días para el gráfico
+        # Asumiendo que quieres 30 puntos para el historial en el gráfico
+        cierres_para_grafico_total = []
+        if len(cierres_para_grafico_full) >= 30:
+            cierres_para_grafico_total = cierres_para_grafico_full[-30:]
+        elif cierres_para_grafico_full: # Si hay menos de 30 pero hay datos, los usamos
+            cierres_para_grafico_total = cierres_para_grafico_full
         else:
-            resistencia_1, resistencia_2, resistencia_3 = round(current_price * 1.05, 2), round(current_price * 1.1, 2), round(current_price * 1.15, 2) # Default si no hay datos
+            cierres_para_grafico_total = [0.0] * 30 # Rellenar con ceros si no hay datos
 
-        # --- LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
-        # Primero, asegurarnos de que tenemos soportes y resistencias válidos para la interpolación
-        # Si no hay 3 soportes/resistencias, usaremos los disponibles o un porcentaje del precio actual.
-
-        # Puntos de referencia para la interpolación del precio objetivo
-        # Ajustamos esto para que dependa del SMI
-        
-        # Extremo inferior y superior basados en SMI
-        # SMI de -100 (sobreventa extrema) -> debería proyectar un precio objetivo más alto
-        # SMI de 100 (sobrecompra extrema) -> debería proyectar un precio objetivo más bajo
-        
-        # Mapping SMI (-100 a 100) to a [0, 1] range for interpolation
-        # Where 0 is a bearish projection, and 1 is a bullish projection.
-        # Let's say -60 is very bullish (0.9), 60 is very bearish (0.1)
-        # and 0 is neutral (0.5)
-        
-        # Invertimos el SMI para que un SMI bajo (negativo) dé un valor alto (bullish) y viceversa.
-        normalised_smi_for_target = (smi_actual * -1 + 100) / 200 # Maps -100 to 1 and 100 to 0
-
-        # Clamp between 0.1 and 0.9 to avoid extreme, unrealistic targets
-        normalised_smi_for_target = max(0.1, min(0.9, normalised_smi_for_target))
-
-        # Extremo inferior: Un soporte más bajo o un porcentaje de caída
-        referencia_min = soportes[2] if len(soportes) >= 3 else (soportes[1] if len(soportes) >= 2 else (soportes[0] if len(soportes) >= 1 else round(current_price * 0.80, 2)))
-        
-        # Extremo superior: Una resistencia más alta o un porcentaje de subida
-        referencia_max = resistencias[2] if len(resistencias) >= 3 else (resistencias[1] if len(resistencias) >= 2 else (resistencias[0] if len(resistencias) >= 1 else round(current_price * 1.20, 2)))
-
-        # Asegurarse de que referencia_min sea menor que referencia_max
-        if referencia_min >= referencia_max:
-            referencia_min = round(current_price * 0.85, 2)
-            referencia_max = round(current_price * 1.15, 2)
-        
-        # El precio objetivo se calcula como una interpolación entre referencia_min y referencia_max
-        precio_objetivo = referencia_min + (referencia_max - referencia_min) * normalised_smi_for_target
-        
-        precio_objetivo = round(precio_objetivo, 2)
-        # --- FIN DE LA LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
-
-        # Precio objetivo de compra (ejemplo simple, puedes refinarlo)
-        # Este 'precio_objetivo_compra' es diferente al 'precio_objetivo' general
-        precio_objetivo_compra = round(current_price * 0.98, 2) # Un 2% por debajo del precio actual como ejemplo
-
-        
-
-        # Inicializar recomendacion y condicion_rsi como temporales, se recalcularán después
-        recomendacion = "Pendiente de análisis avanzado"
-        condicion_rsi = "Pendiente"
-
-
-        # Nuevas variables para los gráficos con offset y proyección
-        OFFSET_DIAS = 4 # El SMI de hoy (D) se alinea con el precio de D+4
-        PROYECCION_FUTURA_DIAS = 5 # Días a proyectar después del último precio real
-
-        # Aseguramos tener suficientes datos para el historial, el offset y la proyección
-        smi_history_full = hist_extended['SMI_signal'].dropna()
-        cierres_history_full = hist_extended['Close'].dropna()
-
-        # Calcula el volumen promedio de los últimos 30 días usando hist_extended
-        volumen_promedio_30d = hist_extended['Volume'].tail(30).mean()
-
-        # SMI para los 30 días del gráfico (serán los que se visualicen)
-        # Serán los 30 SMI más recientes disponibles
         smi_historico_para_grafico = []
         if len(smi_history_full) >= 30:
             smi_historico_para_grafico = smi_history_full.tail(30).tolist()
         elif smi_history_full.empty:
-            smi_historico_para_grafico = [0.0] * 30 # Default neutral if no data
-        else:
-            # Fill with first available SMI if less than 30
+            smi_historico_para_grafico = [0.0] * 30 # Asegurarse de que no esté vacío
+        else: # Si hay menos de 30, rellenar el principio con el primer valor para mantener la longitud de 30
             first_smi_val = smi_history_full.iloc[0]
             smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
 
+        smi_raw_historico_para_grafico = []
+        if len(smi_raw_history_full) >= 30:
+            smi_raw_historico_para_grafico = smi_raw_history_full.tail(30).tolist()
+        elif smi_raw_history_full.empty:
+            smi_raw_historico_para_grafico = [0.0] * 30 # Asegurarse de que no esté vacío
+        else: # Si hay menos de 30, rellenar el principio con el primer valor para mantener la longitud de 30
+            first_smi_raw_val = smi_raw_history_full.iloc[0]
+            smi_raw_historico_para_grafico = [first_smi_raw_val] * (30 - len(smi_raw_history_full)) + smi_raw_history_full.tolist()
 
-        # Precios para el gráfico: 30 días DESPLAZADOS + PROYECCIÓN
-        # Necesitamos los últimos (30 + OFFSET_DIAS) precios reales para tener el rango completo
-        precios_reales_para_grafico = []
-        if len(cierres_history_full) >= (30 + OFFSET_DIAS):
-            # Tomamos los 30 precios que se alinearán con los 30 SMI (considerando el offset)
-            precios_reales_para_grafico = cierres_history_full.tail(30).tolist()
-        elif len(cierres_history_full) > OFFSET_DIAS: # Si tenemos menos de 30 pero más que el offset
-            # Tomamos lo que tengamos después del offset y rellenamos al principio
-            temp_prices = cierres_history_full.iloc[OFFSET_DIAS:].tolist()
-            first_price_val = temp_prices[0] if temp_prices else current_price
-            precios_reales_para_grafico = [first_price_val] * (30 - len(temp_prices)) + temp_prices
-        else: # Muy pocos datos históricos
-             precios_reales_para_grafico = [current_price] * 30 # Default to current price if no historical data
-            
-        smi_history_last_30 = hist['SMI_signal'].dropna().tail(30).tolist()
-        
-        # Proyección con subida libre hasta resistencia, pero sin perforarla si está lejos (>2%)
-        TOLERANCIA_CRUCE = 0.02
-        precios_proyectados = []
-        ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
-        for _ in range(PROYECCION_FUTURA_DIAS):
-            # Calcular intento de movimiento basado en SMI_actual
-            if smi_actual < -40: # Zona de sobreventa, indica posible rebote al alza
-                siguiente_precio = ultimo_precio_conocido * (1 + 0.015)
-            elif smi_actual > 40: # Zona de sobrecompra, indica posible corrección a la baja
-                siguiente_precio = ultimo_precio_conocido * (1 - 0.015)
-            else: # SMI neutral, movimiento más lateral o gradual
-                # Ajuste para SMI neutral, gradual y con poca volatilidad
-                daily_rate_of_change = (smi_actual / 100) * (-0.005) # Pequeño movimiento inverso al SMI
-                siguiente_precio = ultimo_precio_conocido * (1 + daily_rate_of_change)
+        # Definir niveles de soporte y resistencia de forma simplificada
+        # Esto es un ejemplo, puedes necesitar una lógica más sofisticada
+        if len(hist['Close']) > 10:
+            soporte_1 = round(hist['Low'].tail(10).min() * 0.98, 2)
+            soporte_2 = round(hist['Low'].tail(20).min() * 0.95, 2)
+            soporte_3 = round(hist['Low'].min() * 0.92, 2)
+            resistencia_1 = round(hist['High'].tail(10).max() * 1.02, 2)
+            resistencia_2 = round(hist['High'].tail(20).max() * 1.05, 2)
+            resistencia_3 = round(hist['High'].max() * 1.08, 2)
+        else: # Valores por defecto si no hay suficientes datos
+            soporte_1, soporte_2, soporte_3 = current_price * 0.95, current_price * 0.90, current_price * 0.85
+            resistencia_1, resistencia_2, resistencia_3 = current_price * 1.05, current_price * 1.10, current_price * 1.15
 
-            # Si va subiendo, comprobar resistencias
-            if siguiente_precio > ultimo_precio_conocido:
-                for r in sorted(resistencias):
-                    if ultimo_precio_conocido < r < siguiente_precio:
-                        distancia_relativa = abs(siguiente_precio - r) / r
-                        if distancia_relativa > TOLERANCIA_CRUCE:
-                            siguiente_precio = round(r * (1 - 0.001), 2)
-                        break  # Solo considerar la primera que se interponga
+        # Nota de la empresa (simplificado para el ejemplo)
+        # Esto debería venir de otra fuente o cálculo
+        nota_empresa = round((smi_actual + rsi_actual) / 20, 1) # Ejemplo simplificado
 
-            # Si va bajando, comprobar soportes
-            elif siguiente_precio < ultimo_precio_conocido:
-                for s in sorted(soportes, reverse=True):
-                    if siguiente_precio < s < ultimo_precio_conocido:
-                        distancia_relativa = abs(siguiente_precio - s) / s
-                        if distancia_relativa > TOLERANCIA_CRUCE:
-                            siguiente_precio = round(s * (1 + 0.001), 2)
-                        break
+        # Tendencia de la nota (ejemplo simplificado)
+        tendencia_nota = "Estable"
+        if smi_actual > 60 and rsi_actual > 60:
+            tendencia_nota = "Ascendente"
+        elif smi_actual < -60 and rsi_actual < 40:
+            tendencia_nota = "Descendente"
 
-            siguiente_precio = round(siguiente_precio, 2)
-            precios_proyectados.append(siguiente_precio)
-            ultimo_precio_conocido = siguiente_precio
-     
-        # Unir precios reales y proyectados
-        cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
+        # Recomendación (simplificado)
+        recomendacion = "Neutral"
+        if smi_actual > 40 and rsi_actual > 50:
+            recomendacion = "Compra"
+        elif smi_actual < -40 and rsi_actual < 50:
+            recomendacion = "Venta"
+        elif -40 <= smi_actual <= 40 and 40 <= rsi_actual <= 60:
+            recomendacion = "Neutral"
 
-        tendencia_smi = "No disponible"
-        
-        if len(smi_history_last_30) >= 2:
-            x = np.arange(len(smi_history_last_30))
-            y = np.array(smi_history_last_30)
-            if np.std(y) > 0.01:
-                slope, intercept = np.polyfit(x, y, 1)
-            else:
-                slope = 0.0
+        motivo_recomendacion = "Basado en una combinación de SMI y RSI. Se requiere un análisis más profundo para decisiones de inversión."
+        if recomendacion == "Compra":
+            motivo_recomendacion = f"Los indicadores SMI ({smi_actual:.2f}) y RSI ({rsi_actual:.2f}) muestran una fuerte señal alcista, con el precio consolidándose por encima del soporte de {soporte_1:.2f}€."
+        elif recomendacion == "Venta":
+            motivo_recomendacion = f"Los indicadores SMI ({smi_actual:.2f}) y RSI ({rsi_actual:.2f}) sugieren una debilidad, con el precio acercándose a la resistencia de {resistencia_1:.2f}€."
 
-            if slope > 0.1:
-                tendencia_smi = "mejorando"
-            elif slope < -0.1:
-                tendencia_smi = "empeorando"
-            else:
-                tendencia_smi = "estable"
+        # Precio objetivo (simplificado)
+        precio_objetivo = round(current_price * 1.05, 2) if recomendacion == "Compra" else round(current_price * 0.95, 2)
+        precio_objetivo_compra = round(current_price * 0.98, 2) if recomendacion == "Compra" else "N/A"
 
+        # Preparar datos para el prompt
         datos = {
+            "NOMBRE_EMPRESA": data.info.get('longName', ticker),
             "TICKER": ticker,
-            "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
-            "VOLUMEN": current_volume,
-            "VOLUMEN_MEDIO": round(volumen_promedio_30d, 2) if not pd.isna(volumen_promedio_30d) else "N/A",
+            "VOLUMEN": volume,
+            "VOLUMEN_MEDIO": average_volume,
+            "SMI": smi_actual,
+            "SMI_RAW": smi_raw_actual, # Asegúrate de que este dato se pasa
+            "TENDENCIA_SMI": tendencia_smi,
+            "RSI": rsi_actual,
+            "CONDICION_RSI": condicion_rsi,
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
-            "RESISTENCIA": resistencia_1,
-            "CONDICION_RSI": condicion_rsi,
-            "RECOMENDACION": recomendacion,
-            "SMI": smi_actual,
-            "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
-            "TENDENCIA_SMI": tendencia_smi, # Renombrado de TENDENCIA_NOTA
-            "CIERRES_30_DIAS": hist['Close'].dropna().tail(30).tolist(),
-            "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico, # Renombrado
-            "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total,
-            "OFFSET_DIAS_GRAFICO": OFFSET_DIAS,
             "RESISTENCIA_1": resistencia_1,
             "RESISTENCIA_2": resistencia_2,
             "RESISTENCIA_3": resistencia_3,
+            "RECOMENDACION": recomendacion,
+            "NOTA_EMPRESA": nota_empresa,
+            "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
             "PRECIO_OBJETIVO": precio_objetivo,
-            "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
+            "TENDENCIA_NOTA": tendencia_nota,
+            "MOTIVO_RECOMENDACION": motivo_recomendacion,
+            "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total,
+            "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico,
+            "SMI_RAW_HISTORICO_PARA_GRAFICO": smi_raw_historico_para_grafico, # Asegúrate de que este dato se pasa
+            "PROYECCION_FUTURA_DIAS": 5 # Número de días para proyectar en el gráfico
         }
-
         return datos
 
     except Exception as e:
-        print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
+        print(f"❌ Error al obtener datos para {ticker}: {e}")
         return None
 
 def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_historico_para_grafico): # Cambio de nombre de la variable
@@ -471,63 +404,69 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
 
 
 def construir_prompt_formateado(data):
-    # Generación de la recomendación de volumen
+    def formatear_numero(numero):
+        if numero is None:
+            return "N/A"
+        return f"{numero:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    ticker = data.get('TICKER', 'N/A')
+    titulo_post = f"Análisis Técnico Avanzado: ¡Oportunidad en {data['NOMBRE_EMPRESA']} ({ticker})!"
+
     volumen_analisis_text = ""
-    if data['VOLUMEN'] != "N/A":
-        volumen_actual = data['VOLUMEN']
-        try:
-            ticker_obj = yf.Ticker(data['TICKER'])
-            hist_vol = ticker_obj.history(period="90d")
-            if not hist_vol.empty and 'Volume' in hist_vol.columns:
-                volumen_promedio_30d = hist_vol['Volume'].tail(30).mean()
-                if volumen_promedio_30d > 0:
-                    cambio_porcentual_volumen = ((volumen_actual - volumen_promedio_30d) / volumen_promedio_30d) * 100
-                    if cambio_porcentual_volumen > 50:
-                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia del SMI ({data['TENDENCIA_SMI']})."
-                    elif cambio_porcentual_volumen < -30:
-                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es inferior a lo habitual, lo que podría sugerir cautela en la actual tendencia. Una confirmación de la señal del SMI ({data['TENDENCIA_SMI']}) requeriría un aumento en la participación del mercado."
-                    else:
-                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> se mantiene en línea con el promedio. Es un volumen adecuado, pero no excepcional, para confirmar de manera contundente la señal del SMI ({data['TENDENCIA_SMI']})."
-                else:
-                    volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. "
-            else:
-                volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. "
-        except Exception as e:
-            volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. No fue posible comparar con el volumen promedio: {e}"
+    if data['VOLUMEN'] > data['VOLUMEN_MEDIO'] * 1.5:
+        volumen_analisis_text = f"El volumen de {formatear_numero(data['VOLUMEN'])} acciones, un {((data['VOLUMEN'] / data['VOLUMEN_MEDIO']) - 1) * 100:.2f}% superior al promedio, indica un fuerte interés. Esto refuerza mi recomendación de {data['RECOMENDACION']}."
+    elif data['VOLUMEN'] < data['VOLUMEN_MEDIO'] * 0.5:
+        volumen_analisis_text = f"El volumen de {formatear_numero(data['VOLUMEN'])} acciones, un {((data['VOLUMEN_MEDIO'] / data['VOLUMEN']) - 1) * 100:.2f}% inferior al promedio, sugiere cautela. Esto debilita mi recomendación de {data['RECOMENDACION']}."
     else:
-        volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
+        volumen_analisis_text = f"El volumen de {formatear_numero(data['VOLUMEN'])} acciones, en línea con el promedio, indica un interés normal. Esto apoya mi recomendación de {data['RECOMENDACION']}."
 
-    titulo_post = f"Análisis Técnico: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Recomendación de {data['RECOMENDACION']}"
-
-    # Datos para el gráfico principal de SMI y Precios
+    chart_html = "" # Inicializar chart_html
+    cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
     smi_raw_historico_para_grafico = data.get('SMI_RAW_HISTORICO_PARA_GRAFICO', [])
-    cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
-    OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 4)
-    PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
+    PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS', 5)
+    OFFSET_DIAS = 4 # Este valor se usa para alinear el SMI en el gráfico
 
-    chart_html = ""
-    if smi_historico_para_grafico and cierres_para_grafico_total and smi_raw_historico_para_grafico: # Asegurarse de tener todos los datos
+
+    # Solo generar el gráfico si tenemos datos válidos para todos los elementos clave
+    if smi_historico_para_grafico and cierres_para_grafico_total and smi_raw_historico_para_grafico:
+        # Asegurarse de que las listas de SMI tengan al menos 30 elementos para Chart.js
+        # Si tienes menos de 30 días, rellena con el primer valor para que el gráfico no falle
+        if len(smi_historico_para_grafico) < 30:
+            padding_needed = 30 - len(smi_historico_para_grafico)
+            smi_historico_para_grafico = [smi_historico_para_grafico[0]] * padding_needed + smi_historico_para_grafico if smi_historico_para_grafico else [0.0] * 30
+        
+        if len(smi_raw_historico_para_grafico) < 30:
+            padding_needed = 30 - len(smi_raw_historico_para_grafico)
+            smi_raw_historico_para_grafico = [smi_raw_historico_para_grafico[0]] * padding_needed + smi_raw_historico_para_grafico if smi_raw_historico_para_grafico else [0.0] * 30
+
+        if len(cierres_para_grafico_total) < 30:
+            padding_needed = 30 - len(cierres_para_grafico_total)
+            cierres_para_grafico_total = [cierres_para_grafico_total[0]] * padding_needed + cierres_para_grafico_total if cierres_para_grafico_total else [0.0] * 30
+
+
         labels_historial = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
         labels_proyeccion = [(datetime.today() + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
         labels_total = labels_historial + labels_proyeccion
 
         precios_reales_grafico = cierres_para_grafico_total[:30]
-        data_proyectada = [None] * (len(labels_historial) - 1) + [precios_reales_grafico[-1]] + cierres_para_grafico_total[len(labels_historial):]
+        data_proyectada = [None] * (len(labels_historial) - 1) + [precios_reales_grafico[-1]] + ([None] * PROYECCION_FUTURA_DIAS) # Proyección inicialmente nula
 
-        smi_desplazados_para_grafico = smi_historico_para_grafico
+
+        # Desplazar el SMI para el gráfico
+        smi_desplazados_para_grafico = [None] * OFFSET_DIAS + smi_historico_para_grafico
         if len(smi_desplazados_para_grafico) < len(labels_total):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
 
-        smi_raw_desplazados_para_grafico = smi_raw_historico_para_grafico # SMI sin suavizar
+        smi_raw_desplazados_para_grafico = [None] * OFFSET_DIAS + smi_raw_historico_para_grafico # SMI sin suavizar
         if len(smi_raw_desplazados_para_grafico) < len(labels_total):
             smi_raw_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_raw_desplazados_para_grafico)))
 
 
         chart_html += f"""
         <h2>Evolución del Stochastic Momentum Index (SMI) y Precio</h2>
-        <p>Para ofrecer una perspectiva visual clara de la evolución del SMI...
-        Es importante recordar que el SMI de hoy (D) se alinea con el precio de D+4,
+        <p>Para ofrecer una perspectiva visual clara de la evolución del SMI y su relación con el precio,
+        se presenta el siguiente gráfico. Es importante recordar que el SMI de hoy (D) se alinea con el precio de D+{OFFSET_DIAS},
         lo que significa que la reacción del mercado al SMI generalmente se observa
         unos pocos días después de su formación.
         </p>
@@ -678,40 +617,14 @@ def construir_prompt_formateado(data):
                                         content: 'Soporte 1',
                                         enabled: true,
                                         position: 'start',
-                                        font: {{ size: 10 }}
+                                        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                                        borderColor: 'rgba(75, 192, 192, 0.8)',
+                                        borderRadius: 4,
+                                        borderWidth: 1,
+                                        font: {{ size: 10, weight: 'bold' }},
+                                        color: 'black'
                                     }}
                                 }},
-                                soporte2Line: {{
-                                    type: 'line',
-                                    yScaleID: 'y1',
-                                    yMin: {data['SOPORTE_2']},
-                                    yMax: {data['SOPORTE_2']},
-                                    borderColor: 'rgba(75, 192, 192, 0.8)',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Soporte 2',
-                                        enabled: true,
-                                        position: 'start',
-                                        font: {{ size: 10 }}
-                                    }}
-                                }},
-                                soporte3Line: {{
-                                    type: 'line',
-                                    yScaleID: 'y1',
-                                    yMin: {data['SOPORTE_3']},
-                                    yMax: {data['SOPORTE_3']},
-                                    borderColor: 'rgba(75, 192, 192, 0.8)',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Soporte 3',
-                                        enabled: true,
-                                        position: 'start',
-                                        font: {{ size: 10 }}
-                                    }}
-                                }},
-                                // Líneas de resistencia
                                 resistencia1Line: {{
                                     type: 'line',
                                     yScaleID: 'y1',
@@ -724,172 +637,37 @@ def construir_prompt_formateado(data):
                                         content: 'Resistencia 1',
                                         enabled: true,
                                         position: 'end',
-                                        font: {{ size: 10 }}
-                                    }}
-                                }},
-                                resistencia2Line: {{
-                                    type: 'line',
-                                    yScaleID: 'y1',
-                                    yMin: {data['RESISTENCIA_2']},
-                                    yMax: {data['RESISTENCIA_2']},
-                                    borderColor: 'rgba(255, 99, 132, 0.8)',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Resistencia 2',
-                                        enabled: true,
-                                        position: 'end',
-                                        font: {{ size: 10 }}
-                                    }}
-                                }},
-                                resistencia3Line: {{
-                                    type: 'line',
-                                    yScaleID: 'y1',
-                                    yMin: {data['RESISTENCIA_3']},
-                                    yMax: {data['RESISTENCIA_3']},
-                                    borderColor: 'rgba(255, 99, 132, 0.8)',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Resistencia 3',
-                                        enabled: true,
-                                        position: 'end',
-                                        font: {{ size: 10 }}
+                                        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                                        borderColor: 'rgba(255, 99, 132, 0.8)',
+                                        borderRadius: 4,
+                                        borderWidth: 1,
+                                        font: {{ size: 10, weight: 'bold' }},
+                                        color: 'black'
                                     }}
                                 }}
-                                // Icono de Entrada/Salida en el último día de historial
-                                // (último día del dataset de precios reales)
-                                signalPoint:{{
-                                    type: 'point',
-                                    xValue: {len(labels_historial) - 1}, // Último día del historial real
-                                    yValue: {precios_reales_grafico[-1] if precios_reales_grafico else 'null'}, // Precio del último día real
-                                    yScaleID: 'y1', // En el eje del precio
-                                    radius: 10,
-                                    pointStyle: {'"triangle"' if 'Compra' in data['RECOMENDACION'] else ('"triangle"' if 'Venta' in data['RECOMENDACION'] else '"circle"')},
-                                    rotation: {{0 if 'Compra' in data['RECOMENDACION'] else (180 if 'Venta' in data['RECOMENDACION'] else 0)}},
-                                    backgroundColor: {'"rgba(0, 200, 0, 0.8)"' if 'Compra' in data['RECOMENDACION'] else ('"rgba(200, 0, 0, 0.8)"' if 'Venta' in data['RECOMENDACION'] else '"rgba(100, 100, 100, 0.8)"')},
-                                    borderColor: 'white',
-                                    borderWidth: 2,
-                                    display: {('true' if 'Compra' in data['RECOMENDACION'] or 'Venta' in data['RECOMENDACION'] else 'false')},
-                                    label: {{
-                                        content: '{data["RECOMENDACION"]}',
-                                        enabled: true,
-                                        position: 'top',
-                                        font: {{ size: 10, weight: 'bold' }},
-                                        color: {'"rgba(0, 200, 0, 0.8)"' if 'Compra' in data['RECOMENDACION'] else ('"rgba(200, 0, 0, 0.8)"' if 'Venta' in data['RECOMENDACION'] else '"rgba(100, 100, 100, 0.8)"')},
-                                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                                        borderRadius: 4,
-                                        padding: 4
-                                    }}
-                                }}                                
                             }}
                         }}
-                    }},
-                    scales: {{
-                        y: {{
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {{
-                                display: true,
-                                text: 'Stochastic Momentum Index (SMI)'
-                            }},
-                            min: -100,
-                            max: 100
-                        }},
-                        y1: {{
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {{
-                                display: true,
-                                text: 'Precio'
-                            }},
-                            grid: {{
-                                drawOnChartArea: false,
-                            }},
-                        }}
                     }}
-                }}
+                }});
             }});
-        }});
         </script>
         """
-
-    soportes_unicos = []
-    temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
-    
-    if len(temp_soportes) > 0:
-        soportes_unicos.append(temp_soportes[0])
-        for i in range(1, len(temp_soportes)):
-            if abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
-                soportes_unicos.append(temp_soportes[i])
-    
-    if not soportes_unicos:
-        soportes_unicos.append(0.0)
-
-    soportes_texto = ""
-    if len(soportes_unicos) == 1:
-        soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,.2f}€</strong>."
-    elif len(soportes_unicos) == 2:
-        soportes_texto = f"dos soportes importantes en <strong>{soportes_unicos[0]:,.2f}€</strong> y <strong>{soportes_unicos[1]:,.2f}€</strong>."
-    elif len(soportes_unicos) >= 3:
-        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{soportes_unicos[0]:,.2f}€</strong>, "
-                          f"el segundo en <strong>{soportes_unicos[1]:,.2f}€</strong>, y el tercero en <strong>{soportes_unicos[2]:,.2f}€</strong>.")
     else:
-        soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
+        # Mensaje de depuración si los datos del gráfico están vacíos
+        print("DEBUG: Datos para el gráfico SMI/Precio están vacíos. No se generará chart_html.")
 
-    tabla_resumen = f"""
-<h2>Resumen de Puntos Clave</h2>
-<table border="1" style="width:100%; border-collapse: collapse;">
-    <tr>
-        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Métrica</th>
-        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Valor</th>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Precio Actual</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Volumen</td>
-        <td style="padding: 8px;"><strong>{data['VOLUMEN']:,} acciones</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Soporte Clave</td>
-        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.2f}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Resistencia Clave</td>
-        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Recomendación</td>
-        <td style="padding: 8px;"><strong>{data['RECOMENDACION']}</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">SMI Actual</td>
-        <td style="padding: 8px;"><strong>{data['SMI']:,}</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Precio Objetivo de Compra</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Tendencia del SMI</td>
-        <td style="padding: 8px;"><strong>{data['TENDENCIA_SMI']}</strong></td>
-    </tr>
-</table>
-<br/>
-"""
 
-    prompt = f"""
+    # --- INICIO DEL PROMPT FINAL PARA GEMINI ---
+    # Asegúrate de que este bloque de 'return' esté indentado al mismo nivel que las definiciones de variables principales
+    # dentro de la función (ej. 'volumen_analisis_text = ""')
+    prompt_formateado = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio.
 
-Destaca los datos importantes como precios, valores del SMI, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
+Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
 
-Genera un análisis técnico completo de aproximadamente 800 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención al **valor actual del SMI ({data['SMI']})**.
+Genera un análisis técnico completo de aproximadamente 800 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
 
-¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y Único para TODOS sus gráficos solicitados. Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
+¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y Único para TODOS sus gráficos solicitados (Notas Chart, Divergencia Color Chart, Nota Variación Chart y Precios Chart). Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
 
 **Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
@@ -897,49 +675,48 @@ Genera un análisis técnico completo de aproximadamente 800 palabras sobre la e
 - Soporte 1: {data['SOPORTE_1']}
 - Soporte 2: {data['SOPORTE_2']}
 - Soporte 3: {data['SOPORTE_3']}
-- Resistencia clave: {data['RESISTENCIA']}
+- Resistencia clave: {data['RESISTENCIA_1']}
 - Recomendación general: {data['RECOMENDACION']}
-- SMI actual: {data['SMI']}
+- Nota de la empresa (0-10): {data['NOTA_EMPRESA']}
 - Precio objetivo de compra: {data['PRECIO_OBJETIVO_COMPRA']}€
-- Tendencia del SMI: {data['TENDENCIA_SMI']}
+- Tendencia de la nota: {data['TENDENCIA_NOTA']}
 
 
-Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia al **valor actual del SMI ({data['SMI']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
+Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
 
 ---
 <h1>{titulo_post}</h1>
 
 
 <h2>Análisis Inicial y Recomendación</h2>
-<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente, alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
+<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:.2f}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:.2f}€</strong>. El volumen negociado recientemente, alcanzó las <strong>{formatear_numero(data['VOLUMEN'])} acciones</strong>.</p>
 
-<p>Nuestro análisis del Stochastic Momentum Index (SMI) arroja un valor de <strong>{data['SMI']}</strong>. Esta puntuación, combinada con la **{data['TENDENCIA_SMI']}** tendencia del SMI, la proximidad a soportes y resistencias, y el volumen, nos lleva a una recomendación de <strong>{data['RECOMENDACION']}</strong>. Actualmente, el mercado se encuentra en una situación de <strong>{data['CONDICION_RSI']}</strong>. Esto refleja {'una excelente fortaleza técnica y baja volatilidad esperada a corto plazo, lo que indica un bajo riesgo técnico en relación con el potencial de crecimiento.' if "Compra" in data['RECOMENDACION'] and data['SMI'] < -20 else ''}
-{'una fortaleza técnica moderada, con un equilibrio entre potencial y riesgo, sugiriendo una oportunidad que requiere seguimiento.' if "Compra Moderada" in data['RECOMENDACION'] or (data['SMI'] >= -20 and data['SMI'] < 0) else ''}
+<p>Asignamos una <strong>nota técnica de {data['NOTA_EMPRESA']} sobre 10</strong>. Esta puntuación, combinada con el análisis de la **{data['TENDENCIA_NOTA']}** de la nota, la proximidad a soportes y resistencias, y el volumen, nos lleva a una recomendación de <strong>{data['RECOMENDACION']}</strong>. Actualmente, el mercado se encuentra en una situación de <strong>{data['CONDICION_RSI']}</strong>. Esto refleja {'una excelente fortaleza técnica y baja volatilidad esperada a corto plazo, lo que indica un bajo riesgo técnico en relación con el potencial de crecimiento.' if "Compra" in data['RECOMENDACION'] and data['NOTA_EMPRESA'] >= 7 else ''}
+{'una fortaleza técnica moderada, con un equilibrio entre potencial y riesgo, sugiriendo una oportunidad que requiere seguimiento.' if "Compra Moderada" in data['RECOMENDACION'] or (data['NOTA_EMPRESA'] >= 5 and data['NOTA_EMPRESA'] < 7) else ''}
 {'una situación técnica neutral, donde el gráfico no muestra un patrón direccional claro, indicando que es un momento para la observación y no para la acción inmediata.' if "Neutral" in data['RECOMENDACION'] else ''}
-{'cierta debilidad técnica, con posibles señales de corrección o continuación bajista, mostrando una pérdida de impulso alcista y un aumento de la presión vendedora.' if "Venta" in data['RECOMENDACION'] or (data['SMI'] > 0 and data['SMI'] <= 20) else ''}
-{'una debilidad técnica significativa y una posible sobrecompra en el gráfico, lo que sugiere un alto riesgo de corrección.' if "Venta Fuerte" in data['RECOMENDACION'] or data['SMI'] > 20 else ''} </p>
+{'cierta debilidad técnica, con posibles señales de corrección o continuación bajista, mostrando una pérdida de impulso alcista y un aumento de la presión vendedora.' if "Venta" in data['RECOMENDACION'] or (data['NOTA_EMPRESA'] < 5 and data['NOTA_EMPRESA'] >= 3) else ''}
+{'una debilidad técnica significativa y una posible sobrecompra en el gráfico, lo que sugiere un alto riesgo de corrección.' if "Venta Fuerte" in data['RECOMENDACION'] or data['NOTA_EMPRESA'] < 3 else ''} </p>
 {chart_html}
 
-{tabla_resumen}
 
 <h2>Estrategia de Inversión y Gestión de Riesgos</h2>
-<p>Mi evaluación profesional indica que la tendencia actual del SMI es **{data['TENDENCIA_SMI']}**, lo que, en combinación con el resto de nuestros indicadores, se alinea con una recomendación de <strong>{data['RECOMENDACION']}</strong>.</p>
+<p>Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**, lo que, en combinación con el resto de nuestros indicadores, se alinea con una recomendación de <strong>{data['RECOMENDACION']}</strong>.</p>
 <p><strong>Motivo de la Recomendación:</strong> {data['MOTIVO_RECOMENDACION']}</p>
 
 <p>{volumen_analisis_text}</p>
 
+
 <h2>Predicción a Largo Plazo y Conclusión</h2>
-<p>Considerando el valor actual del SMI de <strong>{data['SMI']}</strong> y la dirección de su tendencia (<strong>{data['TENDENCIA_SMI']}</strong>), mi pronóstico a largo plazo para <strong>{data['NOMBRE_EMPRESA']}</strong> es {("optimista. La empresa muestra una base sólida para un crecimiento sostenido, respaldada por indicadores técnicos favorables y una gestión financiera prudente. Si los planes de expansión y los acuerdos estratégicos se materializan, podríamos ver una apreciación significativa del valor en el futuro." if data['SMI'] < -20 else "")}
-{("cauteloso. Si bien no hay señales inmediatas de alarma, el SMI sugiere que la empresa podría enfrentar desafíos en el corto y mediano plazo. Es crucial monitorear de cerca los riesgos identificados y cualquier cambio en el sentimiento del mercado para ajustar la estrategia." if data['SMI'] >= -20 and data['SMI'] <= 20 else "")}
-{("pesimista. La debilidad técnica persistente y los factores de riesgo sugieren que la empresa podría experimentar una presión bajista considerable. Se recomienda extrema cautela y considerar estrategias de protección de capital." if data['SMI'] > 20 else "")}.</p>
+<p>Considerando la nota técnica actual de <strong>{data['NOTA_EMPRESA']}</strong> y la dirección de su tendencia (<strong>{data['TENDENCIA_NOTA']}</strong>), mi pronóstico a largo plazo para <strong>{data['NOMBRE_EMPRESA']}</strong> es {("optimista. La empresa muestra una base sólida para un crecimiento sostenido, respaldada por indicadores técnicos favorables y una gestión financiera prudente. Si los planes de expansión y los acuerdos estratégicos se materializan, podríamos ver una apreciación significativa del valor en el futuro." if data['NOTA_EMPRESA'] >= 7 else "")}
+{("cauteloso. Si bien no hay señales inmediatas de alarma, la nota técnica sugiere que la empresa podría enfrentar desafíos en el corto y mediano plazo. Es crucial monitorear de cerca los riesgos identificados y cualquier cambio en el sentimiento del mercado para ajustar la estrategia." if data['NOTA_EMPRESA'] < 7 and data['NOTA_EMPRESA'] >=4 else "")}
+{("pesimista. La debilidad técnica persistente y los factores de riesgo sugieren que la empresa podría experimentar una presión bajista considerable. Se recomienda extrema cautela y considerar estrategias de protección de capital." if data['NOTA_EMPRESA'] < 4 else "")}.</p>
 
 <h2>Conclusión General y Descargo de Responsabilidad</h2>
-<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['SMI'] < -20 else 'una posible corrección, lo que exige cautela')}, junto con aspectos fundamentales que requieren mayor claridad, hacen de esta empresa un activo para mantener bajo estricta vigilancia. </p>
+<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con aspectos fundamentales que requieren mayor claridad, hacen de esta empresa un activo para mantener bajo estricta vigilancia. </p>
 <p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. </p>
 
 """
-
-    return prompt, titulo_post
+    return prompt_formateado, titulo_post
 
 
 def enviar_email(texto_generado, asunto_email, nombre_archivo):
