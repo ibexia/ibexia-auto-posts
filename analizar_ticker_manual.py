@@ -127,7 +127,7 @@ def obtener_datos_yfinance(ticker):
         current_volume = info.get("volume", "N/A")
 
         # Get last valid SMI signal and calculate nota_empresa safely
-        smi_actual_series = hist['SMI_signal'].dropna() # Obtener las señales SMI sin NaN
+        smi_actual_series = hist['SMI'].dropna() # Obtener las señales SMI sin NaN
 
         if not smi_actual_series.empty:
             smi_actual = round(smi_actual_series.iloc[-1], 2)
