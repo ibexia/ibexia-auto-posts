@@ -112,16 +112,6 @@ def obtener_datos_yfinance(ticker):
         # hist = stock.history(period="30d", interval="1d")
         # hist = calculate_smi_tv(hist)
 
-        # --- El bloque duplicado de arriba lo debes borrar ---
-        # stock = yf.Ticker(ticker)
-        # info = stock.info
-        # hist_extended = stock.history(period="90d", interval="1d")
-        # hist_extended = calculate_smi_tv(hist_extended)
-        # hist = stock.history(period="30d", interval="1d")
-        # hist = calculate_smi_tv(hist)
-        # ---------------------------------------------------
-
-
         # Obtener el precio actual y volumen
         current_price = round(info["currentPrice"], 2)
         current_volume = info.get("volume", "N/A")
