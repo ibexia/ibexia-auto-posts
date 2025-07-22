@@ -185,42 +185,30 @@ def obtener_datos_yfinance(ticker):
             resistencia_1, resistencia_2, resistencia_3 = round(current_price * 1.05, 2), round(current_price * 1.1, 2), round(current_price * 1.15, 2) # Default si no hay datos
 
         # --- LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
-        # Primero, asegurarnos de que tenemos soportes y resistencias válidos para la interpolación
-        # Si no hay 3 soportes/resistencias, usaremos los disponibles o un porcentaje del precio actual.
+        # --- NUEVA LÓGICA DE PRECIO OBJETIVO BASADA EN PENDIENTE DEL SMI ---
 
-        # Puntos de referencia para la interpolación del precio objetivo
-        # Ajustamos esto para que dependa del SMI
-        
-        # Extremo inferior y superior basados en SMI
-        # SMI de -100 (sobreventa extrema) -> debería proyectar un precio objetivo más alto
-        # SMI de 100 (sobrecompra extrema) -> debería proyectar un precio objetivo más bajo
-        
-        # Mapping SMI (-100 a 100) to a [0, 1] range for interpolation
-        # Where 0 is a bearish projection, and 1 is a bullish projection.
-        # Let's say -60 is very bullish (0.9), 60 is very bearish (0.1)
-        # and 0 is neutral (0.5)
-        
-        # Invertimos el SMI para que un SMI bajo (negativo) dé un valor alto (bullish) y viceversa.
-        normalised_smi_for_target = (smi_actual * -1 + 100) / 200 # Maps -100 to 1 and 100 to 0
+        # Calcular pendiente de los últimos 5 días del SMI
+        smi_ultimos_5 = smi_history_full.tail(5).dropna()
+        if len(smi_ultimos_5) >= 2:
+            x = np.arange(len(smi_ultimos_5))
+            y = smi_ultimos_5.values
+            pendiente_smi, _ = np.polyfit(x, y, 1)
+        else:
+            pendiente_smi = 0
 
-        # Clamp between 0.1 and 0.9 to avoid extreme, unrealistic targets
-        normalised_smi_for_target = max(0.1, min(0.9, normalised_smi_for_target))
+        # Precio objetivo basado en dirección del SMI
+        if pendiente_smi > 0.1:
+            # Tendencia alcista → subir hasta resistencia más próxima
+            precio_objetivo = next((r for r in sorted(resistencias) if r > current_price), current_price * 1.05)
+        elif pendiente_smi < -0.1:
+            # Tendencia bajista → bajar hasta soporte más próximo
+            precio_objetivo = next((s for s in sorted(soportes, reverse=True) if s < current_price), current_price * 0.95)
+        else:
+            # SMI sin dirección clara → mantener precio actual
+            precio_objetivo = current_price
 
-        # Extremo inferior: Un soporte más bajo o un porcentaje de caída
-        referencia_min = soportes[2] if len(soportes) >= 3 else (soportes[1] if len(soportes) >= 2 else (soportes[0] if len(soportes) >= 1 else round(current_price * 0.80, 2)))
-        
-        # Extremo superior: Una resistencia más alta o un porcentaje de subida
-        referencia_max = resistencias[2] if len(resistencias) >= 3 else (resistencias[1] if len(resistencias) >= 2 else (resistencias[0] if len(resistencias) >= 1 else round(current_price * 1.20, 2)))
-
-        # Asegurarse de que referencia_min sea menor que referencia_max
-        if referencia_min >= referencia_max:
-            referencia_min = round(current_price * 0.85, 2)
-            referencia_max = round(current_price * 1.15, 2)
-        
-        # El precio objetivo se calcula como una interpolación entre referencia_min y referencia_max
-        precio_objetivo = referencia_min + (referencia_max - referencia_min) * normalised_smi_for_target
-        
         precio_objetivo = round(precio_objetivo, 2)
+        # --- FIN NUEVA LÓGICA ---
         # --- FIN DE LA LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
 
         # Precio objetivo de compra (ejemplo simple, puedes refinarlo)
