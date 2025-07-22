@@ -501,12 +501,13 @@ def construir_prompt_formateado(data):
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
+    smi_raw_historico_para_grafico = data.get('SMI_RAW_HISTORICO_PARA_GRAFICO', [])
     cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
     OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 4)
     PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
 
-    chart_html = ""
-    if smi_historico_para_grafico and cierres_para_grafico_total:
+chart_html = ""
+    if smi_historico_para_grafico and cierres_para_grafico_total and smi_raw_historico_para_grafico: # Asegurarse de tener todos los datos
         labels_historial = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
         labels_proyeccion = [(datetime.today() + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
         labels_total = labels_historial + labels_proyeccion
@@ -517,6 +518,11 @@ def construir_prompt_formateado(data):
         smi_desplazados_para_grafico = smi_historico_para_grafico
         if len(smi_desplazados_para_grafico) < len(labels_total):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
+
+        smi_raw_desplazados_para_grafico = smi_raw_historico_para_grafico # SMI sin suavizar
+        if len(smi_raw_desplazados_para_grafico) < len(labels_total):
+            smi_raw_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_raw_desplazados_para_grafico)))
+
 
         chart_html += f"""
         <h2>Evolución del Stochastic Momentum Index (SMI) y Precio</h2>
@@ -540,13 +546,23 @@ def construir_prompt_formateado(data):
                     labels: {json.dumps(labels_total)},
                     datasets: [
                         {{
-                            label: 'SMI',
+                            label: 'SMI (Suavizado)',
                             data: {json.dumps(smi_desplazados_para_grafico)},
                             borderColor: 'rgba(75, 192, 192, 1)',
                             backgroundColor: 'rgba(75, 192, 192, 0.2)',
                             yAxisID: 'y',
                             tension: 0.1,
                             fill: false
+                        }},
+                        {{
+                            label: 'SMI (Rápido)',
+                            data: {json.dumps(smi_raw_desplazados_para_grafico)},
+                            borderColor: 'rgba(255, 159, 64, 1)', // Color diferente para el SMI rápido
+                            backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                            yAxisID: 'y',
+                            tension: 0.1,
+                            fill: false,
+                            borderDash: [2, 2] // Línea punteada para el rápido
                         }},
                         {{
                             label: 'Precio Actual',
@@ -602,13 +618,12 @@ def construir_prompt_formateado(data):
                                         }}
                                     }}
                                 }},
-                                // Zonas de color en el eje Y del SMI (-100 a 100)
                                 zonaSobrecompra: {{
                                     type: 'box',
                                     yScaleID: 'y',
                                     yMin: 40,
                                     yMax: 100,
-                                    backgroundColor: 'rgba(255, 0, 0, 0.1)', // Rojo claro para sobrecompra
+                                    backgroundColor: 'rgba(255, 0, 0, 0.1)',
                                     borderColor: 'rgba(255, 0, 0, 0.2)',
                                     borderWidth: 1,
                                     label: {{
@@ -624,7 +639,7 @@ def construir_prompt_formateado(data):
                                     yScaleID: 'y',
                                     yMin: -40,
                                     yMax: 40,
-                                    backgroundColor: 'rgba(255, 255, 0, 0.1)', // Amarillo claro para neutral
+                                    backgroundColor: 'rgba(255, 255, 0, 0.1)',
                                     borderColor: 'rgba(255, 255, 0, 0.2)',
                                     borderWidth: 1,
                                     label: {{
@@ -640,7 +655,7 @@ def construir_prompt_formateado(data):
                                     yScaleID: 'y',
                                     yMin: -100,
                                     yMax: -40,
-                                    backgroundColor: 'rgba(0, 255, 0, 0.1)', // Verde claro para sobreventa
+                                    backgroundColor: 'rgba(0, 255, 0, 0.1)',
                                     borderColor: 'rgba(0, 255, 0, 0.2)',
                                     borderWidth: 1,
                                     label: {{
@@ -651,7 +666,6 @@ def construir_prompt_formateado(data):
                                         font: {{ size: 12, weight: 'bold' }}
                                     }}
                                 }},
-                                // Líneas de soporte
                                 soporte1Line: {{
                                     type: 'line',
                                     yScaleID: 'y1',
