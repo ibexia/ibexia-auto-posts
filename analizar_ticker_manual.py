@@ -239,7 +239,7 @@ def obtener_datos_yfinance(ticker):
 
 
         # Nuevas variables para los gráficos con offset y proyección
-        OFFSET_DIAS = 4 # El SMI de hoy (D) se alinea con el precio de D+4
+        OFFSET_DIAS = 0 # Elimina el desplazamiento de 4 días
         PROYECCION_FUTURA_DIAS = 5 # Días a proyectar después del último precio real
 
         # Aseguramos tener suficientes datos para el historial, el offset y la proyección
