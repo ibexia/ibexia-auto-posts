@@ -60,43 +60,31 @@ def formatear_numero(numero):
     except (ValueError, TypeError):
         return "N/A"
 
-def calculate_smi_tv(df, window=10, smooth_window=3):
-    """
-    Calcula el Stochastic Momentum Index (SMI) y su señal para un DataFrame.
-    Añade un campo TV (True Value) para normalizar el volumen.
-    """
-    if 'High' not in df.columns or 'Low' not in df.columns or 'Close' not in df.columns or 'Open' not in df.columns or 'Volume' not in df.columns:
-        # print("Advertencia: Columnas necesarias (High, Low, Close, Open, Volume) no encontradas en el DataFrame. Saltando cálculo de SMI.")
-        df['SMI'] = np.nan
-        df['SMI_signal'] = np.nan
-        df['TV'] = np.nan
-        return df
+def calculate_smi_tv(df):
+    # Calcula Highest High y Lowest Low en las últimas 14 velas
+    df['HH'] = df['High'].rolling(window=14).max()
+    df['LL'] = df['Low'].rolling(window=14).min()
 
-    # Calcular SMI al estilo TradingView
-    hh = df['High'].rolling(window=window).max()
-    ll = df['Low'].rolling(window=window).min()
+    # Calcula el rango de precio para el SMI (HH - LL)
+    df['range'] = df['HH'] - df['LL']
 
-    diff = hh - ll
-    rdiff = df['Close'] - (hh + ll) / 2
+    # Calcula el cambio de precio con respecto al punto medio del rango (Close - LL)
+    df['C_LL'] = df['Close'] - df['LL']
 
-    avgrel = rdiff.ewm(span=3, adjust=False).mean()
-    avgdiff = diff.ewm(span=3, adjust=False).mean()
+    # Calcula el cambio de precio con respecto al punto alto del rango (Close - HH)
+    df['C_HH'] = df['Close'] - df['HH']
 
-    smi = np.where(avgdiff != 0, (avgrel / (avgdiff / 2)) * 100, 0)
-    smi_smoothed = pd.Series(smi, index=df.index).rolling(window=smooth_window).mean()
-    smi_signal = smi_smoothed.ewm(span=10, adjust=False).mean()
+    # Calcula la diferencia y la relación de fuerza
+    diff = df['C_LL'].ewm(span=3, adjust=False).mean() - df['C_HH'].ewm(span=3, adjust=False).mean()
+    range_ewm = df['range'].ewm(span=3, adjust=False).mean()
 
-    df['SMI'] = smi_smoothed
-    df['SMI_signal'] = smi_signal
+    # Calcula el SMI
+    smi = ((diff / range_ewm) * 100).fillna(0)
 
-    # Calcular True Value (TV) para el volumen
-    df['TR'] = np.maximum(df['High'] - df['Low'],
-                          np.maximum(abs(df['High'] - df['Close'].shift()),
-                                     abs(df['Low'] - df['Close'].shift())))
-    df['ATR'] = df['TR'].rolling(window=window).mean()
-    df['TV'] = df['Volume'] / df['ATR'] # Normalización simple de volumen
-    df['TV'] = df['TV'].replace([np.inf, -np.inf], np.nan).fillna(0) # Manejar infinitos y NaN
+    # Suaviza el SMI con una EMA de 3 periodos
+    smi_smoothed = smi.ewm(span=3, adjust=False).mean()
 
+    df['SMI'] = smi_smoothed # Aquí SMI es la versión suavizada
     return df
 
 def obtener_datos_yfinance(ticker):
@@ -239,11 +227,11 @@ def obtener_datos_yfinance(ticker):
 
 
         # Nuevas variables para los gráficos con offset y proyección
-        OFFSET_DIAS = 0 # Elimina el desplazamiento de 4 días
+        OFFSET_DIAS = 0 # El SMI de hoy (D) se alinea con el precio de D+4
         PROYECCION_FUTURA_DIAS = 5 # Días a proyectar después del último precio real
 
         # Aseguramos tener suficientes datos para el historial, el offset y la proyección
-        smi_history_full = hist_extended['SMI_signal'].dropna()
+        smi_history_full = hist_extended['SMI'].dropna() # Ahora el SMI final está en 'SMI'
         cierres_history_full = hist_extended['Close'].dropna()
 
         # Calcula el volumen promedio de los últimos 30 días usando hist_extended
