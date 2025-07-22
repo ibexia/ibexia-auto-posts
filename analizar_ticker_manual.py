@@ -506,7 +506,7 @@ def construir_prompt_formateado(data):
     OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 4)
     PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
 
-chart_html = ""
+    chart_html = ""
     if smi_historico_para_grafico and cierres_para_grafico_total and smi_raw_historico_para_grafico: # Asegurarse de tener todos los datos
         labels_historial = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
         labels_proyeccion = [(datetime.today() + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
