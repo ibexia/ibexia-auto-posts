@@ -104,9 +104,7 @@ def obtener_datos_yfinance(ticker):
         info = stock.info
 
         # Ampliar periodo si es necesario para el retraso y proyecciones
-        hist_extended = stock.history(period="91d", interval="1d", actions=False)
-        # Eliminar días sin volumen para evitar días incompletos
-        hist_extended = hist_extended[hist_extended['Volume'] > 0]
+        hist_extended = stock.history(period="90d", interval="1d")
         hist_extended = calculate_smi_tv(hist_extended)
 
         # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
