@@ -104,7 +104,9 @@ def obtener_datos_yfinance(ticker):
         info = stock.info
 
         # Ampliar periodo si es necesario para el retraso y proyecciones
-        hist_extended = stock.history(period="90d", interval="1d")
+        hist_extended = stock.history(period="91d", interval="1d", actions=False)
+        # Eliminar días sin volumen para evitar días incompletos
+        hist_extended = hist_extended[hist_extended['Volume'] > 0]
         hist_extended = calculate_smi_tv(hist_extended)
 
         # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
@@ -234,7 +236,7 @@ def obtener_datos_yfinance(ticker):
 
 
         # Nuevas variables para los gráficos con offset y proyección
-        OFFSET_DIAS = 4 # La nota de hoy (D) se alinea con el precio de D+4
+        OFFSET_DIAS = 0 # La nota de hoy (D) se alinea con el precio de D+4
         PROYECCION_FUTURA_DIAS = 5 # Días a proyectar después del último precio real
 
         # Aseguramos tener suficientes datos para el historial, el offset y la proyección
