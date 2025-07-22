@@ -83,7 +83,7 @@ def calculate_smi_tv(df, window=20, smooth_window=5):
     avgdiff = diff.ewm(span=3, adjust=False).mean()
 
     smi = np.where(avgdiff != 0, (avgrel / (avgdiff / 2)) * 100, 0)
-    smi_smoothed = pd.Series(smi, index=df.index).rolling(window=smooth_window, center=True).mean()
+    smi_smoothed = pd.Series(smi, index=df.index).rolling(window=smooth_window).mean()
     smi_signal = smi_smoothed.ewm(span=10, adjust=False).mean()
 
     df['SMI'] = smi_smoothed
