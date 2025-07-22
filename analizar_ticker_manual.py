@@ -245,6 +245,12 @@ def obtener_datos_yfinance(ticker):
         # Calcula el volumen promedio de los últimos 30 días usando hist_extended
         volumen_promedio_30d = hist_extended['Volume'].tail(30).mean()
 
+
+        # Fechas reales de cotización para los últimos 30 días
+        fechas_historial = hist_extended['Close'].dropna().tail(30).index.strftime("%d/%m").tolist()
+        ultima_fecha_historial = hist_extended['Close'].dropna().tail(1).index[0]
+        fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
+        
         # SMI para los 30 días del gráfico (serán los que se visualicen)
         # Serán los 30 SMI más recientes disponibles
         smi_historico_para_grafico = []
@@ -355,6 +361,8 @@ def obtener_datos_yfinance(ticker):
             "RESISTENCIA_2": resistencia_2,
             "RESISTENCIA_3": resistencia_3,
             "PRECIO_OBJETIVO": precio_objetivo,
+            "FECHAS_HISTORIAL": fechas_historial,
+            "FECHAS_PROYECCION": fechas_proyeccion,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
 
@@ -503,8 +511,8 @@ def construir_prompt_formateado(data):
 
     chart_html = ""
     if smi_historico_para_grafico and cierres_para_grafico_total:
-        labels_historial = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
-        labels_proyeccion = [(datetime.today() + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
+        labels_historial = data.get("FECHAS_HISTORIAL", [])
+        labels_proyeccion = data.get("FECHAS_PROYECCION", [])
         labels_total = labels_historial + labels_proyeccion
 
         precios_reales_grafico = cierres_para_grafico_total[:30]
