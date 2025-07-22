@@ -61,30 +61,38 @@ def formatear_numero(numero):
         return "N/A"
 
 def calculate_smi_tv(df):
-    # Calcula Highest High y Lowest Low en las últimas 14 velas
-    df['HH'] = df['High'].rolling(window=14).max()
-    df['LL'] = df['Low'].rolling(window=14).min()
+    high = df['High']
+    low = df['Low']
+    close = df['Close']
 
-    # Calcula el rango de precio para el SMI (HH - LL)
-    df['range'] = df['HH'] - df['LL']
+    length_k = 10
+    length_d = 3
+    ema_signal_len = 10
+    smooth_period = 5
 
-    # Calcula el cambio de precio con respecto al punto medio del rango (Close - LL)
-    df['C_LL'] = df['Close'] - df['LL']
+    hh = high.rolling(window=length_k).max()
+    ll = low.rolling(window=length_k).min()
+    diff = hh - ll
+    rdiff = close - (hh + ll) / 2
 
-    # Calcula el cambio de precio con respecto al punto alto del rango (Close - HH)
-    df['C_HH'] = df['Close'] - df['HH']
+    avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
+    avgdiff = diff.ewm(span=length_d, adjust=False).mean()
 
-    # Calcula la diferencia y la relación de fuerza
-    diff = df['C_LL'].ewm(span=3, adjust=False).mean() - df['C_HH'].ewm(span=3, adjust=False).mean()
-    range_ewm = df['range'].ewm(span=3, adjust=False).mean()
+    # Manejo de división por cero y clipado para SMI
+    # Se añade un pequeño epsilon al denominador para mayor robustez
+    epsilon = 1e-9
+    # np.where permite definir el valor cuando la condición es True/False
+    smi_raw = np.where(
+        (avgdiff / 2 + epsilon) != 0, # Si el denominador (más epsilon) no es cero
+        (avgrel / (avgdiff / 2 + epsilon)) * 100, # Realiza el cálculo
+        0.0 # Si es cero, asigna 0.0
+    )
+    smi_raw = np.clip(smi_raw, -100, 100) # Asegurar que esté entre -100 y 100
 
-    # Calcula el SMI
-    smi = ((diff / range_ewm) * 100).fillna(0)
+    smi_smoothed = pd.Series(smi_raw, index=df.index).rolling(window=smooth_period).mean()
+    smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
 
-    # Suaviza el SMI con una EMA de 3 periodos
-    smi_smoothed = smi.ewm(span=3, adjust=False).mean()
-
-    df['SMI'] = smi_smoothed # Aquí SMI es la versión suavizada
+    df['SMI'] = smi_signal # Asignamos directamente la señal SMI suavizada al DataFrame
     return df
 
 def obtener_datos_yfinance(ticker):
