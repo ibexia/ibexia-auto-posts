@@ -590,7 +590,8 @@ def construir_prompt_formateado(data):
         # Las notas históricas ya están calculadas para los 30 días
         # Para la visualización de "nota D vs precio D+4", las líneas se desplazan visualmente, no los datos.
         # Insertamos Nones al principio de la nota para desplazarla visualmente 4 días a la derecha.
-        notas_desplazadas_para_grafico = [None] * OFFSET_DIAS + notas_historicas_para_grafico
+        # notas_desplazadas_para_grafico = [None] * OFFSET_DIAS + notas_historicas_para_grafico # Esta línea se comenta o borra
+        notas_desplazadas_para_grafico = notas_historicas_para_grafico + [None] * PROYECCION_FUTURA_DIAS
         # La longitud del array de notas desplazadas debe coincidir con la de labels_total
         # Si notas_desplazadas_para_grafico es más corto que labels_total, rellenar con None
         if len(notas_desplazadas_para_grafico) < len(labels_total):
