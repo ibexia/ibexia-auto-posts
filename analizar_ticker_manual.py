@@ -139,8 +139,8 @@ def obtener_datos_yfinance(ticker):
         average_volume = hist['Volume'].tail(30).mean() if not hist['Volume'].empty else 0
 
         # Obtener valores actuales de SMI
-        smi_actual = round(hist['SMI'].iloc[-1], 2) if 'SMI' in hist.columns and not hist['SMI'].empty else 0
-        smi_raw_actual = round(hist['SMI_raw'].iloc[-1], 2) if 'SMI_raw' in hist.columns and not hist['SMI_raw'].empty else smi_actual
+        smi_actual = round(hist['SMI'].iloc[-1], 2) if 'SMI' in hist.columns and not hist['SMI'].empty and pd.notna(hist['SMI'].iloc[-1]) else 0
+        smi_raw_actual = round(hist['SMI_raw'].iloc[-1], 2) if 'SMI_raw' in hist.columns and not hist['SMI_raw'].empty and pd.notna(hist['SMI_raw'].iloc[-1]) else smi_actual
 
         if smi_actual == 0:
             print(f"⚠️ Advertencia: No hay datos de SMI suavizado válidos para {ticker}. Asignando SMI neutral.")
@@ -151,21 +151,28 @@ def obtener_datos_yfinance(ticker):
         tendencia_smi = "Neutral"
         if 'SMI' in hist.columns and len(hist['SMI'].dropna()) >= 5: # Necesitamos al menos 5 puntos para una pequeña tendencia
             smi_last_5 = hist['SMI'].dropna().tail(5)
-            if smi_last_5.iloc[-1] > smi_last_5.iloc[0]:
-                tendencia_smi = "Ascendente"
-            elif smi_last_5.iloc[-1] < smi_last_5.iloc[0]:
-                tendencia_smi = "Descendente"
+            if not smi_last_5.empty:
+                if smi_last_5.iloc[-1] > smi_last_5.iloc[0]:
+                    tendencia_smi = "Ascendente"
+                elif smi_last_5.iloc[-1] < smi_last_5.iloc[0]:
+                    tendencia_smi = "Descendente"
 
-        # Calcular RSI
-        delta = hist['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).ewm(com=13, adjust=False, min_periods=1).mean()
-        loss = (-delta.where(delta < 0, 0)).ewm(com=13, adjust=False, min_periods=1).mean()
-        
-        # Evitar división por cero para RSI
-        rs = np.where(loss == 0, np.inf, gain / loss)
-        rsi = 100 - (100 / (1 + rs))
-        rsi_actual = rsi.iloc[-1] if not rsi.empty else 50
-        rsi_actual = rsi_actual.item() if isinstance(rsi_actual, np.ndarray) else rsi_actual # Handle numpy array if it comes out as such
+        # Calcular RSI - FIX para el error 'numpy.ndarray' object has no attribute 'empty'
+        rsi_actual = 50.0 # Default value
+        if len(hist['Close']) > 1: # Need at least 2 data points for diff() to be meaningful
+            delta = hist['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).ewm(com=13, adjust=False, min_periods=1).mean()
+            loss = (-delta.where(delta < 0, 0)).ewm(com=13, adjust=False, min_periods=1).mean()
+            
+            # Use pandas division to ensure Series output, then handle inf/NaN
+            # Replace 0s in loss with NaN to avoid division by zero
+            rs = gain / loss.replace(0, np.nan) 
+            rs = rs.replace([np.inf, -np.inf], np.nan).fillna(np.inf) # Handle division by zero giving inf, then fill NaNs from division by zero with inf
+
+            rsi = 100 - (100 / (1 + rs))
+            
+            if not rsi.empty and pd.notna(rsi.iloc[-1]):
+                rsi_actual = float(rsi.iloc[-1])
 
 
         condicion_rsi = "Indeterminada"
