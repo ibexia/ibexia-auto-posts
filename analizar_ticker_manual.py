@@ -186,6 +186,8 @@ def obtener_datos_yfinance(ticker):
 
         # --- LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
         # --- NUEVA LÓGICA DE PRECIO OBJETIVO BASADA EN PENDIENTE DEL SMI ---
+        # Asegúrate de tener historial completo para calcular SMI reciente
+        smi_history_full = hist_extended['SMI'].dropna()
 
         # Calcular pendiente de los últimos 5 días del SMI
         smi_ultimos_5 = smi_history_full.tail(5).dropna()
