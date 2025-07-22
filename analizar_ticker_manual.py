@@ -1125,7 +1125,7 @@ def generar_contenido_con_gemini(tickers):
 
 def main():
     # Define el ticker que quieres analizar
-    ticker_deseado = "IBE.MC"  # <-- ¡CAMBIA "BBVA.MC" por el Ticker que quieras analizar!
+    ticker_deseado = "AMS.MC"  # <-- ¡CAMBIA "BBVA.MC" por el Ticker que quieras analizar!
                                 # Por ejemplo: "REP.MC", "TSLA", etc.
 
     # Prepara la lista de tickers para la función generar_contenido_con_gemini
