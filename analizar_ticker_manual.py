@@ -102,32 +102,33 @@ def obtener_datos_yfinance(ticker):
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
-        
+
         # Ampliar periodo si es necesario para el retraso y proyecciones
         hist_extended = stock.history(period="90d", interval="1d")
         hist_extended = calculate_smi_tv(hist_extended)
 
         # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
-        hist = stock.history(period="30d", interval="1d")
-        hist = calculate_smi_tv(hist)
+        # ESTE BLOQUE ES OPCIONAL: Si 'hist' de 30 días no se usa para nada más, puedes eliminarlo.
+        # hist = stock.history(period="30d", interval="1d")
+        # hist = calculate_smi_tv(hist)
 
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        # Ampliar periodo si es necesario para el retraso y proyecciones
-        hist_extended = stock.history(period="90d", interval="1d")
-        hist_extended = calculate_smi_tv(hist_extended)
+        # --- El bloque duplicado de arriba lo debes borrar ---
+        # stock = yf.Ticker(ticker)
+        # info = stock.info
+        # hist_extended = stock.history(period="90d", interval="1d")
+        # hist_extended = calculate_smi_tv(hist_extended)
+        # hist = stock.history(period="30d", interval="1d")
+        # hist = calculate_smi_tv(hist)
+        # ---------------------------------------------------
 
-        # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
-        hist = stock.history(period="30d", interval="1d")
-        hist = calculate_smi_tv(hist)
 
         # Obtener el precio actual y volumen
         current_price = round(info["currentPrice"], 2)
         current_volume = info.get("volume", "N/A")
 
         # Get last valid SMI signal and calculate nota_empresa safely
-        smi_actual_series = hist['SMI'].dropna() # Obtener las señales SMI sin NaN
+        # ¡IMPORTANTE: Cambia 'hist' a 'hist_extended' aquí!
+        smi_actual_series = hist_extended['SMI'].dropna() # <-- ¡AHORA SÍ USA EL HISTORIAL EXTENDIDO!
 
         if not smi_actual_series.empty:
             smi_actual = round(smi_actual_series.iloc[-1], 2)
