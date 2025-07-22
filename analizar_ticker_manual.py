@@ -60,7 +60,7 @@ def formatear_numero(numero):
     except (ValueError, TypeError):
         return "N/A"
 
-def calculate_smi_tv(df, window=20, smooth_window=5):
+def calculate_smi_tv(df, window=18, smooth_window=3):
     """
     Calcula el Stochastic Momentum Index (SMI) y su señal para un DataFrame.
     Añade un campo TV (True Value) para normalizar el volumen.
