@@ -60,7 +60,7 @@ def formatear_numero(numero):
     except (ValueError, TypeError):
         return "N/A"
 
-def calculate_smi_tv(df, window=18, smooth_window=3):
+def calculate_smi_tv(df, window=20, smooth_window=5):
     """
     Calcula el Stochastic Momentum Index (SMI) y su señal para un DataFrame.
     Añade un campo TV (True Value) para normalizar el volumen.
@@ -102,7 +102,18 @@ def obtener_datos_yfinance(ticker):
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
+        
+        # Ampliar periodo si es necesario para el retraso y proyecciones
+        hist_extended = stock.history(period="90d", interval="1d")
+        hist_extended = calculate_smi_tv(hist_extended)
 
+        # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
+        hist = stock.history(period="30d", interval="1d")
+        hist = calculate_smi_tv(hist)
+
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
         # Ampliar periodo si es necesario para el retraso y proyecciones
         hist_extended = stock.history(period="90d", interval="1d")
         hist_extended = calculate_smi_tv(hist_extended)
@@ -116,8 +127,7 @@ def obtener_datos_yfinance(ticker):
         current_volume = info.get("volume", "N/A")
 
         # Get last valid SMI signal and calculate nota_empresa safely
-        # ¡IMPORTANTE: Cambia 'hist' a 'hist_extended' aquí!
-        smi_actual_series = hist_extended['SMI'].dropna() # <-- ¡AHORA SÍ USA EL HISTORIAL EXTENDIDO!
+        smi_actual_series = hist['SMI_signal'].dropna() # Obtener las señales SMI sin NaN
 
         if not smi_actual_series.empty:
             smi_actual = round(smi_actual_series.iloc[-1], 2)
@@ -234,7 +244,7 @@ def obtener_datos_yfinance(ticker):
 
 
         # Nuevas variables para los gráficos con offset y proyección
-        OFFSET_DIAS = 0 # La nota de hoy (D) se alinea con el precio de D+4
+        OFFSET_DIAS = 4 # La nota de hoy (D) se alinea con el precio de D+4
         PROYECCION_FUTURA_DIAS = 5 # Días a proyectar después del último precio real
 
         # Aseguramos tener suficientes datos para el historial, el offset y la proyección
@@ -418,7 +428,7 @@ def obtener_datos_yfinance(ticker):
 def generar_recomendacion_avanzada(data, cierres_para_grafico_total, notas_historicas_para_grafico):
     # Asegúrate de que notas_historicas_para_grafico y cierres_para_grafico_total son listas válidas.
     # Si no lo son, o están vacías, esto podría causar errores.
-    # Se asume que data['NOTA_EMPRESA'], data['VOLUMEN'], data['VOLUMEN_MEDIO'],
+    # Se asume que data['NOTA_TECNICA'], data['VOLUMEN'], data['VOLUMEN_MEDIO'],
     # data['PRECIO_ACTUAL'], data['SOPORTE_1'], data['RESISTENCIA_1'] ya están poblados.
 
     # Extraer los últimos 30 días de notas para el análisis de tendencias
@@ -468,13 +478,13 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, notas_histo
     motivo_recomendacion = "La situación actual no presenta señales claras de compra ni venta." # NUEVA VARIABLE: Motivo por defecto
 
     # Lógica de Giro Alcista (Compra)
-    if tendencia_nota == "mejorando" and data['NOTA_EMPRESA'] >= 5 and volumen_alto:
+    if tendencia_nota == "mejorando" and data['NOTA_TECNICA'] >= 5 and volumen_alto:
         recomendacion = "Fuerte Compra"
         condicion_mercado = "Impulso alcista con confirmación de volumen"
         motivo_recomendacion = "La nota técnica está mejorando con un volumen significativo, indicando un fuerte impulso alcista."
 
     # Lógica de Giro Bajista (Venta Condicional)
-    elif tendencia_nota == "empeorando" and data['NOTA_EMPRESA'] <= 6 and volumen_alto:
+    elif tendencia_nota == "empeorando" and data['NOTA_TECNICA'] <= 6 and volumen_alto:
         if not proximidad_soporte:
             recomendacion = "Venta Condicional / Alerta"
             condicion_mercado = "Debilidad confirmada por volumen, considerar salida"
@@ -508,11 +518,11 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, notas_histo
         if tendencia_nota == "neutral":
             condicion_mercado = "Consolidación o lateralidad sin dirección clara."
             motivo_recomendacion = "La nota técnica se mantiene neutral, indicando una fase de consolidación o lateralidad sin dirección clara."
-        elif data['NOTA_EMPRESA'] >= 7 and tendencia_nota == "mejorando" and not volumen_alto:
+        elif data['NOTA_TECNICA'] >= 7 and tendencia_nota == "mejorando" and not volumen_alto:
             recomendacion = "Neutral / Observación"
             condicion_mercado = "Nota alta con mejora, pero falta confirmación de volumen."
             motivo_recomendacion = "La nota técnica es alta y muestra una mejora, pero la falta de volumen significativo sugiere una fase de observación."
-        elif data['NOTA_EMPRESA'] <= 4 and tendencia_nota == "empeorando" and not volumen_alto:
+        elif data['NOTA_TECNICA'] <= 4 and tendencia_nota == "empeorando" and not volumen_alto:
             recomendacion = "Neutral / Observación"
             condicion_mercado = "Nota baja con empeoramiento, pero falta confirmación de volumen."
             motivo_recomendacion = "La nota técnica es baja y empeora, pero la falta de volumen significativo sugiere una fase de observación."
@@ -580,8 +590,7 @@ def construir_prompt_formateado(data):
         # Las notas históricas ya están calculadas para los 30 días
         # Para la visualización de "nota D vs precio D+4", las líneas se desplazan visualmente, no los datos.
         # Insertamos Nones al principio de la nota para desplazarla visualmente 4 días a la derecha.
-        # notas_desplazadas_para_grafico = [None] * OFFSET_DIAS + notas_historicas_para_grafico # Esta línea se comenta o borra
-        notas_desplazadas_para_grafico = notas_historicas_para_grafico + [None] * PROYECCION_FUTURA_DIAS
+        notas_desplazadas_para_grafico = [None] * OFFSET_DIAS + notas_historicas_para_grafico
         # La longitud del array de notas desplazadas debe coincidir con la de labels_total
         # Si notas_desplazadas_para_grafico es más corto que labels_total, rellenar con None
         if len(notas_desplazadas_para_grafico) < len(labels_total):
