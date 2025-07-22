@@ -116,7 +116,7 @@ def obtener_datos_yfinance(ticker):
         current_volume = info.get("volume", "N/A")
 
         # Get last valid SMI signal
-        smi_actual_series = hist['SMI_signal'].dropna() # Obtener las señales SMI sin NaN
+        smi_actual_series = hist['SMI'].dropna() # Obtener las señales SMI sin NaN
 
         if not smi_actual_series.empty:
             smi_actual = round(smi_actual_series.iloc[-1], 2)
@@ -264,7 +264,7 @@ def obtener_datos_yfinance(ticker):
         else: # Muy pocos datos históricos
              precios_reales_para_grafico = [current_price] * 30 # Default to current price if no historical data
             
-        smi_history_last_30 = hist['SMI_signal'].dropna().tail(30).tolist()
+        smi_history_last_30 = hist['SMI'].dropna().tail(30).tolist()
         
         # Proyección con subida libre hasta resistencia, pero sin perforarla si está lejos (>2%)
         TOLERANCIA_CRUCE = 0.02
