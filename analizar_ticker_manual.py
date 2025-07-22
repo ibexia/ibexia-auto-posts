@@ -276,7 +276,7 @@ def obtener_datos_yfinance(ticker):
         precios_reales_para_grafico = []
         if len(cierres_history_full) >= (30 + OFFSET_DIAS):
             # Tomamos los 30 precios que se alinearán con las 30 notas (considerando el offset)
-            precios_reales_para_grafico = cierres_history_full.iloc[-(30 + OFFSET_DIAS):-OFFSET_DIAS].tolist()
+            precios_reales_para_grafico = cierres_history_full.tail(30).tolist()
         elif len(cierres_history_full) > OFFSET_DIAS: # Si tenemos menos de 30 pero más que el offset
             # Tomamos lo que tengamos después del offset y rellenamos al principio
             temp_prices = cierres_history_full.iloc[OFFSET_DIAS:].tolist()
@@ -591,7 +591,7 @@ def construir_prompt_formateado(data):
         # Las notas históricas ya están calculadas para los 30 días
         # Para la visualización de "nota D vs precio D+4", las líneas se desplazan visualmente, no los datos.
         # Insertamos Nones al principio de la nota para desplazarla visualmente 4 días a la derecha.
-        notas_desplazadas_para_grafico = [None] * OFFSET_DIAS + notas_historicas_para_grafico
+        notas_desplazadas_para_grafico = notas_historicas_para_grafico
         # La longitud del array de notas desplazadas debe coincidir con la de labels_total
         # Si notas_desplazadas_para_grafico es más corto que labels_total, rellenar con None
         if len(notas_desplazadas_para_grafico) < len(labels_total):
