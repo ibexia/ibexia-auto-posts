@@ -428,7 +428,7 @@ def obtener_datos_yfinance(ticker):
 def generar_recomendacion_avanzada(data, cierres_para_grafico_total, notas_historicas_para_grafico):
     # Asegúrate de que notas_historicas_para_grafico y cierres_para_grafico_total son listas válidas.
     # Si no lo son, o están vacías, esto podría causar errores.
-    # Se asume que data['NOTA_TECNICA'], data['VOLUMEN'], data['VOLUMEN_MEDIO'],
+    # Se asume que data['NOTA_EMPRESA'], data['VOLUMEN'], data['VOLUMEN_MEDIO'],
     # data['PRECIO_ACTUAL'], data['SOPORTE_1'], data['RESISTENCIA_1'] ya están poblados.
 
     # Extraer los últimos 30 días de notas para el análisis de tendencias
@@ -478,13 +478,13 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, notas_histo
     motivo_recomendacion = "La situación actual no presenta señales claras de compra ni venta." # NUEVA VARIABLE: Motivo por defecto
 
     # Lógica de Giro Alcista (Compra)
-    if tendencia_nota == "mejorando" and data['NOTA_TECNICA'] >= 5 and volumen_alto:
+    if tendencia_nota == "mejorando" and data['NOTA_EMPRESA'] >= 5 and volumen_alto:
         recomendacion = "Fuerte Compra"
         condicion_mercado = "Impulso alcista con confirmación de volumen"
         motivo_recomendacion = "La nota técnica está mejorando con un volumen significativo, indicando un fuerte impulso alcista."
 
     # Lógica de Giro Bajista (Venta Condicional)
-    elif tendencia_nota == "empeorando" and data['NOTA_TECNICA'] <= 6 and volumen_alto:
+    elif tendencia_nota == "empeorando" and data['NOTA_EMPRESA'] <= 6 and volumen_alto:
         if not proximidad_soporte:
             recomendacion = "Venta Condicional / Alerta"
             condicion_mercado = "Debilidad confirmada por volumen, considerar salida"
@@ -518,11 +518,11 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, notas_histo
         if tendencia_nota == "neutral":
             condicion_mercado = "Consolidación o lateralidad sin dirección clara."
             motivo_recomendacion = "La nota técnica se mantiene neutral, indicando una fase de consolidación o lateralidad sin dirección clara."
-        elif data['NOTA_TECNICA'] >= 7 and tendencia_nota == "mejorando" and not volumen_alto:
+        elif data['NOTA_EMPRESA'] >= 7 and tendencia_nota == "mejorando" and not volumen_alto:
             recomendacion = "Neutral / Observación"
             condicion_mercado = "Nota alta con mejora, pero falta confirmación de volumen."
             motivo_recomendacion = "La nota técnica es alta y muestra una mejora, pero la falta de volumen significativo sugiere una fase de observación."
-        elif data['NOTA_TECNICA'] <= 4 and tendencia_nota == "empeorando" and not volumen_alto:
+        elif data['NOTA_EMPRESA'] <= 4 and tendencia_nota == "empeorando" and not volumen_alto:
             recomendacion = "Neutral / Observación"
             condicion_mercado = "Nota baja con empeoramiento, pero falta confirmación de volumen."
             motivo_recomendacion = "La nota técnica es baja y empeora, pero la falta de volumen significativo sugiere una fase de observación."
