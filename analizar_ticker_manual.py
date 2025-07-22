@@ -108,9 +108,8 @@ def obtener_datos_yfinance(ticker):
         hist_extended = calculate_smi_tv(hist_extended)
 
         # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
-        # ESTE BLOQUE ES OPCIONAL: Si 'hist' de 30 días no se usa para nada más, puedes eliminarlo.
-        # hist = stock.history(period="30d", interval="1d")
-        # hist = calculate_smi_tv(hist)
+        hist = stock.history(period="30d", interval="1d")
+        hist = calculate_smi_tv(hist)
 
         # Obtener el precio actual y volumen
         current_price = round(info["currentPrice"], 2)
