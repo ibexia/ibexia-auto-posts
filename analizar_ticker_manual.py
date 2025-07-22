@@ -92,7 +92,7 @@ def calculate_smi_tv(df):
     smi_smoothed = pd.Series(smi_raw, index=df.index).rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
 
-    df['SMI'] = smi_signal # Asignamos directamente la señal SMI suavizada al DataFrame
+    df['SMI'] = smi_smoothed # Asignamos directamente la señal SMI suavizada al DataFrame
     return df
 
 def obtener_datos_yfinance(ticker):
