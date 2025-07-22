@@ -639,7 +639,47 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 """
     return prompt_formateado, titulo_post
 
+def enviar_email(texto_generado, asunto_email, nombre_archivo):
+    import os
+    from email.mime.base import MIMEBase
+    from email import encoders
 
+    remitente = "xumkox@gmail.com"
+    destinatario = "xumkox@gmail.com"
+    password = "kdgz lvdo wqvt vfkt"  # RECOMENDADO: usar variable de entorno
+
+    # Guardar el HTML en un archivo temporal
+    ruta_archivo = f"{nombre_archivo}.html"
+    with open(ruta_archivo, "w", encoding="utf-8") as f:
+        f.write(texto_generado)
+
+    # Crear el email
+    msg = MIMEMultipart()
+    msg['From'] = remitente
+    msg['To'] = destinatario
+    msg['Subject'] = asunto_email
+    msg.attach(MIMEText("Adjunto el análisis en formato HTML.", 'plain'))
+
+    # Adjuntar el archivo HTML
+    with open(ruta_archivo, "rb") as attachment:
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(attachment.read())
+
+    encoders.encode_base64(part)
+    part.add_header("Content-Disposition", f"attachment; filename= {nombre_archivo}.html")
+    msg.attach(part)
+
+    # Enviar el correo
+    try:
+        servidor = smtplib.SMTP('smtp.gmail.com', 587)
+        servidor.starttls()
+        servidor.login(remitente, password)
+        servidor.sendmail(remitente, destinatario, msg.as_string())
+        servidor.quit()
+        print(f"✅ Correo enviado con el adjunto: {ruta_archivo}")
+    except Exception as e:
+        print("❌ Error al enviar el correo:", e)
+        
 # Función para generar contenido con Gemini (no modificada, excepto por la llamada a construir_prompt_formateado)
 def generar_contenido_con_gemini(tickers):
     model = configurar_gemini()
