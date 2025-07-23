@@ -385,7 +385,7 @@ def obtener_datos_yfinance(ticker):
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
-def generar_recomendacion_avanzada(data, cierres_para_grafico_total, _para_grafico): # Cambio de nombre de la variable
+def generar_recomendacion_avanzada(data, cierres_para_grafico_total, _para_grafico):
     # Extraer los últimos 30 días de SMI para el análisis de tendencias
     smi_historico = _para_grafico[-30:] if len(_para_grafico) >= 30 else _para_grafico
 
