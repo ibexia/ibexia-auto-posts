@@ -227,68 +227,56 @@ def obtener_datos_yfinance(ticker):
         condicion_rsi = "Pendiente"
 
 
-        # Nuevas variables para los gráficos con offset y ción
-        OFFSET_DIAS = 0 # El SMI de hoy (D) se alinea con el precio de D+4
-        CION_FUTURA_DIAS = 5 # Días a tar después del último precio real
-
-        # Aseguramos tener suficientes datos para el historial, el offset y la ción
-        smi_history_full = hist_extended['SMI'].dropna() # Ahora el SMI final está en 'SMI'
+        # --- NUEVAS VARIABLES Y LÓGICA PARA GRÁFICOS Y PROYECCIÓN ---
+        # Definiciones para los gráficos
+        OFFSET_DIAS = 0
+        
+        # Aseguramos tener suficientes datos para el historial y la proyección
+        smi_history_full = hist_extended['SMI'].dropna()
         cierres_history_full = hist_extended['Close'].dropna()
 
-        # Calcula el volumen promedio de los últimos 30 días usando hist_extended
+        # Calcula el volumen promedio de los últimos 30 días
         volumen_promedio_30d = hist_extended['Volume'].tail(30).mean()
-
 
         # Fechas reales de cotización para los últimos 30 días
         fechas_historial = hist_extended['Close'].dropna().tail(30).index.strftime("%d/%m").tolist()
         ultima_fecha_historial = hist_extended['Close'].dropna().tail(1).index[0]
-        fechas_cion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, CION_FUTURA_DIAS + 1)]
+        # Creamos las fechas de proyección con la variable global PROYECCION_FUTURA_DIAS
+        fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
         
-        # SMI para los 30 días del gráfico (serán los que se visualicen)
-        # Serán los 30 SMI más recientes disponibles
+        # SMI para los 30 días del gráfico
         smi_historico_para_grafico = []
         if len(smi_history_full) >= 30:
             smi_historico_para_grafico = smi_history_full.tail(30).tolist()
         elif smi_history_full.empty:
-            smi_historico_para_grafico = [0.0] * 30 # Default neutral if no data
+            smi_historico_para_grafico = [0.0] * 30
         else:
-            # Fill with first available SMI if less than 30
             first_smi_val = smi_history_full.iloc[0]
             smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
 
-
-        # Precios para el gráfico: 30 días DESPLAZADOS + CIÓN
-        # Necesitamos los últimos (30 + OFFSET_DIAS) precios reales para tener el rango completo
+        # Precios para el gráfico: 30 días reales
         precios_reales_para_grafico = []
         if len(cierres_history_full) >= (30 + OFFSET_DIAS):
-            # Tomamos los 30 precios que se alinearán con los 30 SMI (considerando el offset)
             precios_reales_para_grafico = cierres_history_full.tail(30).tolist()
-        elif len(cierres_history_full) > OFFSET_DIAS: # Si tenemos menos de 30 pero más que el offset
-            # Tomamos lo que tengamos después del offset y rellenamos al principio
+        elif len(cierres_history_full) > OFFSET_DIAS:
             temp_prices = cierres_history_full.iloc[OFFSET_DIAS:].tolist()
             first_price_val = temp_prices[0] if temp_prices else current_price
             precios_reales_para_grafico = [first_price_val] * (30 - len(temp_prices)) + temp_prices
-        else: # Muy pocos datos históricos
-             precios_reales_para_grafico = [current_price] * 30 # Default to current price if no historical data
+        else:
+             precios_reales_para_grafico = [current_price] * 30
             
         smi_history_last_30 = hist['SMI'].dropna().tail(30).tolist()
         
-        # Proyección con subida libre hasta resistencia, pero sin perforarla si está lejos (>2%)
-        TOLERANCIA_CRUCE = 0.02
-        precios_proyectados = []
-        ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
-
         # --- NUEVA LÓGICA DE PROYECCIÓN DE PRECIOS BASADA EN TENDENCIA DEL SMI ---
         precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
         smi_history_full = hist_extended['SMI'].dropna()
         smi_proyectado = smi_history_full.tail(1).iloc[0] if not smi_history_full.empty else 0
-        TOLERANCIA_CRUCE = 0.005 # Tolerancia del 0.5%
+        TOLERANCIA_CRUCE = 0.005
 
         # Proyectamos el SMI para la zona del futuro
         smi_proyectado_futuro = []
         for i in range(PROYECCION_FUTURA_DIAS):
-            # Proyectar el SMI del futuro:
             if -100 <= smi_proyectado < -40:
                 smi_proyectado += random.uniform(5, 15)
             elif 40 < smi_proyectado <= 100:
@@ -303,8 +291,6 @@ def obtener_datos_yfinance(ticker):
             factor_cambio = (smi_futuro / 100) * (-0.01)
             siguiente_precio = ultimo_precio_conocido * (1 + factor_cambio)
 
-            # Considerar soportes y resistencias para evitar "perforaciones" inmediatas
-            # Comprobar si cruza una resistencia
             if siguiente_precio > ultimo_precio_conocido:
                 for r in sorted(resistencias):
                     if ultimo_precio_conocido < r < siguiente_precio:
@@ -312,7 +298,6 @@ def obtener_datos_yfinance(ticker):
                         if distancia_relativa > TOLERANCIA_CRUCE:
                             siguiente_precio = round(r * (1 - 0.001), 2)
                         break
-            # Comprobar si cruza un soporte
             elif siguiente_precio < ultimo_precio_conocido:
                 for s in sorted(soportes, reverse=True):
                     if siguiente_precio < s < ultimo_precio_conocido:
@@ -325,7 +310,6 @@ def obtener_datos_yfinance(ticker):
             precios_proyectados.append(siguiente_precio)
             ultimo_precio_conocido = siguiente_precio
         # --- FIN DE LA NUEVA LÓGICA ---
-
      
         # Unir precios reales y proyectados
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
