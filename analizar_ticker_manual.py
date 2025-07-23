@@ -304,8 +304,9 @@ def obtener_datos_yfinance(ticker):
             elif siguiente_smi_proyectado > 40:
                 movimiento_diario = -0.015 # Corrección fuerte a la baja
             else:
-                # Movimiento gradual basado en el SMI
-                movimiento_diario = (siguiente_smi_proyectado / 100) * (0.01)
+                # Movimiento gradual basado en el SMI (CORRECCIÓN APLICADA AQUÍ)
+                # Un SMI negativo provoca subida, y un SMI positivo provoca bajada (movimiento de rebote/corrección)
+                movimiento_diario = (siguiente_smi_proyectado / 100) * (-0.01)
 
             siguiente_precio_tentativo = ultimo_precio_conocido * (1 + movimiento_diario)
             siguiente_precio = siguiente_precio_tentativo # Valor por defecto
@@ -328,6 +329,7 @@ def obtener_datos_yfinance(ticker):
             precios_proyectados.append(siguiente_precio)
             ultimo_precio_conocido = siguiente_precio
             ultimo_smi_conocido = siguiente_smi_proyectado # Actualizar SMI para el siguiente cálculo
+
         # --- Fin de la lógica mejorada ---
       
      
