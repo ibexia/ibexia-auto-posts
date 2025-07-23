@@ -1001,7 +1001,7 @@ def generar_contenido_con_gemini(tickers):
         smi_historico_para_grafico = data.get('_PARA_GRAFICO', [])
 
         # Ahora pasa estas variables a la función generar_recomendacion_avanzada
-        data = generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_historico_para_grafico)
+        data = generar_recomendacion_avanzada(data, cierres_para_grafico_total, data.get('_PARA_GRAFICO', []))
         
 
         prompt, titulo_post = construir_prompt_formateado(data)
