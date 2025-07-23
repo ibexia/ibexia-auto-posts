@@ -293,7 +293,7 @@ def obtener_datos_yfinance(ticker):
         x_vals = np.arange(len(smi_vals))
 
         if len(smi_vals) >= 5:
-            spline = make_interp_spline(x_vals, smi_vals, k=3, ext=0)
+            spline = make_interp_spline(x_vals, smi_vals, k=3)
             x_futuro = np.arange(len(smi_vals), len(smi_vals) + PROYECCION_FUTURA_DIAS)
             smi_proyectado_futuro = spline(x_futuro)
             smi_proyectado_futuro = np.clip(smi_proyectado_futuro, -100, 100)
