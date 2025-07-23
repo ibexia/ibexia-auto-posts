@@ -13,6 +13,14 @@ import numpy as np
 import time
 import re
 import random
+# Asegurarse de que scipy está disponible
+try:
+    from scipy.interpolate import make_interp_spline
+except ImportError:
+    import subprocess
+    import sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "scipy"])
+    from scipy.interpolate import make_interp_spline
 
 # Definición de la cantidad de días para la proyección futura
 PROYECCION_FUTURA_DIAS = 5
