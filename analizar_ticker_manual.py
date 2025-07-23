@@ -274,55 +274,58 @@ def obtener_datos_yfinance(ticker):
         smi_proyectado = smi_history_full.tail(1).iloc[0] if not smi_history_full.empty else 0
         TOLERANCIA_CRUCE = 0.005
 
-        # Proyectamos el SMI para la zona del futuro
+
+        # Proyectamos el SMI para la zona del futuro con reversión lógica
         smi_proyectado_futuro = []
+        smi_ultimos = smi_history_full.tail(7).tolist()
+        cambios_recientes = np.diff(smi_ultimos[-5:]) if len(smi_ultimos) >= 6 else [pendiente_smi]
+        promedio_cambios = np.mean(cambios_recientes)
+
         for i in range(PROYECCION_FUTURA_DIAS):
-            smi_step = pendiente_smi  # La base del movimiento es la pendiente actual
+            # Detecta posible giro si el cambio se está frenando
+            if len(cambios_recientes) >= 3 and cambios_recientes[-1] > cambios_recientes[-2] < cambios_recientes[-3]:
+                pendiente_smi *= -0.5  # invertir suavemente
 
-            # Ajustamos el paso si el SMI se acerca a las zonas de sobrecompra/sobreventa
-            if smi_proyectado > 70:  # Si está en sobrecompra fuerte (>70)
-                smi_step *= (100 - smi_proyectado) / 30  # Disminuye el paso a medida que se acerca a 100
-                if smi_step > 0:
-                    smi_step = -abs(smi_step)  # Si sigue subiendo, fuerza el descenso
-            elif smi_proyectado < -70:  # Si está en sobreventa fuerte (<-70)
-                smi_step *= (smi_proyectado + 100) / 30  # Disminuye el paso a medida que se acerca a -100
-                if smi_step < 0:
-                    smi_step = abs(smi_step)  # Si sigue bajando, fuerza el ascenso
-            elif smi_proyectado > 40:  # En sobrecompra (40-70)
-                if smi_step > 0:
-                    smi_step *= 0.5  # Suaviza el ascenso
-            elif smi_proyectado < -40:  # En sobreventa (-40 - -70)
-                if smi_step < 0:
-                    smi_step *= 0.5  # Suaviza el descenso
+            smi_step = pendiente_smi
 
-            # Añadimos una pequeña aleatoriedad para evitar una línea demasiado recta
-            smi_step += random.uniform(-0.5, 0.5)
+            if smi_proyectado > 70:
+                smi_step *= (100 - smi_proyectado) / 30
+                if smi_step > 0:
+                    smi_step = -abs(smi_step)
+            elif smi_proyectado < -70:
+                smi_step *= (smi_proyectado + 100) / 30
+                if smi_step < 0:
+                    smi_step = abs(smi_step)
+            elif smi_proyectado > 40 and smi_step > 0:
+                smi_step *= 0.5
+            elif smi_proyectado < -40 and smi_step < 0:
+                smi_step *= 0.5
+
+            smi_step += random.uniform(-0.2, 0.2)  # suavemente aleatorio
 
             smi_proyectado += smi_step
-            smi_proyectado = np.clip(smi_proyectado, -100, 100)  # Mantenemos el SMI dentro de [-100, 100]
-            smi_proyectado_futuro.append(smi_proyectado)
+            smi_proyectado = np.clip(smi_proyectado, -100, 100)
+            smi_proyectado_futuro.append(round(smi_proyectado, 2))
+
+            cambios_recientes = cambios_recientes[1:] + [smi_step] if len(cambios_recientes) >= 5 else cambios_recientes + [smi_step]
+
 
         # Usar los SMI proyectados para calcular los precios proyectados
-        for smi_futuro in smi_proyectado_futuro:
-            factor_cambio = (smi_futuro / 100) * (-0.01)
-            siguiente_precio = ultimo_precio_conocido * (1 + factor_cambio)
+        # Sincronizar el precio con el movimiento del SMI proyectado
+        precios_proyectados = []
+        ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
-            if siguiente_precio > ultimo_precio_conocido:
-                for r in sorted(resistencias):
-                    if ultimo_precio_conocido < r < siguiente_precio:
-                        distancia_relativa = abs(siguiente_precio - r) / r
-                        if distancia_relativa > TOLERANCIA_CRUCE:
-                            siguiente_precio = round(r * (1 - 0.001), 2)
-                        break
-            elif siguiente_precio < ultimo_precio_conocido:
-                for s in sorted(soportes, reverse=True):
-                    if siguiente_precio < s < ultimo_precio_conocido:
-                        distancia_relativa = abs(siguiente_precio - s) / s
-                        if distancia_relativa > TOLERANCIA_CRUCE:
-                            siguiente_precio = round(s * (1 + 0.001), 2)
-                        break
+        for i in range(len(smi_proyectado_futuro)):
+            if i == 0:
+                smi_diff = smi_proyectado_futuro[i] - smi_historico_para_grafico[-1]
+            else:
+                smi_diff = smi_proyectado_futuro[i] - smi_proyectado_futuro[i - 1]
 
-            siguiente_precio = round(siguiente_precio, 2)
+            # El precio reacciona proporcional al cambio del SMI
+            factor_cambio = smi_diff / 100  # sensibilidad base
+            siguiente_precio = ultimo_precio_conocido * (1 + factor_cambio * 0.5)  # 0.5 = sensibilidad moderada
+
+            siguiente_precio = max(0.01, round(siguiente_precio, 2))  # evitar precios negativos o cero
             precios_proyectados.append(siguiente_precio)
             ultimo_precio_conocido = siguiente_precio
         # --- FIN DE LA NUEVA LÓGICA ---
