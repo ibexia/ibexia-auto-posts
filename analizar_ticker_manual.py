@@ -382,7 +382,7 @@ def obtener_datos_yfinance(ticker):
             "PRECIO_OBJETIVO": precio_objetivo,
             "FECHAS_HISTORIAL": fechas_historial,
             "FECHAS_PROYECCION": fechas_proyeccion,
-            "PRECIO_PROYECTADO_5DIAS": precio_proyectado_dia_5
+            "PRECIO_PROYECTADO_5DIAS": precio_proyectado_dia_5,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
 
