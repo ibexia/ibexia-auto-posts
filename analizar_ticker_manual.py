@@ -270,43 +270,48 @@ def obtener_datos_yfinance(ticker):
             
         smi_history_last_30 = hist['SMI'].dropna().tail(30).tolist()
         
-        # Proyección con subida libre hasta resistencia, pero sin perforarla si está lejos (>2%)
-        TOLERANCIA_CRUCE = 0.02
+        # --- Lógica mejorada para la proyección sin atravesar soportes y resistencias ---
         precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
+        # Ordenar soportes de mayor a menor para buscar el más cercano por debajo
+        soportes_ordenados_desc = sorted([soporte_1, soporte_2, soporte_3], reverse=True)
+        # Ordenar resistencias de menor a mayor para buscar la más cercana por encima
+        resistencias_ordenadas_asc = sorted([resistencia_1, resistencia_2, resistencia_3])
+
         for _ in range(PROYECCION_FUTURA_DIAS):
-            # Calcular intento de movimiento basado en SMI_actual
-            if smi_actual < -40: # Zona de sobreventa, indica posible rebote al alza
-                siguiente_precio = ultimo_precio_conocido * (1 + 0.015)
-            elif smi_actual > 40: # Zona de sobrecompra, indica posible corrección a la baja
-                siguiente_precio = ultimo_precio_conocido * (1 - 0.015)
-            else: # SMI neutral, movimiento más lateral o gradual
-                # Ajuste para SMI neutral, gradual y con poca volatilidad
-                daily_rate_of_change = (smi_actual / 100) * (-0.005) # Pequeño movimiento inverso al SMI
-                siguiente_precio = ultimo_precio_conocido * (1 + daily_rate_of_change)
-
-            # Si va subiendo, comprobar resistencias
-            if siguiente_precio > ultimo_precio_conocido:
-                for r in sorted(resistencias):
-                    if ultimo_precio_conocido < r < siguiente_precio:
-                        distancia_relativa = abs(siguiente_precio - r) / r
-                        if distancia_relativa > TOLERANCIA_CRUCE:
-                            siguiente_precio = round(r * (1 - 0.001), 2)
-                        break  # Solo considerar la primera que se interponga
-
-            # Si va bajando, comprobar soportes
-            elif siguiente_precio < ultimo_precio_conocido:
-                for s in sorted(soportes, reverse=True):
-                    if siguiente_precio < s < ultimo_precio_conocido:
-                        distancia_relativa = abs(siguiente_precio - s) / s
-                        if distancia_relativa > TOLERANCIA_CRUCE:
-                            siguiente_precio = round(s * (1 + 0.001), 2)
-                        break
+            # Calcular el movimiento del precio basado en el SMI
+            if smi_actual < -40:  # Posible rebote alcista
+                movimiento_diario = 0.015
+            elif smi_actual > 40:  # Posible corrección bajista
+                movimiento_diario = -0.015
+            else:  # Movimiento lateral o gradual
+                movimiento_diario = (smi_actual / 100) * (-0.005)
+            
+            siguiente_precio_tentativo = ultimo_precio_conocido * (1 + movimiento_diario)
+            
+            siguiente_precio = siguiente_precio_tentativo # Valor por defecto
+            
+            # Ajustar el precio para que no atraviese soportes
+            if siguiente_precio_tentativo < ultimo_precio_conocido:
+                for s in soportes_ordenados_desc:
+                    if s < ultimo_precio_conocido: # Asegurarse de que el soporte está por debajo del precio actual
+                        if siguiente_precio_tentativo < s:
+                            siguiente_precio = s # Detener el precio justo en el soporte
+                            break
+            
+            # Ajustar el precio para que no atraviese resistencias
+            elif siguiente_precio_tentativo > ultimo_precio_conocido:
+                for r in resistencias_ordenadas_asc:
+                    if r > ultimo_precio_conocido: # Asegurarse de que la resistencia está por encima del precio actual
+                        if siguiente_precio_tentativo > r:
+                            siguiente_precio = r # Detener el precio justo en la resistencia
+                            break
 
             siguiente_precio = round(siguiente_precio, 2)
             precios_proyectados.append(siguiente_precio)
             ultimo_precio_conocido = siguiente_precio
+        # --- Fin de la lógica mejorada ---
      
         # Unir precios reales y proyectados
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
