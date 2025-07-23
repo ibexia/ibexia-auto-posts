@@ -536,7 +536,7 @@ def construir_prompt_formateado(data):
 
         chart_html += f"""
         <h2>Evolución del indice ibexia y Precio</h2>
-        <p> Para entender nuestro gráfico, es importante saber que verás dos líneas principales. La línea que representa el precio de la acción se mide en el eje vertical izquierdo, mostrándote su valor actual en euros. Por otro lado, la línea Ibexia, que es un indicador propio de la fuerza del mercado, se mide en el eje vertical derecho. </p>
+        <p> Para entender nuestro gráfico, es importante saber que verás dos líneas principales. La línea que representa el precio de la acción se mide en el eje vertical derecho, mostrándote su valor actual en euros. Por otro lado, la línea Ibexia, que es un indicador propio de la fuerza del mercado, se mide en el eje vertical izquierdo. </p>
         <p>La línea Ibexia te ayuda a interpretar los movimientos del precio de la siguiente manera:</p>
         <ul>
             <li><b>Subida:</b> Indica que el impulso alcista está creciendo y que el precio de la acción tiende a subir.</li>
