@@ -387,7 +387,7 @@ def obtener_datos_yfinance(ticker):
 
 def generar_recomendacion_avanzada(data, cierres_para_grafico_total, _para_grafico): # Cambio de nombre de la variable
     # Extraer los últimos 30 días de SMI para el análisis de tendencias
-     = _para_grafico[-30:] if len(_para_grafico) >= 30 else _para_grafico
+    smi_historico = smi_historico_para_grafico[-30:] if len(smi_historico_para_grafico) >= 30 else smi_historico_para_grafico
 
     # Calcular la pendiente de los últimos N SMI para la tendencia
     n_trend = min(7, len()) # Últimos 7 días o menos si no hay tantos
