@@ -387,10 +387,10 @@ def obtener_datos_yfinance(ticker):
 
 def generar_recomendacion_avanzada(data, cierres_para_grafico_total, _para_grafico): # Cambio de nombre de la variable
     # Extraer los últimos 30 días de SMI para el análisis de tendencias
-    smi_historico = smi_historico_para_grafico[-30:] if len(smi_historico_para_grafico) >= 30 else smi_historico_para_grafico
+    smi_historico = _para_grafico[-30:] if len(_para_grafico) >= 30 else _para_grafico
 
     # Calcular la pendiente de los últimos N SMI para la tendencia
-    n_trend = min(7, len()) # Últimos 7 días o menos si no hay tantos
+    n_trend = min(7, len(smi_historico)) # Últimos 7 días o menos si no hay tantos
     if n_trend > 1:
         x_trend = np.arange(n_trend)
         y_trend = np.array(smi_historico[-n_trend:])
@@ -451,7 +451,7 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, _para_grafi
 
     # Detección de Patrones de Reversión desde Extremos:
     # Reversión de Compra (SMI saliendo de sobrecompra/extremo negativo)
-    if len() >= 2 and [-1] > smi_historico[-2] and \
+    if len(smi_historico) >= 2 and smi_historico[-1] > smi_historico[-2] and \
        smi_historico[-2] <= -40 and smi_historico[-1] > -40: # SMI estaba muy bajo y empieza a subir
         if recomendacion not in ["Fuerte Compra", "Oportunidad de Compra (Reversión)"]:
             recomendacion = "Oportunidad de Compra (Reversión)"
@@ -516,7 +516,7 @@ def construir_prompt_formateado(data):
 
     titulo_post = f"Análisis Técnico: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Recomendación de {data['RECOMENDACION']}"
     # Recuperamos los datos del diccionario 'data'
-    smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
+    smi_historico_para_grafico = data.get('_PARA_GRAFICO', [])
     smi_proyectado_futuro = data.get('SMI_PROYECTADO_FUTURO', [])
     precios_reales_para_grafico = data.get('CIERRES_30_DIAS', [])
     precios_proyectados = data.get('PRECIOS_PROYECTADOS', [])
