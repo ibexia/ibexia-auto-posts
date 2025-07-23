@@ -303,7 +303,7 @@ def obtener_datos_yfinance(ticker):
             smi_proyectado_futuro = [smi_vals[-1]] * PROYECCION_FUTURA_DIAS
 
         # --- NUEVA LÓGICA DE PROYECCIÓN DE PRECIOS BASADA EN SMI PROYECTADO ---
-       precios_proyectados = []
+        precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
         # Obtener los soportes y resistencias para usarlos como límites
