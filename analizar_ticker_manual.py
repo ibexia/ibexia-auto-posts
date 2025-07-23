@@ -535,12 +535,15 @@ def construir_prompt_formateado(data):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
 
         chart_html += f"""
-        <h2>Evolución del Stochastic Momentum Index (SMI) y Precio</h2>
-        <p>Para ofrecer una perspectiva visual clara de la evolución del SMI...
-        Es importante recordar que el SMI de hoy (D) se alinea con el precio de D+4,
-        lo que significa que la reacción del mercado al SMI generalmente se observa
-        unos pocos días después de su formación.
-        </p>
+        <h2>Evolución del indice ibexia y Precio</h2>
+        <p> Para entender nuestro gráfico, es importante saber que verás dos líneas principales. La línea que representa el precio de la acción se mide en el eje vertical izquierdo, mostrándote su valor actual en euros. Por otro lado, la línea Ibexia, que es un indicador propio de la fuerza del mercado, se mide en el eje vertical derecho. </p>
+        <p>La línea Ibexia te ayuda a interpretar los movimientos del precio de la siguiente manera:</p>
+        <ul>
+            <li><b>Subida:</b> Indica que el impulso alcista está creciendo y que el precio de la acción tiende a subir.</li>
+            <li><b>Bajada:</b> Señala que el impulso bajista está ganando fuerza y que el precio de la acción tiende a caer.</li>
+            <li><b>Se Aplana:</b> Muestra que el mercado está en una fase de consolidación, sin una dirección clara.</li>
+            <li><b>Gira:</b> Advierte de un posible cambio de tendencia en el precio.</li>
+        </ul>
         <div style="width: 100%; max-width: 800px; margin: auto;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
@@ -879,9 +882,9 @@ def construir_prompt_formateado(data):
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio.
 
-Destaca los datos importantes como precios, valores del SMI, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
+Destaca los datos importantes como precios, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
 
-Genera un análisis técnico completo de aproximadamente 800 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención al **valor actual del SMI ({data['SMI']})**.
+Genera un análisis técnico completo de aproximadamente 800 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención (pero no lo menciones) al **valor actual del SMI ({data['SMI']})**.
 
 ¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y Único para TODOS sus gráficos solicitados. Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
 
@@ -907,11 +910,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <h2>Análisis Inicial y Recomendación</h2>
 <p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente, alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
 
-<p>Nuestro análisis del Stochastic Momentum Index (SMI) arroja un valor de <strong>{data['SMI']}</strong>. Esta puntuación, combinada con la **{data['tendencia_ibexia']}** tendencia del SMI, la proximidad a soportes y resistencias, y el volumen, nos lleva a una recomendación de <strong>{data['RECOMENDACION']}</strong>. Actualmente, el mercado se encuentra en una situación de <strong>{data['CONDICION_RSI']}</strong>. Esto refleja {'una excelente fortaleza técnica y baja volatilidad esperada a corto plazo, lo que indica un bajo riesgo técnico en relación con el potencial de crecimiento.' if "Compra" in data['RECOMENDACION'] and data['SMI'] < -20 else ''}
-{'una fortaleza técnica moderada, con un equilibrio entre potencial y riesgo, sugiriendo una oportunidad que requiere seguimiento.' if "Compra Moderada" in data['RECOMENDACION'] or (data['SMI'] >= -20 and data['SMI'] < 0) else ''}
-{'una situación técnica neutral, donde el gráfico no muestra un patrón direccional claro, indicando que es un momento para la observación y no para la acción inmediata.' if "Neutral" in data['RECOMENDACION'] else ''}
-{'cierta debilidad técnica, con posibles señales de corrección o continuación bajista, mostrando una pérdida de impulso alcista y un aumento de la presión vendedora.' if "Venta" in data['RECOMENDACION'] or (data['SMI'] > 0 and data['SMI'] <= 20) else ''}
-{'una debilidad técnica significativa y una posible sobrecompra en el gráfico, lo que sugiere un alto riesgo de corrección.' if "Venta Fuerte" in data['RECOMENDACION'] or data['SMI'] > 20 else ''} </p>
+
 {chart_html}
 
 {tabla_resumen}
