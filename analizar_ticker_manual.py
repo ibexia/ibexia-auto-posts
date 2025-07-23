@@ -253,14 +253,14 @@ def obtener_datos_yfinance(ticker):
         fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
         
         # SMI para los 30 días del gráfico
-        _para_grafico = []
+        smi_historico_para_grafico = []
         if len(smi_history_full) >= 30:
-            _para_grafico = smi_history_full.tail(30).tolist()
+            smi_historico_para_grafico = smi_history_full.tail(30).tolist()
         elif smi_history_full.empty:
-            _para_grafico = [0.0] * 30
+            smi_historico_para_grafico = [0.0] * 30
         else:
             first_smi_val = smi_history_full.iloc[0]
-            _para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
+            smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
 
         # Precios para el gráfico: 30 días reales
         precios_reales_para_grafico = []
