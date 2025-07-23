@@ -365,6 +365,7 @@ def obtener_datos_yfinance(ticker):
             "CIERRES_30_DIAS": hist['Close'].dropna().tail(30).tolist(),
             "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico, # Renombrado
             "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total,
+            "PRECIOS_PROYECTADOS": precios_proyectados, # ¡NUEVO! Guardamos la lista aquí
             "OFFSET_DIAS_GRAFICO": OFFSET_DIAS,
             "RESISTENCIA_1": resistencia_1,
             "RESISTENCIA_2": resistencia_2,
@@ -513,21 +514,19 @@ def construir_prompt_formateado(data):
 
     titulo_post = f"Análisis Técnico: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Recomendación de {data['RECOMENDACION']}"
 
-    # Datos para el gráfico principal de SMI y Precios
+    # Recuperamos los datos del diccionario 'data' que ahora contiene las listas de precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
-    cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
-    OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 4)
-    PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
+    smi_proyectado_futuro = data.get('SMI_PROYECTADO_FUTURO', [])
+    precios_reales_para_grafico = data.get('CIERRES_30_DIAS', [])
+    precios_proyectados = data.get('PRECIOS_PROYECTADOS', [])
 
-    # Preparamos las dos listas de datos para SMI: histórico y proyectado
-    smi_historico_con_nulos_futuros = smi_historico_para_grafico + [None] * PROYECCION_FUTURA_DIAS
-    smi_proyectado_con_nulos_historicos = [None] * len(smi_historico_para_grafico) + data.get('smi_proyectado_futuro', [])
+    # Preparamos los datos para los gráficos de SMI
+    smi_historico_con_nulos_futuros = smi_historico_para_grafico + [None] * len(smi_proyectado_futuro)
+    smi_proyectado_con_nulos_historicos = [None] * len(smi_historico_para_grafico) + smi_proyectado_futuro
 
-    # El SMI proyectado está en 'smi_proyectado_futuro', lo pasamos aquí
-    # El SMI proyectado está en 'smi_proyectado_futuro', lo pasamos aquí
-    # data_proyectada solo contiene los precios, necesitamos lo mismo para el SMI
-    data_smi_historico = smi_historico_con_nulos_futuros
-    data_smi_proyectado = smi_proyectado_con_nulos_historicos
+    # Preparamos los datos para los gráficos de precios
+    precios_historicos_con_nulos_futuros = precios_reales_para_grafico + [None] * len(precios_proyectados)
+    precios_proyectados_con_nulos_historicos = [None] * len(precios_reales_para_grafico) + precios_proyectados
 
     labels_historial = data.get('FECHAS_HISTORIAL', [])
     labels_proyeccion = data.get('FECHAS_PROYECCION', [])
@@ -568,7 +567,7 @@ def construir_prompt_formateado(data):
                     datasets: [
                         {{
                             label: 'SMI Histórico',
-                            data: {json.dumps(data_smi_historico)},
+                            data: {json.dumps(smi_historico_con_nulos_futuros)},
                             borderColor: 'rgba(54, 162, 235, 1)',
                             backgroundColor: 'rgba(54, 162, 235, 0.2)',
                             yAxisID: 'y',
@@ -578,7 +577,7 @@ def construir_prompt_formateado(data):
                         }},
                         {{
                             label: 'SMI Proyectado',
-                            data: {json.dumps(data_smi_proyectado)},
+                            data: {json.dumps(smi_proyectado_con_nulos_historicos)},
                             borderColor: 'rgba(54, 162, 235, 1)',
                             backgroundColor: 'rgba(54, 162, 235, 0.2)',
                             yAxisID: 'y',
@@ -589,7 +588,7 @@ def construir_prompt_formateado(data):
                         }},
                         {{
                             label: 'Precio',
-                            data: {json.dumps(precios_reales_para_grafico)},
+                            data: {json.dumps(precios_historicos_con_nulos_futuros)},
                             borderColor: 'rgba(75, 192, 192, 1)',
                             backgroundColor: 'rgba(75, 192, 192, 0.2)',
                             yAxisID: 'y1',
@@ -598,7 +597,7 @@ def construir_prompt_formateado(data):
                         }},
                         {{
                             label: 'Precio Proyectado',
-                            data: {json.dumps(data_proyectada)},
+                            data: {json.dumps(precios_proyectados_con_nulos_historicos)},
                             borderColor: 'rgba(255, 99, 132, 1)',
                             backgroundColor: 'rgba(255, 99, 132, 0.2)',
                             yAxisID: 'y1',
