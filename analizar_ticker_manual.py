@@ -333,7 +333,7 @@ def obtener_datos_yfinance(ticker):
         # Unir precios reales y proyectados
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
 
-        tendencia_smi = "No disponible"
+        tendencia_ibexia = "No disponible"
         
         if len(smi_history_last_30) >= 2:
             x = np.arange(len(smi_history_last_30))
@@ -344,11 +344,11 @@ def obtener_datos_yfinance(ticker):
                 slope = 0.0
 
             if slope > 0.1:
-                tendencia_smi = "mejorando"
+                tendencia_ibexia = "mejorando"
             elif slope < -0.1:
-                tendencia_smi = "empeorando"
+                tendencia_ibexia = "empeorando"
             else:
-                tendencia_smi = "estable"
+                tendencia_ibexia = "estable"
 
         datos = {
             "TICKER": ticker,
@@ -364,7 +364,7 @@ def obtener_datos_yfinance(ticker):
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
             "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
-            "TENDENCIA_SMI": tendencia_smi, # Renombrado de TENDENCIA_NOTA
+            "tendencia_ibexia": tendencia_ibexia, # Renombrado de TENDENCIA_NOTA
             "CIERRES_30_DIAS": hist['Close'].dropna().tail(30).tolist(),
             "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico, # Renombrado
             "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total,
@@ -403,11 +403,11 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
         slope = 0 # No hay suficientes datos para calcular la pendiente
 
     if slope > 0.1:
-        tendencia_smi = "mejorando (alcista)"
+        tendencia_ibexia = "mejorando (alcista)"
     elif slope < -0.1:
-        tendencia_smi = "empeorando (bajista)"
+        tendencia_ibexia = "empeorando (bajista)"
     else:
-        tendencia_smi = "estable (lateral)"
+        tendencia_ibexia = "estable (lateral)"
 
     # Determinar si el volumen es alto (ej. > 1.5 veces el volumen medio de los últimos 20 días)
     volumen_alto = False
@@ -427,26 +427,26 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
                 proximidad_resistencia = True
 
     recomendacion = "Neutral"
-    condicion_mercado = "En observación"
-    motivo_recomendacion = "La situación actual no presenta señales claras de compra ni venta."
+    condicion_analisis = "En observación"
+    motivo_analisis = "La situación actual no presenta señales claras de compra ni venta."
 
     # Lógica de Giro Alcista (Compra)
     # Basamos la recomendación en el SMI directamente
-    if tendencia_smi == "mejorando (alcista)" and data['SMI'] < 0 and volumen_alto: # SMI en zona negativa y mejorando con volumen
+    if tendencia_ibexia == "mejorando (alcista)" and data['SMI'] < 0 and volumen_alto: # Linea ibexia en zona negativa y mejorando con volumen
         recomendacion = "Fuerte Compra"
-        condicion_mercado = "Impulso alcista con confirmación de volumen desde zona de sobreventa"
-        motivo_recomendacion = "El SMI está mejorando y se encuentra en zona de sobreventa, con un volumen significativo, indicando un fuerte impulso alcista."
+        condicion_analisis = "Impulso alcista con confirmación de volumen desde zona de sobreventa"
+        motivo_analisis = "La Linea ibexia está mejorando y se encuentra en zona de sobreventa, con un volumen significativo, indicando un fuerte impulso alcista."
 
     # Lógica de Giro Bajista (Venta Condicional)
-    elif tendencia_smi == "empeorando (bajista)" and data['SMI'] > 0 and volumen_alto: # SMI en zona positiva y empeorando con volumen
+    elif tendencia_ibexia == "empeorando (bajista)" and data['SMI'] > 0 and volumen_alto: # La Linea ibexia en zona positiva y empeorando con volumen
         if not proximidad_soporte:
             recomendacion = "Venta Condicional / Alerta"
-            condicion_mercado = "Debilidad confirmada por volumen desde zona de sobrecompra, considerar salida"
-            motivo_recomendacion = "El SMI está empeorando y se encuentra en zona de sobrecompra, con volumen alto y sin soporte cercano, sugiriendo debilidad."
+            condicion_analisis = "Debilidad confirmada por volumen desde zona de sobrecompra, considerar salida"
+            motivo_analisis = "La Linea ibexia está empeorando y se encuentra en zona de sobrecompra, con volumen alto y sin soporte cercano, sugiriendo debilidad."
         else:
             recomendacion = "Neutral / Cautela"
-            condicion_mercado = "Debilidad pero cerca de soporte clave, observar rebote"
-            motivo_recomendacion = "El SMI está empeorando, pero la proximidad a un soporte clave sugiere cautela antes de vender."
+            condicion_analisis = "Debilidad pero cerca de soporte clave, observar rebote"
+            motivo_analisis = "La Linea ibexia está empeorando, pero la proximidad a un soporte clave sugiere cautela antes de vender."
 
     # Detección de Patrones de Reversión desde Extremos:
     # Reversión de Compra (SMI saliendo de sobrecompra/extremo negativo)
@@ -454,34 +454,34 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
        smi_historico[-2] <= -40 and smi_historico[-1] > -40: # SMI estaba muy bajo y empieza a subir
         if recomendacion not in ["Fuerte Compra", "Oportunidad de Compra (Reversión)"]:
             recomendacion = "Oportunidad de Compra (Reversión)"
-            condicion_mercado = "Posible inicio de rebote tras sobreventa extrema, punto de entrada"
-            motivo_recomendacion = "Reversión de compra: El SMI está ascendiendo desde una zona de sobreventa extrema, indicando una oportunidad de entrada."
+            condicion_analisis = "Posible inicio de rebote tras sobreventa extrema, punto de entrada"
+            motivo_analisis = "Reversión de compra: La Linea ibexia está ascendiendo desde una zona de sobreventa extrema, indicando una oportunidad de entrada."
 
     # Reversión de Venta (SMI saliendo de sobreventa/extremo positivo)
     elif len(smi_historico) >= 2 and smi_historico[-1] < smi_historico[-2] and \
          smi_historico[-2] >= 40 and smi_historico[-1] < 40: # SMI estaba muy alto y empieza a bajar
         if recomendacion not in ["Venta Condicional / Alerta", "Señal de Venta (Reversión)"]:
             recomendacion = "Señal de Venta (Reversión)"
-            condicion_mercado = "Posible inicio de corrección tras sobrecompra extrema, punto de salida"
-            motivo_recomendacion = "Señal de venta: El SMI está descendiendo desde una zona de sobrecompra extrema, indicando un punto de salida."
+            condicion_analisis = "Posible inicio de corrección tras sobrecompra extrema, punto de salida"
+            motivo_analisis = "Señal de venta: La Linea ibexia está descendiendo desde una zona de sobrecompra extrema, indicando un punto de salida."
 
     # Lógica para "Neutral" si ninguna de las condiciones anteriores se cumple con fuerza
     if recomendacion == "Neutral":
-        if tendencia_smi == "estable (lateral)":
-            condicion_mercado = "Consolidación o lateralidad sin dirección clara."
-            motivo_recomendacion = "El SMI se mantiene estable, indicando una fase de consolidación o lateralidad sin dirección clara."
-        elif data['SMI'] < 20 and tendencia_smi == "mejorando (alcista)" and not volumen_alto:
+        if tendencia_ibexia == "estable (lateral)":
+            condicion_analisis = "Consolidación o lateralidad sin dirección clara."
+            motivo_analisis = "La Linea ibexia se mantiene estable, indicando una fase de consolidación o lateralidad sin dirección clara."
+        elif data['SMI'] < 20 and tendencia_ibexia == "mejorando (alcista)" and not volumen_alto:
             recomendacion = "Neutral / Observación"
-            condicion_mercado = "SMI moderadamente bajo con mejora, pero falta confirmación de volumen."
-            motivo_recomendacion = "El SMI es moderadamente bajo y muestra una mejora, pero la falta de volumen significativo sugiere una fase de observación."
-        elif data['SMI'] > -20 and tendencia_smi == "empeorando (bajista)" and not volumen_alto:
+            condicion_analisis = "La Linea ibexia moderadamente bajo con mejora, pero falta confirmación de volumen."
+            motivo_analisis = "La Linea ibexia es moderadamente bajo y muestra una mejora, pero la falta de volumen significativo sugiere una fase de observación."
+        elif data['SMI'] > -20 and tendencia_ibexia == "empeorando (bajista)" and not volumen_alto:
             recomendacion = "Neutral / Observación"
-            condicion_mercado = "SMI moderadamente alto con empeoramiento, pero falta confirmación de volumen."
-            motivo_recomendacion = "El SMI es moderadamente alto y empeora, pero la falta de volumen significativo sugiere una fase de observación."
+            condicion_analisis = "La Linea ibexia moderadamente alto con empeoramiento, pero falta confirmación de volumen."
+            motivo_analisis = "La Linea ibexiaes moderadamente alto y empeora, pero la falta de volumen significativo sugiere una fase de observación."
 
     data['RECOMENDACION'] = recomendacion
-    data['CONDICION_RSI'] = condicion_mercado # Aunque el nombre es RSI, el concepto es la condición del mercado
-    data['MOTIVO_RECOMENDACION'] = motivo_recomendacion
+    data['CONDICION_RSI'] = condicion_analisis # Aunque el nombre es RSI, el concepto es la condición del mercado
+    data['motivo_analisis'] = motivo_analisis
 
     return data
 
@@ -499,11 +499,11 @@ def construir_prompt_formateado(data):
                 if volumen_promedio_30d > 0:
                     cambio_porcentual_volumen = ((volumen_actual - volumen_promedio_30d) / volumen_promedio_30d) * 100
                     if cambio_porcentual_volumen > 50:
-                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia del SMI ({data['TENDENCIA_SMI']})."
+                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia de  La Linea ibexia ({data['tendencia_ibexia']})."
                     elif cambio_porcentual_volumen < -30:
-                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es inferior a lo habitual, lo que podría sugerir cautela en la actual tendencia. Una confirmación de la señal del SMI ({data['TENDENCIA_SMI']}) requeriría un aumento en la participación del mercado."
+                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es inferior a lo habitual, lo que podría sugerir cautela en la actual tendencia. Una confirmación de la señal de La Linea ibexia ({data['tendencia_ibexia']}) requeriría un aumento en la participación del mercado."
                     else:
-                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> se mantiene en línea con el promedio. Es un volumen adecuado, pero no excepcional, para confirmar de manera contundente la señal del SMI ({data['TENDENCIA_SMI']})."
+                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> se mantiene en línea con el promedio. Es un volumen adecuado, pero no excepcional, para confirmar de manera contundente la señal de La Linea ibexia ({data['tendencia_ibexia']})."
                 else:
                     volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. "
             else:
@@ -869,16 +869,8 @@ def construir_prompt_formateado(data):
         <td style="padding: 8px;"><strong>{data['RECOMENDACION']}</strong></td>
     </tr>
     <tr>
-        <td style="padding: 8px;">SMI Actual</td>
-        <td style="padding: 8px;"><strong>{data['SMI']:,}</strong></td>
-    </tr>
-    <tr>
         <td style="padding: 8px;">Precio Objetivo de Compra</td>
         <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Tendencia del SMI</td>
-        <td style="padding: 8px;"><strong>{data['TENDENCIA_SMI']}</strong></td>
     </tr>
 </table>
 <br/>
@@ -903,7 +895,7 @@ Genera un análisis técnico completo de aproximadamente 800 palabras sobre la e
 - Recomendación general: {data['RECOMENDACION']}
 - SMI actual: {data['SMI']}
 - Precio objetivo de compra: {data['PRECIO_OBJETIVO_COMPRA']}€
-- Tendencia del SMI: {data['TENDENCIA_SMI']}
+- Tendencia del SMI: {data['tendencia_ibexia']}
 
 
 Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia al **valor actual del SMI ({data['SMI']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
@@ -915,7 +907,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <h2>Análisis Inicial y Recomendación</h2>
 <p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente, alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
 
-<p>Nuestro análisis del Stochastic Momentum Index (SMI) arroja un valor de <strong>{data['SMI']}</strong>. Esta puntuación, combinada con la **{data['TENDENCIA_SMI']}** tendencia del SMI, la proximidad a soportes y resistencias, y el volumen, nos lleva a una recomendación de <strong>{data['RECOMENDACION']}</strong>. Actualmente, el mercado se encuentra en una situación de <strong>{data['CONDICION_RSI']}</strong>. Esto refleja {'una excelente fortaleza técnica y baja volatilidad esperada a corto plazo, lo que indica un bajo riesgo técnico en relación con el potencial de crecimiento.' if "Compra" in data['RECOMENDACION'] and data['SMI'] < -20 else ''}
+<p>Nuestro análisis del Stochastic Momentum Index (SMI) arroja un valor de <strong>{data['SMI']}</strong>. Esta puntuación, combinada con la **{data['tendencia_ibexia']}** tendencia del SMI, la proximidad a soportes y resistencias, y el volumen, nos lleva a una recomendación de <strong>{data['RECOMENDACION']}</strong>. Actualmente, el mercado se encuentra en una situación de <strong>{data['CONDICION_RSI']}</strong>. Esto refleja {'una excelente fortaleza técnica y baja volatilidad esperada a corto plazo, lo que indica un bajo riesgo técnico en relación con el potencial de crecimiento.' if "Compra" in data['RECOMENDACION'] and data['SMI'] < -20 else ''}
 {'una fortaleza técnica moderada, con un equilibrio entre potencial y riesgo, sugiriendo una oportunidad que requiere seguimiento.' if "Compra Moderada" in data['RECOMENDACION'] or (data['SMI'] >= -20 and data['SMI'] < 0) else ''}
 {'una situación técnica neutral, donde el gráfico no muestra un patrón direccional claro, indicando que es un momento para la observación y no para la acción inmediata.' if "Neutral" in data['RECOMENDACION'] else ''}
 {'cierta debilidad técnica, con posibles señales de corrección o continuación bajista, mostrando una pérdida de impulso alcista y un aumento de la presión vendedora.' if "Venta" in data['RECOMENDACION'] or (data['SMI'] > 0 and data['SMI'] <= 20) else ''}
@@ -924,20 +916,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 {tabla_resumen}
 
-<h2>Estrategia de Inversión y Gestión de Riesgos</h2>
-<p>Mi evaluación profesional indica que la tendencia actual del SMI es **{data['TENDENCIA_SMI']}**, lo que, en combinación con el resto de nuestros indicadores, se alinea con una recomendación de <strong>{data['RECOMENDACION']}</strong>.</p>
-<p><strong>Motivo de la Recomendación:</strong> {data['MOTIVO_RECOMENDACION']}</p>
 
-<p>{volumen_analisis_text}</p>
-
-<h2>Predicción a Largo Plazo y Conclusión</h2>
-<p>Considerando el valor actual del SMI de <strong>{data['SMI']}</strong> y la dirección de su tendencia (<strong>{data['TENDENCIA_SMI']}</strong>), mi pronóstico a largo plazo para <strong>{data['NOMBRE_EMPRESA']}</strong> es {("optimista. La empresa muestra una base sólida para un crecimiento sostenido, respaldada por indicadores técnicos favorables y una gestión financiera prudente. Si los planes de expansión y los acuerdos estratégicos se materializan, podríamos ver una apreciación significativa del valor en el futuro." if data['SMI'] < -20 else "")}
-{("cauteloso. Si bien no hay señales inmediatas de alarma, el SMI sugiere que la empresa podría enfrentar desafíos en el corto y mediano plazo. Es crucial monitorear de cerca los riesgos identificados y cualquier cambio en el sentimiento del mercado para ajustar la estrategia." if data['SMI'] >= -20 and data['SMI'] <= 20 else "")}
-{("pesimista. La debilidad técnica persistente y los factores de riesgo sugieren que la empresa podría experimentar una presión bajista considerable. Se recomienda extrema cautela y considerar estrategias de protección de capital." if data['SMI'] > 20 else "")}.</p>
-
-<h2>Conclusión General y Descargo de Responsabilidad</h2>
-<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['SMI'] < -20 else 'una posible corrección, lo que exige cautela')}, junto con aspectos fundamentales que requieren mayor claridad, hacen de esta empresa un activo para mantener bajo estricta vigilancia. </p>
-<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. </p>
 
 """
 
