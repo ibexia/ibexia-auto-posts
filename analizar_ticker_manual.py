@@ -998,7 +998,7 @@ def generar_contenido_con_gemini(tickers):
         # ANTES ERAN INDEFINIDAS, AHORA SE OBTIENEN DE 'data'
         cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
         # Cambio aquí para usar 'SMI_HISTORICO_PARA_GRAFICO'
-        smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
+        smi_historico_para_grafico = data.get('_PARA_GRAFICO', [])
 
         # Ahora pasa estas variables a la función generar_recomendacion_avanzada
         data = generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_historico_para_grafico)
