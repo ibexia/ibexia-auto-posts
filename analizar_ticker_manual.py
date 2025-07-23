@@ -277,13 +277,29 @@ def obtener_datos_yfinance(ticker):
         # Proyectamos el SMI para la zona del futuro
         smi_proyectado_futuro = []
         for i in range(PROYECCION_FUTURA_DIAS):
-            if -100 <= smi_proyectado < -40:
-                smi_proyectado += random.uniform(5, 15)
-            elif 40 < smi_proyectado <= 100:
-                smi_proyectado -= random.uniform(5, 15)
-            else:
-                smi_proyectado += pendiente_smi * random.uniform(0.8, 1.2)
-            smi_proyectado = np.clip(smi_proyectado, -100, 100)
+            smi_step = pendiente_smi  # La base del movimiento es la pendiente actual
+
+            # Ajustamos el paso si el SMI se acerca a las zonas de sobrecompra/sobreventa
+            if smi_proyectado > 70:  # Si está en sobrecompra fuerte (>70)
+                smi_step *= (100 - smi_proyectado) / 30  # Disminuye el paso a medida que se acerca a 100
+                if smi_step > 0:
+                    smi_step = -abs(smi_step)  # Si sigue subiendo, fuerza el descenso
+            elif smi_proyectado < -70:  # Si está en sobreventa fuerte (<-70)
+                smi_step *= (smi_proyectado + 100) / 30  # Disminuye el paso a medida que se acerca a -100
+                if smi_step < 0:
+                    smi_step = abs(smi_step)  # Si sigue bajando, fuerza el ascenso
+            elif smi_proyectado > 40:  # En sobrecompra (40-70)
+                if smi_step > 0:
+                    smi_step *= 0.5  # Suaviza el ascenso
+            elif smi_proyectado < -40:  # En sobreventa (-40 - -70)
+                if smi_step < 0:
+                    smi_step *= 0.5  # Suaviza el descenso
+
+            # Añadimos una pequeña aleatoriedad para evitar una línea demasiado recta
+            smi_step += random.uniform(-0.5, 0.5)
+
+            smi_proyectado += smi_step
+            smi_proyectado = np.clip(smi_proyectado, -100, 100)  # Mantenemos el SMI dentro de [-100, 100]
             smi_proyectado_futuro.append(smi_proyectado)
 
         # Usar los SMI proyectados para calcular los precios proyectados
@@ -503,6 +519,20 @@ def construir_prompt_formateado(data):
     OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 4)
     PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
 
+    # Preparamos las dos listas de datos para SMI: histórico y proyectado
+    smi_historico_con_nulos_futuros = smi_historico_para_grafico + [None] * PROYECCION_FUTURA_DIAS
+    smi_proyectado_con_nulos_historicos = [None] * len(smi_historico_para_grafico) + data.get('smi_proyectado_futuro', [])
+
+    # El SMI proyectado está en 'smi_proyectado_futuro', lo pasamos aquí
+    # El SMI proyectado está en 'smi_proyectado_futuro', lo pasamos aquí
+    # data_proyectada solo contiene los precios, necesitamos lo mismo para el SMI
+    data_smi_historico = smi_historico_con_nulos_futuros
+    data_smi_proyectado = smi_proyectado_con_nulos_historicos
+
+    labels_historial = data.get('FECHAS_HISTORIAL', [])
+    labels_proyeccion = data.get('FECHAS_PROYECCION', [])
+    labels_total = labels_historial + labels_proyeccion
+
     chart_html = ""
     if smi_historico_para_grafico and cierres_para_grafico_total:
         labels_historial = data.get("FECHAS_HISTORIAL", [])
@@ -537,22 +567,34 @@ def construir_prompt_formateado(data):
                     labels: {json.dumps(labels_total)},
                     datasets: [
                         {{
-                            label: 'SMI',
-                            data: {json.dumps(smi_desplazados_para_grafico)},
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            label: 'SMI Histórico',
+                            data: {json.dumps(data_smi_historico)},
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
                             yAxisID: 'y',
                             tension: 0.1,
-                            fill: false
+                            fill: false,
+                            pointRadius: 0
                         }},
                         {{
-                            label: 'Precio Actual',
-                            data: {json.dumps(precios_reales_grafico)},
-                            borderColor: 'rgba(153, 102, 255, 1)',
-                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                            label: 'SMI Proyectado',
+                            data: {json.dumps(data_smi_proyectado)},
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            yAxisID: 'y',
+                            tension: 0.1,
+                            fill: false,
+                            borderDash: [5, 5],
+                            pointRadius: 0
+                        }},
+                        {{
+                            label: 'Precio',
+                            data: {json.dumps(precios_reales_para_grafico)},
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
                             yAxisID: 'y1',
                             tension: 0.1,
-                            fill: false
+                            fill: false,
                         }},
                         {{
                             label: 'Precio Proyectado',
