@@ -19,7 +19,7 @@ try:
 except ImportError:
     import subprocess
     import sys
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "scipy"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "scipy>=1.8.0"])
     from scipy.interpolate import make_interp_spline
 
 # Definición de la cantidad de días para la proyección futura
