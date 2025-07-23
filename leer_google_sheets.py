@@ -42,19 +42,33 @@ def leer_google_sheets():
         print('Datos leídos de la hoja:')
         for row in values:
             print(row)
-
     return [row[0] for row in values if row]
 
-
-length_k = 10
-length_d = 3
-ema_signal_len = 10
-smooth_period = 5
+def formatear_numero(numero):
+    if pd.isna(numero) or numero == "N/A" or numero is None:
+        return "N/A"
+    try:
+        num = float(numero)
+        if abs(num) >= 1_000_000_000:
+            return f"{num / 1_000_000_000:,.2f}B"
+        elif abs(num) >= 1_000_000:
+            return f"{num / 1_000_000:,.2f}M"
+        elif abs(num) >= 1_000:
+            return f"{num / 1_000:,.2f}K"
+        else:
+            return f"{num:,.2f}"
+    except (ValueError, TypeError):
+        return "N/A"
 
 def calculate_smi_tv(df):
     high = df['High']
     low = df['Low']
     close = df['Close']
+
+    length_k = 10
+    length_d = 3
+    ema_signal_len = 10
+    smooth_period = 5
 
     hh = high.rolling(window=length_k).max()
     ll = low.rolling(window=length_k).min()
@@ -64,215 +78,313 @@ def calculate_smi_tv(df):
     avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
     avgdiff = diff.ewm(span=length_d, adjust=False).mean()
 
-    smi_raw = (avgrel / (avgdiff / 2)) * 100
-    smi_raw[avgdiff == 0] = 0.0 # Asegura que no haya NaNs por división por cero
+    # Manejo de división por cero y clipado para SMI
+    # Se añade un pequeño epsilon al denominador para mayor robustez
+    epsilon = 1e-9
+    # np.where permite definir el valor cuando la condición es True/False
+    smi_raw = np.where(
+        (avgdiff / 2 + epsilon) != 0, # Si el denominador (más epsilon) no es cero
+        (avgrel / (avgdiff / 2 + epsilon)) * 100, # Realiza el cálculo
+        0.0 # Si es cero, asigna 0.0
+    )
+    smi_raw = np.clip(smi_raw, -100, 100) # Asegurar que esté entre -100 y 100
 
-    smi_smoothed = pd.Series(smi_raw).rolling(window=smooth_period).mean()
+    smi_smoothed = pd.Series(smi_raw, index=df.index).rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
 
-    df = df.copy()
-    df['SMI'] = smi_smoothed
-    df['SMI_signal'] = smi_signal
-    
+    df['SMI'] = smi_smoothed # Asignamos directamente la señal SMI suavizada al DataFrame
     return df
-
-def find_significant_supports(df, current_price, window=40, tolerance_percent=0.01, max_deviation_percent=0.15):
-    """
-    Identifica los 3 soportes más significativos y cercanos al precio actual
-    basándose en mínimos locales y agrupaciones de precios.
-    """
-    if df.empty:
-        return [0, 0, 0]
-
-    recent_data = df.tail(window)
-    lows = recent_data['Low']
-    
-    potential_supports = []
-    
-    for i in range(1, len(lows) - 1):
-        if lows.iloc[i] < lows.iloc[i-1] and lows.iloc[i] < lows.iloc[i+1]:
-            potential_supports.append(lows.iloc[i])
-
-    if not potential_supports:
-        potential_supports = lows.tolist()
-        
-    support_zones = {}
-    for support in potential_supports:
-        found_zone = False
-        for zone_level in support_zones.keys():
-            if abs(support - zone_level) / support <= tolerance_percent:
-                support_zones[zone_level].append(support)
-                found_zone = True
-                break
-        if not found_zone:
-            support_zones[support] = [support]
-            
-    final_supports = []
-    for zone_level, values in support_zones.items():
-        avg_support = np.mean(values)
-        if avg_support < current_price:
-            if abs(current_price - avg_support) / current_price <= max_deviation_percent:
-                final_supports.append({'level': avg_support, 'frequency': len(values)})
-
-    final_supports.sort(key=lambda x: (abs(x['level'] - current_price), -x['frequency']))
-    
-    top_3_supports = [round(s['level'], 2) for s in final_supports if s['level'] < current_price][:3]
-    
-    # Asegurarse de que haya 3 soportes, rellenando con valores calculados si es necesario
-    while len(top_3_supports) < 3:
-        if len(top_3_supports) > 0:
-            top_3_supports.append(round(top_3_supports[-1] * 0.95, 2))
-        else:
-            top_3_supports.append(round(current_price * 0.90, 2))
-
-    return top_3_supports
-
-
-
 
 def obtener_datos_yfinance(ticker):
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
-        hist = stock.history(period="60d", interval="1d")
+        
+        # Ampliar periodo si es necesario para el retraso y proyecciones
+        hist_extended = stock.history(period="90d", interval="1d")
+        hist_extended = calculate_smi_tv(hist_extended)
 
+        # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
+        hist = stock.history(period="30d", interval="1d")
         hist = calculate_smi_tv(hist)
 
-        smi_actual = round(hist['SMI_signal'].iloc[-1], 2)
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # Ampliar periodo si es necesario para el retraso y proyecciones
+        hist_extended = stock.history(period="90d", interval="1d")
+        hist_extended = calculate_smi_tv(hist_extended)
+
+        # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
+        hist = stock.history(period="30d", interval="1d")
+        hist = calculate_smi_tv(hist)
+
+        # Obtener el precio actual y volumen
         current_price = round(info["currentPrice"], 2)
-        # Asegurarse de que haya al menos dos días de datos para obtener el volumen del día anterior completo
-        if len(hist) >= 2:
-            current_volume = hist['Volume'].iloc[-2]
-        elif len(hist) == 1:
-            # Si solo hay un día de historial, usa el volumen de ese día
-            current_volume = hist['Volume'].iloc[-1]
+        current_volume = info.get("volume", "N/A")
+
+        # Get last valid SMI signal
+        smi_actual_series = hist['SMI'].dropna() # Obtener las señales SMI sin NaN
+
+        if not smi_actual_series.empty:
+            smi_actual = round(smi_actual_series.iloc[-1], 2)
         else:
-            # Si no hay datos históricos, el volumen es 0
-            current_volume = 0
+            # Si no hay datos SMI válidos, asignar un valor por defecto
+            print(f"⚠️ Advertencia: No hay datos de SMI válidos para {ticker}. Asignando SMI neutral.")
+            smi_actual = 0  # Un valor por defecto para smi_actual
 
 
-        soportes = find_significant_supports(hist, current_price)
-        soporte_1, soporte_2, soporte_3 = soportes
-
-        nota_empresa = round((-(max(min(smi_actual, 60), -60)) + 60) * 10 / 120, 1)
-
-        if nota_empresa <= 2:
-            recomendacion = "Riesgo muy elevado. No entres"
-            condicion_rsi = "muy sobrecomprado"
-        elif 2 < nota_empresa <= 4:
-            recomendacion = "Riesgo elevado. No entres"
-            condicion_rsi = "algo sobrecomprado"
-        elif 4 < nota_empresa <= 5:
-            recomendacion = "Riesgo moderado. Revisar soportes y resistencias"
-            condicion_rsi = "muy poca sobrecompra"
-        elif 5 < nota_empresa < 6:
-            recomendacion = "Riesgo controlado (Neutral)"
-            condicion_rsi = "neutral"
-        elif 6 <= nota_empresa < 7:
-            recomendacion = "Riesgo moderado a la baja. Revisar soportes y resistencias"
-            condicion_rsi = "muy poca sobreventa"
-        elif 7 <= nota_empresa < 8:
-            recomendacion = "Riesgo bajo, pero aún con precaución"
-            condicion_rsi = "algo de sobreventa"
-        elif 8 <= nota_empresa < 9:
-            recomendacion = "Invierte. Riesgo muy bajo"
-            condicion_rsi = "sobreventa"
-        elif nota_empresa >= 9:
-            recomendacion = "Puedes invertir. Sin riesgo aparente"
-            condicion_rsi = "extremadamente sobrevendido"
+        # Calcular soportes y resistencia
+        # Asegurarse de tener al menos 30 días para un cálculo significativo
+        if len(hist) < 30:
+            highs_lows = hist[['High', 'Low', 'Close']].values.flatten()
         else:
-            recomendacion = "Indefinido"
-            condicion_rsi = "desconocido"
+            highs_lows = hist[['High', 'Low', 'Close']].iloc[-30:].values.flatten()
+        
 
-        if nota_empresa >= 7:
-            precio_objetivo_compra = soporte_1
+        # Calculamos soportes y resistencias como listas ordenadas
+        # Soportes: de menor a mayor
+        soportes_raw = np.unique(highs_lows)
+        soportes = np.sort(soportes_raw).tolist()
+
+        # Resistencias: de mayor a menor
+        resistencias_raw = np.unique(highs_lows)
+        resistencias = np.sort(resistencias_raw)[::-1].tolist() # Orden inverso para tener las más altas primero
+
+
+        # Definir los 3 soportes
+        if len(soportes) >= 3:
+            soporte_1 = round(soportes[0], 2)
+            soporte_2 = round(soportes[1], 2)
+            soporte_3 = round(soportes[2], 2)
+        elif len(soportes) == 2:
+            soporte_1 = round(soportes[0], 2)
+            soporte_2 = round(soportes[1], 2)
+            soporte_3 = soporte_2 # Usar el mismo si no hay 3 distintos
+        elif len(soportes) == 1:
+            soporte_1 = round(soportes[0], 2)
+            soporte_2 = soporte_1
+            soporte_3 = soporte_1
         else:
-            drop_percentage_from_base = (7 - nota_empresa) / 7 * 0.15
-            precio_objetivo_compra = soporte_1 * (1 - drop_percentage_from_base)
+            soporte_1, soporte_2, soporte_3 = round(current_price * 0.95, 2), round(current_price * 0.9, 2), round(current_price * 0.85, 2) # Default si no hay datos
 
-        precio_objetivo_compra = round(precio_objetivo_compra, 2)
+        # Definir las 3 resistencias (similar a soportes)
+        if len(resistencias) >= 3:
+            resistencia_1 = round(resistencias[0], 2)
+            resistencia_2 = round(resistencias[1], 2)
+            resistencia_3 = round(resistencias[2], 2)
+        elif len(resistencias) == 2:
+            resistencia_1 = round(resistencias[0], 2)
+            resistencia_2 = round(resistencias[1], 2)
+            resistencia_3 = resistencia_2
+        elif len(resistencias) == 1:
+            resistencia_1 = round(resistencias[0], 2)
+            resistencia_2 = resistencia_1
+            resistencia_3 = resistencia_1
+        else:
+            resistencia_1, resistencia_2, resistencia_3 = round(current_price * 1.05, 2), round(current_price * 1.1, 2), round(current_price * 1.15, 2) # Default si no hay datos
 
-        smi_history_last_30 = hist['SMI_signal'].dropna().tail(30).tolist()
-        notas_historicas_ultimos_30_dias = [round((-(max(min(smi, 60), -60)) + 60) * 10 / 120, 1) for smi in smi_history_last_30]
+        # --- LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
+        # --- NUEVA LÓGICA DE PRECIO OBJETIVO BASADA EN PENDIENTE DEL SMI ---
+        # Asegúrate de tener historial completo para calcular SMI reciente
+        smi_history_full = hist_extended['SMI'].dropna()
 
-        tendencia_smi = "No disponible"
-        dias_estimados_accion = "No disponible"
+        # Calcular pendiente de los últimos 5 días del SMI
+        smi_ultimos_5 = smi_history_full.tail(5).dropna()
+        if len(smi_ultimos_5) >= 2:
+            x = np.arange(len(smi_ultimos_5))
+            y = smi_ultimos_5.values
+            pendiente_smi, _ = np.polyfit(x, y, 1)
+        else:
+            pendiente_smi = 0
 
-        if len(notas_historicas_ultimos_30_dias) >= 2:
-            x = np.arange(len(notas_historicas_ultimos_30_dias))
-            y = np.array(notas_historicas_ultimos_30_dias)
+        # Precio objetivo basado en dirección del SMI
+        if pendiente_smi > 0.1:
+            # Tendencia alcista → subir hasta resistencia más próxima
+            precio_objetivo = next((r for r in sorted(resistencias) if r > current_price), current_price * 1.05)
+        elif pendiente_smi < -0.1:
+            # Tendencia bajista → bajar hasta soporte más próximo
+            precio_objetivo = next((s for s in sorted(soportes, reverse=True) if s < current_price), current_price * 0.95)
+        else:
+            # SMI sin dirección clara → mantener precio actual
+            precio_objetivo = current_price
+
+        precio_objetivo = round(precio_objetivo, 2)
+        # --- FIN NUEVA LÓGICA ---
+        # --- FIN DE LA LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
+
+        # Precio objetivo de compra (ejemplo simple, puedes refinarlo)
+        # Este 'precio_objetivo_compra' es diferente al 'precio_objetivo' general
+        precio_objetivo_compra = round(current_price * 0.98, 2) # Un 2% por debajo del precio actual como ejemplo
+
+        
+
+        # Inicializar recomendacion y condicion_rsi como temporales, se recalcularán después
+        recomendacion = "Pendiente de análisis avanzado"
+        condicion_rsi = "Pendiente"
+
+
+        # Nuevas variables para los gráficos con offset y proyección
+        OFFSET_DIAS = 0 # El SMI de hoy (D) se alinea con el precio de D+4
+        PROYECCION_FUTURA_DIAS = 5 # Días a proyectar después del último precio real
+
+        # Aseguramos tener suficientes datos para el historial, el offset y la proyección
+        smi_history_full = hist_extended['SMI'].dropna() # Ahora el SMI final está en 'SMI'
+        cierres_history_full = hist_extended['Close'].dropna()
+
+        # Calcula el volumen promedio de los últimos 30 días usando hist_extended
+        volumen_promedio_30d = hist_extended['Volume'].tail(30).mean()
+
+
+        # Fechas reales de cotización para los últimos 30 días
+        fechas_historial = hist_extended['Close'].dropna().tail(30).index.strftime("%d/%m").tolist()
+        ultima_fecha_historial = hist_extended['Close'].dropna().tail(1).index[0]
+        fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
+        
+        # SMI para los 30 días del gráfico (serán los que se visualicen)
+        # Serán los 30 SMI más recientes disponibles
+        smi_historico_para_grafico = []
+        if len(smi_history_full) >= 30:
+            smi_historico_para_grafico = smi_history_full.tail(30).tolist()
+        elif smi_history_full.empty:
+            smi_historico_para_grafico = [0.0] * 30 # Default neutral if no data
+        else:
+            # Fill with first available SMI if less than 30
+            first_smi_val = smi_history_full.iloc[0]
+            smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
+
+
+        # Precios para el gráfico: 30 días DESPLAZADOS + PROYECCIÓN
+        # Necesitamos los últimos (30 + OFFSET_DIAS) precios reales para tener el rango completo
+        precios_reales_para_grafico = []
+        if len(cierres_history_full) >= (30 + OFFSET_DIAS):
+            # Tomamos los 30 precios que se alinearán con los 30 SMI (considerando el offset)
+            precios_reales_para_grafico = cierres_history_full.tail(30).tolist()
+        elif len(cierres_history_full) > OFFSET_DIAS: # Si tenemos menos de 30 pero más que el offset
+            # Tomamos lo que tengamos después del offset y rellenamos al principio
+            temp_prices = cierres_history_full.iloc[OFFSET_DIAS:].tolist()
+            first_price_val = temp_prices[0] if temp_prices else current_price
+            precios_reales_para_grafico = [first_price_val] * (30 - len(temp_prices)) + temp_prices
+        else: # Muy pocos datos históricos
+             precios_reales_para_grafico = [current_price] * 30 # Default to current price if no historical data
+            
+        smi_history_last_30 = hist['SMI'].dropna().tail(30).tolist()
+        
+        # --- Lógica FINAL sin Precio Objetivo: Movimiento lineal constante ---
+        precios_proyectados = []
+        ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
+
+        # Determinar la dirección de la tendencia y el movimiento diario constante
+        # Usamos la pendiente del SMI para determinar si la tendencia es alcista o bajista
+        smi_history_full = hist_extended['SMI'].dropna()
+        smi_ultimos_5 = smi_history_full.tail(5).dropna()
+        
+        pendiente_smi = 0
+        if len(smi_ultimos_5) >= 2:
+            x = np.arange(len(smi_ultimos_5))
+            y = smi_ultimos_5.values
+            pendiente_smi, _ = np.polyfit(x, y, 1)
+
+        # Definir un movimiento diario constante, lo suficientemente grande para no redondearse
+        # Usamos 1% como un valor base claro y visible
+        movimiento_diario = 0
+        if pendiente_smi > 0.1 or smi_actual < -40:  # Si SMI sube o está en sobreventa
+            movimiento_diario = 0.01  # +1% de subida diaria
+        elif pendiente_smi < -0.1 or smi_actual > 40: # Si SMI baja o está en sobrecompra
+            movimiento_diario = -0.01 # -1% de bajada diaria
+        
+        # Ordenar soportes y resistencias para la comprobación
+        soportes_ordenados_desc = sorted([soporte_1, soporte_2, soporte_3], reverse=True)
+        resistencias_ordenadas_asc = sorted([resistencia_1, resistencia_2, resistencia_3])
+
+        proyeccion_detenida = False
+        
+        for _ in range(PROYECCION_FUTURA_DIAS):
+            if proyeccion_detenida:
+                siguiente_precio = ultimo_precio_conocido
+            else:
+                siguiente_precio_tentativo = ultimo_precio_conocido * (1 + movimiento_diario)
+                siguiente_precio = siguiente_precio_tentativo
+
+                # Comprobar si ha cruzado algún nivel y detener la proyección
+                if movimiento_diario > 0:  # Tendencia alcista
+                    for r in resistencias_ordenadas_asc:
+                        if siguiente_precio_tentativo > r:
+                            siguiente_precio = r
+                            proyeccion_detenida = True
+                            break
+                elif movimiento_diario < 0: # Tendencia bajista
+                    for s in soportes_ordenados_desc:
+                        if siguiente_precio_tentativo < s:
+                            siguiente_precio = s
+                            proyeccion_detenida = True
+                            break
+
+            siguiente_precio = round(siguiente_precio, 2)
+            precios_proyectados.append(siguiente_precio)
+            ultimo_precio_conocido = siguiente_precio
+
+        # --- Fin de la lógica lineal sin Precio Objetivo ---
+
+
+
+      
+     
+        # Unir precios reales y proyectados
+        cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
+        precio_proyectado_dia_5 = cierres_para_grafico_total[-1]  # Último precio proyectado a 5 días
+
+        tendencia_ibexia = "No disponible"
+        
+        if len(smi_history_last_30) >= 2:
+            x = np.arange(len(smi_history_last_30))
+            y = np.array(smi_history_last_30)
             if np.std(y) > 0.01:
                 slope, intercept = np.polyfit(x, y, 1)
             else:
                 slope = 0.0
 
             if slope > 0.1:
-                tendencia_smi = "mejorando"
+                tendencia_ibexia = "mejorando (alcista)"
+                recomendacion = "Comprar"
+                motivo_recomendacion = f"La línea Ibexia muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
             elif slope < -0.1:
-                tendencia_smi = "empeorando"
+                tendencia_ibexia = "empeorando (bajista)"
+                recomendacion = "Vender"
+                motivo_recomendacion = f"La línea Ibexia muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
             else:
-                tendencia_smi = "estable"
-
-            if nota_empresa <= 2:
-                dias_estimados_accion = "Ya en zona de posible venta"
-            elif nota_empresa >= 8:
-                dias_estimados_accion = "Ya en zona de posible compra"
-            elif abs(slope) < 0.01:
-                dias_estimados_accion = "Tendencia estable, sin acción inmediata clara"
-            elif slope < 0:
-                dias = (nota_empresa - 2.0) / abs(slope)
-                dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de venta"
-            elif slope > 0:
-                dias = (8.0 - nota_empresa) / abs(slope)
-                dias_estimados_accion = f"aprox. {int(max(1, dias))} días para alcanzar zona de compra"
+                tendencia_ibexia = "estable (lateral)"
+                recomendacion = "Neutral"
+                motivo_recomendacion = "La acción se encuentra en un momento de consolidación sin una dirección clara a corto plazo."
 
         datos = {
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": current_price,
             "VOLUMEN": current_volume,
+            "VOLUMEN_MEDIO": round(volumen_promedio_30d, 2) if not pd.isna(volumen_promedio_30d) else "N/A",
             "SOPORTE_1": soporte_1,
             "SOPORTE_2": soporte_2,
             "SOPORTE_3": soporte_3,
-            "RESISTENCIA": round(hist["High"].max(), 2),
+            "RESISTENCIA": resistencia_1,
             "CONDICION_RSI": condicion_rsi,
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
-            "NOTA_EMPRESA": nota_empresa,
             "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
-            "INGRESOS": info.get("totalRevenue", "N/A"),
-            "EBITDA": info.get("ebitda", "N/A"),
-            "BENEFICIOS": info.get("grossProfits", "N/A"),
-            "DEUDA": info.get("totalDebt", "N/A"),
-            "FLUJO_CAJA": info.get("freeCashflow", "N/A"),
-            "EXPANSION_PLANES": "Información de planes de expansión no disponible o no traducible en este momento.",
-            "ACUERDOS": "Información sobre acuerdos no disponible o no traducible en este momento.",
-            "SENTIMIENTO_ANALISTAS": "Sentimiento de analistas no disponible o no traducible.",
-            "TENDENCIA_SOCIAL": "No disponible",
-            "EMPRESAS_SIMILARES": ", ".join(info.get("category", "").split(",")) if info.get("category") else "No disponibles",
-            "RIESGOS_OPORTUNIDADES": "No disponibles",
-            "TENDENCIA_NOTA": tendencia_smi,
-            "DIAS_ESTIMADOS_ACCION": dias_estimados_accion,
-            "NOTAS_HISTORICAS_30_DIAS": notas_historicas_ultimos_30_dias
+            "tendencia_ibexia": tendencia_ibexia, # Renombrado de TENDENCIA_NOTA
+            "CIERRES_30_DIAS": hist['Close'].dropna().tail(30).tolist(),
+            "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico, # Renombrado
+            "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total,
+            "OFFSET_DIAS_GRAFICO": OFFSET_DIAS,
+            "RESISTENCIA_1": resistencia_1,
+            "RESISTENCIA_2": resistencia_2,
+            "RESISTENCIA_3": resistencia_3,
+            "PRECIO_OBJETIVO": precio_objetivo,
+            "FECHAS_HISTORIAL": fechas_historial,
+            "FECHAS_PROYECCION": fechas_proyeccion,
+            "PRECIO_PROYECTADO_5DIAS": precio_proyectado_dia_5,
+            "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
-
-        # 🔴 Esta parte debe ir aquí, después de crear 'datos'
-        # 🔴 Mejorado: asegurarse de tener precios válidos
-        cierres_ultimos_30_dias = hist['Close'].fillna(method='ffill').dropna().tail(30).tolist()
-
-        # Rellenar si hay menos de 30
-        if len(cierres_ultimos_30_dias) < 30 and cierres_ultimos_30_dias:
-            primer_valor = cierres_ultimos_30_dias[0]
-            cierres_ultimos_30_dias = [primer_valor] * (30 - len(cierres_ultimos_30_dias)) + cierres_ultimos_30_dias
-        elif not cierres_ultimos_30_dias:
-            cierres_ultimos_30_dias = [0.0] * 30
-
-        # Validación adicional para evitar todos ceros
-        if all(c == 0.0 for c in cierres_ultimos_30_dias):
-            print(f"⚠️ Advertencia: Todos los cierres para {ticker} son 0. No se mostrará el gráfico correctamente.")
-
-        datos["CIERRES_30_DIAS"] = [round(float(c), 2) for c in cierres_ultimos_30_dias]
-
 
         return datos
 
@@ -280,529 +392,456 @@ def obtener_datos_yfinance(ticker):
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
+def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_historico_para_grafico): # Cambio de nombre de la variable
+    # Extraer los últimos 30 días de SMI para el análisis de tendencias
+    smi_historico = smi_historico_para_grafico[-30:] if len(smi_historico_para_grafico) >= 30 else smi_historico_para_grafico
 
-def formatear_numero(valor):
-    try:
-        numero = int(valor)
-        return f"{numero:,} €".replace(",", ".") # Formato español para miles
-    except (ValueError, TypeError):
-        return "No disponible"
-        
+    # Calcular la pendiente de los últimos N SMI para la tendencia
+    n_trend = min(7, len(smi_historico)) # Últimos 7 días o menos si no hay tantos
+    if n_trend > 1:
+        x_trend = np.arange(n_trend)
+        y_trend = np.array(smi_historico[-n_trend:])
+        # Filtrar NaN para calcular la pendiente
+        valid_indices = ~np.isnan(y_trend)
+        if np.any(valid_indices): # Solo calcular si hay datos válidos
+            slope, _ = np.polyfit(x_trend[valid_indices], y_trend[valid_indices], 1)
+        else:
+            slope = 0 # No hay datos válidos para la pendiente
+    else:
+        slope = 0 # No hay suficientes datos para calcular la pendiente
+
+    if slope > 0.1:
+        tendencia_ibexia = "mejorando (alcista)"
+    elif slope < -0.1:
+        tendencia_ibexia = "empeorando (bajista)"
+    else:
+        tendencia_ibexia = "estable (lateral)"
+
+    # Determinar si el volumen es alto (ej. > 1.5 veces el volumen medio de los últimos 20 días)
+    volumen_alto = False
+    if data['VOLUMEN_MEDIO'] and data['VOLUMEN'] is not None and data['VOLUMEN_MEDIO'] > 0:
+        if data['VOLUMEN'] > (data['VOLUMEN_MEDIO'] * 1.5):
+            volumen_alto = True
+
+    # Determinar proximidad a soportes y resistencias
+    proximidad_soporte = False
+    proximidad_resistencia = False
+    if data['PRECIO_ACTUAL'] is not None:
+        if data['SOPORTE_1'] is not None and data['PRECIO_ACTUAL'] != 0:
+            if abs(data['PRECIO_ACTUAL'] - data['SOPORTE_1']) / data['PRECIO_ACTUAL'] < 0.02: # 2% de proximidad
+                proximidad_soporte = True
+        if data['RESISTENCIA_1'] is not None and data['PRECIO_ACTUAL'] != 0:
+            if abs(data['PRECIO_ACTUAL'] - data['RESISTENCIA_1']) / data['PRECIO_ACTUAL'] < 0.02: # 2% de proximidad
+                proximidad_resistencia = True
+
+    recomendacion = "Neutral"
+    condicion_analisis = "En observación"
+    motivo_analisis = "La situación actual no presenta señales claras de compra ni venta."
+
+    # Lógica de Giro Alcista (Compra)
+    # Basamos la recomendación en el SMI directamente
+    if tendencia_ibexia == "mejorando (alcista)" and data['SMI'] < 0 and volumen_alto: # Indice Ibexia en zona negativa y mejorando con volumen
+        recomendacion = "Fuerte Compra"
+        condicion_analisis = "Impulso alcista con confirmación de volumen desde zona de sobreventa"
+        motivo_analisis = "La Indice Ibexia está mejorando y se encuentra en zona de sobreventa, con un volumen significativo, indicando un fuerte impulso alcista."
+
+    # Lógica de Giro Bajista (Venta Condicional)
+    elif tendencia_ibexia == "empeorando (bajista)" and data['SMI'] > 0 and volumen_alto: # La Indice Ibexia en zona positiva y empeorando con volumen
+        if not proximidad_soporte:
+            recomendacion = "Venta Condicional / Alerta"
+            condicion_analisis = "Debilidad confirmada por volumen desde zona de sobrecompra, considerar salida"
+            motivo_analisis = "La Indice Ibexia está empeorando y se encuentra en zona de sobrecompra, con volumen alto y sin soporte cercano, sugiriendo debilidad."
+        else:
+            recomendacion = "Neutral / Cautela"
+            condicion_analisis = "Debilidad pero cerca de soporte clave, observar rebote"
+            motivo_analisis = "La Indice Ibexia está empeorando, pero la proximidad a un soporte clave sugiere cautela antes de vender."
+
+    # Detección de Patrones de Reversión desde Extremos:
+    # Reversión de Compra (SMI saliendo de sobrecompra/extremo negativo)
+    if len(smi_historico) >= 2 and smi_historico[-1] > smi_historico[-2] and \
+       smi_historico[-2] <= -40 and smi_historico[-1] > -40: # SMI estaba muy bajo y empieza a subir
+        if recomendacion not in ["Fuerte Compra", "Oportunidad de Compra (Reversión)"]:
+            recomendacion = "Oportunidad de Compra (Reversión)"
+            condicion_analisis = "Posible inicio de rebote tras sobreventa extrema, punto de entrada"
+            motivo_analisis = "Reversión de compra: La Indice Ibexia está ascendiendo desde una zona de sobreventa extrema, indicando una oportunidad de entrada."
+
+    # Reversión de Venta (SMI saliendo de sobreventa/extremo positivo)
+    elif len(smi_historico) >= 2 and smi_historico[-1] < smi_historico[-2] and \
+         smi_historico[-2] >= 40 and smi_historico[-1] < 40: # SMI estaba muy alto y empieza a bajar
+        if recomendacion not in ["Venta Condicional / Alerta", "Señal de Venta (Reversión)"]:
+            recomendacion = "Señal de Venta (Reversión)"
+            condicion_analisis = "Posible inicio de corrección tras sobrecompra extrema, punto de salida"
+            motivo_analisis = "Señal de venta: La Indice Ibexia está descendiendo desde una zona de sobrecompra extrema, indicando un punto de salida."
+
+    # Lógica para "Neutral" si ninguna de las condiciones anteriores se cumple con fuerza
+    if recomendacion == "Neutral":
+        if tendencia_ibexia == "estable (lateral)":
+            condicion_analisis = "Consolidación o lateralidad sin dirección clara."
+            motivo_analisis = "La Indice Ibexia se mantiene estable, indicando una fase de consolidación o lateralidad sin dirección clara."
+        elif data['SMI'] < 20 and tendencia_ibexia == "mejorando (alcista)" and not volumen_alto:
+            recomendacion = "Neutral / Observación"
+            condicion_analisis = "La Indice Ibexia moderadamente bajo con mejora, pero falta confirmación de volumen."
+            motivo_analisis = "La Indice Ibexia es moderadamente bajo y muestra una mejora, pero la falta de volumen significativo sugiere una fase de observación."
+        elif data['SMI'] > -20 and tendencia_ibexia == "empeorando (bajista)" and not volumen_alto:
+            recomendacion = "Neutral / Observación"
+            condicion_analisis = "La Indice Ibexia moderadamente alto con empeoramiento, pero falta confirmación de volumen."
+            motivo_analisis = "La Indice Ibexiaes moderadamente alto y empeora, pero la falta de volumen significativo sugiere una fase de observación."
+
+    data['RECOMENDACION'] = recomendacion
+    data['CONDICION_RSI'] = condicion_analisis # Aunque el nombre es RSI, el concepto es la condición del mercado
+    data['motivo_analisis'] = motivo_analisis
+
+    return data
+
+
 def construir_prompt_formateado(data):
-        # Calcula el nombre de la empresa para el hashtag, eliminando caracteres especiales y pasando a minúsculas.
-    company_name_for_hashtag = re.sub(r'[^a-zA-Z0-9]', '', data['NOMBRE_EMPRESA']).lower()
-    
-    # Construye el título completo, incluyendo los hashtags.
-    titulo_post = f"{data['RECOMENDACION']} {data['NOMBRE_EMPRESA']} ({data['PRECIO_ACTUAL']:,}€) {data['TICKER']} #{company_name_for_hashtag} #{data['TICKER'].replace('.MC', '').lower()}"
-    
-    inversion_base = 10000.0
-    inversion_base = 10000.0
-    comision_por_operacion_porcentual = 0.001
+    # Generación de la recomendación de volumen
+    volumen_analisis_text = ""
+    if data['VOLUMEN'] != "N/A":
+        volumen_actual = data['VOLUMEN']
+        try:
+            ticker_obj = yf.Ticker(data['TICKER'])
+            hist_vol = ticker_obj.history(period="90d")
+            if not hist_vol.empty and 'Volume' in hist_vol.columns:
+                volumen_promedio_30d = hist_vol['Volume'].tail(30).mean()
+                if volumen_promedio_30d > 0:
+                    cambio_porcentual_volumen = ((volumen_actual - volumen_promedio_30d) / volumen_promedio_30d) * 100
+                    if cambio_porcentual_volumen > 50:
+                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia de  La Indice Ibexia ({data['tendencia_ibexia']})."
+                    elif cambio_porcentual_volumen < -30:
+                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es inferior a lo habitual, lo que podría sugerir cautela en la actual tendencia. Una confirmación de la señal de La Indice Ibexia ({data['tendencia_ibexia']}) requeriría un aumento en la participación del mercado."
+                    else:
+                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> se mantiene en línea con el promedio. Es un volumen adecuado, pero no excepcional, para confirmar de manera contundente la señal de La Indice Ibexia ({data['tendencia_ibexia']})."
+                else:
+                    volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. "
+            else:
+                volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. "
+        except Exception as e:
+            volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. No fue posible comparar con el volumen promedio: {e}"
+    else:
+        volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
 
-       # NUEVO: Obtener las notas históricas para el gráfico
-    notas_historicas = data.get('NOTAS_HISTORICAS_30_DIAS', [])
-    cierres_historicos = data.get('CIERRES_30_DIAS', [])
-    if len(cierres_historicos) < 30 and cierres_historicos:
-        cierres_historicos = [cierres_historicos[0]] * (30 - len(cierres_historicos)) + cierres_historicos
-    elif not cierres_historicos:
-        cierres_historicos = [0.0] * 30
+    titulo_post = f"Análisis Técnico: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Recomendación de {data['RECOMENDACION']}"
 
-    # Ajustar para asegurar que siempre haya 7 elementos, rellenando con el último valor si hay menos
-    if len(notas_historicas) < 30 and notas_historicas:
-        notas_historicas = [notas_historicas[0]] * (30 - len(notas_historicas)) + notas_historicas
-    elif not notas_historicas:
-        notas_historicas = [0.0] * 30 # Si no hay datos, rellenar con ceros
-    
-    
-    # ... (el resto de tu código para soportes_unicos y tabla_resumen) ...
+    # Datos para el gráfico principal de SMI y Precios
+    smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
+    cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
+    OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 4)
+    PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
 
-    # COPIA Y PEGA ESTE BLOQUE EXACTAMENTE AQUÍ (esta variable sí usa """ porque es un HTML largo)
     chart_html = ""
-    if notas_historicas:
-        labels = [(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)]
-        
-        # Invertir las notas para que el gráfico muestre "Hoy" a la derecha
-        notas_historicas_display = notas_historicas
+    if smi_historico_para_grafico and cierres_para_grafico_total:
+        labels_historial = data.get("FECHAS_HISTORIAL", [])
+        labels_proyeccion = data.get("FECHAS_PROYECCION", [])
+        labels_total = labels_historial + labels_proyeccion
 
-        chart_html = f"""
-<h2>Evolución de la Nota Técnica</h2>
-<p>Para ofrecer una perspectiva visual clara de la evolución de la nota técnica de <strong>{data['NOMBRE_EMPRESA']}</strong>, mostramos un gráfico que muestra los valores de los últimos treinta días. Esta calificación es una herramienta exclusiva de <strong>ibexia.es</strong> y representa el histórico entre nuestra valoración técnica (barras azules) sobre el precio de cotización (linea roja). La escala va de 0 (venta o cautela) a 10 (oportunidad de compra).</p>
-<p>Para comprender mejor cómo interpretar estos gráficos y tomar decisiones informadas, visita nuestro enlace explicativo: <a href="https://ibexia.es/como-interpretar-los-graficos-para-comprar-o-vender/" target="_blank">Cómo interpretar los gráficos para comprar o vender</a>. </p>
+        precios_reales_grafico = cierres_para_grafico_total[:30]
+        data_proyectada = [None] * (len(labels_historial) - 1) + [precios_reales_grafico[-1]] + cierres_para_grafico_total[len(labels_historial):]
 
+        smi_desplazados_para_grafico = smi_historico_para_grafico
+        if len(smi_desplazados_para_grafico) < len(labels_total):
+            smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
 
-<div style="width: 100%; height: 500px;">
-    <canvas id="notasChart"></canvas>
-</div>
+        chart_html += f"""
+        <h2>Evolución del indice ibexia y Precio</h2>
+        <p> Para entender nuestro gráfico, es importante saber que verás dos líneas principales. La línea que representa el precio de la acción se mide en el eje vertical derecho, mostrándote su valor actual en euros. Por otro lado, la línea Ibexia, que es un indicador propio de la fuerza del mercado, se mide en el eje vertical izquierdo. </p>
+        <p>Gracias al indice Ibexia podemos predecir el precio de los próximos 5 dias directamente en el gráfico. </p>
+        <p>La línea Ibexia te ayuda a interpretar los movimientos del precio de la siguiente manera:</p>
+        <ul>
+            <li><b>Subida:</b> Indica que el impulso alcista está creciendo y que el precio de la acción tiende a subir.</li>
+            <li><b>Bajada:</b> Señala que el impulso bajista está ganando fuerza y que el precio de la acción tiende a caer.</li>
+            <li><b>Se Aplana:</b> Muestra que el mercado está en una fase de consolidación, sin una dirección clara.</li>
+            <li><b>Gira:</b> Advierte de un posible cambio de tendencia en el precio.</li>
+        </ul>
+        <div style="width: 100%; max-width: 800px; margin: auto;">
+            <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
+        </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
-<script>
-    // Unique ID for this chart block: {{random.random()}} - {{datetime.now().timestamp()}}
-    document.addEventListener('DOMContentLoaded', function() {{
-
-        var cierres = {{json.dumps(cierres_historicos)}};
-        var objetivo = {{data['PRECIO_OBJETIVO_COMPRA']}};
-
-        var minPrecio = Math.min(...cierres, objetivo);
-        var maxPrecio = Math.max(...cierres, objetivo);
-
-        if (minPrecio === maxPrecio) {{
-            minPrecio *= 0.95;
-            maxPrecio *= 1.05;
-        }} else {{
-            minPrecio *= 0.98;
-            maxPrecio *= 1.02;
-        }}
-
-        var ctx = document.getElementById('notasChart').getContext('2d');
-        var notasChart = new Chart(ctx, {{
-            type: 'bar',
-            data: {{
-                labels: {{json.dumps(labels)}},
-                datasets: [
-                    {{
-                        label: 'Nota Técnica',
-                        data: {{json.dumps(notas_historicas_display)}},
-                        backgroundColor: 'rgba(0, 128, 255, 0.4)',
-                        borderColor: 'rgba(0, 128, 255, 1)',
-                        borderWidth: 1,
-                        type: 'bar',
-                        yAxisID: 'y'
-                    }},
-                    {{
-                        label: 'Precio de Cierre',
-                        data: {{json.dumps(cierres_historicos)}},
-                        type: 'line',
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 2,
-                        fill: false,
-                        yAxisID: 'y1'
-                    }}
-                ]
-            }},
-            options: {{
-                plugins: {{
-                    annotation: {{
-                        annotations: {{
-                            soporte1: {{
-                                type: 'line',
-                                yMin: {{data['SOPORTE_1']}},
-                                yMax: {{data['SOPORTE_1']}},
-                                yScaleID: 'y1',
-                                borderColor: 'rgba(0, 255, 0, 0.8)',
-                                borderWidth: 2,
-                                label: {{
-                                    enabled: true,
-                                    content: 'Soporte 1 ({{data["SOPORTE_1"]}}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            soporte2: {{
-                                type: 'line',
-                                yMin: {{data['SOPORTE_2']}},
-                                yMax: {{data['SOPORTE_2']}},
-                                yScaleID: 'y1',
-                                borderColor: 'rgba(0, 200, 0, 0.6)',
-                                borderWidth: 2,
-                                label: {{
-                                    enabled: true,
-                                    content: 'Soporte 2 ({{data["SOPORTE_2"]}}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            soporte3: {{
-                                type: 'line',
-                                yMin: {{data['SOPORTE_3']}},
-                                yMax: {{data['SOPORTE_3']}},
-                                yScaleID: 'y1',
-                                borderColor: 'rgba(0, 150, 0, 0.6)',
-                                borderWidth: 2,
-                                label: {{
-                                    enabled: true,
-                                    content: 'Soporte 3 ({{data["SOPORTE_3"]}}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            resistencia: {{
-                                type: 'line',
-                                yMin: {{data['RESISTENCIA']}},
-                                yMax: {{data['RESISTENCIA']}},
-                                yScaleID: 'y1',
-                                borderColor: 'rgba(255, 99, 132, 1)',
-                                borderWidth: 2,
-                                label: {{
-                                    enabled: true,
-                                    content: 'Resistencia ({{data["RESISTENCIA"]}}€)',
-                                    position: 'end'
-                                }}
-                            }},
-                            objetivo: {{
-                                type: 'line',
-                                yMin: {{data['PRECIO_OBJETIVO_COMPRA']}},
-                                yMax: {{data['PRECIO_OBJETIVO_COMPRA']}},
-                                yScaleID: 'y1',
-                                borderColor: 'rgba(255, 206, 86, 1)',
-                                borderWidth: 2,
-                                borderDash: [6, 6],
-                                label: {{
-                                    enabled: true,
-                                    content: 'Objetivo ({{data["PRECIO_OBJETIVO_COMPRA"]}}€)',
-                                    position: 'end',
-                                    backgroundColor: 'rgba(255, 206, 86, 0.8)'
-                                }}
-                            }}
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {{
+            const ctx = document.getElementById('smiPrecioChart').getContext('2d');
+            const smiPrecioChart = new Chart(ctx, {{
+                type: 'line',
+                data: {{
+                    labels: {json.dumps(labels_total)},
+                    datasets: [
+                        {{
+                            label: 'Indice Ibexia',
+                            data: {json.dumps(smi_desplazados_para_grafico)},
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            yAxisID: 'y',
+                            tension: 0.1,
+                            fill: false
+                        }},
+                        {{
+                            label: 'Precio Actual',
+                            data: {json.dumps(precios_reales_grafico)},
+                            borderColor: 'rgba(153, 102, 255, 1)',
+                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                            yAxisID: 'y1',
+                            tension: 0.1,
+                            fill: false
+                        }},
+                        {{
+                            label: 'Precio Proyectado',
+                            data: {json.dumps(data_proyectada)},
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            yAxisID: 'y1',
+                            tension: 0.1,
+                            fill: false,
+                            borderDash: [5, 5]
                         }}
-                    }},
-                    legend: {{
-                        display: true
-                    }},
-                    tooltip: {{
+                    ]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {{
                         mode: 'index',
                         intersect: false,
-                        callbacks: {{
-                            label: function(context) {{
-                                let label = context.dataset.label || '';
-                                if (label) {{
-                                    label += ': ';
+                    }},
+                    stacked: false,
+                    plugins: {{
+                        title: {{
+                            display: true,
+                            text: 'Evolución de "indice Ibexia" y Precio'
+                        }},
+                        annotation: {{
+                            annotations: {{
+                                futureZone: {{
+                                    type: 'box',
+                                    xMin: {30},
+                                    xMax: {30 + PROYECCION_FUTURA_DIAS},
+                                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                                    borderColor: 'rgba(0, 123, 255, 0.3)',
+                                    borderWidth: 1,
+                                    label: {{
+                                        content: 'Zona Futuro',
+                                        enabled: true,
+                                        position: 'start',
+                                        color: 'rgba(0, 123, 255, 0.7)',
+                                        font: {{
+                                            size: 10,
+                                            weight: 'bold'
+                                        }}
+                                    }}
+                                }},
+                                // Zonas de color en el eje Y del SMI (-100 a 100)
+                                zonaSobrecompra: {{
+                                    type: 'box',
+                                    yScaleID: 'y',
+                                    yMin: 40,
+                                    yMax: 100,
+                                    backgroundColor: 'rgba(255, 0, 0, 0.1)', // Rojo claro para sobrecompra
+                                    borderColor: 'rgba(255, 0, 0, 0.2)',
+                                    borderWidth: 1,
+                                    label: {{
+                                        content: 'Zona de Sobrecompra',
+                                        enabled: false,
+                                        position: 'end',
+                                        color: 'rgba(150, 0, 0, 0.7)',
+                                        font: {{ size: 12, weight: 'bold' }}
+                                    }}
+                                }},
+                                zonaNeutralSMI: {{
+                                    type: 'box',
+                                    yScaleID: 'y',
+                                    yMin: -40,
+                                    yMax: 40,
+                                    backgroundColor: 'rgba(255, 255, 0, 0.1)', // Amarillo claro para neutral
+                                    borderColor: 'rgba(255, 255, 0, 0.2)',
+                                    borderWidth: 1,
+                                    label: {{
+                                        content: 'Zona Neutral SMI',
+                                        enabled: false,
+                                        position: 'center',
+                                        color: 'rgba(150, 150, 0, 0.7)',
+                                        font: {{ size: 12, weight: 'bold' }}
+                                    }}
+                                }},
+                                zonaSobreventa: {{
+                                    type: 'box',
+                                    yScaleID: 'y',
+                                    yMin: -100,
+                                    yMax: -40,
+                                    backgroundColor: 'rgba(0, 255, 0, 0.1)', // Verde claro para sobreventa
+                                    borderColor: 'rgba(0, 255, 0, 0.2)',
+                                    borderWidth: 1,
+                                    label: {{
+                                        content: 'Zona de Sobreventa',
+                                        enabled: false,
+                                        position: 'start',
+                                        color: 'rgba(0, 150, 0, 0.7)',
+                                        font: {{ size: 12, weight: 'bold' }}
+                                    }}
+                                }},
+                                // Líneas de soporte
+                                soporte1Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['SOPORTE_1']},
+                                    yMax: {data['SOPORTE_1']},
+                                    borderColor: 'rgba(75, 192, 192, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Soporte 1',
+                                        enabled: true,
+                                        position: 'start',
+                                        font: {{ size: 10 }}
+                                    }}
+                                }},
+                                soporte2Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['SOPORTE_2']},
+                                    yMax: {data['SOPORTE_2']},
+                                    borderColor: 'rgba(75, 192, 192, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Soporte 2',
+                                        enabled: true,
+                                        position: 'start',
+                                        font: {{ size: 10 }}
+                                    }}
+                                }},
+                                soporte3Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['SOPORTE_3']},
+                                    yMax: {data['SOPORTE_3']},
+                                    borderColor: 'rgba(75, 192, 192, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Soporte 3',
+                                        enabled: true,
+                                        position: 'start',
+                                        font: {{ size: 10 }}
+                                    }}
+                                }},
+                                // Líneas de resistencia
+                                resistencia1Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['RESISTENCIA_1']},
+                                    yMax: {data['RESISTENCIA_1']},
+                                    borderColor: 'rgba(255, 99, 132, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Resistencia 1',
+                                        enabled: true,
+                                        position: 'end',
+                                        font: {{ size: 10 }}
+                                    }}
+                                }},
+                                resistencia2Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['RESISTENCIA_2']},
+                                    yMax: {data['RESISTENCIA_2']},
+                                    borderColor: 'rgba(255, 99, 132, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Resistencia 2',
+                                        enabled: true,
+                                        position: 'end',
+                                        font: {{ size: 10 }}
+                                    }}
+                                }},
+                                resistencia3Line: {{
+                                    type: 'line',
+                                    yScaleID: 'y1',
+                                    yMin: {data['RESISTENCIA_3']},
+                                    yMax: {data['RESISTENCIA_3']},
+                                    borderColor: 'rgba(255, 99, 132, 0.8)',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Resistencia 3',
+                                        enabled: true,
+                                        position: 'end',
+                                        font: {{ size: 10 }}
+                                    }}
                                 }}
-                                label += context.parsed.y.toFixed(2);
-                                return label;
+                                // Icono de Entrada/Salida en el último día de historial
+                                // (último día del dataset de precios reales)
+                                signalPoint:{{
+                                    type: 'point',
+                                    xValue: {len(labels_historial) - 1}, // Último día del historial real
+                                    yValue: {precios_reales_grafico[-1] if precios_reales_grafico else 'null'}, // Precio del último día real
+                                    yScaleID: 'y1', // En el eje del precio
+                                    radius: 10,
+                                    pointStyle: {'"triangle"' if 'Compra' in data['RECOMENDACION'] else ('"triangle"' if 'Venta' in data['RECOMENDACION'] else '"circle"')},
+                                    rotation: {{0 if 'Compra' in data['RECOMENDACION'] else (180 if 'Venta' in data['RECOMENDACION'] else 0)}},
+                                    backgroundColor: {'"rgba(0, 200, 0, 0.8)"' if 'Compra' in data['RECOMENDACION'] else ('"rgba(200, 0, 0, 0.8)"' if 'Venta' in data['RECOMENDACION'] else '"rgba(100, 100, 100, 0.8)"')},
+                                    borderColor: 'white',
+                                    borderWidth: 2,
+                                    display: {('true' if 'Compra' in data['RECOMENDACION'] or 'Venta' in data['RECOMENDACION'] else 'false')},
+                                    label: {{
+                                        content: '{data["RECOMENDACION"]}',
+                                        enabled: true,
+                                        position: 'top',
+                                        font: {{ size: 10, weight: 'bold' }},
+                                        color: {'"rgba(0, 200, 0, 0.8)"' if 'Compra' in data['RECOMENDACION'] else ('"rgba(200, 0, 0, 0.8)"' if 'Venta' in data['RECOMENDACION'] else '"rgba(100, 100, 100, 0.8)"')},
+                                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                                        borderRadius: 4,
+                                        padding: 4
+                                    }}
+                                }}                                
                             }}
                         }}
-                    }}
-                }},
-                scales: {{
-                    y: {{
-                        beginAtZero: true,
-                        max: 10,
-                        title: {{
-                            display: true,
-                            text: 'Nota Técnica (0-10)'
-                        }}
                     }},
-                    y1: {{
-                        position: 'right',
-                        beginAtZero: false,
-                        title: {{
+                    scales: {{
+                        y: {{
+                            type: 'linear',
                             display: true,
-                            text: 'Precio de Cierre (€)'
+                            position: 'left',
+                            title: {{
+                                display: true,
+                                text: 'Indice Ibexia'
+                            }},
+                            min: -100,
+                            max: 100
                         }},
-                        grid: {{
-                            drawOnChartArea: false
-                        }},
-                        ticks: {{
-                            padding: 5
-                        }},
-                        suggestedMin: minPrecio,
-                        suggestedMax: maxPrecio
-                    }},
-                    x: {{
-                        title: {{
+                        y1: {{
+                            type: 'linear',
                             display: true,
-                            text: 'Últimos 30 Días (ibexia.es)'
+                            position: 'right',
+                            title: {{
+                                display: true,
+                                text: 'Precio'
+                            }},
+                            grid: {{
+                                drawOnChartArea: false,
+                            }},
                         }}
                     }}
-                }},
-                responsive: true,
-                maintainAspectRatio: false
-            }}
+                }}
+            }});
         }});
-    }});
-</script>
-<br/>
-
-"""
-        # Cálculo dinámico de la descripción del gráfico
-                  
-        descripcion_grafico = ""
-        cierres = data.get("CIERRES_30_DIAS", [])
-        notas = data.get("NOTAS_HISTORICAS_30_DIAS", [])
-
-        mejor_compra = None
-        mejor_venta = None
-        ganancia_neta_compra = 0.0
-        ganancia_neta_venta = 0.0
-        
-        if cierres and notas and len(cierres) == len(notas):
-            for i in range(len(notas)):
-                nota = notas[i]
-                cierre = cierres[i]
-        
-                if nota >= 8:
-                    max_post = max(cierres[i:], default=cierre)
-                    pct = ((max_post - cierre) / cierre) * 100
-                    
-                    if (not mejor_compra) or (pct > mejor_compra[3]):
-                        ganancia_bruta = (max_post - cierre) * (inversion_base / cierre)
-                        comision_compra = inversion_base * comision_por_operacion_porcentual
-                        comision_venta = (inversion_base + ganancia_bruta) * comision_por_operacion_porcentual
-                        comision_total = comision_compra + comision_venta
-                        
-                        ganancia_neta_compra_actual = ganancia_bruta - comision_total
-                        
-                        mejor_compra = (i, cierre, max_post, pct, ganancia_neta_compra_actual)
-                        ganancia_neta_compra = ganancia_neta_compra_actual
-        
-                elif nota <= 2:
-                    min_post = min(cierres[i:], default=cierre)
-                    pct = ((min_post - cierre) / cierre) * 100
-                    
-                    if (not mejor_venta) or (pct < mejor_venta[3]):
-                        perdida_bruta_evitada = (cierre - min_post) * (inversion_base / cierre)
-                        comision_compra_imaginaria = inversion_base * comision_por_operacion_porcentual
-                        comision_venta_real = (inversion_base - (inversion_base * abs(pct)/100)) * comision_por_operacion_porcentual
-                        comision_total_simulada = comision_compra_imaginaria + comision_venta_real
-                        
-                        perdida_evitada_neta_actual = perdida_bruta_evitada - comision_total_simulada
-                        
-                        mejor_venta = (i, cierre, min_post, pct, perdida_evitada_neta_actual)
-                        ganancia_neta_venta = perdida_evitada_neta_actual
-
-
-
-
-        # Generar el párrafo explicativo
-        ganancia_compra_texto = ""
-        ganancia_venta_texto = ""
-        
-        if mejor_compra:
-            idx, inicio, maximo, pct, ganancia_neta = mejor_compra
-            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            ganancia_compra_texto = f"<p>En nuestra mejor recomendación de <strong>compra</strong>, el día {fecha}, con el precio a <strong>{inicio:.2f}€</strong>, el valor alcanzó un máximo de <strong>{maximo:.2f}€</strong>. Con una inversión de <strong>{inversion_base:,.2f}€</strong>, esto habría generado una ganancia neta estimada de <strong>{ganancia_neta:,.2f}€</strong> (tras descontar las comisiones del {comision_por_operacion_porcentual*100:.1f}% por operación). Este acierto demuestra la potencia de nuestras señales para capturar el potencial alcista del mercado.</p>"
-
-        if mejor_venta:
-            idx, inicio, minimo, pct, perdida_evitada_neta = mejor_venta
-            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            ganancia_venta_texto = f"<p>En cuanto a nuestras señales de <strong>venta</strong>, la más destacada ocurrió el día {fecha}, con un precio de <strong>{inicio:.2f}€</strong>. Si hubiéramos invertido <strong>{inversion_base:,.2f}€</strong> y seguido nuestra señal para evitar la caída hasta <strong>{minimo:.2f}€</strong>, habríamos evitado una pérdida neta estimada de <strong>{abs(perdida_evitada_neta):,.2f}€</strong> (tras descontar comisiones). Esto subraya la capacidad de nuestros análisis para proteger tu capital en momentos de debilidad del mercado.</p>"
-
-        ganancia_seccion_contenido = ""
-        if ganancia_compra_texto:
-            ganancia_seccion_contenido += ganancia_compra_texto
-        if ganancia_venta_texto:
-            ganancia_seccion_contenido += ganancia_venta_texto
-        
-        if not ganancia_seccion_contenido:
-            ganancia_seccion_contenido = f"<p>En este análisis no se detectaron señales de compra o venta lo suficientemente claras en el histórico reciente para proyectar ganancias o pérdidas evitadas significativas con una inversión de {inversion_base:,.2f}€.</p>"
-
-
-        mejor_punto_giro_compra = None
-        mejor_punto_giro_venta = None
-
-        if cierres and notas and len(cierres) == len(notas) and len(notas) > 1:
-            for i in range(1, len(notas) - 1): # Empezar desde el segundo elemento para ar con el anterior y mirar el siguiente
-                nota_anterior = notas[i-1]
-                nota_actual = notas[i]
-                nota_siguiente = notas[i+1]
-                cierre_actual = cierres[i]
-
-                # Detección de giro de tendencia bajista a alcista (posible punto de compra)
-                if nota_anterior > nota_actual and nota_siguiente > nota_actual:
-                    # Si la nota venía bajando o plana y empieza a subir, es un posible punto de compra
-                    max_post = max(cierres[i:], default=cierre_actual)
-                    pct = ((max_post - cierre_actual) / cierre_actual) * 100
-                    if (not mejor_punto_giro_compra) or (pct > mejor_punto_giro_compra[3]):
-                        ganancia_bruta = (max_post - cierre_actual) * (inversion_base / cierre_actual)
-                        comision_compra = inversion_base * comision_por_operacion_porcentual
-                        comision_venta = (inversion_base + ganancia_bruta) * comision_por_operacion_porcentual
-                        comision_total = comision_compra + comision_venta
-                        ganancia_neta_actual = ganancia_bruta - comision_total
-                        mejor_punto_giro_compra = (i, cierre_actual, max_post, pct, ganancia_neta_actual)
-
-                # Detección de giro de tendencia alcista a bajista (posible punto de venta para evitar pérdida)
-                if nota_anterior < nota_actual and nota_siguiente < nota_actual:
-                    # Si la nota venía subiendo o plana y empieza a bajar, es un posible punto de venta
-                    min_post = min(cierres[i:], default=cierre_actual)
-                    pct = ((min_post - cierre_actual) / cierre_actual) * 100 # Será un porcentaje negativo
-                    if (not mejor_punto_giro_venta) or (pct < mejor_punto_giro_venta[3]):
-                        perdida_bruta_evitada = (cierre_actual - min_post) * (inversion_base / cierre_actual)
-                        comision_compra_imaginaria = inversion_base * comision_por_operacion_porcentual
-                        comision_venta_real = (inversion_base - (inversion_base * abs(pct)/100)) * comision_por_operacion_porcentual
-                        comision_total_simulada = comision_compra_imaginaria + comision_venta_real
-                        perdida_evitada_neta_actual = perdida_bruta_evitada - comision_total_simulada
-                        mejor_punto_giro_venta = (i, cierre_actual, min_post, pct, perdida_evitada_neta_actual)
-
-        punto_giro_texto = ""
-        if mejor_punto_giro_compra:
-            idx, inicio, maximo, pct, ganancia_neta = mejor_punto_giro_compra
-            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            punto_giro_texto += f"<p>También, identificamos un punto de inflexión alcista el día {fecha}, cuando el precio era de <strong>{inicio:.2f}€</strong>. Si hubiéramos aprovechado este giro de la nota técnica, el valor alcanzó <strong>{maximo:.2f}€</strong>, lo que podría haber generado una ganancia neta estimada de <strong>{ganancia_neta:,.2f}€</strong> con una inversión de {inversion_base:,.2f}€.</p>"
-        
-        if mejor_punto_giro_venta:
-            idx, inicio, minimo, pct, perdida_evitada_neta = mejor_punto_giro_venta
-            fecha = (datetime.today() - timedelta(days=29 - idx)).strftime("%d/%m")
-            punto_giro_texto += f"<p>De manera similar, un punto de inflexión bajista se observó el día {fecha} con el precio a <strong>{inicio:.2f}€</strong>. Al anticipar esta caída hasta <strong>{minimo:.2f}€</strong>, se habría podido evitar una pérdida neta estimada de <strong>{abs(perdida_evitada_neta):,.2f}€</strong> con una inversión de {inversion_base:,.2f}€.</p>"
-
-        if punto_giro_texto:
-            ganancia_seccion_contenido += punto_giro_texto
-            
-        chart_html += f"""
-        <div style="margin-top:20px;">
-            <h2>Ganaríamos {(ganancia_neta_compra + ganancia_neta_venta):,.2f}€ con nuestra inversión</h2>
-            {ganancia_seccion_contenido}
-        </div>
+        </script>
         """
 
-    
-
-        chart_html += f"""
-<h2>Gráfico de Divergencia: Nota Técnica vs Precio Normalizado</h2>
-<p>Este gráfico es crucial para identificar **divergencias significativas** entre nuestra valoración técnica (la Nota Técnica) y el movimiento real del precio de la acción. Una divergencia positiva (barras verdes) sugiere que nuestra nota está indicando una fortaleza técnica mayor de lo que el precio actual refleja, lo que podría anticipar un movimiento alcista. Por el contrario, una divergencia negativa (barras rojas) indica que la nota técnica es más débil que el precio, lo que podría ser una señal de advertencia o anticipar una corrección.</p>
-<p>Para comprender mejor cómo interpretar estos gráficos y tomar decisiones informadas, visita nuestro enlace explicativo: <a href="https://ibexia.es/como-interpretar-los-graficos-para-comprar-o-vender/" target="_blank">Cómo interpretar los gráficos para comprar o vender</a>. </p>
-
-<div style="width: 100%; height: 400px;">
-    <canvas id="divergenciaColorChart"></canvas>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {{
-    var ctx = document.getElementById('divergenciaColorChart').getContext('2d');
-
-    var preciosOriginales = {json.dumps(data['CIERRES_30_DIAS'])};
-    var notasOriginales = {json.dumps(data['NOTAS_HISTORICAS_30_DIAS'])};
-
-    var minPrecio = Math.min(...preciosOriginales);
-    var maxPrecio = Math.max(...preciosOriginales);
-
-    var preciosNormalizados = [];
-    if (minPrecio === maxPrecio) {{
-        preciosNormalizados = preciosOriginales.map(function() {{ return 5; }});
-    }} else {{
-        preciosNormalizados = preciosOriginales.map(function(p) {{
-            return ((p - minPrecio) / (maxPrecio - minPrecio)) * 10;
-        }});
-    }}
-
-    var divergenciaData = [];
-    var colores = [];
-    for (var i = 0; i < notasOriginales.length; i++) {{
-        var diff = notasOriginales[i] - preciosNormalizados[i];
-        divergenciaData.push(diff);
-        colores.push(diff >= 0 ? 'rgba(0, 150, 0, 0.7)' : 'rgba(255, 0, 0, 0.7)');
-    }}
-
-    // Variación diaria de la nota
-    var variacionNotas = [0];
-    for (var i = 1; i < notasOriginales.length; i++) {{
-        variacionNotas.push(parseFloat((notasOriginales[i] - notasOriginales[i - 1]).toFixed(2)));
-    }}
-
-    var labels = {json.dumps([(datetime.today() - timedelta(days=29 - i)).strftime("%d/%m") for i in range(30)])};
-
-    new Chart(ctx, {{
-        type: 'bar',
-        data: {{
-            labels: labels,
-            datasets: [
-                {{
-                    label: 'Divergencia (Nota - Precio Normalizado)',
-                    data: divergenciaData,
-                    backgroundColor: colores,
-                    borderColor: colores.map(c => c.replace('0.7', '1')),
-                    borderWidth: 1,
-                    yAxisID: 'y'
-                }},
-                {{
-                    label: 'Variación Diaria de Nota',
-                    data: variacionNotas,
-                    type: 'line',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    borderWidth: 2,
-                    fill: false,
-                    yAxisID: 'y1'
-                }}
-            ]
-        }},
-        options: {{
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {{
-                tooltip: {{
-                    mode: 'index',
-                    intersect: false,
-                    callbacks: {{
-                        label: function(context) {{
-                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2);
-                        }}
-                    }}
-                }},
-                legend: {{
-                    display: true
-                }},
-                annotation: {{
-                    annotations: {{
-                        zeroLine: {{
-                            type: 'line',
-                            yMin: 0,
-                            yMax: 0,
-                            borderColor: 'rgba(0, 0, 0, 0.5)',
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            yScaleID: 'y',
-                            label: {{
-                                enabled: true,
-                                content: 'Sin Divergencia (0)',
-                                position: 'end',
-                                backgroundColor: 'rgba(0, 0, 0, 0.6)'
-                            }}
-                        }}
-                    }}
-                }}
-            }},
-            scales: {{
-                y: {{
-                    beginAtZero: false,
-                    title: {{
-                        display: true,
-                        text: 'Divergencia (Nota - Precio Normalizado)'
-                    }},
-                    position: 'left'
-                }},
-                y1: {{
-                    beginAtZero: true,
-                    suggestedMin: -2,
-                    suggestedMax: 2,
-                    title: {{
-                        display: true,
-                        text: 'Δ Nota Técnica'
-                    }},
-                    position: 'right',
-                    grid: {{
-                        drawOnChartArea: false
-                    }}
-                }},
-                x: {{
-                    title: {{
-                        display: true,
-                        text: 'Últimos 30 Días'
-                    }}
-                }}
-            }}
-        }}
-    }});
-}});
-</script>
-
-"""
-
-        
-
-    
-    # Pre-procesamiento de soportes para agruparlos si son muy cercanos
     soportes_unicos = []
     temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
     
     if len(temp_soportes) > 0:
         soportes_unicos.append(temp_soportes[0])
         for i in range(1, len(temp_soportes)):
-            if abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005: # Tolerancia del 0.5%
+            if abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
                 soportes_unicos.append(temp_soportes[i])
     
-    # Asegurarse de que soportes_unicos tenga al menos un elemento para la tabla
     if not soportes_unicos:
-        soportes_unicos.append(0.0) # Valor por defecto si no se encontraron soportes
+        soportes_unicos.append(0.0)
 
-    # Construcción del texto de soportes
     soportes_texto = ""
     if len(soportes_unicos) == 1:
         soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,.2f}€</strong>."
@@ -814,7 +853,6 @@ document.addEventListener('DOMContentLoaded', function () {{
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
 
-    # Construcción de la tabla de resumen de puntos clave
     tabla_resumen = f"""
 <h2>Resumen de Puntos Clave</h2>
 <table border="1" style="width:100%; border-collapse: collapse;">
@@ -843,62 +881,21 @@ document.addEventListener('DOMContentLoaded', function () {{
         <td style="padding: 8px;"><strong>{data['RECOMENDACION']}</strong></td>
     </tr>
     <tr>
-        <td style="padding: 8px;">Nota Técnica (0-10)</td>
-        <td style="padding: 8px;"><strong>{data['NOTA_EMPRESA']:,}</strong></td>
-    </tr>
-    <tr>
         <td style="padding: 8px;">Precio Objetivo de Compra</td>
         <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Tendencia de la Nota</td>
-        <td style="padding: 8px;"><strong>{data['TENDENCIA_NOTA']}</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Días Estimados para Acción</td>
-        <td style="padding: 8px;"><strong>{data['DIAS_ESTIMADOS_ACCION']}</strong></td>
     </tr>
 </table>
 <br/>
 """
 
-    # Dinámica del Impulso - Contenido generado dinámicamente
-    dinamica_impulso_text = ""
-    if data['TENDENCIA_NOTA'] == "mejorando":
-        # Corrección de sintaxis de f-string anidada y eliminación de '***'
-        dias_info = f"Según esta dinámica, estimo que podríamos estar a {data['DIAS_ESTIMADOS_ACCION']} para una posible acción de compra." if 'compra' in data['DIAS_ESTIMADOS_ACCION'] else ''
-        dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **mejorando**, lo que sugiere un **impulso alcista** en el comportamiento técnico de la acción. Esto indica que los indicadores del gráfico están mostrando una fortaleza creciente. {dias_info}"
-    elif data['TENDENCIA_NOTA'] == "empeorando":
-        # Corrección de sintaxis de f-string anidada y eliminación de '***'
-        dias_info = f"Según esta dinámica, estimo que podríamos estar a {data['DIAS_ESTIMADOS_ACCION']} para una posible acción de venta." if 'venta' in data['DIAS_ESTIMADOS_ACCION'] else ''
-        dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **empeorando**, lo que sugiere un **impulso bajista** en el comportamiento técnico de la acción. Esto indica que los indicadores del gráfico están mostrando una debilidad creciente. {dias_info}"
-    else: # Estable o "Ya en zona de posible venta/compra"
-        if "Ya en zona" in data['DIAS_ESTIMADOS_ACCION']:
-            # Corrección de sintaxis de f-string anidada y eliminación de '***'
-            accion_type = 'posible compra' if data['NOTA_EMPRESA'] >= 8 else 'posible venta'
-            entrada_salida = 'de entrada inmediata para compra' if data['NOTA_EMPRESA'] >= 8 else 'de salida inmediata para venta'
-            dinamica_impulso_text = f"La nota técnica de la empresa ya se encuentra en una **zona de {accion_type}**, lo que indica que el mercado ya ha descontado gran parte del movimiento en esa dirección. Esto podría ofrecer una oportunidad {entrada_salida} para el inversor que busque una acción rápida. Si bien la nota es **{data['NOTA_EMPRESA']}**, es crucial vigilar la volatilidad y los eventos externos que puedan alterar el impulso actual."
-        else:
-            dinamica_impulso_text = f"La tendencia de nuestra nota técnica es actualmente **estable**, lo que sugiere que el comportamiento técnico de la acción se mantiene sin cambios significativos. Esto implica que no se proyecta una acción inminente basada únicamente en este indicador, aunque siempre es importante estar atento a cualquier cambio en el volumen o los niveles de soporte y resistencia."
-
-
-    # Volumen - Contenido generado dinámicamente
-    volumen_analisis_text = ""
-    # Corrección: Eliminar los asteriscos de formato de Markdown dentro de la f-string
-    if data['VOLUMEN'] is not None:
-        volumen_analisis_text = f"Analizando el volumen de {data['VOLUMEN']:,} acciones, este volumen [El modelo debe decidir si es alto/bajo/normal en relación al historial y la tendencia. Por ejemplo: 'es consistente con la fase de acumulación que observo en el gráfico, y refuerza la validez de los niveles de soporte detectados.' o 'es ligeramente inferior al promedio reciente, lo que podría indicar una falta de convicción en el movimiento actual.']. "
-    else:
-        volumen_analisis_text = "Actualmente, no dispongo de datos de volumen reciente para realizar un análisis en profundidad. Sin embargo, en cualquier estrategia de inversión, el volumen es un indicador crucial que valida los movimientos de precio y la fuerza de las tendencias. Un volumen significativo en rupturas de niveles clave o en cambios de tendencia es una señal potente a tener en cuenta."
-
-
     prompt = f"""
-Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio. 
+Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio.
 
-Destaca los datos importantes como precios, notas de la empresa, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
+Destaca los datos importantes como precios, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
 
-Genera un análisis técnico completo de aproximadamente 800 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención a la **nota obtenida por la empresa**: {data['NOTA_EMPRESA']}.
+Genera un análisis técnico completo de aproximadamente 800 palabras sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención (pero no lo menciones) al **valor actual del SMI ({data['SMI']})**.
 
-¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y ÚNICO para TODOS sus gráficos solicitados (Notas Chart, Divergencia Color Chart, Nota Variación Chart y Precios Chart). Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
+¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y Único para TODOS sus gráficos solicitados. Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
 
 **Datos clave:**
 - Precio actual: {data['PRECIO_ACTUAL']}
@@ -908,54 +905,25 @@ Genera un análisis técnico completo de aproximadamente 800 palabras sobre la e
 - Soporte 3: {data['SOPORTE_3']}
 - Resistencia clave: {data['RESISTENCIA']}
 - Recomendación general: {data['RECOMENDACION']}
-- Nota de la empresa (0-10): {data['NOTA_EMPRESA']}
+- SMI actual: {data['SMI']}
 - Precio objetivo de compra: {data['PRECIO_OBJETIVO_COMPRA']}€
-- Resultados financieros recientes: {data['INGRESOS']}, {data['EBITDA']}, {data['BENEFICIOS']}
-- Nivel de deuda y flujo de caja: {data['DEUDA']}, {data['FLUJO_CAJA']}
-- Información estratégica: {data['EXPANSION_PLANES']}, {data['ACUERDOS']}
-- Sentimiento del mercado: {data['SENTIMIENTO_ANALISTAS']}, {data['TENDENCIA_SOCIAL']}
-- ativa sectorial: {data['EMPRESAS_SIMILARES']}
-- Riesgos y oportunidades: {data['RIESGOS_OPORTUNIDADES']}
-- Tendencia de la nota: {data['TENDENCIA_NOTA']}
-- Días estimados para acción: {data['DIAS_ESTIMADOS_ACCION']}
+- Tendencia del SMI: {data['tendencia_ibexia']}
 
-Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia a la **nota obtenida por la empresa ({data['NOTA_EMPRESA']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
+
+Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista.
 
 ---
 <h1>{titulo_post}</h1>
 
 
 <h2>Análisis Inicial y Recomendación</h2>
-<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente, alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
+<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']} Según mis proyecciones, el precio podría situarse en aproximadamente <strong>{data['PRECIO_PROYECTADO_5DIAS']:,}€</strong> en los próximos 5 días. Por ello, mi recomendación es <strong>{data['RECOMENDACION']}</strong>.</p>
 
-<p>Asignamos una <strong>nota técnica de {data['NOTA_EMPRESA']} sobre 10</strong>. Esta puntuación refleja [elige una de las siguientes opciones basadas en la nota, manteniendo el foco en el análisis técnico]:
-    {"una excelente fortaleza técnica y baja volatilidad esperada a corto plazo. La sólida puntuación se basa en la evaluación de indicadores clave de impulso, soporte y resistencia, lo que indica un bajo riesgo técnico en relación con el potencial de crecimiento a corto plazo." if data['NOTA_EMPRESA'] >= 8 else ""}
-    {"una fortaleza técnica moderada, con un equilibrio entre potencial y riesgo. Se basa en el comportamiento del gráfico, soportes, resistencias e impulso, sugiriendo una oportunidad que requiere seguimiento." if 6 <= data['NOTA_EMPRESA'] < 8 else ""}
-    {"una situación técnica neutral, donde el gráfico no muestra un patrón direccional claro. La puntuación se deriva del análisis de los movimientos de precio y volumen, indicando que es un momento para la observación y no para la acción inmediata." if 5 <= data['NOTA_EMPRESA'] < 6 else ""}
-    {"cierta debilidad técnica, con posibles señales de corrección o continuación bajista. La puntuación se basa en los indicadores del gráfico, que muestran una pérdida de impulso alcista y un aumento de la presión vendedora." if 3 <= data['NOTA_EMPRESA'] < 5 else ""}
-    {"una debilidad técnica significativa y una posible sobrecompra en el gráfico, lo que sugiere un alto riesgo de corrección." if data['NOTA_EMPRESA'] < 3 else ""} </p>
+
 {chart_html}
-
-<h2>Estrategia de Inversión y Gestión de Riesgos</h2>
-<p>Mi evaluación profesional indica que la tendencia actual de nuestra nota técnica es **{data['TENDENCIA_NOTA']}**. Esto sugiere {('un rebote inminente, dado que los indicadores muestran una sobreventa extrema, lo que significa que la acción ha sido \'castigada\' en exceso y hay una alta probabilidad de que los compradores tomen el control, impulsando el precio al alza. Esta situación de sobreventa, sumada al impulso alcista subyacente, nos sugiere que estamos ante el inicio de un rebote significativo.' if data['TENDENCIA_NOTA'] == 'mejorando' and data['NOTA_EMPRESA'] < 6 else '')}
-{('una potencial continuación bajista, con los indicadores técnicos mostrando una sobrecompra significativa o una pérdida de impulso alcista. Esto sugiere que la acción podría experimentar una corrección. Es un momento para la cautela y la vigilancia de los niveles de soporte.' if data['TENDENCIA_NOTA'] == 'empeorando' and data['NOTA_EMPRESA'] > 4 else '')}
-{('una fase de consolidación o lateralidad, donde los indicadores técnicos no muestran una dirección clara. Es un momento para esperar la confirmación de una nueva tendencia antes de tomar decisiones.' if data['TENDENCIA_NOTA'] == 'estable' else '')}
-{f" Calculamos que este impulso podría llevarnos a una potencial zona de {('toma de beneficios o venta' if data['NOTA_EMPRESA'] >= 8 else 'entrada o compra')} en aproximadamente **{data['DIAS_ESTIMADOS_ACCION']}**." if "No disponible" not in data['DIAS_ESTIMADOS_ACCION'] and "Ya en zona" not in data['DIAS_ESTIMADOS_ACCION'] else ("La nota ya se encuentra en una zona de acción clara, lo que sugiere una oportunidad {('de compra' if data['NOTA_EMPRESA'] >= 8 else 'de venta')} inmediata, y por tanto, no se estima un plazo de días adicional." if "Ya en zona" in data['DIAS_ESTIMADOS_ACCION'] else "")}</p>
-
-<p>{volumen_analisis_text}</p>
-
-
-
-<h2>Visión a Largo Plazo y Fundamentales</h2>
-
-<p>En el último ejercicio, los ingresos declarados fueron de <strong>{formatear_numero(data['INGRESOS'])}</strong>, el EBITDA alcanzó <strong>{formatear_numero(data['EBITDA'])}</strong>, y los beneficios netos se situaron en torno a <strong>{formatear_numero(data['BENEFICIOS'])}</strong>. 
-En cuanto a su posición financiera, la deuda asciende a <strong>{formatear_numero(data['DEUDA'])}</strong>, y el flujo de caja operativo es de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>.</p>
 
 {tabla_resumen}
 
-<h2>Conclusión General y Descargo de Responsabilidad</h2>
-<p>Para cerrar este análisis de <strong>{data['NOMBRE_EMPRESA']}</strong>, considero que las claras señales técnicas que apuntan a {('un rebote desde una zona de sobreventa extrema, configurando una oportunidad atractiva' if data['NOTA_EMPRESA'] >= 7 else 'una posible corrección, lo que exige cautela')}, junto con {f"sus sólidos ingresos de <strong>{formatear_numero(data['INGRESOS'])}</strong> y un flujo de caja positivo de <strong>{formatear_numero(data['FLUJO_CAJA'])}</strong>," if data['INGRESOS'] != 'N/A' else "aspectos fundamentales que requieren mayor claridad,"} hacen de esta empresa un activo para mantener bajo estricta vigilancia. </p>
-<p>Descargo de responsabilidad: Este contenido tiene una finalidad exclusivamente informativa y educativa. No constituye ni debe interpretarse como una recomendación de inversión, asesoramiento financiero o una invitación a comprar o vender ningún activo. </p>
 
 
 """
@@ -1004,14 +972,11 @@ def enviar_email(texto_generado, asunto_email, nombre_archivo):
     except Exception as e:
         print("❌ Error al enviar el correo:", e)
 
-
-
 def generar_contenido_con_gemini(tickers):
     api_key = os.getenv('GEMINI_API_KEY')
     if not api_key:
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
-    
     model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")  
 
     for ticker in tickers:
@@ -1021,6 +986,16 @@ def generar_contenido_con_gemini(tickers):
             print(f"⏩ Saltando {ticker} debido a un error al obtener datos.")
             continue
         
+        # ACCESO A LAS VARIABLES DESDE EL DICCIONARIO 'data'
+        # ANTES ERAN INDEFINIDAS, AHORA SE OBTIENEN DE 'data'
+        cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
+        # Cambio aquí para usar 'SMI_HISTORICO_PARA_GRAFICO'
+        smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
+
+        # Ahora pasa estas variables a la función generar_recomendacion_avanzada
+        data = generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_historico_para_grafico)
+        
+
         prompt, titulo_post = construir_prompt_formateado(data)
 
         max_retries = 1
@@ -1040,7 +1015,7 @@ def generar_contenido_con_gemini(tickers):
                 break  
             except Exception as e:
                 if "429 You exceeded your current quota" in str(e):
-                    server_suggested_delay = 0 # Inicializamos a 0
+                    server_suggested_delay = 0 
                     try:
                         match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
                         if match:
@@ -1048,27 +1023,23 @@ def generar_contenido_con_gemini(tickers):
                     except:
                         pass
 
-                    # Calcula el retraso actual basado en la retirada exponencial o el sugerido por el servidor
                     current_delay = max(initial_delay * (2 ** retries), server_suggested_delay + 1)
 
-                    # Añade jitter (aleatoriedad) para evitar colisiones con otras solicitudes
-                    jitter = random.uniform(0.5, 1.5) # Factor aleatorio entre 0.5 y 1.5
+                    jitter = random.uniform(0.5, 1.5)
                     delay_with_jitter = current_delay * jitter
 
                     print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay_with_jitter:.2f} segundos... (Intento {retries + 1}/{max_retries})")
-                    time.sleep(delay_with_jitter) # Usa el retraso con jitter
+                    time.sleep(delay_with_jitter)
                     retries += 1
-                    # La variable 'delay' ya no se necesita mantener persistente ni multiplicar
-                    # porque 'current_delay' se calcula de nuevo en cada intento
                 else:
                     print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
                     break
         else:  
             print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
             
-        # --- PAUSA DE 3 MINUTO DESPUÉS DE CADA TICKER ---
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
-        time.sleep(180) # Pausa de 180 segundos entre cada ticker
+        time.sleep(180)
+
 
 
 
