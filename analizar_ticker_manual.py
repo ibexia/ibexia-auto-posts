@@ -344,11 +344,17 @@ def obtener_datos_yfinance(ticker):
                 slope = 0.0
 
             if slope > 0.1:
-                tendencia_ibexia = "mejorando"
+                tendencia_ibexia = "mejorando (alcista)"
+                recomendacion = "Comprar"
+                motivo_recomendacion = f"La línea Ibexia muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {data['RESISTENCIA_1']:.2f}€."
             elif slope < -0.1:
-                tendencia_ibexia = "empeorando"
+                tendencia_ibexia = "empeorando (bajista)"
+                recomendacion = "Vender"
+                motivo_recomendacion = f"La línea Ibexia muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {data['SOPORTE_1']:.2f}€."
             else:
-                tendencia_ibexia = "estable"
+                tendencia_ibexia = "estable (lateral)"
+                recomendacion = "Neutral"
+                motivo_recomendacion = "La acción se encuentra en un momento de consolidación sin una dirección clara a corto plazo."
 
         datos = {
             "TICKER": ticker,
@@ -909,7 +915,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 
 <h2>Análisis Inicial y Recomendación</h2>
-<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente, alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
+<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente, alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']} Por ello, mi recomendación es <strong>{data['RECOMENDACION']}</strong>.</p>
 
 
 {chart_html}
