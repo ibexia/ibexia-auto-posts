@@ -276,58 +276,41 @@ def obtener_datos_yfinance(ticker):
 
 
         # Proyectamos el SMI para la zona del futuro con reversión lógica
-        smi_proyectado_futuro = []
-        smi_ultimos = smi_history_full.tail(7).tolist()
-        cambios_recientes = np.diff(smi_ultimos[-5:]) if len(smi_ultimos) >= 6 else [pendiente_smi]
-        promedio_cambios = np.mean(cambios_recientes)
+        from scipy.interpolate import make_interp_spline
 
-        for i in range(PROYECCION_FUTURA_DIAS):
-            # Detecta posible giro si el cambio se está frenando
-            if len(cambios_recientes) >= 3 and cambios_recientes[-1] > cambios_recientes[-2] < cambios_recientes[-3]:
-                pendiente_smi *= -0.5  # invertir suavemente
+        # --- NUEVA LÓGICA DE PROYECCIÓN DE SMI USANDO SPLINE SUAVE ---
+        # Seleccionamos los últimos puntos reales del SMI para extrapolar
+        smi_ultimos = smi_history_full.dropna().tail(10)
+        smi_vals = smi_ultimos.values
+        x_vals = np.arange(len(smi_vals))
 
-            smi_step = pendiente_smi
+        if len(smi_vals) >= 5:
+            spline = make_interp_spline(x_vals, smi_vals, k=3, ext=0)
+            x_futuro = np.arange(len(smi_vals), len(smi_vals) + PROYECCION_FUTURA_DIAS)
+            smi_proyectado_futuro = spline(x_futuro)
+            smi_proyectado_futuro = np.clip(smi_proyectado_futuro, -100, 100)
+            smi_proyectado_futuro = [round(val, 2) for val in smi_proyectado_futuro]
+        else:
+            # Si no hay suficientes datos, repetimos el último valor
+            smi_proyectado_futuro = [smi_vals[-1]] * PROYECCION_FUTURA_DIAS
 
-            if smi_proyectado > 70:
-                smi_step *= (100 - smi_proyectado) / 30
-                if smi_step > 0:
-                    smi_step = -abs(smi_step)
-            elif smi_proyectado < -70:
-                smi_step *= (smi_proyectado + 100) / 30
-                if smi_step < 0:
-                    smi_step = abs(smi_step)
-            elif smi_proyectado > 40 and smi_step > 0:
-                smi_step *= 0.5
-            elif smi_proyectado < -40 and smi_step < 0:
-                smi_step *= 0.5
-
-            smi_step += random.uniform(-0.2, 0.2)  # suavemente aleatorio
-
-            smi_proyectado += smi_step
-            smi_proyectado = np.clip(smi_proyectado, -100, 100)
-            smi_proyectado_futuro.append(round(smi_proyectado, 2))
-
-            cambios_recientes = cambios_recientes[1:] + [smi_step] if len(cambios_recientes) >= 5 else cambios_recientes + [smi_step]
-
-
-        # Usar los SMI proyectados para calcular los precios proyectados
-        # Sincronizar el precio con el movimiento del SMI proyectado
+        # --- NUEVA LÓGICA DE PROYECCIÓN DE PRECIOS BASADA EN SMI PROYECTADO ---
         precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
         for i in range(len(smi_proyectado_futuro)):
             if i == 0:
-                smi_diff = smi_proyectado_futuro[i] - smi_historico_para_grafico[-1]
+                smi_delta = smi_proyectado_futuro[i] - smi_historico_para_grafico[-1]
             else:
-                smi_diff = smi_proyectado_futuro[i] - smi_proyectado_futuro[i - 1]
+                smi_delta = smi_proyectado_futuro[i] - smi_proyectado_futuro[i - 1]
 
-            # El precio reacciona proporcional al cambio del SMI
-            factor_cambio = smi_diff / 100  # sensibilidad base
-            siguiente_precio = ultimo_precio_conocido * (1 + factor_cambio * 0.5)  # 0.5 = sensibilidad moderada
+            factor = smi_delta / 100  # cambio proporcional
+            siguiente_precio = ultimo_precio_conocido * (1 + factor * 0.6)  # sensibilidad ajustable
+            siguiente_precio = max(0.01, round(siguiente_precio, 2))
 
-            siguiente_precio = max(0.01, round(siguiente_precio, 2))  # evitar precios negativos o cero
             precios_proyectados.append(siguiente_precio)
             ultimo_precio_conocido = siguiente_precio
+
         # --- FIN DE LA NUEVA LÓGICA ---
      
         # Unir precios reales y proyectados
