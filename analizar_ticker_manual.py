@@ -270,67 +270,64 @@ def obtener_datos_yfinance(ticker):
             
         smi_history_last_30 = hist['SMI'].dropna().tail(30).tolist()
         
-        # --- Lógica MEJORADA Y DINÁMICA para la proyección sin atravesar niveles ---
+        # --- Lógica FINAL sin Precio Objetivo: Movimiento lineal constante ---
         precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
-        # Obtener los datos del SMI para proyectar su tendencia
-        smi_historico_para_proyeccion = hist_extended['SMI'].dropna().tail(5).tolist()
+        # Determinar la dirección de la tendencia y el movimiento diario constante
+        # Usamos la pendiente del SMI para determinar si la tendencia es alcista o bajista
+        smi_history_full = hist_extended['SMI'].dropna()
+        smi_ultimos_5 = smi_history_full.tail(5).dropna()
+        
+        pendiente_smi = 0
+        if len(smi_ultimos_5) >= 2:
+            x = np.arange(len(smi_ultimos_5))
+            y = smi_ultimos_5.values
+            pendiente_smi, _ = np.polyfit(x, y, 1)
 
-        if len(smi_historico_para_proyeccion) >= 2:
-            x_smi = np.arange(len(smi_historico_para_proyeccion))
-            y_smi = np.array(smi_historico_para_proyeccion)
-            pendiente_smi, _ = np.polyfit(x_smi, y_smi, 1)
-        else:
-            pendiente_smi = 0.0
-
-        smi_proyectado = []
-        ultimo_smi_conocido = smi_actual
-
+        # Definir un movimiento diario constante, lo suficientemente grande para no redondearse
+        # Usamos 1% como un valor base claro y visible
+        movimiento_diario = 0
+        if pendiente_smi > 0.1 or smi_actual < -40:  # Si SMI sube o está en sobreventa
+            movimiento_diario = 0.01  # +1% de subida diaria
+        elif pendiente_smi < -0.1 or smi_actual > 40: # Si SMI baja o está en sobrecompra
+            movimiento_diario = -0.01 # -1% de bajada diaria
+        
         # Ordenar soportes y resistencias para la comprobación
         soportes_ordenados_desc = sorted([soporte_1, soporte_2, soporte_3], reverse=True)
         resistencias_ordenadas_asc = sorted([resistencia_1, resistencia_2, resistencia_3])
 
+        proyeccion_detenida = False
+        
         for _ in range(PROYECCION_FUTURA_DIAS):
-            # Proyectar el SMI para el día futuro basándose en la pendiente
-            siguiente_smi_proyectado = ultimo_smi_conocido + pendiente_smi
-            # Asegurarse de que el SMI proyectado no se salga de -100 a 100
-            siguiente_smi_proyectado = np.clip(siguiente_smi_proyectado, -100, 100)
-
-            # Calcular el movimiento diario del precio en base al SMI proyectado
-            movimiento_diario = 0
-            if siguiente_smi_proyectado < -40:
-                movimiento_diario = 0.015  # Impulso fuerte al alza
-            elif siguiente_smi_proyectado > 40:
-                movimiento_diario = -0.015 # Corrección fuerte a la baja
+            if proyeccion_detenida:
+                siguiente_precio = ultimo_precio_conocido
             else:
-                # Movimiento gradual basado en el SMI (CORRECCIÓN APLICADA AQUÍ)
-                # Un SMI negativo provoca subida, y un SMI positivo provoca bajada (movimiento de rebote/corrección)
-                movimiento_diario = (siguiente_smi_proyectado / 100) * (-0.01)
+                siguiente_precio_tentativo = ultimo_precio_conocido * (1 + movimiento_diario)
+                siguiente_precio = siguiente_precio_tentativo
 
-            siguiente_precio_tentativo = ultimo_precio_conocido * (1 + movimiento_diario)
-            siguiente_precio = siguiente_precio_tentativo # Valor por defecto
-
-            # Ajustar el precio para que no atraviese soportes
-            if siguiente_precio_tentativo < ultimo_precio_conocido:
-                for s in soportes_ordenados_desc:
-                    if s < ultimo_precio_conocido and siguiente_precio_tentativo < s:
-                        siguiente_precio = s
-                        break
-            
-            # Ajustar el precio para que no atraviese resistencias
-            elif siguiente_precio_tentativo > ultimo_precio_conocido:
-                for r in resistencias_ordenadas_asc:
-                    if r > ultimo_precio_conocido and siguiente_precio_tentativo > r:
-                        siguiente_precio = r
-                        break
+                # Comprobar si ha cruzado algún nivel y detener la proyección
+                if movimiento_diario > 0:  # Tendencia alcista
+                    for r in resistencias_ordenadas_asc:
+                        if siguiente_precio_tentativo > r:
+                            siguiente_precio = r
+                            proyeccion_detenida = True
+                            break
+                elif movimiento_diario < 0: # Tendencia bajista
+                    for s in soportes_ordenados_desc:
+                        if siguiente_precio_tentativo < s:
+                            siguiente_precio = s
+                            proyeccion_detenida = True
+                            break
 
             siguiente_precio = round(siguiente_precio, 2)
             precios_proyectados.append(siguiente_precio)
             ultimo_precio_conocido = siguiente_precio
-            ultimo_smi_conocido = siguiente_smi_proyectado # Actualizar SMI para el siguiente cálculo
 
-        # --- Fin de la lógica mejorada ---
+        # --- Fin de la lógica lineal sin Precio Objetivo ---
+
+
+
       
      
         # Unir precios reales y proyectados
