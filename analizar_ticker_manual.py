@@ -393,7 +393,7 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, _para_grafi
     n_trend = min(7, len()) # Últimos 7 días o menos si no hay tantos
     if n_trend > 1:
         x_trend = np.arange(n_trend)
-        y_trend = np.array([-n_trend:])
+        y_trend = np.array(smi_historico[-n_trend:])
         # Filtrar NaN para calcular la pendiente
         valid_indices = ~np.isnan(y_trend)
         if np.any(valid_indices): # Solo calcular si hay datos válidos
