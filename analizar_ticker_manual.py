@@ -14,6 +14,9 @@ import time
 import re
 import random
 
+# Definición de la cantidad de días para la proyección futura
+PROYECCION_FUTURA_DIAS = 5
+
 def leer_google_sheets():
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
     if not credentials_json:
