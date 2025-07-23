@@ -915,7 +915,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 
 <h2>Análisis Inicial y Recomendación</h2>
-<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente, alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>. {datos_con_recomendacion['motivo_analisis']} Por ello, mi recomendación es <strong>{datos_con_recomendacion['RECOMENDACION']}</strong>.</p>
+<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente, alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']} Por ello, mi recomendación es <strong>{data['RECOMENDACION']}</strong>.</p>
 
 
 {chart_html}
