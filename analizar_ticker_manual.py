@@ -323,18 +323,6 @@ def obtener_datos_yfinance(ticker):
             ultimo_precio_conocido = siguiente_precio
         # --- FIN DE LA NUEVA LÓGICA ---
 
-            # Si va bajando, comprobar soportes
-            elif siguiente_precio < ultimo_precio_conocido:
-                for s in sorted(soportes, reverse=True):
-                    if siguiente_precio < s < ultimo_precio_conocido:
-                        distancia_relativa = abs(siguiente_precio - s) / s
-                        if distancia_relativa > TOLERANCIA_CRUCE:
-                            siguiente_precio = round(s * (1 + 0.001), 2)
-                        break
-
-            siguiente_precio = round(siguiente_precio, 2)
-            precios_proyectados.append(siguiente_precio)
-            ultimo_precio_conocido = siguiente_precio
      
         # Unir precios reales y proyectados
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
