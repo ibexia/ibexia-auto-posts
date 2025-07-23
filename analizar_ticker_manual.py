@@ -432,21 +432,21 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
 
     # Lógica de Giro Alcista (Compra)
     # Basamos la recomendación en el SMI directamente
-    if tendencia_ibexia == "mejorando (alcista)" and data['SMI'] < 0 and volumen_alto: # Linea ibexia en zona negativa y mejorando con volumen
+    if tendencia_ibexia == "mejorando (alcista)" and data['SMI'] < 0 and volumen_alto: # Indice Ibexia en zona negativa y mejorando con volumen
         recomendacion = "Fuerte Compra"
         condicion_analisis = "Impulso alcista con confirmación de volumen desde zona de sobreventa"
-        motivo_analisis = "La Linea ibexia está mejorando y se encuentra en zona de sobreventa, con un volumen significativo, indicando un fuerte impulso alcista."
+        motivo_analisis = "La Indice Ibexia está mejorando y se encuentra en zona de sobreventa, con un volumen significativo, indicando un fuerte impulso alcista."
 
     # Lógica de Giro Bajista (Venta Condicional)
-    elif tendencia_ibexia == "empeorando (bajista)" and data['SMI'] > 0 and volumen_alto: # La Linea ibexia en zona positiva y empeorando con volumen
+    elif tendencia_ibexia == "empeorando (bajista)" and data['SMI'] > 0 and volumen_alto: # La Indice Ibexia en zona positiva y empeorando con volumen
         if not proximidad_soporte:
             recomendacion = "Venta Condicional / Alerta"
             condicion_analisis = "Debilidad confirmada por volumen desde zona de sobrecompra, considerar salida"
-            motivo_analisis = "La Linea ibexia está empeorando y se encuentra en zona de sobrecompra, con volumen alto y sin soporte cercano, sugiriendo debilidad."
+            motivo_analisis = "La Indice Ibexia está empeorando y se encuentra en zona de sobrecompra, con volumen alto y sin soporte cercano, sugiriendo debilidad."
         else:
             recomendacion = "Neutral / Cautela"
             condicion_analisis = "Debilidad pero cerca de soporte clave, observar rebote"
-            motivo_analisis = "La Linea ibexia está empeorando, pero la proximidad a un soporte clave sugiere cautela antes de vender."
+            motivo_analisis = "La Indice Ibexia está empeorando, pero la proximidad a un soporte clave sugiere cautela antes de vender."
 
     # Detección de Patrones de Reversión desde Extremos:
     # Reversión de Compra (SMI saliendo de sobrecompra/extremo negativo)
@@ -455,7 +455,7 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
         if recomendacion not in ["Fuerte Compra", "Oportunidad de Compra (Reversión)"]:
             recomendacion = "Oportunidad de Compra (Reversión)"
             condicion_analisis = "Posible inicio de rebote tras sobreventa extrema, punto de entrada"
-            motivo_analisis = "Reversión de compra: La Linea ibexia está ascendiendo desde una zona de sobreventa extrema, indicando una oportunidad de entrada."
+            motivo_analisis = "Reversión de compra: La Indice Ibexia está ascendiendo desde una zona de sobreventa extrema, indicando una oportunidad de entrada."
 
     # Reversión de Venta (SMI saliendo de sobreventa/extremo positivo)
     elif len(smi_historico) >= 2 and smi_historico[-1] < smi_historico[-2] and \
@@ -463,21 +463,21 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
         if recomendacion not in ["Venta Condicional / Alerta", "Señal de Venta (Reversión)"]:
             recomendacion = "Señal de Venta (Reversión)"
             condicion_analisis = "Posible inicio de corrección tras sobrecompra extrema, punto de salida"
-            motivo_analisis = "Señal de venta: La Linea ibexia está descendiendo desde una zona de sobrecompra extrema, indicando un punto de salida."
+            motivo_analisis = "Señal de venta: La Indice Ibexia está descendiendo desde una zona de sobrecompra extrema, indicando un punto de salida."
 
     # Lógica para "Neutral" si ninguna de las condiciones anteriores se cumple con fuerza
     if recomendacion == "Neutral":
         if tendencia_ibexia == "estable (lateral)":
             condicion_analisis = "Consolidación o lateralidad sin dirección clara."
-            motivo_analisis = "La Linea ibexia se mantiene estable, indicando una fase de consolidación o lateralidad sin dirección clara."
+            motivo_analisis = "La Indice Ibexia se mantiene estable, indicando una fase de consolidación o lateralidad sin dirección clara."
         elif data['SMI'] < 20 and tendencia_ibexia == "mejorando (alcista)" and not volumen_alto:
             recomendacion = "Neutral / Observación"
-            condicion_analisis = "La Linea ibexia moderadamente bajo con mejora, pero falta confirmación de volumen."
-            motivo_analisis = "La Linea ibexia es moderadamente bajo y muestra una mejora, pero la falta de volumen significativo sugiere una fase de observación."
+            condicion_analisis = "La Indice Ibexia moderadamente bajo con mejora, pero falta confirmación de volumen."
+            motivo_analisis = "La Indice Ibexia es moderadamente bajo y muestra una mejora, pero la falta de volumen significativo sugiere una fase de observación."
         elif data['SMI'] > -20 and tendencia_ibexia == "empeorando (bajista)" and not volumen_alto:
             recomendacion = "Neutral / Observación"
-            condicion_analisis = "La Linea ibexia moderadamente alto con empeoramiento, pero falta confirmación de volumen."
-            motivo_analisis = "La Linea ibexiaes moderadamente alto y empeora, pero la falta de volumen significativo sugiere una fase de observación."
+            condicion_analisis = "La Indice Ibexia moderadamente alto con empeoramiento, pero falta confirmación de volumen."
+            motivo_analisis = "La Indice Ibexiaes moderadamente alto y empeora, pero la falta de volumen significativo sugiere una fase de observación."
 
     data['RECOMENDACION'] = recomendacion
     data['CONDICION_RSI'] = condicion_analisis # Aunque el nombre es RSI, el concepto es la condición del mercado
@@ -499,11 +499,11 @@ def construir_prompt_formateado(data):
                 if volumen_promedio_30d > 0:
                     cambio_porcentual_volumen = ((volumen_actual - volumen_promedio_30d) / volumen_promedio_30d) * 100
                     if cambio_porcentual_volumen > 50:
-                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia de  La Linea ibexia ({data['tendencia_ibexia']})."
+                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia de  La Indice Ibexia ({data['tendencia_ibexia']})."
                     elif cambio_porcentual_volumen < -30:
-                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es inferior a lo habitual, lo que podría sugerir cautela en la actual tendencia. Una confirmación de la señal de La Linea ibexia ({data['tendencia_ibexia']}) requeriría un aumento en la participación del mercado."
+                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es inferior a lo habitual, lo que podría sugerir cautela en la actual tendencia. Una confirmación de la señal de La Indice Ibexia ({data['tendencia_ibexia']}) requeriría un aumento en la participación del mercado."
                     else:
-                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> se mantiene en línea con el promedio. Es un volumen adecuado, pero no excepcional, para confirmar de manera contundente la señal de La Linea ibexia ({data['tendencia_ibexia']})."
+                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> se mantiene en línea con el promedio. Es un volumen adecuado, pero no excepcional, para confirmar de manera contundente la señal de La Indice Ibexia ({data['tendencia_ibexia']})."
                 else:
                     volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. "
             else:
@@ -559,7 +559,7 @@ def construir_prompt_formateado(data):
                     labels: {json.dumps(labels_total)},
                     datasets: [
                         {{
-                            label: 'SMI',
+                            label: 'Indice Ibexia',
                             data: {json.dumps(smi_desplazados_para_grafico)},
                             borderColor: 'rgba(75, 192, 192, 1)',
                             backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -599,7 +599,7 @@ def construir_prompt_formateado(data):
                     plugins: {{
                         title: {{
                             display: true,
-                            text: 'Evolución del SMI y Precio'
+                            text: 'Evolución de "indice Ibexia" y Precio'
                         }},
                         annotation: {{
                             annotations: {{
@@ -797,7 +797,7 @@ def construir_prompt_formateado(data):
                             position: 'left',
                             title: {{
                                 display: true,
-                                text: 'Stochastic Momentum Index (SMI)'
+                                text: 'Indice Ibexia'
                             }},
                             min: -100,
                             max: 100
@@ -901,7 +901,7 @@ Genera un análisis técnico completo de aproximadamente 800 palabras sobre la e
 - Tendencia del SMI: {data['tendencia_ibexia']}
 
 
-Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista. Al redactar el análisis, haz referencia al **valor actual del SMI ({data['SMI']})** en al menos dos de los párrafos principales (Recomendación General, Análisis a Corto Plazo o Predicción a Largo Plazo) como un factor clave para tu valoración.
+Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico. La recomendación debe presentarse como una conclusión personal basada en tu experiencia y criterio profesional como analista.
 
 ---
 <h1>{titulo_post}</h1>
