@@ -346,11 +346,11 @@ def obtener_datos_yfinance(ticker):
             if slope > 0.1:
                 tendencia_ibexia = "mejorando (alcista)"
                 recomendacion = "Comprar"
-                motivo_recomendacion = f"La línea Ibexia muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {data['RESISTENCIA_1']:.2f}€."
+                motivo_recomendacion = f"La línea Ibexia muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
             elif slope < -0.1:
                 tendencia_ibexia = "empeorando (bajista)"
                 recomendacion = "Vender"
-                motivo_recomendacion = f"La línea Ibexia muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {data['SOPORTE_1']:.2f}€."
+                motivo_recomendacion = f"La línea Ibexia muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
             else:
                 tendencia_ibexia = "estable (lateral)"
                 recomendacion = "Neutral"
