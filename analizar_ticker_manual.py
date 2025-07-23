@@ -332,6 +332,7 @@ def obtener_datos_yfinance(ticker):
      
         # Unir precios reales y proyectados
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
+        precio_proyectado_dia_5 = cierres_para_grafico_total[-1]  # Último precio proyectado a 5 días
 
         tendencia_ibexia = "No disponible"
         
@@ -381,6 +382,7 @@ def obtener_datos_yfinance(ticker):
             "PRECIO_OBJETIVO": precio_objetivo,
             "FECHAS_HISTORIAL": fechas_historial,
             "FECHAS_PROYECCION": fechas_proyeccion,
+            "PRECIO_PROYECTADO_5DIAS": precio_proyectado_dia_5
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
 
@@ -915,7 +917,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 
 <h2>Análisis Inicial y Recomendación</h2>
-<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente, alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']} Por ello, mi recomendación es <strong>{data['RECOMENDACION']}</strong>.</p>
+<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']} Según mis proyecciones, el precio podría situarse en aproximadamente <strong>{data['PRECIO_PROYECTADO_5DIAS']:,}€</strong> en los próximos 5 días. Por ello, mi recomendación es <strong>{data['RECOMENDACION']}</strong>.</p>
 
 
 {chart_html}
