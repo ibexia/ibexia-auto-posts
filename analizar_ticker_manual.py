@@ -356,6 +356,7 @@ def obtener_datos_yfinance(ticker):
             "PRECIO_OBJETIVO": precio_objetivo,
             "FECHAS_HISTORIAL": fechas_historial,
             "FECHAS_PROYECCION": fechas_proyeccion,
+            "SMI_PROYECTADO_FUTURO": smi_proyectado_futuro,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
 
@@ -511,7 +512,7 @@ def construir_prompt_formateado(data):
         precios_reales_grafico = cierres_para_grafico_total[:30]
         data_proyectada = [None] * (len(labels_historial) - 1) + [precios_reales_grafico[-1]] + cierres_para_grafico_total[len(labels_historial):]
 
-        smi_desplazados_para_grafico = smi_historico_para_grafico + smi_proyectado_futuro
+        smi_desplazados_para_grafico = smi_historico_para_grafico + data.get('SMI_PROYECTADO_FUTURO', [])
 
 
         chart_html += f"""
