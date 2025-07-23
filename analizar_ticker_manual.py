@@ -513,14 +513,14 @@ def construir_prompt_formateado(data):
         volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
 
     titulo_post = f"Análisis Técnico: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Recomendación de {data['RECOMENDACION']}"
-
-    # Recuperamos los datos del diccionario 'data' que ahora contiene las listas de precios
+    # Recuperamos los datos del diccionario 'data'
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
     smi_proyectado_futuro = data.get('SMI_PROYECTADO_FUTURO', [])
     precios_reales_para_grafico = data.get('CIERRES_30_DIAS', [])
     precios_proyectados = data.get('PRECIOS_PROYECTADOS', [])
 
-    # Preparamos los datos para los gráficos de SMI
+    # Creamos las listas combinadas y separadas para el gráfico
+    cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
     smi_historico_con_nulos_futuros = smi_historico_para_grafico + [None] * len(smi_proyectado_futuro)
     smi_proyectado_con_nulos_historicos = [None] * len(smi_historico_para_grafico) + smi_proyectado_futuro
 
@@ -531,6 +531,7 @@ def construir_prompt_formateado(data):
     labels_historial = data.get('FECHAS_HISTORIAL', [])
     labels_proyeccion = data.get('FECHAS_PROYECCION', [])
     labels_total = labels_historial + labels_proyeccion
+
 
     chart_html = ""
     if smi_historico_para_grafico and cierres_para_grafico_total:
