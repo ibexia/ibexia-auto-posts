@@ -253,14 +253,14 @@ def obtener_datos_yfinance(ticker):
         fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
         
         # SMI para los 30 días del gráfico
-        smi_historico_para_grafico = []
+        _para_grafico = []
         if len(smi_history_full) >= 30:
-            smi_historico_para_grafico = smi_history_full.tail(30).tolist()
+            _para_grafico = smi_history_full.tail(30).tolist()
         elif smi_history_full.empty:
-            smi_historico_para_grafico = [0.0] * 30
+            _para_grafico = [0.0] * 30
         else:
             first_smi_val = smi_history_full.iloc[0]
-            smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
+            _para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
 
         # Precios para el gráfico: 30 días reales
         precios_reales_para_grafico = []
@@ -303,8 +303,12 @@ def obtener_datos_yfinance(ticker):
             smi_proyectado_futuro = [smi_vals[-1]] * PROYECCION_FUTURA_DIAS
 
         # --- NUEVA LÓGICA DE PROYECCIÓN DE PRECIOS BASADA EN SMI PROYECTADO ---
-        precios_proyectados = []
+       precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
+
+        # Obtener los soportes y resistencias para usarlos como límites
+        limite_superior = resistencia_1
+        limite_inferior = soporte_1
 
         for i in range(len(smi_proyectado_futuro)):
             if i == 0:
@@ -314,6 +318,10 @@ def obtener_datos_yfinance(ticker):
 
             factor = smi_delta / 100  # cambio proporcional
             siguiente_precio = ultimo_precio_conocido * (1 + factor * 0.6)  # sensibilidad ajustable
+
+            # Aplicar los límites de soporte y resistencia
+            siguiente_precio = min(max(siguiente_precio, limite_inferior), limite_superior)
+
             siguiente_precio = max(0.01, round(siguiente_precio, 2))
 
             precios_proyectados.append(siguiente_precio)
@@ -357,7 +365,7 @@ def obtener_datos_yfinance(ticker):
             "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
             "TENDENCIA_SMI": tendencia_smi, # Renombrado de TENDENCIA_NOTA
             "CIERRES_30_DIAS": hist['Close'].dropna().tail(30).tolist(),
-            "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico, # Renombrado
+            "_PARA_GRAFICO": _para_grafico, # Renombrado
             "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total,
             "PRECIOS_PROYECTADOS": precios_proyectados, # ¡NUEVO! Guardamos la lista aquí
             "OFFSET_DIAS_GRAFICO": OFFSET_DIAS,
@@ -377,15 +385,15 @@ def obtener_datos_yfinance(ticker):
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
-def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_historico_para_grafico): # Cambio de nombre de la variable
+def generar_recomendacion_avanzada(data, cierres_para_grafico_total, _para_grafico): # Cambio de nombre de la variable
     # Extraer los últimos 30 días de SMI para el análisis de tendencias
-    smi_historico = smi_historico_para_grafico[-30:] if len(smi_historico_para_grafico) >= 30 else smi_historico_para_grafico
+     = _para_grafico[-30:] if len(_para_grafico) >= 30 else _para_grafico
 
     # Calcular la pendiente de los últimos N SMI para la tendencia
-    n_trend = min(7, len(smi_historico)) # Últimos 7 días o menos si no hay tantos
+    n_trend = min(7, len()) # Últimos 7 días o menos si no hay tantos
     if n_trend > 1:
         x_trend = np.arange(n_trend)
-        y_trend = np.array(smi_historico[-n_trend:])
+        y_trend = np.array([-n_trend:])
         # Filtrar NaN para calcular la pendiente
         valid_indices = ~np.isnan(y_trend)
         if np.any(valid_indices): # Solo calcular si hay datos válidos
@@ -443,7 +451,7 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
 
     # Detección de Patrones de Reversión desde Extremos:
     # Reversión de Compra (SMI saliendo de sobrecompra/extremo negativo)
-    if len(smi_historico) >= 2 and smi_historico[-1] > smi_historico[-2] and \
+    if len() >= 2 and [-1] > smi_historico[-2] and \
        smi_historico[-2] <= -40 and smi_historico[-1] > -40: # SMI estaba muy bajo y empieza a subir
         if recomendacion not in ["Fuerte Compra", "Oportunidad de Compra (Reversión)"]:
             recomendacion = "Oportunidad de Compra (Reversión)"
@@ -515,7 +523,7 @@ def construir_prompt_formateado(data):
 
     # Creamos las listas combinadas y separadas para el gráfico
     cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
-    smi_historico_con_nulos_futuros = smi_historico_para_grafico + [None] * len(smi_proyectado_futuro)
+    smi_total_para_grafico = smi_historico_para_grafico + smi_proyectado_futuro
     smi_proyectado_con_nulos_historicos = [None] * len(smi_historico_para_grafico) + smi_proyectado_futuro
 
     # Preparamos los datos para los gráficos de precios
@@ -561,44 +569,14 @@ def construir_prompt_formateado(data):
                     labels: {json.dumps(labels_total)},
                     datasets: [
                         {{
-                            label: 'SMI Histórico',
-                            data: {json.dumps(smi_historico_con_nulos_futuros)},
+                            label: 'SMI',
+                            data: {json.dumps(smi_total_para_grafico)},
                             borderColor: 'rgba(54, 162, 235, 1)',
                             backgroundColor: 'rgba(54, 162, 235, 0.2)',
                             yAxisID: 'y',
                             tension: 0.1,
                             fill: false,
                             pointRadius: 0
-                        }},
-                        {{
-                            label: 'SMI Proyectado',
-                            data: {json.dumps(smi_proyectado_con_nulos_historicos)},
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                            yAxisID: 'y',
-                            tension: 0.1,
-                            fill: false,
-                            borderDash: [5, 5],
-                            pointRadius: 0
-                        }},
-                        {{
-                            label: 'Precio',
-                            data: {json.dumps(precios_historicos_con_nulos_futuros)},
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                            yAxisID: 'y1',
-                            tension: 0.1,
-                            fill: false,
-                        }},
-                        {{
-                            label: 'Precio Proyectado',
-                            data: {json.dumps(precios_proyectados_con_nulos_historicos)},
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                            yAxisID: 'y1',
-                            tension: 0.1,
-                            fill: false,
-                            borderDash: [5, 5]
                         }}
                     ]
                 }},
