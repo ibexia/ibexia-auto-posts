@@ -347,15 +347,15 @@ def obtener_datos_yfinance(ticker):
             if slope > 0.1:
                 tendencia_ibexia = "mejorando (alcista)"
                 recomendacion = "Comprar"
-                motivo_recomendacion = f"La línea Ibexia muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
+                motivo_recomendacion = f"El indice Ibexia muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
             elif slope < -0.1:
                 tendencia_ibexia = "empeorando (bajista)"
                 recomendacion = "Vender"
-                motivo_recomendacion = f"La línea Ibexia muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
+                motivo_recomendacion = f"El indice Ibexia muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
             else:
-                tendencia_ibexia = "estable (lateral)"
-                recomendacion = "Neutral"
-                motivo_recomendacion = "La acción se encuentra en un momento de consolidación sin una dirección clara a corto plazo."
+                tendencia_ibexia = "cambio de tendencia"
+                recomendacion = "Atención máxima"
+                motivo_recomendacion = "El precio podría girar a a corto plazo."
 
         datos = {
             "TICKER": ticker,
@@ -415,7 +415,7 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
     elif slope < -0.1:
         tendencia_ibexia = "empeorando (bajista)"
     else:
-        tendencia_ibexia = "estable (lateral)"
+        tendencia_ibexia = "atención máxima (giro del precio)"
 
     # Determinar si el volumen es alto (ej. > 1.5 veces el volumen medio de los últimos 20 días)
     volumen_alto = False
