@@ -94,6 +94,51 @@ def calculate_smi_tv(df):
 
     df['SMI'] = smi_smoothed # Asignamos directamente la señal SMI suavizada al DataFrame
     return df
+    
+def calcular_ganancias_simuladas(precios, smis, capital_inicial=10000):
+    compras = []
+    ventas = []
+    posicion_abierta = False
+    precio_compra_actual = 0
+    ganancia_total = 0
+
+    # Iterar sobre los datos históricos para encontrar señales
+    for i in range(1, len(smis)):
+        # Señal de compra: SMI cruza de negativo a positivo
+        if smis[i] > 0 and smis[i-1] <= 0 and not posicion_abierta:
+            posicion_abierta = True
+            precio_compra_actual = precios[i]
+            compras.append((i, precio_compra_actual))
+
+        # Señal de venta: SMI cruza de positivo a negativo
+        elif smis[i] < 0 and smis[i-1] >= 0 and posicion_abierta:
+            posicion_abierta = False
+            ventas.append((i, precios[i]))
+            num_acciones = capital_inicial / precio_compra_actual
+            ganancia_total += (precios[i] - precio_compra_actual) * num_acciones
+    
+    html_resultados = ""
+    # Analizar los resultados para generar el texto
+    if not compras:
+        html_resultados = f"<p>En el periodo analizado, el índice Ibexia no ha detectado una señal de compra (cambio a positivo), por lo que no se ha realizado ninguna inversión.</p>"
+    else:
+        # Calcular la ganancia de la posición actual si está abierta
+        if posicion_abierta and len(precios) > len(compras[-1]):
+            ultimo_precio = precios[-1]
+            num_acciones = capital_inicial / compras[-1][1]
+            ganancia_actual = (ultimo_precio - compras[-1][1]) * num_acciones
+            ganancia_total += ganancia_actual
+            
+            html_resultados = f"""
+            <p>Se detectó una señal de compra en <strong>{compras[-1][1]:,.2f}€</strong>. La posición sigue abierta actualmente y, con una inversión inicial de {capital_inicial:,.2f}€, tendríamos una ganancia simulada de <strong>{ganancia_actual:,.2f}€</strong> hasta el momento.</p>
+            <p>El precio actual de la acción es de <strong>{ultimo_precio:,.2f}€</strong>.</p>
+            """
+        else: # Todas las posiciones se cerraron
+             html_resultados = f"<p>El índice Ibexia ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>"
+             
+    
+    return html_resultados
+
 
 def obtener_datos_yfinance(ticker):
     try:
@@ -334,7 +379,9 @@ def obtener_datos_yfinance(ticker):
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
         precio_proyectado_dia_5 = cierres_para_grafico_total[-1]  # Último precio proyectado a 5 días
 
-
+        # Guarda los datos para la simulación
+        smi_historico_para_simulacion = [round(s, 2) * 100 for s in merged_data['SMI'].tail(30).tolist()]
+        precios_para_simulacion = precios_reales_para_grafico
 
         tendencia_ibexia = "No disponible"
         
@@ -385,6 +432,8 @@ def obtener_datos_yfinance(ticker):
             "FECHAS_HISTORIAL": fechas_historial,
             "FECHAS_PROYECCION": fechas_proyeccion,
             "PRECIO_PROYECTADO_5DIAS": precio_proyectado_dia_5,
+            'PRECIOS_PARA_SIMULACION': precios_para_simulacion,
+            'SMI_PARA_SIMULACION': smi_historico_para_simulacion,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
         # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO ---
@@ -754,7 +803,13 @@ def construir_prompt_formateado(data):
         }});
         </script>
         """
-
+    # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
+    # Llamamos a la nueva función para obtener el HTML
+    ganancias_html = calcular_ganancias_simuladas(
+        precios=data['PRECIOS_PARA_SIMULACION'],
+        smis=data['SMI_PARA_SIMULACION']
+    )
+    
     soportes_unicos = []
     temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
     
@@ -846,6 +901,9 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 
 {chart_html}
+
+<h2>Simulación de Ganancias</h2>
+{ganancias_html}
 
 {tabla_resumen}
 
