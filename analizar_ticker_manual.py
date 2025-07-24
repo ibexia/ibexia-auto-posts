@@ -95,13 +95,12 @@ def calculate_smi_tv(df):
     df['SMI'] = smi_smoothed # Asignamos directamente la señal SMI suavizada al DataFrame
     return df
     
-def calcular_ganancias_simuladas(precios, smis, capital_inicial=10000):
+def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
     compras = []
     ventas = []
     posicion_abierta = False
     precio_compra_actual = 0
     ganancia_total = 0
-    fechas_operaciones = []
 
     # Calcular la pendiente del SMI para cada punto
     pendientes_smi = [0] * len(smis)
@@ -114,17 +113,16 @@ def calcular_ganancias_simuladas(precios, smis, capital_inicial=10000):
         if pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0 and not posicion_abierta:
             posicion_abierta = True
             precio_compra_actual = precios[i]
-            compras.append({'fecha': fechas_operaciones[i], 'precio': precio_compra_actual})
+            compras.append({'fecha': fechas[i], 'precio': precio_compra_actual})
 
         # Señal de venta: la pendiente del SMI cambia de positiva a negativa
         elif pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0 and posicion_abierta:
             posicion_abierta = False
-            ventas.append({'fecha': fechas_operaciones[i], 'precio': precios[i]})
+            ventas.append({'fecha': fechas[i], 'precio': precios[i]})
             num_acciones = capital_inicial / precio_compra_actual
             ganancia_total += (precios[i] - precio_compra_actual) * num_acciones
 
     html_resultados = ""
-    # Analizar los resultados para generar el texto
     if not compras:
         html_resultados = f"""
         <p>En el periodo analizado, nuestro sistema de predicción no ha detectado una señal de compra (giro de la pendiente del índice Ibexia a positivo), por lo que no se ha realizado ninguna inversión. La fiabilidad del sistema reside en su capacidad para esperar el momento óptimo de entrada en el mercado, protegiendo así tu capital de movimientos inciertos.</p>
@@ -161,7 +159,6 @@ def calcular_ganancias_simuladas(precios, smis, capital_inicial=10000):
             <p>A continuación, se detallan las operaciones realizadas en el periodo analizado:</p>
             <ul>{operaciones_html}</ul>
             """
-
     return html_resultados
 
 
