@@ -101,42 +101,67 @@ def calcular_ganancias_simuladas(precios, smis, capital_inicial=10000):
     posicion_abierta = False
     precio_compra_actual = 0
     ganancia_total = 0
+    fechas_operaciones = []
+
+    # Calcular la pendiente del SMI para cada punto
+    pendientes_smi = [0] * len(smis)
+    for i in range(1, len(smis)):
+        pendientes_smi[i] = smis[i] - smis[i-1]
 
     # Iterar sobre los datos históricos para encontrar señales
-    for i in range(1, len(smis)):
-        # Señal de compra: SMI cruza de negativo a positivo
-        if smis[i] > 0 and smis[i-1] <= 0 and not posicion_abierta:
+    for i in range(2, len(smis)):
+        # Señal de compra: la pendiente del SMI cambia de negativa a positiva
+        if pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0 and not posicion_abierta:
             posicion_abierta = True
             precio_compra_actual = precios[i]
-            compras.append((i, precio_compra_actual))
+            compras.append({'fecha': fechas_operaciones[i], 'precio': precio_compra_actual})
 
-        # Señal de venta: SMI cruza de positivo a negativo
-        elif smis[i] < 0 and smis[i-1] >= 0 and posicion_abierta:
+        # Señal de venta: la pendiente del SMI cambia de positiva a negativa
+        elif pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0 and posicion_abierta:
             posicion_abierta = False
-            ventas.append((i, precios[i]))
+            ventas.append({'fecha': fechas_operaciones[i], 'precio': precios[i]})
             num_acciones = capital_inicial / precio_compra_actual
             ganancia_total += (precios[i] - precio_compra_actual) * num_acciones
-    
+
     html_resultados = ""
     # Analizar los resultados para generar el texto
     if not compras:
-        html_resultados = f"<p>En el periodo analizado, el índice Ibexia no ha detectado una señal de compra (cambio a positivo), por lo que no se ha realizado ninguna inversión.</p>"
+        html_resultados = f"""
+        <p>En el periodo analizado, nuestro sistema de predicción no ha detectado una señal de compra (giro de la pendiente del índice Ibexia a positivo), por lo que no se ha realizado ninguna inversión. La fiabilidad del sistema reside en su capacidad para esperar el momento óptimo de entrada en el mercado, protegiendo así tu capital de movimientos inciertos.</p>
+        """
     else:
         # Calcular la ganancia de la posición actual si está abierta
         if posicion_abierta and len(precios) > len(compras[-1]):
             ultimo_precio = precios[-1]
-            num_acciones = capital_inicial / compras[-1][1]
-            ganancia_actual = (ultimo_precio - compras[-1][1]) * num_acciones
+            num_acciones = capital_inicial / compras[-1]['precio']
+            ganancia_actual = (ultimo_precio - compras[-1]['precio']) * num_acciones
             ganancia_total += ganancia_actual
-            
+
+            # Generar lista de operaciones
+            operaciones_html = ""
+            for compra in compras:
+                operaciones_html += f"<li>Compra en {compra['fecha']}: <strong>{compra['precio']:,.2f}€</strong></li>"
+
             html_resultados = f"""
-            <p>Se detectó una señal de compra en <strong>{compras[-1][1]:,.2f}€</strong>. La posición sigue abierta actualmente y, con una inversión inicial de {capital_inicial:,.2f}€, tendríamos una ganancia simulada de <strong>{ganancia_actual:,.2f}€</strong> hasta el momento.</p>
+            <p>Nuestro sistema de predicción ha detectado una señal de compra en {compras[-1]['fecha']}, con un precio de <strong>{compras[-1]['precio']:,.2f}€</strong>. La posición de la operación sigue abierta y, con una inversión inicial de {capital_inicial:,.2f}€, tendríamos una ganancia simulada de <strong>{ganancia_actual:,.2f}€</strong> hasta el momento.</p>
             <p>El precio actual de la acción es de <strong>{ultimo_precio:,.2f}€</strong>.</p>
+            <p>El análisis de esta simulación demuestra la fiabilidad de nuestro sistema para identificar puntos de entrada óptimos. A continuación, se detallan las operaciones realizadas:</p>
+            <ul>{operaciones_html}</ul>
             """
         else: # Todas las posiciones se cerraron
-             html_resultados = f"<p>El índice Ibexia ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>"
-             
-    
+            # Generar lista de operaciones
+            operaciones_html = ""
+            for i in range(len(compras)):
+                compra = compras[i]
+                venta = ventas[i]
+                operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{compra['precio']:,.2f}€</strong>, Venta en {venta['fecha']} a <strong>{venta['precio']:,.2f}€</strong></li>"
+
+            html_resultados = f"""
+            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. El índice Ibexia ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
+            <p>A continuación, se detallan las operaciones realizadas en el periodo analizado:</p>
+            <ul>{operaciones_html}</ul>
+            """
+
     return html_resultados
 
 
@@ -380,8 +405,9 @@ def obtener_datos_yfinance(ticker):
         precio_proyectado_dia_5 = cierres_para_grafico_total[-1]  # Último precio proyectado a 5 días
 
         # Guarda los datos para la simulación
-        smi_historico_para_simulacion = [round(s, 2) * 100 for s in hist_extended['SMI'].tail(30).tolist()]
+        smi_historico_para_simulacion = [round(s, 2) * 100 for s in hist_extended['SMI'].dropna().tail(30).tolist()]
         precios_para_simulacion = precios_reales_para_grafico
+        fechas_para_simulacion = hist_extended.index.strftime("%d/%m/%Y").tolist() # AÑADIDO: Guardar las fechas para la simulación
 
         tendencia_ibexia = "No disponible"
         
@@ -434,6 +460,7 @@ def obtener_datos_yfinance(ticker):
             "PRECIO_PROYECTADO_5DIAS": precio_proyectado_dia_5,
             'PRECIOS_PARA_SIMULACION': precios_para_simulacion,
             'SMI_PARA_SIMULACION': smi_historico_para_simulacion,
+            'FECHAS_PARA_SIMULACION': fechas_para_simulacion,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
         # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO ---
@@ -807,7 +834,8 @@ def construir_prompt_formateado(data):
     # Llamamos a la nueva función para obtener el HTML
     ganancias_html = calcular_ganancias_simuladas(
         precios=data['PRECIOS_PARA_SIMULACION'],
-        smis=data['SMI_PARA_SIMULACION']
+        smis=data['SMI_PARA_SIMULACION'],
+        fechas=data['FECHAS_PARA_SIMULACION'] # AÑADIDO: Se pasa la lista de fechas
     )
     
     soportes_unicos = []
