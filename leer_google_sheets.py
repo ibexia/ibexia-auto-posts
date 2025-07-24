@@ -94,6 +94,73 @@ def calculate_smi_tv(df):
 
     df['SMI'] = smi_smoothed # Asignamos directamente la señal SMI suavizada al DataFrame
     return df
+    
+def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
+    compras = []
+    ventas = []
+    posicion_abierta = False
+    precio_compra_actual = 0
+    ganancia_total = 0
+
+    # Calcular la pendiente del SMI para cada punto
+    pendientes_smi = [0] * len(smis)
+    for i in range(1, len(smis)):
+        pendientes_smi[i] = smis[i] - smis[i-1]
+
+    # Iterar sobre los datos históricos para encontrar señales
+    for i in range(2, len(smis)):
+        # Señal de compra: la pendiente del SMI cambia de negativa a positiva
+        if pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0 and not posicion_abierta:
+            posicion_abierta = True
+            precio_compra_actual = precios[i]
+            compras.append({'fecha': fechas[i], 'precio': precio_compra_actual})
+
+        # Señal de venta: la pendiente del SMI cambia de positiva a negativa
+        elif pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0 and posicion_abierta:
+            posicion_abierta = False
+            ventas.append({'fecha': fechas[i], 'precio': precios[i]})
+            num_acciones = capital_inicial / precio_compra_actual
+            ganancia_total += (precios[i] - precio_compra_actual) * num_acciones
+
+    html_resultados = ""
+    if not compras:
+        html_resultados = f"""
+        <p>En el periodo analizado, nuestro sistema de predicción no ha detectado una señal de compra (giro de la pendiente del índice Ibexia a positivo), por lo que no se ha realizado ninguna inversión. La fiabilidad del sistema reside en su capacidad para esperar el momento óptimo de entrada en el mercado, protegiendo así tu capital de movimientos inciertos.</p>
+        """
+    else:
+        # Calcular la ganancia de la posición actual si está abierta
+        if posicion_abierta and len(precios) > len(compras[-1]):
+            ultimo_precio = precios[-1]
+            num_acciones = capital_inicial / compras[-1]['precio']
+            ganancia_actual = (ultimo_precio - compras[-1]['precio']) * num_acciones
+            ganancia_total += ganancia_actual
+
+            # Generar lista de operaciones
+            operaciones_html = ""
+            for compra in compras:
+                operaciones_html += f"<li>Compra en {compra['fecha']}: <strong>{compra['precio']:,.2f}€</strong></li>"
+
+            html_resultados = f"""
+            <p>Nuestro sistema de predicción ha detectado una señal de compra en {compras[-1]['fecha']}, con un precio de <strong>{compras[-1]['precio']:,.2f}€</strong>. La posición de la operación sigue abierta y, con una inversión inicial de {capital_inicial:,.2f}€, tendríamos una ganancia simulada de <strong>{ganancia_actual:,.2f}€</strong> hasta el momento.</p>
+            <p>El precio actual de la acción es de <strong>{ultimo_precio:,.2f}€</strong>.</p>
+            <p>El análisis de esta simulación demuestra la fiabilidad de nuestro sistema para identificar puntos de entrada óptimos. A continuación, se detallan las operaciones realizadas:</p>
+            <ul>{operaciones_html}</ul>
+            """
+        else: # Todas las posiciones se cerraron
+            # Generar lista de operaciones
+            operaciones_html = ""
+            for i in range(len(compras)):
+                compra = compras[i]
+                venta = ventas[i]
+                operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{compra['precio']:,.2f}€</strong>, Venta en {venta['fecha']} a <strong>{venta['precio']:,.2f}€</strong></li>"
+
+            html_resultados = f"""
+            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. El índice Ibexia ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
+            <p>A continuación, se detallan las operaciones realizadas en el periodo analizado:</p>
+            <ul>{operaciones_html}</ul>
+            """
+    return html_resultados
+
 
 def obtener_datos_yfinance(ticker):
     try:
@@ -334,6 +401,10 @@ def obtener_datos_yfinance(ticker):
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
         precio_proyectado_dia_5 = cierres_para_grafico_total[-1]  # Último precio proyectado a 5 días
 
+        # Guarda los datos para la simulación
+        smi_historico_para_simulacion = [round(s, 2) * 100 for s in hist_extended['SMI'].dropna().tail(30).tolist()]
+        precios_para_simulacion = precios_reales_para_grafico
+        fechas_para_simulacion = hist_extended.tail(30).index.strftime("%d/%m/%Y").tolist() # CORREGIDO: ahora se aplica .tail() al DataFrame
         tendencia_ibexia = "No disponible"
         
         if len(smi_history_last_30) >= 2:
@@ -347,15 +418,15 @@ def obtener_datos_yfinance(ticker):
             if slope > 0.1:
                 tendencia_ibexia = "mejorando (alcista)"
                 recomendacion = "Comprar"
-                motivo_recomendacion = f"La línea Ibexia muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
+                motivo_recomendacion = f"El indice Ibexia muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
             elif slope < -0.1:
                 tendencia_ibexia = "empeorando (bajista)"
                 recomendacion = "Vender"
-                motivo_recomendacion = f"La línea Ibexia muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
+                motivo_recomendacion = f"El indice Ibexia muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
             else:
-                tendencia_ibexia = "estable (lateral)"
-                recomendacion = "Neutral"
-                motivo_recomendacion = "La acción se encuentra en un momento de consolidación sin una dirección clara a corto plazo."
+                tendencia_ibexia = "cambio de tendencia"
+                recomendacion = "Atención máxima"
+                motivo_recomendacion = "El precio podría girar a a corto plazo."
 
         datos = {
             "TICKER": ticker,
@@ -383,115 +454,41 @@ def obtener_datos_yfinance(ticker):
             "FECHAS_HISTORIAL": fechas_historial,
             "FECHAS_PROYECCION": fechas_proyeccion,
             "PRECIO_PROYECTADO_5DIAS": precio_proyectado_dia_5,
+            'PRECIOS_PARA_SIMULACION': precios_para_simulacion,
+            'SMI_PARA_SIMULACION': smi_historico_para_simulacion,
+            'FECHAS_PARA_SIMULACION': fechas_para_simulacion,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
+        # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO ---
+        diferencia_precio_porcentual = ((precio_proyectado_dia_5 - current_price) / current_price) * 100 if current_price != 0 else 0
 
+        recomendacion = "sin dirección clara"
+        motivo_analisis = "La proyección de precio a 5 días es muy similar al precio actual, lo que indica un mercado en consolidación. Se recomienda cautela."
+        
+        if diferencia_precio_porcentual > 3:
+            recomendacion = "Comprar (Impulso Fuerte)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es significativamente superior al precio actual, indicando un fuerte impulso alcista."
+        elif diferencia_precio_porcentual > 1:
+            recomendacion = "Comprar (Impulso Moderado)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es superior al precio actual, sugiriendo un impulso alcista moderado."
+        elif diferencia_precio_porcentual < -3:
+            recomendacion = "Vender (Impulso Fuerte)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es significativamente inferior al precio actual, lo que indica una fuerte presión bajista."
+        elif diferencia_precio_porcentual < -1:
+            recomendacion = "Vender (Impulso Moderado)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es inferior al precio actual, sugiriendo un impulso bajista moderado."
+        
+        # Sobrescribir las variables recomendacion y motivo_analisis
+        datos['RECOMENDACION'] = recomendacion
+        datos['motivo_analisis'] = motivo_analisis
+        # --- FIN NUEVA LÓGICA DE RECOMENDACIÓN ---
         return datos
 
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
-def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_historico_para_grafico): # Cambio de nombre de la variable
-    # Extraer los últimos 30 días de SMI para el análisis de tendencias
-    smi_historico = smi_historico_para_grafico[-30:] if len(smi_historico_para_grafico) >= 30 else smi_historico_para_grafico
 
-    # Calcular la pendiente de los últimos N SMI para la tendencia
-    n_trend = min(7, len(smi_historico)) # Últimos 7 días o menos si no hay tantos
-    if n_trend > 1:
-        x_trend = np.arange(n_trend)
-        y_trend = np.array(smi_historico[-n_trend:])
-        # Filtrar NaN para calcular la pendiente
-        valid_indices = ~np.isnan(y_trend)
-        if np.any(valid_indices): # Solo calcular si hay datos válidos
-            slope, _ = np.polyfit(x_trend[valid_indices], y_trend[valid_indices], 1)
-        else:
-            slope = 0 # No hay datos válidos para la pendiente
-    else:
-        slope = 0 # No hay suficientes datos para calcular la pendiente
-
-    if slope > 0.1:
-        tendencia_ibexia = "mejorando (alcista)"
-    elif slope < -0.1:
-        tendencia_ibexia = "empeorando (bajista)"
-    else:
-        tendencia_ibexia = "estable (lateral)"
-
-    # Determinar si el volumen es alto (ej. > 1.5 veces el volumen medio de los últimos 20 días)
-    volumen_alto = False
-    if data['VOLUMEN_MEDIO'] and data['VOLUMEN'] is not None and data['VOLUMEN_MEDIO'] > 0:
-        if data['VOLUMEN'] > (data['VOLUMEN_MEDIO'] * 1.5):
-            volumen_alto = True
-
-    # Determinar proximidad a soportes y resistencias
-    proximidad_soporte = False
-    proximidad_resistencia = False
-    if data['PRECIO_ACTUAL'] is not None:
-        if data['SOPORTE_1'] is not None and data['PRECIO_ACTUAL'] != 0:
-            if abs(data['PRECIO_ACTUAL'] - data['SOPORTE_1']) / data['PRECIO_ACTUAL'] < 0.02: # 2% de proximidad
-                proximidad_soporte = True
-        if data['RESISTENCIA_1'] is not None and data['PRECIO_ACTUAL'] != 0:
-            if abs(data['PRECIO_ACTUAL'] - data['RESISTENCIA_1']) / data['PRECIO_ACTUAL'] < 0.02: # 2% de proximidad
-                proximidad_resistencia = True
-
-    recomendacion = "Neutral"
-    condicion_analisis = "En observación"
-    motivo_analisis = "La situación actual no presenta señales claras de compra ni venta."
-
-    # Lógica de Giro Alcista (Compra)
-    # Basamos la recomendación en el SMI directamente
-    if tendencia_ibexia == "mejorando (alcista)" and data['SMI'] < 0 and volumen_alto: # Indice Ibexia en zona negativa y mejorando con volumen
-        recomendacion = "Fuerte Compra"
-        condicion_analisis = "Impulso alcista con confirmación de volumen desde zona de sobreventa"
-        motivo_analisis = "La Indice Ibexia está mejorando y se encuentra en zona de sobreventa, con un volumen significativo, indicando un fuerte impulso alcista."
-
-    # Lógica de Giro Bajista (Venta Condicional)
-    elif tendencia_ibexia == "empeorando (bajista)" and data['SMI'] > 0 and volumen_alto: # La Indice Ibexia en zona positiva y empeorando con volumen
-        if not proximidad_soporte:
-            recomendacion = "Venta Condicional / Alerta"
-            condicion_analisis = "Debilidad confirmada por volumen desde zona de sobrecompra, considerar salida"
-            motivo_analisis = "La Indice Ibexia está empeorando y se encuentra en zona de sobrecompra, con volumen alto y sin soporte cercano, sugiriendo debilidad."
-        else:
-            recomendacion = "Neutral / Cautela"
-            condicion_analisis = "Debilidad pero cerca de soporte clave, observar rebote"
-            motivo_analisis = "La Indice Ibexia está empeorando, pero la proximidad a un soporte clave sugiere cautela antes de vender."
-
-    # Detección de Patrones de Reversión desde Extremos:
-    # Reversión de Compra (SMI saliendo de sobrecompra/extremo negativo)
-    if len(smi_historico) >= 2 and smi_historico[-1] > smi_historico[-2] and \
-       smi_historico[-2] <= -40 and smi_historico[-1] > -40: # SMI estaba muy bajo y empieza a subir
-        if recomendacion not in ["Fuerte Compra", "Oportunidad de Compra (Reversión)"]:
-            recomendacion = "Oportunidad de Compra (Reversión)"
-            condicion_analisis = "Posible inicio de rebote tras sobreventa extrema, punto de entrada"
-            motivo_analisis = "Reversión de compra: La Indice Ibexia está ascendiendo desde una zona de sobreventa extrema, indicando una oportunidad de entrada."
-
-    # Reversión de Venta (SMI saliendo de sobreventa/extremo positivo)
-    elif len(smi_historico) >= 2 and smi_historico[-1] < smi_historico[-2] and \
-         smi_historico[-2] >= 40 and smi_historico[-1] < 40: # SMI estaba muy alto y empieza a bajar
-        if recomendacion not in ["Venta Condicional / Alerta", "Señal de Venta (Reversión)"]:
-            recomendacion = "Señal de Venta (Reversión)"
-            condicion_analisis = "Posible inicio de corrección tras sobrecompra extrema, punto de salida"
-            motivo_analisis = "Señal de venta: La Indice Ibexia está descendiendo desde una zona de sobrecompra extrema, indicando un punto de salida."
-
-    # Lógica para "Neutral" si ninguna de las condiciones anteriores se cumple con fuerza
-    if recomendacion == "Neutral":
-        if tendencia_ibexia == "estable (lateral)":
-            condicion_analisis = "Consolidación o lateralidad sin dirección clara."
-            motivo_analisis = "La Indice Ibexia se mantiene estable, indicando una fase de consolidación o lateralidad sin dirección clara."
-        elif data['SMI'] < 20 and tendencia_ibexia == "mejorando (alcista)" and not volumen_alto:
-            recomendacion = "Neutral / Observación"
-            condicion_analisis = "La Indice Ibexia moderadamente bajo con mejora, pero falta confirmación de volumen."
-            motivo_analisis = "La Indice Ibexia es moderadamente bajo y muestra una mejora, pero la falta de volumen significativo sugiere una fase de observación."
-        elif data['SMI'] > -20 and tendencia_ibexia == "empeorando (bajista)" and not volumen_alto:
-            recomendacion = "Neutral / Observación"
-            condicion_analisis = "La Indice Ibexia moderadamente alto con empeoramiento, pero falta confirmación de volumen."
-            motivo_analisis = "La Indice Ibexiaes moderadamente alto y empeora, pero la falta de volumen significativo sugiere una fase de observación."
-
-    data['RECOMENDACION'] = recomendacion
-    data['CONDICION_RSI'] = condicion_analisis # Aunque el nombre es RSI, el concepto es la condición del mercado
-    data['motivo_analisis'] = motivo_analisis
-
-    return data
 
 
 def construir_prompt_formateado(data):
@@ -521,7 +518,7 @@ def construir_prompt_formateado(data):
     else:
         volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
 
-    titulo_post = f"Análisis Técnico: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Recomendación de {data['RECOMENDACION']}"
+    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.2f}€"
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
@@ -829,7 +826,14 @@ def construir_prompt_formateado(data):
         }});
         </script>
         """
-
+    # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
+    # Llamamos a la nueva función para obtener el HTML
+    ganancias_html = calcular_ganancias_simuladas(
+        precios=data['PRECIOS_PARA_SIMULACION'],
+        smis=data['SMI_PARA_SIMULACION'],
+        fechas=data['FECHAS_PARA_SIMULACION'] # AÑADIDO: Se pasa la lista de fechas
+    )
+    
     soportes_unicos = []
     temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
     
@@ -917,10 +921,13 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 
 <h2>Análisis Inicial y Recomendación</h2>
-<p><strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> cotiza actualmente a <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Mi precio objetivo de compra se sitúa en <strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong>. El volumen negociado recientemente alcanzó las <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']} Según mis proyecciones, el precio podría situarse en aproximadamente <strong>{data['PRECIO_PROYECTADO_5DIAS']:,}€</strong> en los próximos 5 días. Por ello, mi recomendación es <strong>{data['RECOMENDACION']}</strong>.</p>
+<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Nuestra recomendación es <strong>{data['RECOMENDACION']}</strong>. Según nuestras proyecciones, el precio podría situarse en <strong>{data['PRECIO_PROYECTADO_5DIAS']:,}€</strong> en los próximos 5 días. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']}.</p>
 
 
 {chart_html}
+
+<h2>Simulación de Ganancias</h2>
+{ganancias_html}
 
 {tabla_resumen}
 
@@ -992,8 +999,7 @@ def generar_contenido_con_gemini(tickers):
         # Cambio aquí para usar 'SMI_HISTORICO_PARA_GRAFICO'
         smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
 
-        # Ahora pasa estas variables a la función generar_recomendacion_avanzada
-        data = generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_historico_para_grafico)
+
         
 
         prompt, titulo_post = construir_prompt_formateado(data)
@@ -1039,6 +1045,7 @@ def generar_contenido_con_gemini(tickers):
             
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180)
+
 
 
 
