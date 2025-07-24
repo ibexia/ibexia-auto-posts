@@ -109,11 +109,15 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
     # Iterar sobre los datos históricos para encontrar señales
     for i in range(2, len(smis)):
-        # Señal de compra: la pendiente del SMI cambia de negativa a positiva
-        if pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0 and not posicion_abierta:
-            posicion_abierta = True
-            precio_compra_actual = precios[i]
-            compras.append({'fecha': fechas[i], 'precio': precio_compra_actual})
+        # Señal de compra: la pendiente del SMI cambia de negativa a positiva y no está en sobrecompra
+        # Se anticipa un día la compra y se añade la condición de sobrecompra
+        if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0 and not posicion_abierta:
+            # Comprobamos el SMI del día ANTERIOR a la señal de giro para evitar sobrecompra
+            if smis[i-1] < 40: # Añadida condición de sobrecompra
+                posicion_abierta = True
+                # La compra se realiza en el día 'i-1' para anticipar
+                precio_compra_actual = precios[i-1]
+                compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
 
         # Señal de venta: la pendiente del SMI cambia de positiva a negativa
         elif pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0 and posicion_abierta:
@@ -152,7 +156,14 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
             for i in range(len(compras)):
                 compra = compras[i]
                 venta = ventas[i]
-                operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{compra['precio']:,.2f}€</strong>, Venta en {venta['fecha']} a <strong>{venta['precio']:,.2f}€</strong></li>"
+                # Calcular la ganancia/pérdida de esta operación específica
+                num_acciones_op = capital_inicial / compra['precio']
+                ganancia_operacion = (venta['precio'] - compra['precio']) * num_acciones_op
+                
+                # Formatear el texto de ganancia/pérdida
+                estado_ganancia = "Ganancia" if ganancia_operacion >= 0 else "Pérdida"
+                
+                operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{compra['precio']:,.2f}€</strong>, Venta en {venta['fecha']} a <strong>{venta['precio']:,.2f}€</strong> - {estado_ganancia}: <strong>{ganancia_operacion:,.2f}€</strong></li>"
 
             html_resultados = f"""
             <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. El índice Ibexia ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
@@ -1050,7 +1061,7 @@ def generar_contenido_con_gemini(tickers):
 
 def main():
     # Define el ticker que quieres analizar
-    ticker_deseado = "ANE.MC"
+    ticker_deseado = "IBG.MC"
 
     tickers_for_today = [ticker_deseado]
 
