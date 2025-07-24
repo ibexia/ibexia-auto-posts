@@ -404,7 +404,7 @@ def obtener_datos_yfinance(ticker):
         # Guarda los datos para la simulación
         smi_historico_para_simulacion = [round(s, 2) * 100 for s in hist_extended['SMI'].dropna().tail(30).tolist()]
         precios_para_simulacion = precios_reales_para_grafico
-        fechas_para_simulacion = hist_extended.index.dropna().tail(30).strftime("%d/%m/%Y").tolist() # CORREGIDO: ahora toma las últimas 30 fechas
+        fechas_para_simulacion = hist_extended.tail(30).index.strftime("%d/%m/%Y").tolist() # CORREGIDO: ahora se aplica .tail() al DataFrame
         tendencia_ibexia = "No disponible"
         
         if len(smi_history_last_30) >= 2:
