@@ -100,7 +100,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
     ventas = []
     posicion_abierta = False
     precio_compra_actual = 0
-    ganancia_total = 0
+    ganancia_total = 0  # Acumula las ganancias de las operaciones CERRADAS
 
     # Calcular la pendiente del SMI para cada punto
     pendientes_smi = [0] * len(smis)
@@ -112,16 +112,13 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
         # Señal de compra: la pendiente del SMI cambia de negativa a positiva y no está en sobrecompra
         # Se anticipa un día la compra y se añade la condición de sobrecompra
         if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0 and not posicion_abierta:
-            # Comprobamos el SMI del día ANTERIOR a la señal de giro para evitar sobrecompra
-            if smis[i-1] < 40: # Añadida condición de sobrecompra
+            if smis[i-1] < 40:  # Añadida condición de sobrecompra
                 posicion_abierta = True
                 # La compra se realiza en el día 'i-1' para anticipar
                 precio_compra_actual = precios[i-1]
                 compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
 
-        # Señal de venta: la pendiente del SMI cambia de positiva a negativa
         # Señal de venta: la pendiente del SMI cambia de positiva a negativa (anticipando un día)
-        # Asegúrate de que i-1 sea un índice válido antes de usarlo
         elif i >= 1 and pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0 and posicion_abierta:
             posicion_abierta = False
             # La venta se realiza en el día 'i-1' para anticipar
@@ -130,52 +127,57 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
             num_acciones = capital_inicial / precio_compra_actual
             ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
 
+    # --- Generación de la lista HTML de operaciones completadas (SIEMPRE) ---
+    operaciones_html = ""
+    # Solo iterar sobre las operaciones que se han completado (pares compra-venta)
+    num_operaciones_completadas = min(len(compras), len(ventas))
+
+    for i in range(num_operaciones_completadas):
+        compra = compras[i]
+        venta = ventas[i]
+        num_acciones_op = capital_inicial / compra['precio']  # Se asume capital_inicial para cada operación
+        ganancia_operacion = (venta['precio'] - compra['precio']) * num_acciones_op
+
+        estado_ganancia = "Ganancia" if ganancia_operacion >= 0 else "Pérdida"
+
+        operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{compra['precio']:,.2f}€</strong>, Venta en {venta['fecha']} a <strong>{venta['precio']:,.2f}€</strong> - {estado_ganancia}: <strong>{ganancia_operacion:,.2f}€</strong></li>"
+
     html_resultados = ""
-    if not compras:
+
+    if not compras:  # No se realizaron compras en el período
         html_resultados = f"""
-        <p>En el periodo analizado, nuestro sistema de predicción no ha detectado una señal de compra (giro de la pendiente del índice Ibexia a positivo), por lo que no se ha realizado ninguna inversión. La fiabilidad del sistema reside en su capacidad para esperar el momento óptimo de entrada en el mercado, protegiendo así tu capital de movimientos inciertos.</p>
+        <p>No se encontraron señales de compra o venta significativas en el período analizado para el índice Ibexia.</p>
+        <p>Esto podría deberse a una baja volatilidad, a que el SMI no generó las señales esperadas, o a que el período de análisis es demasiado corto.</p>
         """
-    else:
-        # Calcular la ganancia de la posición actual si está abierta
-        if posicion_abierta and len(precios) > len(compras[-1]):
-            ultimo_precio = precios[-1]
-            num_acciones = capital_inicial / compras[-1]['precio']
-            ganancia_actual = (ultimo_precio - compras[-1]['precio']) * num_acciones
-            ganancia_total += ganancia_actual
-
-            # Generar lista de operaciones
-            operaciones_html = ""
-            for compra in compras:
-                operaciones_html += f"<li>Compra en {compra['fecha']}: <strong>{compra['precio']:,.2f}€</strong></li>"
+    else:  # Hubo al menos una compra
+        if posicion_abierta:  # La última posición sigue abierta
+            # Calcular la ganancia/pérdida actual de la posición abierta
+            ganancia_actual_posicion_abierta = (precios[-1] - precio_compra_actual) * (capital_inicial / precio_compra_actual)
+            # La ganancia total incluye las operaciones cerradas y la ganancia (o pérdida) actual de la posición abierta
+            ganancia_simulada_total_incl_abierta = ganancia_total + ganancia_actual_posicion_abierta
 
             html_resultados = f"""
-            <p>Nuestro sistema de predicción ha detectado una señal de compra en {compras[-1]['fecha']}, con un precio de <strong>{compras[-1]['precio']:,.2f}€</strong>. La posición de la operación sigue abierta y, con una inversión inicial de {capital_inicial:,.2f}€, tendríamos una ganancia simulada de <strong>{ganancia_actual:,.2f}€</strong> hasta el momento.</p>
-            <p>El precio actual de la acción es de <strong>{ultimo_precio:,.2f}€</strong>.</p>
-            <p>El análisis de esta simulación demuestra la fiabilidad de nuestro sistema para identificar puntos de entrada óptimos. A continuación, se detallan las operaciones realizadas:</p>
-            <ul>{operaciones_html}</ul>
+            <p>Se encontraron señales de compra en el período. La última posición abierta no se ha cerrado todavía.</p>
+            <p>Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{ganancia_simulada_total_incl_abierta:,.2f}€</strong>.</p>
             """
-        else: # Todas las posiciones se cerraron
-            # Generar lista de operaciones
-            operaciones_html = ""
-            for i in range(len(compras)):
-                compra = compras[i]
-                venta = ventas[i]
-                # Calcular la ganancia/pérdida de esta operación específica
-                num_acciones_op = capital_inicial / compra['precio']
-                ganancia_operacion = (venta['precio'] - compra['precio']) * num_acciones_op
-                
-                # Formatear el texto de ganancia/pérdida
-                estado_ganancia = "Ganancia" if ganancia_operacion >= 0 else "Pérdida"
-                
-                operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{compra['precio']:,.2f}€</strong>, Venta en {venta['fecha']} a <strong>{venta['precio']:,.2f}€</strong> - {estado_ganancia}: <strong>{ganancia_operacion:,.2f}€</strong></li>"
-
+            # Si hay operaciones completadas (ventas realizadas), las mostramos
+            if operaciones_html:
+                html_resultados += f"""
+                <p>A continuación, se detallan las operaciones completadas en el periodo analizado:</p>
+                <ul>{operaciones_html}</ul>
+                """
+        else:  # Todas las posiciones se cerraron
             html_resultados = f"""
-            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. El índice Ibexia ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
-            <p>A continuación, se detallan las operaciones realizadas en el periodo analizado:</p>
-            <ul>{operaciones_html}</ul>
+            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. El índice Ibexia ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
             """
-    return html_resultados, compras, ventas # Ahora devuelve también las listas de compras y ventas
+            # Siempre mostramos las operaciones detalladas si hay alguna
+            if operaciones_html:
+                html_resultados += f"""
+                <p>A continuación, se detallan las operaciones realizadas en el periodo analizado:</p>
+                <ul>{operaciones_html}</ul>
+                """
 
+    return html_resultados, compras, ventas
 
 def obtener_datos_yfinance(ticker):
     try:
