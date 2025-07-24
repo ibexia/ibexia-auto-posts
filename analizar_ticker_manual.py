@@ -334,6 +334,30 @@ def obtener_datos_yfinance(ticker):
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
         precio_proyectado_dia_5 = cierres_para_grafico_total[-1]  # Último precio proyectado a 5 días
 
+        # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO ---
+        diferencia_precio_porcentual = ((precio_proyectado_dia_5 - current_price) / current_price) * 100 if current_price != 0 else 0
+
+        recomendacion = "sin dirección clara"
+        motivo_analisis = "La proyección de precio a 5 días es muy similar al precio actual, lo que indica un mercado en consolidación. Se recomienda cautela."
+        
+        if diferencia_precio_porcentual > 3:
+            recomendacion = "Comprar (Impulso Fuerte)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es significativamente superior al precio actual, indicando un fuerte impulso alcista."
+        elif diferencia_precio_porcentual > 1:
+            recomendacion = "Comprar (Impulso Moderado)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es superior al precio actual, sugiriendo un impulso alcista moderado."
+        elif diferencia_precio_porcentual < -3:
+            recomendacion = "Vender (Impulso Fuerte)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es significativamente inferior al precio actual, lo que indica una fuerte presión bajista."
+        elif diferencia_precio_porcentual < -1:
+            recomendacion = "Vender (Impulso Moderado)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es inferior al precio actual, sugiriendo un impulso bajista moderado."
+        
+        # Sobrescribir las variables recomendacion y motivo_analisis
+        datos['RECOMENDACION'] = recomendacion
+        datos['motivo_analisis'] = motivo_analisis
+        # --- FIN NUEVA LÓGICA DE RECOMENDACIÓN ---
+
         tendencia_ibexia = "No disponible"
         
         if len(smi_history_last_30) >= 2:
@@ -392,65 +416,7 @@ def obtener_datos_yfinance(ticker):
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
-def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_historico_para_grafico):
-    # Extraer los últimos 30 días de SMI para el análisis de tendencias
-    smi_historico = smi_historico_para_grafico[-30:] if len(smi_historico_para_grafico) >= 30 else smi_historico_para_grafico
 
-    # Calcular la pendiente de los últimos 7 días del SMI para la tendencia
-    n_trend = min(7, len(smi_historico))
-    if n_trend > 1:
-        x_trend = np.arange(n_trend)
-        y_trend = np.array(smi_historico[-n_trend:])
-        valid_indices = ~np.isnan(y_trend)
-        if np.any(valid_indices):
-            slope, _ = np.polyfit(x_trend[valid_indices], y_trend[valid_indices], 1)
-        else:
-            slope = 0
-    else:
-        slope = 0
-    
-    # Obtener el valor actual del SMI para las zonas de sobrecompra/sobreventa
-    smi_actual = data.get('SMI', 0)
-
-    recomendacion = "Atención máxima (Giro del Precio)"
-    motivo_analisis = "La pendiente del índice Ibexia es plana, lo que puede preceder a un cambio de tendencia. Se recomienda cautela y observación."
-    tendencia_ibexia = "cambio de tendencia"
-
-    # Lógica de recomendación mejorada basada en la pendiente y la posición del SMI
-    if slope > 0.1:
-        tendencia_ibexia = "mejorando (alcista)"
-        if smi_actual < -40:
-            recomendacion = "Comprar (Posible Rebote)"
-            motivo_analisis = "La pendiente del índice Ibexia es alcista, lo que indica un posible rebote desde una zona de sobreventa extrema."
-        else:
-            recomendacion = "Comprar (Impulso Alcista Fuerte)"
-            motivo_analisis = "La pendiente del índice Ibexia es fuertemente alcista, lo que sugiere un sólido impulso de compra en la zona neutral."
-    elif slope < -0.1:
-        tendencia_ibexia = "empeorando (bajista)"
-        if smi_actual > 40:
-            recomendacion = "Vender (Alerta de Corrección)"
-            motivo_analisis = "La pendiente del índice Ibexia es bajista, lo que indica una posible corrección desde una zona de sobrecompra extrema."
-        else:
-            recomendacion = "Vender (Impulso Bajista Fuerte)"
-            motivo_analisis = "La pendiente del índice Ibexia es fuertemente bajista, lo que sugiere un sólido impulso de venta en la zona neutral."
-    else: # Pendiente plana o sin dirección clara
-        tendencia_ibexia = "cambio de tendencia"
-        # Mantener la recomendación por defecto "Atención máxima (Giro del Precio)"
-        # a menos que haya una condición de giro más específica
-        if smi_actual < -40 and slope > 0: # Si ya está en sobreventa y empieza a girar
-             recomendacion = "Comprar (Posible Rebote)"
-             motivo_analisis = "El índice Ibexia ha estado en zona de sobreventa y la pendiente empieza a volverse positiva. Se observa un posible rebote."
-        elif smi_actual > 40 and slope < 0: # Si ya está en sobrecompra y empieza a girar
-             recomendacion = "Vender (Alerta de Corrección)"
-             motivo_analisis = "El índice Ibexia ha estado en zona de sobrecompra y la pendiente empieza a volverse negativa. Se observa un posible giro bajista."
-
-    # Actualizar el diccionario de datos con la nueva recomendación y análisis
-    data['RECOMENDACION'] = recomendacion
-    data['CONDICION_RSI'] = recomendacion # Usar el mismo texto para consistencia
-    data['motivo_analisis'] = motivo_analisis
-    data['tendencia_ibexia'] = tendencia_ibexia
-
-    return data
 
 
 def construir_prompt_formateado(data):
@@ -951,8 +917,7 @@ def generar_contenido_con_gemini(tickers):
         # Cambio aquí para usar 'SMI_HISTORICO_PARA_GRAFICO'
         smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
 
-        # Ahora pasa estas variables a la función generar_recomendacion_avanzada
-        data = generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_historico_para_grafico)
+
         
 
         prompt, titulo_post = construir_prompt_formateado(data)
