@@ -813,7 +813,7 @@ def construir_prompt_formateado(data):
                                 }}
                                 # GENERACIÓN DINÁMICA DE ANOTACIONES DE COMPRA Y VENTA
                                 {",\n".join([f"""
-                                ,compra_{idx}: {{
+                                compra_{idx}: {{
                                     type: 'point',
                                     xValue: {labels_total.index(compra['fecha'].strftime("%d/%m")) if compra['fecha'].strftime("%d/%m") in labels_total else 'null'},
                                     yValue: {compra['precio']},
@@ -837,7 +837,7 @@ def construir_prompt_formateado(data):
                                 }}
                                 """ for idx, compra in enumerate(compras_simuladas)])}
                                 {",\n".join([f"""
-                                ,venta_{idx}: {{
+                                venta_{idx}: {{
                                     type: 'point',
                                     xValue: {labels_total.index(venta['fecha'].strftime("%d/%m")) if venta['fecha'].strftime("%d/%m") in labels_total else 'null'},
                                     yValue: {venta['precio']},
