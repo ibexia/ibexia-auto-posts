@@ -120,11 +120,15 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
 
         # Señal de venta: la pendiente del SMI cambia de positiva a negativa
-        elif pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0 and posicion_abierta:
+        # Señal de venta: la pendiente del SMI cambia de positiva a negativa (anticipando un día)
+        # Asegúrate de que i-1 sea un índice válido antes de usarlo
+        elif i >= 1 and pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0 and posicion_abierta:
             posicion_abierta = False
-            ventas.append({'fecha': fechas[i], 'precio': precios[i]})
+            # La venta se realiza en el día 'i-1' para anticipar
+            ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
+            # Nota: el cálculo de ganancia total se basa en el precio de venta del día 'i-1'
             num_acciones = capital_inicial / precio_compra_actual
-            ganancia_total += (precios[i] - precio_compra_actual) * num_acciones
+            ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
 
     html_resultados = ""
     if not compras:
