@@ -334,29 +334,7 @@ def obtener_datos_yfinance(ticker):
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
         precio_proyectado_dia_5 = cierres_para_grafico_total[-1]  # Último precio proyectado a 5 días
 
-        # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO ---
-        diferencia_precio_porcentual = ((precio_proyectado_dia_5 - current_price) / current_price) * 100 if current_price != 0 else 0
 
-        recomendacion = "sin dirección clara"
-        motivo_analisis = "La proyección de precio a 5 días es muy similar al precio actual, lo que indica un mercado en consolidación. Se recomienda cautela."
-        
-        if diferencia_precio_porcentual > 3:
-            recomendacion = "Comprar (Impulso Fuerte)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es significativamente superior al precio actual, indicando un fuerte impulso alcista."
-        elif diferencia_precio_porcentual > 1:
-            recomendacion = "Comprar (Impulso Moderado)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es superior al precio actual, sugiriendo un impulso alcista moderado."
-        elif diferencia_precio_porcentual < -3:
-            recomendacion = "Vender (Impulso Fuerte)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es significativamente inferior al precio actual, lo que indica una fuerte presión bajista."
-        elif diferencia_precio_porcentual < -1:
-            recomendacion = "Vender (Impulso Moderado)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es inferior al precio actual, sugiriendo un impulso bajista moderado."
-        
-        # Sobrescribir las variables recomendacion y motivo_analisis
-        datos['RECOMENDACION'] = recomendacion
-        datos['motivo_analisis'] = motivo_analisis
-        # --- FIN NUEVA LÓGICA DE RECOMENDACIÓN ---
 
         tendencia_ibexia = "No disponible"
         
@@ -409,7 +387,29 @@ def obtener_datos_yfinance(ticker):
             "PRECIO_PROYECTADO_5DIAS": precio_proyectado_dia_5,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
+        # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO ---
+        diferencia_precio_porcentual = ((precio_proyectado_dia_5 - current_price) / current_price) * 100 if current_price != 0 else 0
 
+        recomendacion = "sin dirección clara"
+        motivo_analisis = "La proyección de precio a 5 días es muy similar al precio actual, lo que indica un mercado en consolidación. Se recomienda cautela."
+        
+        if diferencia_precio_porcentual > 3:
+            recomendacion = "Comprar (Impulso Fuerte)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es significativamente superior al precio actual, indicando un fuerte impulso alcista."
+        elif diferencia_precio_porcentual > 1:
+            recomendacion = "Comprar (Impulso Moderado)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es superior al precio actual, sugiriendo un impulso alcista moderado."
+        elif diferencia_precio_porcentual < -3:
+            recomendacion = "Vender (Impulso Fuerte)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es significativamente inferior al precio actual, lo que indica una fuerte presión bajista."
+        elif diferencia_precio_porcentual < -1:
+            recomendacion = "Vender (Impulso Moderado)"
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es inferior al precio actual, sugiriendo un impulso bajista moderado."
+        
+        # Sobrescribir las variables recomendacion y motivo_analisis
+        datos['RECOMENDACION'] = recomendacion
+        datos['motivo_analisis'] = motivo_analisis
+        # --- FIN NUEVA LÓGICA DE RECOMENDACIÓN ---
         return datos
 
     except Exception as e:
