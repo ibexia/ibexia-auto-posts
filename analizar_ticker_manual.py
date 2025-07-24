@@ -161,6 +161,10 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
             <p>Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{ganancia_simulada_total_incl_abierta:,.2f}€</strong>.</p>
             """
             # Si hay operaciones completadas (ventas realizadas), las mostramos
+            if compras and posicion_abierta: # NUEVA LÍNEA AÑADIDA
+                html_resultados += f"""
+                <p>La última posición comprada fue en {compras[-1]['fecha']} a <strong>{compras[-1]['precio']:,.2f}€</strong> y todavía no se ha vendido.</p>
+                """
             if operaciones_html:
                 html_resultados += f"""
                 <p>A continuación, se detallan las operaciones completadas en el periodo analizado:</p>
