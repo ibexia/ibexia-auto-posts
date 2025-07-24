@@ -921,7 +921,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 
 <h2>Análisis Inicial y Recomendación</h2>
-<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Nuestro análisis indica que la tendencia del índice Ibexia es <strong>{data['tendencia_ibexia']}</strong>. Esto nos lleva a una recomendación de <strong>{data['RECOMENDACION']}</strong>. Según nuestras proyecciones, el precio podría situarse en <strong>{data['PRECIO_PROYECTADO_5DIAS']:,}€</strong> en los próximos 5 días. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']}.</p>
+<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Nuestra recomendación es <strong>{data['RECOMENDACION']}</strong>. Según nuestras proyecciones, el precio podría situarse en <strong>{data['PRECIO_PROYECTADO_5DIAS']:,}€</strong> en los próximos 5 días. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']}.</p>
 
 
 {chart_html}
