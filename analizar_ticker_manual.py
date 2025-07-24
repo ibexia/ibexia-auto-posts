@@ -408,28 +408,39 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
             slope = 0
     else:
         slope = 0
+    
+    # Obtener el valor actual del SMI para las zonas de sobrecompra/sobreventa
+    smi_actual = data.get('SMI', 0)
 
-    recomendacion = "Neutral"
-    motivo_analisis = "La situación actual no presenta señales claras de compra ni venta."
+    recomendacion = "Atención máxima"
+    motivo_analisis = "La pendiente del índice Ibexia es plana, lo que puede preceder a un cambio de tendencia. Se recomienda cautela y observación."
     tendencia_ibexia = "cambio de tendencia"
 
-    # Lógica de recomendación basada exclusivamente en la pendiente
+    # Lógica de recomendación basada exclusivamente en la pendiente y la posición del SMI
     if slope > 0.1:
-        recomendacion = "Comprar"
         tendencia_ibexia = "mejorando (alcista)"
-        motivo_analisis = "La pendiente del índice Ibexia es alcista, lo que indica un fuerte impulso de compra y un potencial de subida del precio."
+        if smi_actual < -40:
+            recomendacion = "Comprar (Posible Rebote)"
+            motivo_analisis = "La pendiente del índice Ibexia es alcista, lo que indica un posible rebote desde una zona de sobreventa extrema."
+        else:
+            recomendacion = "Comprar (Impulso Alcista Fuerte)"
+            motivo_analisis = "La pendiente del índice Ibexia es fuertemente alcista, lo que sugiere un sólido impulso de compra en la zona neutral."
     elif slope < -0.1:
-        recomendacion = "Vender"
         tendencia_ibexia = "empeorando (bajista)"
-        motivo_analisis = "La pendiente del índice Ibexia es bajista, lo que sugiere una debilidad en el mercado y una posible caída del precio."
+        if smi_actual > 40:
+            recomendacion = "Vender (Alerta de Corrección)"
+            motivo_analisis = "La pendiente del índice Ibexia es bajista, lo que indica una posible corrección desde una zona de sobrecompra extrema."
+        else:
+            recomendacion = "Vender (Impulso Bajista Fuerte)"
+            motivo_analisis = "La pendiente del índice Ibexia es fuertemente bajista, lo que sugiere un sólido impulso de venta en la zona neutral."
     else:
-        recomendacion = "Atención máxima"
         tendencia_ibexia = "cambio de tendencia"
-        motivo_analisis = "La pendiente del índice Ibexia es plana o sin una dirección clara, lo que puede preceder a un cambio de tendencia. Se recomienda cautela y observación."
+        recomendacion = "Atención máxima (Giro del Precio)"
+        motivo_analisis = "La pendiente del índice Ibexia es plana, lo que a menudo precede a un cambio de tendencia. Se recomienda máxima atención y cautela."
 
     # Actualizar el diccionario de datos con la nueva recomendación y análisis
     data['RECOMENDACION'] = recomendacion
-    data['CONDICION_RSI'] = recomendacion # Usar el mismo texto para consistencia
+    data['CONDICION_RSI'] = recomendacion
     data['motivo_analisis'] = motivo_analisis
     data['tendencia_ibexia'] = tendencia_ibexia
 
