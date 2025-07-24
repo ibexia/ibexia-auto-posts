@@ -174,7 +174,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
             <p>A continuación, se detallan las operaciones realizadas en el periodo analizado:</p>
             <ul>{operaciones_html}</ul>
             """
-    return html_resultados
+    return html_resultados, compras, ventas # Ahora devuelve también las listas de compras y ventas
 
 
 def obtener_datos_yfinance(ticker):
@@ -509,6 +509,9 @@ def obtener_datos_yfinance(ticker):
 def construir_prompt_formateado(data):
     # Generación de la recomendación de volumen
     volumen_analisis_text = ""
+    # Recuperar los datos de compras y ventas simuladas
+    compras_simuladas = data.get('COMPRAS_SIMULADAS', [])
+    ventas_simuladas = data.get('VENTAS_SIMULADAS', [])
     if data['VOLUMEN'] != "N/A":
         volumen_actual = data['VOLUMEN']
         try:
@@ -807,10 +810,59 @@ def construir_prompt_formateado(data):
                                         borderRadius: 4,
                                         padding: 4
                                     }}
-                                }}                                
-                            }}
-                        }}
-                    }},
+                                }}
+                                # GENERACIÓN DINÁMICA DE ANOTACIONES DE COMPRA Y VENTA
+                                {",\n".join([f"""
+                                ,compra_{idx}: {{
+                                    type: 'point',
+                                    xValue: {labels_total.index(compra['fecha'].strftime("%d/%m")) if compra['fecha'].strftime("%d/%m") in labels_total else 'null'},
+                                    yValue: {compra['precio']},
+                                    yScaleID: 'y1',
+                                    radius: 7,
+                                    pointStyle: 'triangle',
+                                    rotation: 0, // Flecha hacia arriba
+                                    backgroundColor: 'rgba(0, 200, 0, 0.8)', // Verde
+                                    borderColor: 'white',
+                                    borderWidth: 2,
+                                    label: {{
+                                        content: 'Compra',
+                                        enabled: true,
+                                        position: 'bottom',
+                                        font: {{ size: 8, weight: 'bold' }},
+                                        color: 'black',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                                        borderRadius: 4,
+                                        padding: 3
+                                    }}
+                                }}
+                                """ for idx, compra in enumerate(compras_simuladas)])}
+                                {",\n".join([f"""
+                                ,venta_{idx}: {{
+                                    type: 'point',
+                                    xValue: {labels_total.index(venta['fecha'].strftime("%d/%m")) if venta['fecha'].strftime("%d/%m") in labels_total else 'null'},
+                                    yValue: {venta['precio']},
+                                    yScaleID: 'y1',
+                                    radius: 7,
+                                    pointStyle: 'triangle',
+                                    rotation: 180, // Flecha hacia abajo
+                                    backgroundColor: 'rgba(200, 0, 0, 0.8)', // Rojo
+                                    borderColor: 'white',
+                                    borderWidth: 2,
+                                    label: {{
+                                        content: 'Venta',
+                                        enabled: true,
+                                        position: 'top',
+                                        font: {{ size: 8, weight: 'bold' }},
+                                        color: 'black',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                                        borderRadius: 4,
+                                        padding: 3
+                                    }}
+                                }}
+                                """ for idx, venta in enumerate(ventas_simuladas)])}
+                            }} // Cierre de annotations
+                        }} // Cierre de plugins
+                    }}, // Cierre de options
                     scales: {{
                         y: {{
                             type: 'linear',
@@ -842,12 +894,16 @@ def construir_prompt_formateado(data):
         </script>
         """
     # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
-    # Llamamos a la nueva función para obtener el HTML
-    ganancias_html = calcular_ganancias_simuladas(
+    # Llamamos a la nueva función para obtener el HTML y las listas de compras/ventas
+    ganancias_html, compras_simuladas, ventas_simuladas = calcular_ganancias_simuladas(
         precios=data['PRECIOS_PARA_SIMULACION'],
         smis=data['SMI_PARA_SIMULACION'],
-        fechas=data['FECHAS_PARA_SIMULACION'] # AÑADIDO: Se pasa la lista de fechas
+        fechas=data['FECHAS_PARA_SIMULACION']
     )
+
+    # Añadimos las listas de compras y ventas al diccionario de datos
+    data['COMPRAS_SIMULADAS'] = compras_simuladas
+    data['VENTAS_SIMULADAS'] = ventas_simuladas
     
     soportes_unicos = []
     temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
