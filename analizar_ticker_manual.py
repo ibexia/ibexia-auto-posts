@@ -396,7 +396,7 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
     # Extraer los últimos 30 días de SMI para el análisis de tendencias
     smi_historico = smi_historico_para_grafico[-30:] if len(smi_historico_para_grafico) >= 30 else smi_historico_para_grafico
 
-    # Calcular la pendiente de los últimos 7 días del SMI para determinar la tendencia
+    # Calcular la pendiente de los últimos 7 días del SMI para la tendencia
     n_trend = min(7, len(smi_historico))
     if n_trend > 1:
         x_trend = np.arange(n_trend)
@@ -412,11 +412,11 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
     # Obtener el valor actual del SMI para las zonas de sobrecompra/sobreventa
     smi_actual = data.get('SMI', 0)
 
-    recomendacion = "Atención máxima"
+    recomendacion = "Atención máxima (Giro del Precio)"
     motivo_analisis = "La pendiente del índice Ibexia es plana, lo que puede preceder a un cambio de tendencia. Se recomienda cautela y observación."
     tendencia_ibexia = "cambio de tendencia"
 
-    # Lógica de recomendación basada exclusivamente en la pendiente y la posición del SMI
+    # Lógica de recomendación mejorada basada en la pendiente y la posición del SMI
     if slope > 0.1:
         tendencia_ibexia = "mejorando (alcista)"
         if smi_actual < -40:
@@ -433,14 +433,20 @@ def generar_recomendacion_avanzada(data, cierres_para_grafico_total, smi_histori
         else:
             recomendacion = "Vender (Impulso Bajista Fuerte)"
             motivo_analisis = "La pendiente del índice Ibexia es fuertemente bajista, lo que sugiere un sólido impulso de venta en la zona neutral."
-    else:
+    else: # Pendiente plana o sin dirección clara
         tendencia_ibexia = "cambio de tendencia"
-        recomendacion = "Atención máxima (Giro del Precio)"
-        motivo_analisis = "La pendiente del índice Ibexia es plana, lo que a menudo precede a un cambio de tendencia. Se recomienda máxima atención y cautela."
+        # Mantener la recomendación por defecto "Atención máxima (Giro del Precio)"
+        # a menos que haya una condición de giro más específica
+        if smi_actual < -40 and slope > 0: # Si ya está en sobreventa y empieza a girar
+             recomendacion = "Comprar (Posible Rebote)"
+             motivo_analisis = "El índice Ibexia ha estado en zona de sobreventa y la pendiente empieza a volverse positiva. Se observa un posible rebote."
+        elif smi_actual > 40 and slope < 0: # Si ya está en sobrecompra y empieza a girar
+             recomendacion = "Vender (Alerta de Corrección)"
+             motivo_analisis = "El índice Ibexia ha estado en zona de sobrecompra y la pendiente empieza a volverse negativa. Se observa un posible giro bajista."
 
     # Actualizar el diccionario de datos con la nueva recomendación y análisis
     data['RECOMENDACION'] = recomendacion
-    data['CONDICION_RSI'] = recomendacion
+    data['CONDICION_RSI'] = recomendacion # Usar el mismo texto para consistencia
     data['motivo_analisis'] = motivo_analisis
     data['tendencia_ibexia'] = tendencia_ibexia
 
