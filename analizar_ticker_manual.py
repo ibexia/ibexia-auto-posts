@@ -563,7 +563,19 @@ def construir_prompt_formateado(data):
     else:
         volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
 
-    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.2f}€"
+    # Calcular ganancia total de operaciones cerradas
+    ganancia_total = 0
+    for i in range(min(len(compras_simuladas), len(ventas_simuladas))):
+        compra = compras_simuladas[i]
+        venta = ventas_simuladas[i]
+        num_acciones = 10000 / compra['precio']  # capital_inicial fijo como en la función
+        ganancia_total += (venta['precio'] - compra['precio']) * num_acciones
+
+    # Crear el título del post con ganancias si son positivas
+    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']})"
+    if ganancia_total > 0:
+        titulo_post += f" - {ganancia_total:,.2f}€ GANADOS"
+    titulo_post += f" - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.2f}€"
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
