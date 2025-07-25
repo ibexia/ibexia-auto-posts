@@ -444,7 +444,7 @@ def obtener_datos_yfinance(ticker):
         precio_proyectado_dia_5 = cierres_para_grafico_total[-1]  # Último precio proyectado a 5 días
 
         # Guarda los datos para la simulación
-        smi_historico_para_simulacion = [round(s, 2) * 100 for s in hist_extended['SMI'].dropna().tail(30).tolist()]
+        smi_historico_para_simulacion = [round(s, 2) for s in hist_extended['SMI'].dropna().tail(30).tolist()]
         precios_para_simulacion = precios_reales_para_grafico
         fechas_para_simulacion = hist_extended.tail(30).index.strftime("%d/%m/%Y").tolist() # CORREGIDO: ahora se aplica .tail() al DataFrame
         tendencia_ibexia = "No disponible"
