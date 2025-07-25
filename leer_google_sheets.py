@@ -109,23 +109,31 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
     # Iterar sobre los datos históricos para encontrar señales
     for i in range(2, len(smis)):
+        print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:.2f}, SMI[i]={smis[i]:.2f}, pendiente[i]={pendientes_smi[i]:.2f}, pendiente[i-1]={pendientes_smi[i-1]:.2f}")
         # Señal de compra: la pendiente del SMI cambia de negativa a positiva y no está en sobrecompra
         # Se anticipa un día la compra y se añade la condición de sobrecompra
-        if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0 and not posicion_abierta:
-            if smis[i-1] < 40:  # Añadida condición de sobrecompra
-                posicion_abierta = True
-                # La compra se realiza en el día 'i-1' para anticipar
-                precio_compra_actual = precios[i-1]
-                compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
+        if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0:
+            if not posicion_abierta:
+                if smis[i-1] < 40:
+                    posicion_abierta = True
+                    precio_compra_actual = precios[i-1]
+                    compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
+                    print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.2f}")
+                else:
+                    print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.2f})")
+            else:
+                print(f"❌ No compra en {fechas[i-1]}: Ya hay posición abierta")
 
         # Señal de venta: la pendiente del SMI cambia de positiva a negativa (anticipando un día)
-        elif i >= 1 and pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0 and posicion_abierta:
-            posicion_abierta = False
-            # La venta se realiza en el día 'i-1' para anticipar
-            ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
-            # Nota: el cálculo de ganancia total se basa en el precio de venta del día 'i-1'
-            num_acciones = capital_inicial / precio_compra_actual
-            ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
+        elif i >= 1 and pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0:
+            if posicion_abierta:
+                posicion_abierta = False
+                ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
+                num_acciones = capital_inicial / precio_compra_actual
+                ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
+                print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.2f}")
+            else:
+                print(f"❌ No venta en {fechas[i-1]}: No hay posición abierta")
 
     # --- Generación de la lista HTML de operaciones completadas (SIEMPRE) ---
     operaciones_html = ""
@@ -207,9 +215,22 @@ def obtener_datos_yfinance(ticker):
         hist = stock.history(period="30d", interval="1d")
         hist = calculate_smi_tv(hist)
 
-        # Obtener el precio actual y volumen
-        current_price = round(info["currentPrice"], 2)
-        current_volume = info.get("volume", "N/A")
+        # Obtener datos históricos para el volumen del día anterior completo
+        # Solicitamos un periodo más largo (por ejemplo, 5 días) para tener margen
+        # y asegurarnos de encontrar un día de trading completo anterior.
+        hist_recent = stock.history(period="5d", interval="1d") 
+        
+        current_price = round(info["currentPrice"], 2) # Este sigue siendo el precio actual
+
+        current_volume = "N/A" # Inicializamos a N/A
+        if not hist_recent.empty:
+            # Intentamos obtener el volumen del penúltimo día. 
+            # Si el último día es el actual (incompleto), el penúltimo será el anterior completo.
+            # Si solo hay un día (por ejemplo, fin de semana y solo trae el último viernes), entonces es ese.
+            if len(hist_recent) >= 2:
+                current_volume = hist_recent['Volume'].iloc[-2] # Penúltima fila
+            else: # Solo hay un día de datos (ejecutándose un lunes temprano y solo trae el viernes anterior)
+                current_volume = hist_recent['Volume'].iloc[-1] # Última fila (que sería el día anterior completo)
 
         # Get last valid SMI signal
         smi_actual_series = hist['SMI'].dropna() # Obtener las señales SMI sin NaN
@@ -423,7 +444,7 @@ def obtener_datos_yfinance(ticker):
         precio_proyectado_dia_5 = cierres_para_grafico_total[-1]  # Último precio proyectado a 5 días
 
         # Guarda los datos para la simulación
-        smi_historico_para_simulacion = [round(s, 2) * 100 for s in hist_extended['SMI'].dropna().tail(30).tolist()]
+        smi_historico_para_simulacion = [round(s, 2) for s in hist_extended['SMI'].dropna().tail(30).tolist()]
         precios_para_simulacion = precios_reales_para_grafico
         fechas_para_simulacion = hist_extended.tail(30).index.strftime("%d/%m/%Y").tolist() # CORREGIDO: ahora se aplica .tail() al DataFrame
         tendencia_ibexia = "No disponible"
@@ -1122,7 +1143,6 @@ def generar_contenido_con_gemini(tickers):
             
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180)
-
 
 
 
