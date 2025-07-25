@@ -189,16 +189,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 <ul>{operaciones_html}</ul>
                 """
 
-    # Al final de calcular_ganancias_simuladas, antes del return
-    # Determina cuál es la ganancia final real que quieres mostrar
-    if posicion_abierta:
-        # La ganancia total incluye operaciones cerradas + la posición actual
-        ganancia_final_para_reporte = ganancia_total + ganancia_actual_posicion_abierta
-    else:
-        # Solo las ganancias de las operaciones cerradas
-        ganancia_final_para_reporte = ganancia_total
-
-    return html_resultados, compras, ventas, ganancia_final_para_reporte
+    return html_resultados, compras, ventas
 
 def obtener_datos_yfinance(ticker):
     try:
@@ -571,30 +562,8 @@ def construir_prompt_formateado(data):
             volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. No fue posible comparar con el volumen promedio: {e}"
     else:
         volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
-    # >>>>>>>>>>>>>>>>> PEGA EL BLOQUE DE LAS GANANCIAS AQUÍ DEBAJO <<<<<<<<<<<<<<<<<
-    # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
-    # Llamamos a la nueva función para obtener el HTML y las listas de compras/ventas
-    ganancias_html, compras_simuladas, ventas_simuladas, ganancia_total_simulada = calcular_ganancias_simuladas(
-        precios=data['PRECIOS_PARA_SIMULACION'],
-        smis=data['SMI_PARA_SIMULACION'],
-        fechas=data['FECHAS_PARA_SIMULACION']
-    )
 
-    # Ahora, guarda esta ganancia total en el diccionario 'data' para que sea accesible en el titulo_post
-    data['GANANCIA_TOTAL_FINAL'] = ganancia_total_simulada
-
-    # Añadimos las listas de compras y ventas al diccionario de datos
-    data['COMPRAS_SIMULADAS'] = compras_simuladas
-    data['VENTAS_SIMULADAS'] = ventas_simuladas
-    # Obtener la ganancia final simulada (asegúrate de que esta clave exista en `data` y contenga el valor correcto)
-    ganancia_final = data.get('GANANCIA_TOTAL_FINAL', 0) # Si no existe, default a 0
-
-    ganancia_texto = ""
-    if ganancia_final > 0:
-        ganancia_texto = f" - {ganancia_final:,.2f} € GANADOS"
-    # No se añade nada si la ganancia es 0 o negativa
-
-    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}){ganancia_texto}. Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.2f}€"
+    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.2f}€"
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
@@ -873,7 +842,8 @@ def construir_prompt_formateado(data):
                                 {",\n".join([f"""
                                 compra_{idx}: {{
                                     type: 'point',
-                                    xValue: {f"labels_total.index(datetime.strptime(str(compra['fecha']), '%d/%m/%Y').strftime('%d/%m'))" if datetime.strptime(str(compra['fecha']), '%d/%m/%Y').strftime('%d/%m') in labels_total else 'null'},
+                                    xValue: {labels_total.index(compra['fecha'].strftime("%d/%m")) if compra['fecha'].strftime("%d/%m") in labels_total else 'null'},
+                                    yValue: {compra['precio']},
                                     yScaleID: 'y1',
                                     radius: 7,
                                     pointStyle: 'triangle',
@@ -896,7 +866,7 @@ def construir_prompt_formateado(data):
                                 {",\n".join([f"""
                                 venta_{idx}: {{
                                     type: 'point',
-                                    xValue: {f"labels_total.index(datetime.strptime(str(venta['fecha']), '%d/%m/%Y').strftime('%d/%m'))" if datetime.strptime(str(venta['fecha']), '%d/%m/%Y').strftime('%d/%m') in labels_total else 'null'},
+                                    xValue: {labels_total.index(venta['fecha'].strftime("%d/%m")) if venta['fecha'].strftime("%d/%m") in labels_total else 'null'},
                                     yValue: {venta['precio']},
                                     yScaleID: 'y1',
                                     radius: 7,
@@ -950,7 +920,17 @@ def construir_prompt_formateado(data):
         }});
         </script>
         """
-    
+    # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
+    # Llamamos a la nueva función para obtener el HTML y las listas de compras/ventas
+    ganancias_html, compras_simuladas, ventas_simuladas = calcular_ganancias_simuladas(
+        precios=data['PRECIOS_PARA_SIMULACION'],
+        smis=data['SMI_PARA_SIMULACION'],
+        fechas=data['FECHAS_PARA_SIMULACION']
+    )
+
+    # Añadimos las listas de compras y ventas al diccionario de datos
+    data['COMPRAS_SIMULADAS'] = compras_simuladas
+    data['VENTAS_SIMULADAS'] = ventas_simuladas
     
     soportes_unicos = []
     temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
