@@ -109,23 +109,31 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
     # Iterar sobre los datos históricos para encontrar señales
     for i in range(2, len(smis)):
+        print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:.2f}, SMI[i]={smis[i]:.2f}, pendiente[i]={pendientes_smi[i]:.2f}, pendiente[i-1]={pendientes_smi[i-1]:.2f}")
         # Señal de compra: la pendiente del SMI cambia de negativa a positiva y no está en sobrecompra
         # Se anticipa un día la compra y se añade la condición de sobrecompra
-        if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0 and not posicion_abierta:
-            if smis[i-1] < 40:  # Añadida condición de sobrecompra
-                posicion_abierta = True
-                # La compra se realiza en el día 'i-1' para anticipar
-                precio_compra_actual = precios[i-1]
-                compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
+        if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0:
+            if not posicion_abierta:
+                if smis[i-1] < 40:
+                    posicion_abierta = True
+                    precio_compra_actual = precios[i-1]
+                    compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
+                    print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.2f}")
+                else:
+                    print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.2f})")
+            else:
+                print(f"❌ No compra en {fechas[i-1]}: Ya hay posición abierta")
 
         # Señal de venta: la pendiente del SMI cambia de positiva a negativa (anticipando un día)
-        elif i >= 1 and pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0 and posicion_abierta:
-            posicion_abierta = False
-            # La venta se realiza en el día 'i-1' para anticipar
-            ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
-            # Nota: el cálculo de ganancia total se basa en el precio de venta del día 'i-1'
-            num_acciones = capital_inicial / precio_compra_actual
-            ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
+        elif i >= 1 and pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0:
+            if posicion_abierta:
+                posicion_abierta = False
+                ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
+                num_acciones = capital_inicial / precio_compra_actual
+                ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
+                print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.2f}")
+            else:
+                print(f"❌ No venta en {fechas[i-1]}: No hay posición abierta")
 
     # --- Generación de la lista HTML de operaciones completadas (SIEMPRE) ---
     operaciones_html = ""
