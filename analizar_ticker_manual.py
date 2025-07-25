@@ -207,9 +207,21 @@ def obtener_datos_yfinance(ticker):
         hist = stock.history(period="30d", interval="1d")
         hist = calculate_smi_tv(hist)
 
-        # Obtener el precio actual y volumen
-        current_price = round(info["currentPrice"], 2)
-        current_volume = info.get("volume", "N/A")
+        # Obtener datos históricos para el volumen del día anterior
+        hist_latest = stock.history(period="2d", interval="1d") 
+        
+        current_price = round(info["currentPrice"], 2) # Este sigue siendo el precio actual
+
+        # Verificar si hay suficientes datos históricos para el volumen del día anterior
+        if len(hist_latest) >= 2:
+            # Si hay al menos dos días de datos, el volumen del día anterior es la primera fila (índice 0)
+            current_volume = hist_latest['Volume'].iloc[0] 
+        elif len(hist_latest) == 1:
+            # Si solo hay un día de datos (probablemente el día actual si se ejecuta antes del cierre)
+            # entonces tomamos el volumen de ese día, que es lo más cercano al "anterior completo"
+            current_volume = hist_latest['Volume'].iloc[0]
+        else:
+            current_volume = "N/A"
 
         # Get last valid SMI signal
         smi_actual_series = hist['SMI'].dropna() # Obtener las señales SMI sin NaN
