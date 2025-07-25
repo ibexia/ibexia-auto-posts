@@ -873,8 +873,7 @@ def construir_prompt_formateado(data):
                                 {",\n".join([f"""
                                 compra_{idx}: {{
                                     type: 'point',
-                                    xValue: {labels_total.index(datetime.strptime(str(compra['fecha']), "%Y-%m-%d").strftime("%d/%m")) if isinstance(compra['fecha'], str) and datetime.strptime(str(compra['fecha']), "%Y-%m-%d").strftime("%d/%m") in labels_total else labels_total.index(compra['fecha'].strftime("%d/%m")) if not isinstance(compra['fecha'], str) and compra['fecha'].strftime("%d/%m") in labels_total else 'null'},
-                                    yValue: {compra['precio']},
+                                    xValue: {f"labels_total.index(datetime.strptime(str(compra['fecha']), '%d/%m/%Y').strftime('%d/%m'))" if datetime.strptime(str(compra['fecha']), '%d/%m/%Y').strftime('%d/%m') in labels_total else 'null'},
                                     yScaleID: 'y1',
                                     radius: 7,
                                     pointStyle: 'triangle',
@@ -897,7 +896,7 @@ def construir_prompt_formateado(data):
                                 {",\n".join([f"""
                                 venta_{idx}: {{
                                     type: 'point',
-                                    xValue: {labels_total.index(datetime.strptime(str(venta['fecha']), "%Y-%m-%d").strftime("%d/%m")) if isinstance(venta['fecha'], str) and datetime.strptime(str(venta['fecha']), "%Y-%m-%d").strftime("%d/%m") in labels_total else labels_total.index(venta['fecha'].strftime("%d/%m")) if not isinstance(venta['fecha'], str) and venta['fecha'].strftime("%d/%m") in labels_total else 'null'},
+                                    xValue: {f"labels_total.index(datetime.strptime(str(venta['fecha']), '%d/%m/%Y').strftime('%d/%m'))" if datetime.strptime(str(venta['fecha']), '%d/%m/%Y').strftime('%d/%m') in labels_total else 'null'},
                                     yValue: {venta['precio']},
                                     yScaleID: 'y1',
                                     radius: 7,
