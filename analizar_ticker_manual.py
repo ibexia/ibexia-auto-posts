@@ -207,22 +207,9 @@ def obtener_datos_yfinance(ticker):
         hist = stock.history(period="30d", interval="1d")
         hist = calculate_smi_tv(hist)
 
-        # Obtener datos históricos para el volumen del día anterior completo
-        # Solicitamos un periodo más largo (por ejemplo, 5 días) para tener margen
-        # y asegurarnos de encontrar un día de trading completo anterior.
-        hist_recent = stock.history(period="5d", interval="1d") 
-        
-        current_price = round(info["currentPrice"], 2) # Este sigue siendo el precio actual
-
-        current_volume = "N/A" # Inicializamos a N/A
-        if not hist_recent.empty:
-            # Intentamos obtener el volumen del penúltimo día. 
-            # Si el último día es el actual (incompleto), el penúltimo será el anterior completo.
-            # Si solo hay un día (por ejemplo, fin de semana y solo trae el último viernes), entonces es ese.
-            if len(hist_recent) >= 2:
-                current_volume = hist_recent['Volume'].iloc[-2] # Penúltima fila
-            else: # Solo hay un día de datos (ejecutándose un lunes temprano y solo trae el viernes anterior)
-                current_volume = hist_recent['Volume'].iloc[-1] # Última fila (que sería el día anterior completo)
+        # Obtener el precio actual y volumen
+        current_price = round(info["currentPrice"], 2)
+        current_volume = info.get("volume", "N/A")
 
         # Get last valid SMI signal
         smi_actual_series = hist['SMI'].dropna() # Obtener las señales SMI sin NaN
@@ -1140,7 +1127,7 @@ def generar_contenido_con_gemini(tickers):
 
 def main():
     # Define el ticker que quieres analizar
-    ticker_deseado = "MRL.MC"
+    ticker_deseado = "SLR.MC"
 
     tickers_for_today = [ticker_deseado]
 
