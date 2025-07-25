@@ -189,7 +189,16 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 <ul>{operaciones_html}</ul>
                 """
 
-    return html_resultados, compras, ventas
+    # Al final de calcular_ganancias_simuladas, antes del return
+    # Determina cuál es la ganancia final real que quieres mostrar
+    if posicion_abierta:
+        # La ganancia total incluye operaciones cerradas + la posición actual
+        ganancia_final_para_reporte = ganancia_total + ganancia_actual_posicion_abierta
+    else:
+        # Solo las ganancias de las operaciones cerradas
+        ganancia_final_para_reporte = ganancia_total
+
+    return html_resultados, compras, ventas, ganancia_final_para_reporte
 
 def obtener_datos_yfinance(ticker):
     try:
@@ -563,7 +572,15 @@ def construir_prompt_formateado(data):
     else:
         volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
 
-    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.2f}€"
+    # Obtener la ganancia final simulada (asegúrate de que esta clave exista en `data` y contenga el valor correcto)
+    ganancia_final = data.get('GANANCIA_TOTAL_FINAL', 0) # Si no existe, default a 0
+
+    ganancia_texto = ""
+    if ganancia_final > 0:
+        ganancia_texto = f" - {ganancia_final:,.2f} € GANADOS"
+    # No se añade nada si la ganancia es 0 o negativa
+
+    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}){ganancia_texto}. Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.2f}€"
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
@@ -922,11 +939,14 @@ def construir_prompt_formateado(data):
         """
     # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
     # Llamamos a la nueva función para obtener el HTML y las listas de compras/ventas
-    ganancias_html, compras_simuladas, ventas_simuladas = calcular_ganancias_simuladas(
+    ganancias_html, compras_simuladas, ventas_simuladas, ganancia_total_simulada = calcular_ganancias_simuladas(
         precios=data['PRECIOS_PARA_SIMULACION'],
         smis=data['SMI_PARA_SIMULACION'],
         fechas=data['FECHAS_PARA_SIMULACION']
     )
+
+    # Ahora, guarda esta ganancia total en el diccionario 'data' para que sea accesible en el titulo_post
+    data['GANANCIA_TOTAL_FINAL'] = ganancia_total_simulada
 
     # Añadimos las listas de compras y ventas al diccionario de datos
     data['COMPRAS_SIMULADAS'] = compras_simuladas
