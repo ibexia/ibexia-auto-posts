@@ -154,7 +154,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
     if not compras:  # No se realizaron compras en el período
         html_resultados = f"""
-        <p>No se encontraron señales de compra o venta significativas en el período analizado para Nuestro .</p>
+        <p>No se encontraron señales de compra o venta significativas en el período analizado para Nuestro logaritmo.</p>
         <p>Esto podría deberse a una baja volatilidad, a que el SMI no generó las señales esperadas, o a que el período de análisis es demasiado corto.</p>
         """
     else:  # Hubo al menos una compra
@@ -180,7 +180,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 """
         else:  # Todas las posiciones se cerraron
             html_resultados = f"""
-            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro  ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
+            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro logaritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
             """
             # Siempre mostramos las operaciones detalladas si hay alguna
             if operaciones_html:
@@ -190,6 +190,60 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 """
 
     return html_resultados, compras, ventas
+
+
+
+def generar_explicacion_tramos(smis, fechas):
+    """
+    Genera una narrativa día por día del comportamiento del logaritmo (SMI).
+    Identifica tramos de subida, bajada, aplanamiento, giros, sobrecompra y sobreventa.
+    """
+    narrativa = []
+    if not smis or not fechas:
+        return "<p>No hay datos suficientes para generar la explicación del gráfico.</p>"
+
+    estado_anterior = None
+    inicio_tramo = fechas[0]
+
+    for i in range(1, len(smis)):
+        if pd.isna(smis[i]) or pd.isna(smis[i-1]):
+            continue
+
+        diferencia = smis[i] - smis[i-1]
+        fecha_actual = fechas[i]
+
+        # Determinar estado actual
+        if diferencia > 0.5:
+            estado_actual = "subida"
+        elif diferencia < -0.5:
+            estado_actual = "bajada"
+        else:
+            estado_actual = "aplanamiento"
+
+        # Detectar sobrecompra/sobreventa
+        extra = ""
+        if smis[i] > 40:
+            extra = " entrando en <strong>sobrecompra</strong>"
+        elif smis[i] < -40:
+            extra = " acercándose a <strong>sobreventa</strong>"
+
+        # Detectar giros
+        if estado_anterior and estado_actual != estado_anterior:
+            narrativa.append(
+                f"<li>Del {inicio_tramo} al {fechas[i-1]} el logaritmo estuvo en {estado_anterior}. "
+                f"El {fecha_actual} se produjo un <strong>giro</strong> hacia {estado_actual}{extra}.</li>"
+            )
+            inicio_tramo = fecha_actual
+        elif i == len(smis) - 1:
+            narrativa.append(
+                f"<li>Del {inicio_tramo} al {fecha_actual} el logaritmo mostró una fase de {estado_actual}{extra}.</li>"
+            )
+
+        estado_anterior = estado_actual
+
+    return "<h2>Evolución del Logaritmo</h2><ul>" + "".join(narrativa) + "</ul>"
+
+
 
 def obtener_datos_yfinance(ticker):
     try:
@@ -460,11 +514,11 @@ def obtener_datos_yfinance(ticker):
             if slope > 0.1:
                 tendencia_ibexia = "mejorando (alcista)"
                 recomendacion = "Comprar"
-                motivo_recomendacion = f"Nuestro  muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
+                motivo_recomendacion = f"Nuestro logaritmo muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
             elif slope < -0.1:
                 tendencia_ibexia = "empeorando (bajista)"
                 recomendacion = "Vender"
-                motivo_recomendacion = f"Nuestro  muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
+                motivo_recomendacion = f"Nuestro logaritmo muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
             else:
                 tendencia_ibexia = "cambio de tendencia"
                 recomendacion = "Atención máxima"
@@ -585,58 +639,17 @@ def construir_prompt_formateado(data):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
 
 
-        # --- NUEVO BLOQUE DE ANÁLISIS POR TRAMOS ---
-        smi_vals = data['SMI_PARA_SIMULACION']
-        fechas_vals = data['FECHAS_PARA_SIMULACION']
-        precios_vals = data['PRECIOS_PARA_SIMULACION']
+        explicacion_dinamica = generar_explicacion_tramos(
+            smis=data['SMI_PARA_SIMULACION'],
+            fechas=data['FECHAS_PARA_SIMULACION']
+        )
 
         chart_html += f"""
-        <h2>Evolución de Nuestro logaritmo y Precio</h2>
-        <p>A continuación, detallo el comportamiento del logaritmo en cada tramo relevante, indicando la fase (ascendente, descendente, aplanamiento o giro) y la decisión tomada en cada momento:</p>
-        <ul>
+            {explicacion_dinamica}
+            <div style="width: 100%; max-width: 800px; margin: auto;">
+                <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
+            </div>
         """
-
-        if smi_vals and fechas_vals:
-            tramo_inicio = fechas_vals[0]
-            fase_actual = None
-
-            for i in range(1, len(smi_vals)):
-                pendiente = smi_vals[i] - smi_vals[i-1]
-                nueva_fase = fase_actual
-
-                if pendiente > 0.5:
-                    nueva_fase = "ascendente"
-                elif pendiente < -0.5:
-                    nueva_fase = "descendente"
-                else:
-                    nueva_fase = "plana"
-
-                # Cuando la fase cambia, cerramos el tramo anterior y lo describimos
-                if fase_actual is None:
-                    fase_actual = nueva_fase
-                elif nueva_fase != fase_actual or i == len(smi_vals) - 1:
-                    tramo_fin = fechas_vals[i]
-                    
-                    if fase_actual == "ascendente":
-                        chart_html += f"<li>Del <strong>{{tramo_inicio}}</strong> al <strong>{{tramo_fin}}</strong> el logaritmo mostró una <strong>fase ascendente</strong>, lo que justificó mantener o abrir compras.</li>"
-                    elif fase_actual == "descendente":
-                        chart_html += f"<li>Del <strong>{{tramo_inicio}}</strong> al <strong>{{tramo_fin}}</strong> el logaritmo entró en una <strong>fase descendente</strong>, por lo que se evaluó venta o mantenerse fuera.</li>"
-                    elif fase_actual == "plana":
-                        chart_html += f"<li>Entre <strong>{{tramo_inicio}}</strong> y <strong>{{tramo_fin}}</strong> el logaritmo se mantuvo <strong>aplanado</strong>, señal de espera y cautela.</li>"
-
-                    # Reiniciar tramo
-                    tramo_inicio = fechas_vals[i]
-                    fase_actual = nueva_fase
-
-            chart_html += "</ul>"
-        else:
-            chart_html += "<li>No hay suficientes datos para generar un análisis de tramos.</li></ul>"
-
-
-        
-        <div style="width: 100%; max-width: 800px; margin: auto;">
-            <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
-        </div>
 
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
