@@ -584,17 +584,56 @@ def construir_prompt_formateado(data):
         if len(smi_desplazados_para_grafico) < len(labels_total):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
 
+
+        # --- NUEVO BLOQUE DE ANÁLISIS POR TRAMOS ---
+        smi_vals = data['SMI_PARA_SIMULACION']
+        fechas_vals = data['FECHAS_PARA_SIMULACION']
+        precios_vals = data['PRECIOS_PARA_SIMULACION']
+
         chart_html += f"""
-        <h2>Evolución dNuestro logaritmo y Precio</h2>
-        <p> Para entender nuestro gráfico, es importante saber que verás dos líneas principales. La línea que representa el precio de la acción se mide en el eje vertical derecho, mostrándote su valor actual en euros. Por otro lado, Nuestro logaritmo, que es un indicador propio de la fuerza del mercado, se mide en el eje vertical izquierdo. </p>
-        <p>Gracias al logaritmo podemos predecir el precio de los próximos 5 dias directamente en el gráfico. </p>
-        <p>Nuestro logaritmo te ayuda a interpretar los movimientos del precio de la siguiente manera:</p>
+        <h2>Evolución de Nuestro logaritmo y Precio</h2>
+        <p>A continuación, detallo el comportamiento del logaritmo en cada tramo relevante, indicando la fase (ascendente, descendente, aplanamiento o giro) y la decisión tomada en cada momento:</p>
         <ul>
-            <li><b>Subida:</b> Indica que el impulso alcista está creciendo y que el precio de la acción tiende a subir.</li>
-            <li><b>Bajada:</b> Señala que el impulso bajista está ganando fuerza y que el precio de la acción tiende a caer.</li>
-            <li><b>Se Aplana:</b> Muestra que el mercado está en una fase de consolidación, sin una dirección clara.</li>
-            <li><b>Gira:</b> Advierte de un posible cambio de tendencia en el precio.</li>
-        </ul>
+        """
+
+        if smi_vals and fechas_vals:
+            tramo_inicio = fechas_vals[0]
+            fase_actual = None
+
+            for i in range(1, len(smi_vals)):
+                pendiente = smi_vals[i] - smi_vals[i-1]
+                nueva_fase = fase_actual
+
+                if pendiente > 0.5:
+                    nueva_fase = "ascendente"
+                elif pendiente < -0.5:
+                    nueva_fase = "descendente"
+                else:
+                    nueva_fase = "plana"
+
+                # Cuando la fase cambia, cerramos el tramo anterior y lo describimos
+                if fase_actual is None:
+                    fase_actual = nueva_fase
+                elif nueva_fase != fase_actual or i == len(smi_vals) - 1:
+                    tramo_fin = fechas_vals[i]
+                    
+                    if fase_actual == "ascendente":
+                        chart_html += f"<li>Del <strong>{tramo_inicio}</strong> al <strong>{tramo_fin}</strong> el logaritmo mostró una <strong>fase ascendente</strong>, lo que justificó mantener o abrir compras.</li>"
+                    elif fase_actual == "descendente":
+                        chart_html += f"<li>Del <strong>{tramo_inicio}</strong> al <strong>{tramo_fin}</strong> el logaritmo entró en una <strong>fase descendente</strong>, por lo que se evaluó venta o mantenerse fuera.</li>"
+                    elif fase_actual == "plana":
+                        chart_html += f"<li>Entre <strong>{tramo_inicio}</strong> y <strong>{tramo_fin}</strong> el logaritmo se mantuvo <strong>aplanado</strong>, señal de espera y cautela.</li>"
+
+                    # Reiniciar tramo
+                    tramo_inicio = fechas_vals[i]
+                    fase_actual = nueva_fase
+
+            chart_html += "</ul>"
+        else:
+            chart_html += "<li>No hay suficientes datos para generar un análisis de tramos.</li></ul>"
+
+
+        
         <div style="width: 100%; max-width: 800px; margin: auto;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
