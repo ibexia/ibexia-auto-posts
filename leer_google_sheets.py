@@ -625,11 +625,12 @@ def construir_prompt_formateado(data):
                 
                 # Descripción narrativa del tramo
                 if tendencia_actual_smi == "alcista":
-                    analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, el logaritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio desde <strong>{precios[start_index]:,.2f}€</strong> hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                    analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, el logaritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
                 elif tendencia_actual_smi == "bajista":
-                    analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, el logaritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió de <strong>{precios[start_index]:,.2f}€</strong> a <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                    analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, el logaritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
                 elif tendencia_actual_smi == "consolidación":
-                    analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. El logaritmo se mantuvo plano y el precio se movió lateralmente, desde <strong>{precios[start_index]:,.2f}€</strong> a <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                    analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. El logaritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+
                 
                 # Chequeo de compra o venta en el cambio de tramo
                 compra_en_giro = next((c for c in compras_simuladas if c['fecha'] == fechas[end_index]), None)
