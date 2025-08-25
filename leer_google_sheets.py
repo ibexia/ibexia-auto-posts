@@ -586,15 +586,73 @@ def construir_prompt_formateado(data):
 
         chart_html += f"""
         <h2>Evolución dNuestro logaritmo y Precio</h2>
-        <p> Para entender nuestro gráfico, es importante saber que verás dos líneas principales. La línea que representa el precio de la acción se mide en el eje vertical derecho, mostrándote su valor actual en euros. Por otro lado, Nuestro logaritmo, que es un indicador propio de la fuerza del mercado, se mide en el eje vertical izquierdo. </p>
-        <p>Gracias al logaritmo podemos predecir el precio de los próximos 5 dias directamente en el gráfico. </p>
-        <p>Nuestro logaritmo te ayuda a interpretar los movimientos del precio de la siguiente manera:</p>
-        <ul>
-            <li><b>Subida:</b> Indica que el impulso alcista está creciendo y que el precio de la acción tiende a subir.</li>
-            <li><b>Bajada:</b> Señala que el impulso bajista está ganando fuerza y que el precio de la acción tiende a caer.</li>
-            <li><b>Se Aplana:</b> Muestra que el mercado está en una fase de consolidación, sin una dirección clara.</li>
-            <li><b>Gira:</b> Advierte de un posible cambio de tendencia en el precio.</li>
-        </ul>
+        # Genera la narrativa del gráfico basada en la simulación de operaciones
+        narrativa_grafico_html = ""
+        if compras_simuladas or ventas_simuladas:
+            operaciones = []
+            # Combina compras y ventas en una sola lista, ordenadas por fecha
+            for op in compras_simuladas:
+                operaciones.append({'tipo': 'compra', 'fecha': op['fecha'], 'precio': op['precio']})
+            for op in ventas_simuladas:
+                operaciones.append({'tipo': 'venta', 'fecha': op['fecha'], 'precio': op['precio']})
+            operaciones.sort(key=lambda x: x['fecha'])
+
+            narrativa_grafico_html += f"""
+            <p>A continuación, detallamos la actividad reciente de la acción según las señales de Nuestro logaritmo:</p>
+            <ul>
+            """
+            for i, op in enumerate(operaciones):
+                tipo = "compra" if op['tipo'] == 'compra' else "venta"
+                fecha = op['fecha'].strftime("%d de %B de %Y")
+                precio = f"{op['precio']:,.2f}€"
+            
+                if tipo == 'compra':
+                    # Buscamos la venta correspondiente para calcular la ganancia/pérdida
+                    venta_correspondiente = None
+                    for venta in ventas_simuladas:
+                        if venta['fecha'] > op['fecha']:
+                            venta_correspondiente = venta
+                            break
+                
+                    if venta_correspondiente:
+                        ganancia = (venta_correspondiente['precio'] - op['precio'])
+                        estado_ganancia = "ganancia" if ganancia >= 0 else "pérdida"
+                        color_ganancia = "green" if ganancia >= 0 else "red"
+                        narrativa_grafico_html += f"""
+                        <li>El <strong>{fecha}</strong>, se produjo una señal de <strong>compra</strong> cuando Nuestro logaritmo giró al alza. Compramos la acción a <strong>{precio}</strong>. El impulso continuó hasta que, en el momento de la venta, generamos una <strong style="color: {color_ganancia};">{estado_ganancia}</strong>.</li>
+                        """
+                    else:
+                        narrativa_grafico_html += f"""
+                        <li>El <strong>{fecha}</strong>, se activó una señal de <strong>compra</strong> cuando Nuestro logaritmo giró al alza. Compramos a <strong>{precio}</strong> y la posición se mantiene abierta, esperando la próxima señal de venta.</li>
+                        """
+                elif tipo == 'venta':
+                    # Las ventas se explican dentro del ciclo de compra para contextualizar la operación completa
+                    continue
+
+            # Descripción del estado actual
+            recomendacion_actual = data['RECOMENDACION']
+            tendencia_ibexia = data['tendencia_ibexia']
+            smi_actual = data['SMI']
+        
+            if "Comprar" in recomendacion_actual:
+                 narrativa_grafico_html += f"""
+                <li>Actualmente, Nuestro logaritmo presenta una tendencia {tendencia_ibexia} con un valor de **{smi_actual:.2f}**. El impulso alcista es fuerte y la señal actual es de **COMPRA**.</li>
+                """
+            elif "Vender" in recomendacion_actual:
+                narrativa_grafico_html += f"""
+                <li>En este momento, Nuestro logaritmo presenta una tendencia {tendencia_ibexia} con un valor de **{smi_actual:.2f}**. El impulso bajista es fuerte y la señal actual es de **VENTA**.</li>
+                """
+            else: # consolidación, sin dirección clara
+                narrativa_grafico_html += f"""
+                <li>Actualmente, Nuestro logaritmo no muestra una dirección clara, lo que indica una fase de consolidación o indecisión en el mercado. El valor del SMI es de **{smi_actual:.2f}**, lo que confirma la ausencia de un impulso fuerte en el mercado.</li>
+                """
+        
+            narrativa_grafico_html += f"</ul>"
+        else:
+             # Si no hay operaciones, muestra un mensaje general
+            narrativa_grafico_html += f"""
+            <p>En el período analizado, no se han detectado señales claras de compra o venta. Nuestro logaritmo se ha mantenido en una zona de consolidación, lo que indica un movimiento lateral sin una tendencia definida. Este es un período ideal para la observación, esperando que se desarrolle una señal clara antes de tomar una decisión. Actualmente, el valor del SMI es de **{data['SMI']:.2f}**, lo que confirma la ausencia de un impulso fuerte en el mercado.</p>
+            """
         <div style="width: 100%; max-width: 800px; margin: auto;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
