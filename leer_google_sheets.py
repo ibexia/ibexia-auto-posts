@@ -154,7 +154,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
     if not compras:  # No se realizaron compras en el período
         html_resultados = f"""
-        <p>No se encontraron señales de compra o venta significativas en el período analizado para Nuestro logaritmo.</p>
+        <p>No se encontraron señales de compra o venta significativas en el período analizado para Nuestro .</p>
         <p>Esto podría deberse a una baja volatilidad, a que el SMI no generó las señales esperadas, o a que el período de análisis es demasiado corto.</p>
         """
     else:  # Hubo al menos una compra
@@ -180,7 +180,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 """
         else:  # Todas las posiciones se cerraron
             html_resultados = f"""
-            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro logaritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
+            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro  ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
             """
             # Siempre mostramos las operaciones detalladas si hay alguna
             if operaciones_html:
@@ -460,11 +460,11 @@ def obtener_datos_yfinance(ticker):
             if slope > 0.1:
                 tendencia_ibexia = "mejorando (alcista)"
                 recomendacion = "Comprar"
-                motivo_recomendacion = f"Nuestro logaritmo muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
+                motivo_recomendacion = f"Nuestro  muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
             elif slope < -0.1:
                 tendencia_ibexia = "empeorando (bajista)"
                 recomendacion = "Vender"
-                motivo_recomendacion = f"Nuestro logaritmo muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
+                motivo_recomendacion = f"Nuestro  muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
             else:
                 tendencia_ibexia = "cambio de tendencia"
                 recomendacion = "Atención máxima"
@@ -618,11 +618,11 @@ def construir_prompt_formateado(data):
                     tramo_fin = fechas_vals[i]
                     
                     if fase_actual == "ascendente":
-                        chart_html += f"<li>Del <strong>{tramo_inicio}</strong> al <strong>{tramo_fin}</strong> el logaritmo mostró una <strong>fase ascendente</strong>, lo que justificó mantener o abrir compras.</li>"
+                        chart_html += f"<li>Del <strong>{{tramo_inicio}}</strong> al <strong>{{tramo_fin}}</strong> el logaritmo mostró una <strong>fase ascendente</strong>, lo que justificó mantener o abrir compras.</li>"
                     elif fase_actual == "descendente":
-                        chart_html += f"<li>Del <strong>{tramo_inicio}</strong> al <strong>{tramo_fin}</strong> el logaritmo entró en una <strong>fase descendente</strong>, por lo que se evaluó venta o mantenerse fuera.</li>"
+                        chart_html += f"<li>Del <strong>{{tramo_inicio}}</strong> al <strong>{{tramo_fin}}</strong> el logaritmo entró en una <strong>fase descendente</strong>, por lo que se evaluó venta o mantenerse fuera.</li>"
                     elif fase_actual == "plana":
-                        chart_html += f"<li>Entre <strong>{tramo_inicio}</strong> y <strong>{tramo_fin}</strong> el logaritmo se mantuvo <strong>aplanado</strong>, señal de espera y cautela.</li>"
+                        chart_html += f"<li>Entre <strong>{{tramo_inicio}}</strong> y <strong>{{tramo_fin}}</strong> el logaritmo se mantuvo <strong>aplanado</strong>, señal de espera y cautela.</li>"
 
                     # Reiniciar tramo
                     tramo_inicio = fechas_vals[i]
