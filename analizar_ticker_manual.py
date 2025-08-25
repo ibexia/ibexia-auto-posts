@@ -563,19 +563,7 @@ def construir_prompt_formateado(data):
     else:
         volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
 
-    # Calcular ganancia total de operaciones cerradas
-    ganancia_total = 0
-    for i in range(min(len(compras_simuladas), len(ventas_simuladas))):
-        compra = compras_simuladas[i]
-        venta = ventas_simuladas[i]
-        num_acciones = 10000 / compra['precio']  # capital_inicial fijo como en la función
-        ganancia_total += (venta['precio'] - compra['precio']) * num_acciones
-
-    # Crear el título del post con ganancias si son positivas
-    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']})"
-    if ganancia_total > 0:
-        titulo_post += f" - {ganancia_total:,.2f}€ GANADOS"
-    titulo_post += f" - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.2f}€"
+    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.2f}€"
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
@@ -596,20 +584,73 @@ def construir_prompt_formateado(data):
         if len(smi_desplazados_para_grafico) < len(labels_total):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
 
+
+
+        # NUEVA LÓGICA: generar análisis dinámico del gráfico
+        analisis_grafico = ""
+        compras_simuladas = data.get('COMPRAS_SIMULADAS', [])
+        ventas_simuladas = data.get('VENTAS_SIMULADAS', [])
+        
+        # Unir compras y ventas y ordenarlas por fecha
+        eventos = sorted(compras_simuladas + ventas_simuladas, key=lambda x: x['fecha'])
+
+        if eventos:
+            analisis_grafico += "<p>A continuación, detallamos la evolución de la cotización y las señales de nuestro logaritmo en el período analizado:</p><ul>"
+            for i, evento in enumerate(eventos):
+                tipo = "Compra" if 'Compra' in str(evento) else "Venta"
+                fecha = evento['fecha'].strftime("%d/%m")
+                precio = evento['precio']
+                
+                # Buscar el SMI correspondiente a esa fecha
+                try:
+                    fecha_str = evento['fecha'].strftime("%d/%m/%Y")
+                    idx = data['FECHAS_PARA_SIMULACION'].index(fecha_str)
+                    smi_valor = data['SMI_PARA_SIMULACION'][idx]
+                except (ValueError, IndexError):
+                    smi_valor = "N/A"
+
+                if tipo == "Compra":
+                    analisis_grafico += f"<li>El día <strong>{fecha}</strong>, nuestro logaritmo giró al alza desde un nivel de sobreventa ({smi_valor:.2f}), lo que activó una señal de compra. El precio de la acción en ese momento era de <strong>{precio:.2f}€</strong>.</li>"
+                else: # Venta
+                    analisis_grafico += f"<li>El día <strong>{fecha}</strong>, el logaritmo giró a la baja tras un período alcista, lo que indicó el momento de vender. El precio de venta fue de <strong>{precio:.2f}€</strong>.</li>"
+
+            analisis_grafico += "</ul>"
+        else:
+            analisis_grafico = "<p>No se encontraron señales de compra o venta en el período analizado. El logaritmo no generó los giros necesarios para una operación, lo que sugiere un mercado en consolidación o una baja volatilidad.</p>"
+
+        # Análisis de la situación actual
+        smi_actual = data.get('SMI', 0)
+        tendencia = data.get('tendencia_ibexia', 'sin dirección clara')
+        
+        if 'cambio de tendencia' in tendencia:
+            estado_actual = "Nuestro logaritmo se encuentra en un punto de <strong>cambio de tendencia</strong>, lo que nos pone en alerta máxima para una posible operación."
+        elif 'alcista' in tendencia:
+            if smi_actual > 40:
+                estado_actual = f"El logaritmo se encuentra en la zona de sobrecompra ({smi_actual:.2f}) con una tendencia alcista. Aunque el impulso es fuerte, se aproxima a un nivel donde podría aplanarse o girar."
+            else:
+                estado_actual = f"El logaritmo se encuentra en una fase de <strong>subida constante</strong>, indicando un impulso alcista claro."
+        elif 'bajista' in tendencia:
+            if smi_actual < -40:
+                estado_actual = f"El logaritmo se encuentra en la zona de sobreventa ({smi_actual:.2f}) con una tendencia bajista. Aunque la presión de venta es alta, se acerca a un nivel donde podría aplanarse o girar, ofreciendo una potencial oportunidad de compra."
+            else:
+                estado_actual = f"El logaritmo se encuentra en una fase de <strong>bajada constante</strong>, sugiriendo una presión bajista en el mercado."
+        else:
+            estado_actual = "Actualmente, el logaritmo se ha aplanado y no muestra una dirección clara."
+        
+        analisis_grafico += f"<p><strong>Situación actual:</strong> {estado_actual}</p>"
+
+
         chart_html += f"""
-        <h2>Evolución dNuestro logaritmo y Precio</h2>
-        <p> Para entender nuestro gráfico, es importante saber que verás dos líneas principales. La línea que representa el precio de la acción se mide en el eje vertical derecho, mostrándote su valor actual en euros. Por otro lado, Nuestro logaritmo, que es un indicador propio de la fuerza del mercado, se mide en el eje vertical izquierdo. </p>
+        <h2>Evolución de nuestro logaritmo y Precio</h2>
+        {analisis_grafico}
         <p>Gracias al logaritmo podemos predecir el precio de los próximos 5 dias directamente en el gráfico. </p>
-        <p>Nuestro logaritmo te ayuda a interpretar los movimientos del precio de la siguiente manera:</p>
-        <ul>
-            <li><b>Subida:</b> Indica que el impulso alcista está creciendo y que el precio de la acción tiende a subir.</li>
-            <li><b>Bajada:</b> Señala que el impulso bajista está ganando fuerza y que el precio de la acción tiende a caer.</li>
-            <li><b>Se Aplana:</b> Muestra que el mercado está en una fase de consolidación, sin una dirección clara.</li>
-            <li><b>Gira:</b> Advierte de un posible cambio de tendencia en el precio.</li>
-        </ul>
         <div style="width: 100%; max-width: 800px; margin: auto;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
+
+
+
+        
 
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
@@ -1155,6 +1196,9 @@ def generar_contenido_con_gemini(tickers):
             
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180)
+
+
+
 
 
 
