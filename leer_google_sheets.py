@@ -584,17 +584,66 @@ def construir_prompt_formateado(data):
         if len(smi_desplazados_para_grafico) < len(labels_total):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
 
+
+        # 2. Generación del análisis dinámico del gráfico
+        analisis_grafico_html = "<h2>Análisis de la Evolución del Gráfico</h2>"
+        precios = data['PRECIOS_PARA_SIMULACION']
+        smis = data['SMI_PARA_SIMULACION']
+        fechas = data['FECHAS_PARA_SIMULACION']
+        
+        if len(smis) < 2:
+            analisis_grafico_html += "<p>No hay suficientes datos históricos para realizar un análisis detallado del gráfico.</p>"
+        else:
+            # Lógica para identificar tramos
+            tramo_actual_inicio_fecha = fechas[0]
+            tendencia_actual = "neutral"
+            
+            def get_trend(smi_val):
+                if smi_val > 40:
+                    return "sobrecompra"
+                elif smi_val < -40:
+                    return "sobreventa"
+                elif smi_val > 0.1: # Pendiente del SMI
+                    return "alcista"
+                elif smi_val < -0.1: # Pendiente del SMI
+                    return "bajista"
+                else:
+                    return "consolidación"
+
+            # Calcular pendientes
+            pendientes_smi = [0] * len(smis)
+            for i in range(1, len(smis)):
+                pendientes_smi[i] = smis[i] - smis[i-1]
+
+            # Recorrer los tramos por cambio de tendencia
+            i = 1
+            while i < len(smis):
+                tendencia_actual_smi = get_trend(pendientes_smi[i])
+                start_index = i - 1
+                
+                # Encontrar el final del tramo actual
+                while i < len(smis) and get_trend(pendientes_smi[i]) == tendencia_actual_smi:
+                    i += 1
+                
+                end_index = i - 1
+                
+                analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong> hasta el <strong>{fechas[end_index]}</strong>, el logaritmo mostró una tendencia <strong>{tendencia_actual_smi}</strong>, lo que se tradujo en un movimiento del precio desde <strong>{precios[start_index]:,.2f}€</strong> a <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                
+                # Chequeo de compra o venta en el cambio de tramo
+                compra_en_giro = next((c for c in compras_simuladas if c['fecha'] == fechas[end_index]), None)
+                if compra_en_giro:
+                    analisis_grafico_html += f"<p>✅ Se detectó una señal de compra y se operó en el giro a <strong>{compra_en_giro['precio']:,.2f}€</strong>.</p>"
+                
+                venta_en_giro = next((v for v in ventas_simuladas if v['fecha'] == fechas[end_index]), None)
+                if venta_en_giro:
+                    analisis_grafico_html += f"<p>❌ Se detectó una señal de venta y se cerró la posición en <strong>{venta_en_giro['precio']:,.2f}€</strong>.</p>"
+        
         chart_html += f"""
-        <h2>Evolución dNuestro logaritmo y Precio</h2>
-        <p> Para entender nuestro gráfico, es importante saber que verás dos líneas principales. La línea que representa el precio de la acción se mide en el eje vertical derecho, mostrándote su valor actual en euros. Por otro lado, Nuestro logaritmo, que es un indicador propio de la fuerza del mercado, se mide en el eje vertical izquierdo. </p>
-        <p>Gracias al logaritmo podemos predecir el precio de los próximos 5 dias directamente en el gráfico. </p>
-        <p>Nuestro logaritmo te ayuda a interpretar los movimientos del precio de la siguiente manera:</p>
-        <ul>
-            <li><b>Subida:</b> Indica que el impulso alcista está creciendo y que el precio de la acción tiende a subir.</li>
-            <li><b>Bajada:</b> Señala que el impulso bajista está ganando fuerza y que el precio de la acción tiende a caer.</li>
-            <li><b>Se Aplana:</b> Muestra que el mercado está en una fase de consolidación, sin una dirección clara.</li>
-            <li><b>Gira:</b> Advierte de un posible cambio de tendencia en el precio.</li>
-        </ul>
+        {analisis_grafico_html}
+        <div style="width: 100%; max-width: 800px; margin: auto;">
+            <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
+        </div>
+        
         <div style="width: 100%; max-width: 800px; margin: auto;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
