@@ -571,6 +571,8 @@ def construir_prompt_formateado(data):
     OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 4)
     PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
 
+
+
     chart_html = ""
     if smi_historico_para_grafico and cierres_para_grafico_total:
         labels_historial = data.get("FECHAS_HISTORIAL", [])
@@ -583,112 +585,117 @@ def construir_prompt_formateado(data):
         smi_desplazados_para_grafico = smi_historico_para_grafico
         if len(smi_desplazados_para_grafico) < len(labels_total):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
-
-
-
-        # NUEVA LÓGICA: generar análisis dinámico del gráfico
-        analisis_grafico = ""
-        compras_simuladas = data.get('COMPRAS_SIMULADAS', [])
-        ventas_simuladas = data.get('VENTAS_SIMULADAS', [])
         
-        # Unir compras y ventas y ordenarlas por fecha
-        eventos = sorted(compras_simuladas + ventas_simuladas, key=lambda x: x['fecha'])
+        # 2. Generación del análisis dinámico del gráfico
+        analisis_grafico_html = "<h2>Análisis Detallado del Gráfico</h2>"
+        precios = data['PRECIOS_PARA_SIMULACION']
+        smis = data['SMI_PARA_SIMULACION']
+        fechas = data['FECHAS_PARA_SIMULACION']
+        
+        if len(smis) < 2:
+            analisis_grafico_html += "<p>No hay suficientes datos históricos para realizar un análisis detallado del gráfico.</p>"
+        else:
+            analisis_grafico_html += "<p>A continuación, analizaremos los movimientos clave del logaritmo y cómo se reflejaron en el precio de la acción:</p>"
 
-        if eventos:
-            analisis_grafico += "<p>A continuación, detallamos la evolución de la cotización y las señales de nuestro logaritmo en el período analizado:</p><ul>"
-            for i, evento in enumerate(eventos):
-                tipo = "Compra" if 'Compra' in str(evento) else "Venta"
-                fecha = evento['fecha'].strftime("%d/%m")
-                precio = evento['precio']
+            def get_trend(smi_val):
+                if smi_val > 40:
+                    return "sobrecompra"
+                elif smi_val < -40:
+                    return "sobreventa"
+                elif smi_val > 0.1:
+                    return "alcista"
+                elif smi_val < -0.1:
+                    return "bajista"
+                else:
+                    return "consolidación"
+
+            pendientes_smi = [0] * len(smis)
+            for i in range(1, len(smis)):
+                pendientes_smi[i] = smis[i] - smis[i-1]
+
+            i = 1
+            while i < len(smis):
+                tendencia_actual_smi = get_trend(pendientes_smi[i])
+                start_index = i - 1
                 
-                # Buscar el SMI correspondiente a esa fecha
-                try:
-                    fecha_str = evento['fecha'].strftime("%d/%m/%Y")
-                    idx = data['FECHAS_PARA_SIMULACION'].index(fecha_str)
-                    smi_valor = data['SMI_PARA_SIMULACION'][idx]
-                except (ValueError, IndexError):
-                    smi_valor = "N/A"
+                while i < len(smis) and get_trend(pendientes_smi[i]) == tendencia_actual_smi:
+                    i += 1
+                
+                end_index = i - 1
+                
+                # Descripción narrativa del tramo
+                if tendencia_actual_smi == "alcista":
+                    analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, el logaritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                elif tendencia_actual_smi == "bajista":
+                    analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, el logaritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                elif tendencia_actual_smi == "consolidación":
+                    analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. El logaritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.2f}€</strong>.</p>"
 
-                if tipo == "Compra":
-                    analisis_grafico += f"<li>El día <strong>{fecha}</strong>, nuestro logaritmo giró al alza desde un nivel de sobreventa ({smi_valor:.2f}), lo que activó una señal de compra. El precio de la acción en ese momento era de <strong>{precio:.2f}€</strong>.</li>"
-                else: # Venta
-                    analisis_grafico += f"<li>El día <strong>{fecha}</strong>, el logaritmo giró a la baja tras un período alcista, lo que indicó el momento de vender. El precio de venta fue de <strong>{precio:.2f}€</strong>.</li>"
-
-            analisis_grafico += "</ul>"
-        else:
-            analisis_grafico = "<p>No se encontraron señales de compra o venta en el período analizado. El logaritmo no generó los giros necesarios para una operación, lo que sugiere un mercado en consolidación o una baja volatilidad.</p>"
-
-        # Análisis de la situación actual
-        smi_actual = data.get('SMI', 0)
-        tendencia = data.get('tendencia_ibexia', 'sin dirección clara')
+                
+                # Chequeo de compra o venta en el cambio de tramo
+                compra_en_giro = next((c for c in compras_simuladas if c['fecha'] == fechas[end_index]), None)
+                if compra_en_giro:
+                    analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! El logaritmo mostró un giro y se compró en <strong>{compra_en_giro['precio']:,.2f}€</strong>.</p>"
+                
+                venta_en_giro = next((v for v in ventas_simuladas if v['fecha'] == fechas[end_index]), None)
+                if venta_en_giro:
+                    analisis_grafico_html += f"<p>❌ ¡Se detectó una señal de venta! Se vendió en el giro a <strong>{venta_en_giro['precio']:,.2f}€</strong>.</p>"
         
-        if 'cambio de tendencia' in tendencia:
-            estado_actual = "Nuestro logaritmo se encuentra en un punto de <strong>cambio de tendencia</strong>, lo que nos pone en alerta máxima para una posible operación."
-        elif 'alcista' in tendencia:
-            if smi_actual > 40:
-                estado_actual = f"El logaritmo se encuentra en la zona de sobrecompra ({smi_actual:.2f}) con una tendencia alcista. Aunque el impulso es fuerte, se aproxima a un nivel donde podría aplanarse o girar."
-            else:
-                estado_actual = f"El logaritmo se encuentra en una fase de <strong>subida constante</strong>, indicando un impulso alcista claro."
-        elif 'bajista' in tendencia:
-            if smi_actual < -40:
-                estado_actual = f"El logaritmo se encuentra en la zona de sobreventa ({smi_actual:.2f}) con una tendencia bajista. Aunque la presión de venta es alta, se acerca a un nivel donde podría aplanarse o girar, ofreciendo una potencial oportunidad de compra."
-            else:
-                estado_actual = f"El logaritmo se encuentra en una fase de <strong>bajada constante</strong>, sugiriendo una presión bajista en el mercado."
-        else:
-            estado_actual = "Actualmente, el logaritmo se ha aplanado y no muestra una dirección clara."
-        
-        analisis_grafico += f"<p><strong>Situación actual:</strong> {estado_actual}</p>"
+            # Conclusión basada en la última tendencia
+            ultima_tendencia = get_trend(pendientes_smi[-1])
+            if ultima_tendencia == "alcista":
+                analisis_grafico_html += f"<p>Actualmente, el logaritmo muestra una tendencia <strong>alcista</strong>. Nos mantendremos en posición y atentos a los próximos movimientos para futuras ventas.</p>"
+            elif ultima_tendencia == "bajista":
+                analisis_grafico_html += f"<p>En estos momentos, el logaritmo tiene una pendiente <strong>bajista</strong>. Esto no es momento de comprar, por lo que esperaremos una señal de giro más adelante.</p>"
+            elif ultima_tendencia == "consolidación":
+                analisis_grafico_html += f"<p>El logaritmo se encuentra en una fase de <strong>consolidación</strong>, moviéndose de forma lateral. Nos mantendremos atentos para entrar o salir del mercado cuando se detecte un giro claro.</p>"
+            elif ultima_tendencia == "sobrecompra":
+                analisis_grafico_html += f"<p>El logaritmo ha entrado en una zona de <strong>sobrecompra</strong>. Esto indica que la tendencia alcista podría estar agotándose y podríamos ver una señal de venta o un giro en cualquier momento.</p>"
+            elif ultima_tendencia == "sobreventa":
+                analisis_grafico_html += f"<p>El logaritmo se encuentra en una zona de <strong>sobreventa</strong>. Esto indica que la tendencia bajista está llegando a su fin y podríamos ver un giro y una señal de compra en breve.</p>"
 
-
-        chart_html += f"""
-        <h2>Evolución de nuestro logaritmo y Precio</h2>
-        {analisis_grafico}
-        <p>Gracias al logaritmo podemos predecir el precio de los próximos 5 dias directamente en el gráfico. </p>
+        chart_html = f"""
+        {analisis_grafico_html}
         <div style="width: 100%; max-width: 800px; margin: auto;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
-
-
-
-        
-
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
         <script>
-        document.addEventListener('DOMContentLoaded', function() {{
-            const ctx = document.getElementById('smiPrecioChart').getContext('2d');
-            const smiPrecioChart = new Chart(ctx, {{
+            // Configuración del gráfico
+            var ctx = document.getElementById('smiPrecioChart').getContext('2d');
+            var smiPrecioChart = new Chart(ctx, {{
                 type: 'line',
                 data: {{
-                    labels: {json.dumps(labels_total)},
+                    labels: {labels_total},
                     datasets: [
                         {{
-                            label: 'logaritmo',
-                            data: {json.dumps(smi_desplazados_para_grafico)},
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                            yAxisID: 'y',
-                            tension: 0.1,
-                            fill: false
+                            label: 'Nuestro Logaritmo',
+                            data: {smi_desplazados_para_grafico},
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                            yAxisID: 'y1',
+                            pointRadius: 0,
+                            borderWidth: 2
                         }},
                         {{
-                            label: 'Precio Actual',
-                            data: {json.dumps(precios_reales_grafico)},
-                            borderColor: 'rgba(153, 102, 255, 1)',
-                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
-                            yAxisID: 'y1',
-                            tension: 0.1,
-                            fill: false
+                            label: 'Precio Real',
+                            data: {precios_reales_grafico},
+                            borderColor: 'rgb(54, 162, 235)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            yAxisID: 'y',
+                            pointRadius: 0,
+                            borderWidth: 2
                         }},
                         {{
                             label: 'Precio Proyectado',
-                            data: {json.dumps(data_proyectada)},
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                            yAxisID: 'y1',
-                            tension: 0.1,
-                            fill: false,
-                            borderDash: [5, 5]
+                            data: {data_proyectada},
+                            borderColor: 'rgb(75, 192, 192)',
+                            borderDash: [5, 5],
+                            backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                            yAxisID: 'y',
+                            pointRadius: 0,
+                            borderWidth: 2
                         }}
                     ]
                 }},
@@ -699,280 +706,92 @@ def construir_prompt_formateado(data):
                         mode: 'index',
                         intersect: false,
                     }},
-                    stacked: false,
-                    plugins: {{
-                        title: {{
-                            display: true,
-                            text: 'Evolución de "logaritmo" y Precio'
-                        }},
-                        annotation: {{
-                            annotations: {{
-                                futureZone: {{
-                                    type: 'box',
-                                    xMin: {30},
-                                    xMax: {30 + PROYECCION_FUTURA_DIAS},
-                                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                                    borderColor: 'rgba(0, 123, 255, 0.3)',
-                                    borderWidth: 1,
-                                    label: {{
-                                        content: 'Zona Futuro',
-                                        enabled: true,
-                                        position: 'start',
-                                        color: 'rgba(0, 123, 255, 0.7)',
-                                        font: {{
-                                            size: 10,
-                                            weight: 'bold'
-                                        }}
-                                    }}
-                                }},
-                                // Zonas de color en el eje Y del SMI (-100 a 100)
-                                zonaSobrecompra: {{
-                                    type: 'box',
-                                    yScaleID: 'y',
-                                    yMin: 40,
-                                    yMax: 100,
-                                    backgroundColor: 'rgba(255, 0, 0, 0.1)', // Rojo claro para sobrecompra
-                                    borderColor: 'rgba(255, 0, 0, 0.2)',
-                                    borderWidth: 1,
-                                    label: {{
-                                        content: 'Zona de Sobrecompra',
-                                        enabled: false,
-                                        position: 'end',
-                                        color: 'rgba(150, 0, 0, 0.7)',
-                                        font: {{ size: 12, weight: 'bold' }}
-                                    }}
-                                }},
-                                zonaNeutralSMI: {{
-                                    type: 'box',
-                                    yScaleID: 'y',
-                                    yMin: -40,
-                                    yMax: 40,
-                                    backgroundColor: 'rgba(255, 255, 0, 0.1)', // Amarillo claro para neutral
-                                    borderColor: 'rgba(255, 255, 0, 0.2)',
-                                    borderWidth: 1,
-                                    label: {{
-                                        content: 'Zona Neutral SMI',
-                                        enabled: false,
-                                        position: 'center',
-                                        color: 'rgba(150, 150, 0, 0.7)',
-                                        font: {{ size: 12, weight: 'bold' }}
-                                    }}
-                                }},
-                                zonaSobreventa: {{
-                                    type: 'box',
-                                    yScaleID: 'y',
-                                    yMin: -100,
-                                    yMax: -40,
-                                    backgroundColor: 'rgba(0, 255, 0, 0.1)', // Verde claro para sobreventa
-                                    borderColor: 'rgba(0, 255, 0, 0.2)',
-                                    borderWidth: 1,
-                                    label: {{
-                                        content: 'Zona de Sobreventa',
-                                        enabled: false,
-                                        position: 'start',
-                                        color: 'rgba(0, 150, 0, 0.7)',
-                                        font: {{ size: 12, weight: 'bold' }}
-                                    }}
-                                }},
-                                // Líneas de soporte
-                                soporte1Line: {{
-                                    type: 'line',
-                                    yScaleID: 'y1',
-                                    yMin: {data['SOPORTE_1']},
-                                    yMax: {data['SOPORTE_1']},
-                                    borderColor: 'rgba(75, 192, 192, 0.8)',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Soporte 1',
-                                        enabled: true,
-                                        position: 'start',
-                                        font: {{ size: 10 }}
-                                    }}
-                                }},
-                                soporte2Line: {{
-                                    type: 'line',
-                                    yScaleID: 'y1',
-                                    yMin: {data['SOPORTE_2']},
-                                    yMax: {data['SOPORTE_2']},
-                                    borderColor: 'rgba(75, 192, 192, 0.8)',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Soporte 2',
-                                        enabled: true,
-                                        position: 'start',
-                                        font: {{ size: 10 }}
-                                    }}
-                                }},
-                                soporte3Line: {{
-                                    type: 'line',
-                                    yScaleID: 'y1',
-                                    yMin: {data['SOPORTE_3']},
-                                    yMax: {data['SOPORTE_3']},
-                                    borderColor: 'rgba(75, 192, 192, 0.8)',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Soporte 3',
-                                        enabled: true,
-                                        position: 'start',
-                                        font: {{ size: 10 }}
-                                    }}
-                                }},
-                                // Líneas de resistencia
-                                resistencia1Line: {{
-                                    type: 'line',
-                                    yScaleID: 'y1',
-                                    yMin: {data['RESISTENCIA_1']},
-                                    yMax: {data['RESISTENCIA_1']},
-                                    borderColor: 'rgba(255, 99, 132, 0.8)',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Resistencia 1',
-                                        enabled: true,
-                                        position: 'end',
-                                        font: {{ size: 10 }}
-                                    }}
-                                }},
-                                resistencia2Line: {{
-                                    type: 'line',
-                                    yScaleID: 'y1',
-                                    yMin: {data['RESISTENCIA_2']},
-                                    yMax: {data['RESISTENCIA_2']},
-                                    borderColor: 'rgba(255, 99, 132, 0.8)',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Resistencia 2',
-                                        enabled: true,
-                                        position: 'end',
-                                        font: {{ size: 10 }}
-                                    }}
-                                }},
-                                resistencia3Line: {{
-                                    type: 'line',
-                                    yScaleID: 'y1',
-                                    yMin: {data['RESISTENCIA_3']},
-                                    yMax: {data['RESISTENCIA_3']},
-                                    borderColor: 'rgba(255, 99, 132, 0.8)',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Resistencia 3',
-                                        enabled: true,
-                                        position: 'end',
-                                        font: {{ size: 10 }}
-                                    }}
-                                }}
-                                // Icono de Entrada/Salida en el último día de historial
-                                // (último día del dataset de precios reales)
-                                signalPoint:{{
-                                    type: 'point',
-                                    xValue: {len(labels_historial) - 1}, // Último día del historial real
-                                    yValue: {precios_reales_grafico[-1] if precios_reales_grafico else 'null'}, // Precio del último día real
-                                    yScaleID: 'y1', // En el eje del precio
-                                    radius: 10,
-                                    pointStyle: {'"triangle"' if 'Compra' in data['RECOMENDACION'] else ('"triangle"' if 'Venta' in data['RECOMENDACION'] else '"circle"')},
-                                    rotation: {{0 if 'Compra' in data['RECOMENDACION'] else (180 if 'Venta' in data['RECOMENDACION'] else 0)}},
-                                    backgroundColor: {'"rgba(0, 200, 0, 0.8)"' if 'Compra' in data['RECOMENDACION'] else ('"rgba(200, 0, 0, 0.8)"' if 'Venta' in data['RECOMENDACION'] else '"rgba(100, 100, 100, 0.8)"')},
-                                    borderColor: 'white',
-                                    borderWidth: 2,
-                                    display: {('true' if 'Compra' in data['RECOMENDACION'] or 'Venta' in data['RECOMENDACION'] else 'false')},
-                                    label: {{
-                                        content: '{data["RECOMENDACION"]}',
-                                        enabled: true,
-                                        position: 'top',
-                                        font: {{ size: 10, weight: 'bold' }},
-                                        color: {'"rgba(0, 200, 0, 0.8)"' if 'Compra' in data['RECOMENDACION'] else ('"rgba(200, 0, 0, 0.8)"' if 'Venta' in data['RECOMENDACION'] else '"rgba(100, 100, 100, 0.8)"')},
-                                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                                        borderRadius: 4,
-                                        padding: 4
-                                    }}
-                                }}
-                                # GENERACIÓN DINÁMICA DE ANOTACIONES DE COMPRA Y VENTA
-                                {",\n".join([f"""
-                                compra_{idx}: {{
-                                    type: 'point',
-                                    xValue: {labels_total.index(compra['fecha'].strftime("%d/%m")) if compra['fecha'].strftime("%d/%m") in labels_total else 'null'},
-                                    yValue: {compra['precio']},
-                                    yScaleID: 'y1',
-                                    radius: 7,
-                                    pointStyle: 'triangle',
-                                    rotation: 0, // Flecha hacia arriba
-                                    backgroundColor: 'rgba(0, 200, 0, 0.8)', // Verde
-                                    borderColor: 'white',
-                                    borderWidth: 2,
-                                    label: {{
-                                        content: 'Compra',
-                                        enabled: true,
-                                        position: 'bottom',
-                                        font: {{ size: 8, weight: 'bold' }},
-                                        color: 'black',
-                                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                                        borderRadius: 4,
-                                        padding: 3
-                                    }}
-                                }}
-                                """ for idx, compra in enumerate(compras_simuladas)])}
-                                {",\n".join([f"""
-                                venta_{idx}: {{
-                                    type: 'point',
-                                    xValue: {labels_total.index(venta['fecha'].strftime("%d/%m")) if venta['fecha'].strftime("%d/%m") in labels_total else 'null'},
-                                    yValue: {venta['precio']},
-                                    yScaleID: 'y1',
-                                    radius: 7,
-                                    pointStyle: 'triangle',
-                                    rotation: 180, // Flecha hacia abajo
-                                    backgroundColor: 'rgba(200, 0, 0, 0.8)', // Rojo
-                                    borderColor: 'white',
-                                    borderWidth: 2,
-                                    label: {{
-                                        content: 'Venta',
-                                        enabled: true,
-                                        position: 'top',
-                                        font: {{ size: 8, weight: 'bold' }},
-                                        color: 'black',
-                                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                                        borderRadius: 4,
-                                        padding: 3
-                                    }}
-                                }}
-                                """ for idx, venta in enumerate(ventas_simuladas)])}
-                            }} // Cierre de annotations
-                        }} // Cierre de plugins
-                    }}, // Cierre de options
                     scales: {{
                         y: {{
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {{
-                                display: true,
-                                text: 'logaritmo'
-                            }},
-                            min: -100,
-                            max: 100
-                        }},
-                        y1: {{
                             type: 'linear',
                             display: true,
                             position: 'right',
                             title: {{
                                 display: true,
-                                text: 'Precio'
+                                text: 'Precio (EUR)'
+                            }}
+                        }},
+                        y1: {{
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {{
+                                display: true,
+                                text: 'Nuestro Logaritmo'
                             }},
                             grid: {{
                                 drawOnChartArea: false,
                             }},
+                            min: -100,
+                            max: 100,
+                            ticks: {{
+                                stepSize: 20
+                            }}
+                        }}
+                    }},
+                    plugins: {{
+                        legend: {{
+                            display: true
+                        }},
+                        tooltip: {{
+                            callbacks: {{
+                                label: function(context) {{
+                                    let label = context.dataset.label || '';
+                                    if (label) {{
+                                        label += ': ';
+                                    }}
+                                    if (context.parsed.y !== null) {{
+                                        label += context.parsed.y.toFixed(2);
+                                    }}
+                                    return label;
+                                }}
+                            }}
+                        }},
+                        annotation: {{
+                            annotations: {{
+                                compra: {{
+                                    type: 'line',
+                                    mode: 'horizontal',
+                                    scaleID: 'y1',
+                                    value: 40,
+                                    borderColor: 'rgba(0, 128, 0, 0.5)',
+                                    borderWidth: 2,
+                                    label: {{
+                                        content: 'Sobrecompra (+40)',
+                                        enabled: true,
+                                        position: 'start',
+                                        backgroundColor: 'rgba(0, 128, 0, 0.5)'
+                                    }}
+                                }},
+                                venta: {{
+                                    type: 'line',
+                                    mode: 'horizontal',
+                                    scaleID: 'y1',
+                                    value: -40,
+                                    borderColor: 'rgba(255, 0, 0, 0.5)',
+                                    borderWidth: 2,
+                                    label: {{
+                                        content: 'Sobreventa (-40)',
+                                        enabled: true,
+                                        position: 'start',
+                                        backgroundColor: 'rgba(255, 0, 0, 0.5)'
+                                    }}
+                                }}
+                            }}
                         }}
                     }}
                 }}
             }});
-        }});
         </script>
         """
+    else:
+        chart_html = "<p>No hay suficientes datos para generar el gráfico.</p>"
+    
     # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
     # Llamamos a la nueva función para obtener el HTML y las listas de compras/ventas
     ganancias_html, compras_simuladas, ventas_simuladas = calcular_ganancias_simuladas(
@@ -1201,10 +1020,9 @@ def generar_contenido_con_gemini(tickers):
 
 
 
-
 def main():
     # Define el ticker que quieres analizar
-    ticker_deseado = "FCC.MC"
+    ticker_deseado = "SLR.MC"
 
     tickers_for_today = [ticker_deseado]
 
