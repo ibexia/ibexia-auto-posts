@@ -359,6 +359,9 @@ def obtener_datos_yfinance(ticker):
                 recomendacion = "Atención máxima"
                 motivo_recomendacion = "El precio podría girar a a corto plazo."
 
+        # Definir la variable precio_objetivo aquí
+        precio_objetivo = precio_proyectado_dia_5 if recomendacion.startswith("Comprar") else current_price
+
         datos = {
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
