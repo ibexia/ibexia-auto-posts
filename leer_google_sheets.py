@@ -549,7 +549,7 @@ def construir_prompt_formateado(data):
                 if volumen_promedio_30d > 0:
                     cambio_porcentual_volumen = ((volumen_actual - volumen_promedio_30d) / volumen_promedio_30d) * 100
                     if cambio_porcentual_volumen > 50:
-                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia de  Nuestro logaritmo ({data['tendencia_ibexia']})."
+                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia de Nuestro logaritmo ({data['tendencia_ibexia']})."
                     elif cambio_porcentual_volumen < -30:
                         volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es inferior a lo habitual, lo que podría sugerir cautela en la actual tendencia. Una confirmación de la señal de Nuestro logaritmo ({data['tendencia_ibexia']}) requeriría un aumento en la participación del mercado."
                     else:
@@ -572,7 +572,77 @@ def construir_prompt_formateado(data):
     PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
 
 
+    # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
+    # Llamamos a la nueva función para obtener el HTML y las listas de compras/ventas
+    ganancias_html, compras_simuladas, ventas_simuladas = calcular_ganancias_simuladas(
+        precios=data['PRECIOS_PARA_SIMULACION'],
+        smis=data['SMI_PARA_SIMULACION'],
+        fechas=data['FECHAS_PARA_SIMULACION']
+    )
 
+    # Añadimos las listas de compras y ventas al diccionario de datos
+    data['COMPRAS_SIMULADAS'] = compras_simuladas
+    data['VENTAS_SIMULADAS'] = ventas_simuladas
+    
+    soportes_unicos = []
+    temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
+    
+    if len(temp_soportes) > 0:
+        soportes_unicos.append(temp_soportes[0])
+        for i in range(1, len(temp_soportes)):
+            if abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
+                soportes_unicos.append(temp_soportes[i])
+    
+    if not soportes_unicos:
+        soportes_unicos.append(0.0)
+
+    soportes_texto = ""
+    if len(soportes_unicos) == 1:
+        soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,.2f}€</strong>."
+    elif len(soportes_unicos) == 2:
+        soportes_texto = f"dos soportes importantes en <strong>{soportes_unicos[0]:,.2f}€</strong> y <strong>{soportes_unicos[1]:,.2f}€</strong>."
+    elif len(soportes_unicos) >= 3:
+        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{soportes_unicos[0]:,.2f}€</strong>, "
+                          f"el segundo en <strong>{soportes_unicos[1]:,.2f}€</strong>, y el tercero en <strong>{soportes_unicos[2]:,.2f}€</strong>.")
+    else:
+        soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
+
+    tabla_resumen = f"""
+<h2>Resumen de Puntos Clave</h2>
+<table border="1" style="width:100%; border-collapse: collapse;">
+    <tr>
+        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Métrica</th>
+        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Valor</th>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Precio Actual</td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}€</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Volumen</td>
+        <td style="padding: 8px;"><strong>{data['VOLUMEN']:,} acciones</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Soporte Clave</td>
+        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.2f}€</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Resistencia Clave</td>
+        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Recomendación</td>
+        <td style="padding: 8px;"><strong>{data['RECOMENDACION']}</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Precio Objetivo de Compra</td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
+    </tr>
+</table>
+<br/>
+"""
+    
+    # Nuevo HTML del gráfico (incluyendo el análisis detallado)
     chart_html = ""
     if smi_historico_para_grafico and cierres_para_grafico_total:
         labels_historial = data.get("FECHAS_HISTORIAL", [])
@@ -592,67 +662,63 @@ def construir_prompt_formateado(data):
         smis = data['SMI_PARA_SIMULACION']
         fechas = data['FECHAS_PARA_SIMULACION']
         
-        if len(smis) < 2:
-            analisis_grafico_html += "<p>No hay suficientes datos históricos para realizar un análisis detallado del gráfico.</p>"
-        else:
-            analisis_grafico_html += "<p>A continuación, analizaremos los movimientos clave del logaritmo y cómo se reflejaron en el precio de la acción:</p>"
+        analisis_grafico_html += f"<p>A continuación, analizaremos los movimientos clave de nuestro logaritmo y cómo se reflejaron en el precio de la acción:</p>"
 
-            def get_trend(smi_val):
-                if smi_val > 40:
-                    return "sobrecompra"
-                elif smi_val < -40:
-                    return "sobreventa"
-                elif smi_val > 0.1:
-                    return "alcista"
-                elif smi_val < -0.1:
-                    return "bajista"
-                else:
-                    return "consolidación"
+        def get_trend(smi_val):
+            if smi_val > 40:
+                return "sobrecompra"
+            elif smi_val < -40:
+                return "sobreventa"
+            elif smi_val > 0.1:
+                return "alcista"
+            elif smi_val < -0.1:
+                return "bajista"
+            else:
+                return "consolidación"
 
-            pendientes_smi = [0] * len(smis)
-            for i in range(1, len(smis)):
-                pendientes_smi[i] = smis[i] - smis[i-1]
+        pendientes_smi = [0] * len(smis)
+        for i in range(1, len(smis)):
+            pendientes_smi[i] = smis[i] - smis[i-1]
 
-            i = 1
-            while i < len(smis):
-                tendencia_actual_smi = get_trend(pendientes_smi[i])
-                start_index = i - 1
-                
-                while i < len(smis) and get_trend(pendientes_smi[i]) == tendencia_actual_smi:
-                    i += 1
-                
-                end_index = i - 1
-                
-                # Descripción narrativa del tramo
-                if tendencia_actual_smi == "alcista":
-                    analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, el logaritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
-                elif tendencia_actual_smi == "bajista":
-                    analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, el logaritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
-                elif tendencia_actual_smi == "consolidación":
-                    analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. El logaritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.2f}€</strong>.</p>"
-
-                
-                # Chequeo de compra o venta en el cambio de tramo
-                compra_en_giro = next((c for c in compras_simuladas if c['fecha'] == fechas[end_index]), None)
-                if compra_en_giro:
-                    analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! El logaritmo mostró un giro y se compró en <strong>{compra_en_giro['precio']:,.2f}€</strong>.</p>"
-                
-                venta_en_giro = next((v for v in ventas_simuladas if v['fecha'] == fechas[end_index]), None)
-                if venta_en_giro:
-                    analisis_grafico_html += f"<p>❌ ¡Se detectó una señal de venta! Se vendió en el giro a <strong>{venta_en_giro['precio']:,.2f}€</strong>.</p>"
-        
-            # Conclusión basada en la última tendencia
-            ultima_tendencia = get_trend(pendientes_smi[-1])
-            if ultima_tendencia == "alcista":
-                analisis_grafico_html += f"<p>Actualmente, el logaritmo muestra una tendencia <strong>alcista</strong>. Nos mantendremos en posición y atentos a los próximos movimientos para futuras ventas.</p>"
-            elif ultima_tendencia == "bajista":
-                analisis_grafico_html += f"<p>En estos momentos, el logaritmo tiene una pendiente <strong>bajista</strong>. Esto no es momento de comprar, por lo que esperaremos una señal de giro más adelante.</p>"
-            elif ultima_tendencia == "consolidación":
-                analisis_grafico_html += f"<p>El logaritmo se encuentra en una fase de <strong>consolidación</strong>, moviéndose de forma lateral. Nos mantendremos atentos para entrar o salir del mercado cuando se detecte un giro claro.</p>"
-            elif ultima_tendencia == "sobrecompra":
-                analisis_grafico_html += f"<p>El logaritmo ha entrado en una zona de <strong>sobrecompra</strong>. Esto indica que la tendencia alcista podría estar agotándose y podríamos ver una señal de venta o un giro en cualquier momento.</p>"
-            elif ultima_tendencia == "sobreventa":
-                analisis_grafico_html += f"<p>El logaritmo se encuentra en una zona de <strong>sobreventa</strong>. Esto indica que la tendencia bajista está llegando a su fin y podríamos ver un giro y una señal de compra en breve.</p>"
+        i = 1
+        while i < len(smis):
+            tendencia_actual_smi = get_trend(pendientes_smi[i])
+            start_index = i - 1
+            
+            while i < len(smis) and get_trend(pendientes_smi[i]) == tendencia_actual_smi:
+                i += 1
+            
+            end_index = i - 1
+            
+            # Descripción narrativa del tramo
+            if tendencia_actual_smi == "alcista":
+                analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, nuestro logaritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+            elif tendencia_actual_smi == "bajista":
+                analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, nuestro logaritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+            elif tendencia_actual_smi == "consolidación":
+                analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. Nuestro logaritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+            
+            # Chequeo de compra o venta en el cambio de tramo
+            compra_en_giro = next((c for c in compras_simuladas if c['fecha'] == fechas[end_index]), None)
+            if compra_en_giro:
+                analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! Nuestro logaritmo mostró un giro y se compró en <strong>{compra_en_giro['precio']:,.2f}€</strong>.</p>"
+            
+            venta_en_giro = next((v for v in ventas_simuladas if v['fecha'] == fechas[end_index]), None)
+            if venta_en_giro:
+                analisis_grafico_html += f"<p>❌ ¡Se detectó una señal de venta! Se vendió en el giro a <strong>{venta_en_giro['precio']:,.2f}€</strong>.</p>"
+    
+        # Conclusión basada en la última tendencia
+        ultima_tendencia = get_trend(pendientes_smi[-1])
+        if ultima_tendencia == "alcista":
+            analisis_grafico_html += f"<p>Actualmente, nuestro logaritmo muestra una tendencia <strong>alcista</strong>. Nos mantendremos en posición y atentos a los próximos movimientos para futuras ventas.</p>"
+        elif ultima_tendencia == "bajista":
+            analisis_grafico_html += f"<p>En estos momentos, nuestro logaritmo tiene una pendiente <strong>bajista</strong>. Esto no es momento de comprar, por lo que esperaremos una señal de giro más adelante.</p>"
+        elif ultima_tendencia == "consolidación":
+            analisis_grafico_html += f"<p>Nuestro logaritmo se encuentra en una fase de <strong>consolidación</strong>, moviéndose de forma lateral. Nos mantendremos atentos para entrar o salir del mercado cuando se detecte un giro claro.</p>"
+        elif ultima_tendencia == "sobrecompra":
+            analisis_grafico_html += f"<p>Nuestro logaritmo ha entrado en una zona de <strong>sobrecompra</strong>. Esto indica que la tendencia alcista podría estar agotándose y podríamos ver una señal de venta o un giro en cualquier momento.</p>"
+        elif ultima_tendencia == "sobreventa":
+            analisis_grafico_html += f"<p>Nuestro logaritmo se encuentra en una zona de <strong>sobreventa</strong>. Esto indica que la tendencia bajista está llegando a su fin y podríamos ver un giro y una señal de compra en breve.</p>"
 
         chart_html = f"""
         {analisis_grafico_html}
@@ -792,76 +858,7 @@ def construir_prompt_formateado(data):
     else:
         chart_html = "<p>No hay suficientes datos para generar el gráfico.</p>"
     
-    # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
-    # Llamamos a la nueva función para obtener el HTML y las listas de compras/ventas
-    ganancias_html, compras_simuladas, ventas_simuladas = calcular_ganancias_simuladas(
-        precios=data['PRECIOS_PARA_SIMULACION'],
-        smis=data['SMI_PARA_SIMULACION'],
-        fechas=data['FECHAS_PARA_SIMULACION']
-    )
-
-    # Añadimos las listas de compras y ventas al diccionario de datos
-    data['COMPRAS_SIMULADAS'] = compras_simuladas
-    data['VENTAS_SIMULADAS'] = ventas_simuladas
     
-    soportes_unicos = []
-    temp_soportes = sorted([data['SOPORTE_1'], data['SOPORTE_2'], data['SOPORTE_3']], reverse=True)
-    
-    if len(temp_soportes) > 0:
-        soportes_unicos.append(temp_soportes[0])
-        for i in range(1, len(temp_soportes)):
-            if abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
-                soportes_unicos.append(temp_soportes[i])
-    
-    if not soportes_unicos:
-        soportes_unicos.append(0.0)
-
-    soportes_texto = ""
-    if len(soportes_unicos) == 1:
-        soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,.2f}€</strong>."
-    elif len(soportes_unicos) == 2:
-        soportes_texto = f"dos soportes importantes en <strong>{soportes_unicos[0]:,.2f}€</strong> y <strong>{soportes_unicos[1]:,.2f}€</strong>."
-    elif len(soportes_unicos) >= 3:
-        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{soportes_unicos[0]:,.2f}€</strong>, "
-                          f"el segundo en <strong>{soportes_unicos[1]:,.2f}€</strong>, y el tercero en <strong>{soportes_unicos[2]:,.2f}€</strong>.")
-    else:
-        soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
-
-    tabla_resumen = f"""
-<h2>Resumen de Puntos Clave</h2>
-<table border="1" style="width:100%; border-collapse: collapse;">
-    <tr>
-        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Métrica</th>
-        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Valor</th>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Precio Actual</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Volumen</td>
-        <td style="padding: 8px;"><strong>{data['VOLUMEN']:,} acciones</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Soporte Clave</td>
-        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.2f}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Resistencia Clave</td>
-        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Recomendación</td>
-        <td style="padding: 8px;"><strong>{data['RECOMENDACION']}</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Precio Objetivo de Compra</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
-    </tr>
-</table>
-<br/>
-"""
-
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio.
 
@@ -889,22 +886,28 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 ---
 <h1>{titulo_post}</h1>
 
-
 <h2>Análisis Inicial y Recomendación</h2>
 <p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Nuestra recomendación es <strong>{data['RECOMENDACION']}</strong>. Según nuestras proyecciones, el precio podría situarse en <strong>{data['PRECIO_PROYECTADO_5DIAS']:,}€</strong> en los próximos 5 días. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']}.</p>
 
+<h2>La Clave: El Logaritmo como tu "Guía de Compra"</h2>
+<p>Nuestro sistema se basa en un <strong>logaritmo</strong> que funciona como una brújula que te dice si es un buen momento para comprar o no. La clave está en cómo se mueve:</p>
+<ul>
+    <li>
+        <strong>Si el logaritmo está en sobreventa (muy abajo):</strong> La acción podría estar "demasiado barata". Es probable que el logaritmo gire hacia arriba, lo que sería una <strong>señal de compra</strong>.
+    </li>
+    <li>
+        <strong>Si el logaritmo está en sobrecompra (muy arriba):</strong> La acción podría estar "demasiado cara". El logaritmo podría girar a la baja, lo que sería una <strong>señal para no comprar</strong>.
+    </li>
+</ul>
+<p>Más allá de la sobrecompra o sobreventa, la señal de compra más clara es cuando el logaritmo <strong>gira hacia arriba</strong>. Si ves que sube, es un buen momento para comprar (siempre y cuando no esté en una zona extrema de sobrecompra). Si gira a la baja, es mejor esperar.</p>
 
 {chart_html}
 
-<h2>Simulación de Ganancias</h2>
+<h2>Historial de Operaciones</h2>
 {ganancias_html}
 
 {tabla_resumen}
-
-
-
 """
-
     return prompt, titulo_post
 
 
@@ -1015,6 +1018,11 @@ def generar_contenido_con_gemini(tickers):
             
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180)
+
+
+
+
+
 
 
 
