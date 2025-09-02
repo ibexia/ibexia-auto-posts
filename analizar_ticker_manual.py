@@ -166,7 +166,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
             html_resultados = f"""
             <p>Se encontraron señales de compra en el período. La última posición abierta no se ha cerrado todavía.</p>
-            <p>Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{ganancia_simulada_total_incl_abierta:,.2f}€</strong>.</p>
+            <p>Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{ganancia_simulada_total_incl_abierta:,.2f}€</strong>.</p>
             """
             # Si hay operaciones completadas (ventas realizadas), las mostramos
             if compras and posicion_abierta: # NUEVA LÍNEA AÑADIDA
@@ -180,7 +180,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 """
         else:  # Todas las posiciones se cerraron
             html_resultados = f"""
-            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro logaritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
+            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro logaritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
             """
             # Siempre mostramos las operaciones detalladas si hay alguna
             if operaciones_html:
@@ -889,14 +889,24 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 ---
 <h1>{titulo_post}</h1>
 
-
 <h2>Análisis Inicial y Recomendación</h2>
 <p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Nuestra recomendación es <strong>{data['RECOMENDACION']}</strong>. Según nuestras proyecciones, el precio podría situarse en <strong>{data['PRECIO_PROYECTADO_5DIAS']:,}€</strong> en los próximos 5 días. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']}.</p>
 
+<h2>La Clave: El Logaritmo como tu "Guía de Compra"</h2>
+<p>Nuestro sistema se basa en un <strong>logaritmo</strong> que funciona como una brújula que te dice si es un buen momento para comprar o no. La clave está en cómo se mueve:</p>
+<ul>
+    <li>
+        <strong>Si el logaritmo está en sobreventa (muy abajo):</strong> La acción podría estar "demasiado barata". Es probable que el logaritmo gire hacia arriba, lo que sería una <strong>señal de compra</strong>.
+    </li>
+    <li>
+        <strong>Si el logaritmo está en sobrecompra (muy arriba):</strong> La acción podría estar "demasiado cara". El logaritmo podría girar a la baja, lo que sería una <strong>señal para no comprar</strong>.
+    </li>
+</ul>
+<p>Más allá de la sobrecompra o sobreventa, la señal de compra más clara es cuando el logaritmo <strong>gira hacia arriba</strong>. Si ves que sube, es un buen momento para comprar (siempre y cuando no esté en una zona extrema de sobrecompra). Si gira a la baja, es mejor esperar.</p>
 
 {chart_html}
 
-<h2>Simulación de Ganancias</h2>
+<h2>Historial de Operaciones</h2>
 {ganancias_html}
 
 {tabla_resumen}
@@ -1022,7 +1032,7 @@ def generar_contenido_con_gemini(tickers):
 
 def main():
     # Define el ticker que quieres analizar
-    ticker_deseado = "GAM.MC"
+    ticker_deseado = "SLR.MC"
 
     tickers_for_today = [ticker_deseado]
 
