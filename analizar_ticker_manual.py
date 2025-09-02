@@ -668,7 +668,7 @@ def generar_contenido_con_gemini(tickers):
 
 
 def main():
-    ticker_deseado = "GAM.MC"
+    ticker_deseado = "GRF.MC"
 
     tickers_for_today = [ticker_deseado]
 
