@@ -75,6 +75,9 @@ def calculate_smi_tv(df):
     diff = hh - ll
     rdiff = close - (hh + ll) / 2
 
+    avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
+    avgdiff = diff.ewm(span=length_d, adjust=False).mean()
+
     # Handling of division by zero and clipping for SMI
     epsilon = 1e-9
     smi_raw = np.where(
@@ -172,15 +175,6 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
 def obtener_datos_yfinance(ticker):
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        hist_extended = stock.history(period="90d", interval="1d")
-        hist_extended = calculate_smi_tv(hist_extended)
-
-        hist = stock.history(period="30d", interval="1d")
-        hist = calculate_smi_tv(hist)
-
         stock = yf.Ticker(ticker)
         info = stock.info
         
@@ -674,7 +668,7 @@ def generar_contenido_con_gemini(tickers):
 
 
 def main():
-    ticker_deseado = "GRF.MC"
+    ticker_deseado = "GAM.MC"
 
     tickers_for_today = [ticker_deseado]
 
