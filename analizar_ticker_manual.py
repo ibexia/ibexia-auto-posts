@@ -162,11 +162,11 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
             # Calcular la ganancia/pérdida actual de la posición abierta
             ganancia_actual_posicion_abierta = (precios[-1] - precio_compra_actual) * (capital_inicial / precio_compra_actual)
             # La ganancia total incluye las operaciones cerradas y la ganancia (o pérdida) actual de la posición abierta
-            ganancia_simulada_total_incl_abierta = ganancia_total + ganancia_actual_posicion_abierta
+            ganancia_total_incl_abierta = ganancia_total + ganancia_actual_posicion_abierta
 
             html_resultados = f"""
             <p>Se encontraron señales de compra en el período. La última posición abierta no se ha cerrado todavía.</p>
-            <p>Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{ganancia_simulada_total_incl_abierta:,.2f}€</strong>.</p>
+            <p>Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{ganancia_total_incl_abierta:,.2f}€</strong>.</p>
             """
             # Si hay operaciones completadas (ventas realizadas), las mostramos
             if compras and posicion_abierta: # NUEVA LÍNEA AÑADIDA
@@ -572,227 +572,7 @@ def construir_prompt_formateado(data):
     PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
 
 
-
-    chart_html = ""
-    if smi_historico_para_grafico and cierres_para_grafico_total:
-        labels_historial = data.get("FECHAS_HISTORIAL", [])
-        labels_proyeccion = data.get("FECHAS_PROYECCION", [])
-        labels_total = labels_historial + labels_proyeccion
-
-        precios_reales_grafico = cierres_para_grafico_total[:30]
-        data_proyectada = [None] * (len(labels_historial) - 1) + [precios_reales_grafico[-1]] + cierres_para_grafico_total[len(labels_historial):]
-
-        smi_desplazados_para_grafico = smi_historico_para_grafico
-        if len(smi_desplazados_para_grafico) < len(labels_total):
-            smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
-        
-        # 2. Generación del análisis dinámico del gráfico
-        analisis_grafico_html = "<h2>Análisis Detallado del Gráfico</h2>"
-        precios = data['PRECIOS_PARA_SIMULACION']
-        smis = data['SMI_PARA_SIMULACION']
-        fechas = data['FECHAS_PARA_SIMULACION']
-        
-        if len(smis) < 2:
-            analisis_grafico_html += "<p>No hay suficientes datos históricos para realizar un análisis detallado del gráfico.</p>"
-        else:
-            analisis_grafico_html += "<p>A continuación, analizaremos los movimientos clave del logaritmo y cómo se reflejaron en el precio de la acción:</p>"
-
-            def get_trend(smi_val):
-                if smi_val > 40:
-                    return "sobrecompra"
-                elif smi_val < -40:
-                    return "sobreventa"
-                elif smi_val > 0.1:
-                    return "alcista"
-                elif smi_val < -0.1:
-                    return "bajista"
-                else:
-                    return "consolidación"
-
-            pendientes_smi = [0] * len(smis)
-            for i in range(1, len(smis)):
-                pendientes_smi[i] = smis[i] - smis[i-1]
-
-            i = 1
-            while i < len(smis):
-                tendencia_actual_smi = get_trend(pendientes_smi[i])
-                start_index = i - 1
-                
-                while i < len(smis) and get_trend(pendientes_smi[i]) == tendencia_actual_smi:
-                    i += 1
-                
-                end_index = i - 1
-                
-                # Descripción narrativa del tramo
-                if tendencia_actual_smi == "alcista":
-                    analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, el logaritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
-                elif tendencia_actual_smi == "bajista":
-                    analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, el logaritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
-                elif tendencia_actual_smi == "consolidación":
-                    analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. El logaritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.2f}€</strong>.</p>"
-
-                
-                # Chequeo de compra o venta en el cambio de tramo
-                compra_en_giro = next((c for c in compras_simuladas if c['fecha'] == fechas[end_index]), None)
-                if compra_en_giro:
-                    analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! El logaritmo mostró un giro y se compró en <strong>{compra_en_giro['precio']:,.2f}€</strong>.</p>"
-                
-                venta_en_giro = next((v for v in ventas_simuladas if v['fecha'] == fechas[end_index]), None)
-                if venta_en_giro:
-                    analisis_grafico_html += f"<p>❌ ¡Se detectó una señal de venta! Se vendió en el giro a <strong>{venta_en_giro['precio']:,.2f}€</strong>.</p>"
-        
-            # Conclusión basada en la última tendencia
-            ultima_tendencia = get_trend(pendientes_smi[-1])
-            if ultima_tendencia == "alcista":
-                analisis_grafico_html += f"<p>Actualmente, el logaritmo muestra una tendencia <strong>alcista</strong>. Nos mantendremos en posición y atentos a los próximos movimientos para futuras ventas.</p>"
-            elif ultima_tendencia == "bajista":
-                analisis_grafico_html += f"<p>En estos momentos, el logaritmo tiene una pendiente <strong>bajista</strong>. Esto no es momento de comprar, por lo que esperaremos una señal de giro más adelante.</p>"
-            elif ultima_tendencia == "consolidación":
-                analisis_grafico_html += f"<p>El logaritmo se encuentra en una fase de <strong>consolidación</strong>, moviéndose de forma lateral. Nos mantendremos atentos para entrar o salir del mercado cuando se detecte un giro claro.</p>"
-            elif ultima_tendencia == "sobrecompra":
-                analisis_grafico_html += f"<p>El logaritmo ha entrado en una zona de <strong>sobrecompra</strong>. Esto indica que la tendencia alcista podría estar agotándose y podríamos ver una señal de venta o un giro en cualquier momento.</p>"
-            elif ultima_tendencia == "sobreventa":
-                analisis_grafico_html += f"<p>El logaritmo se encuentra en una zona de <strong>sobreventa</strong>. Esto indica que la tendencia bajista está llegando a su fin y podríamos ver un giro y una señal de compra en breve.</p>"
-
-        chart_html = f"""
-        {analisis_grafico_html}
-        <div style="width: 100%; max-width: 800px; margin: auto;">
-            <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
-        </div>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
-        <script>
-            // Configuración del gráfico
-            var ctx = document.getElementById('smiPrecioChart').getContext('2d');
-            var smiPrecioChart = new Chart(ctx, {{
-                type: 'line',
-                data: {{
-                    labels: {labels_total},
-                    datasets: [
-                        {{
-                            label: 'Nuestro Logaritmo',
-                            data: {smi_desplazados_para_grafico},
-                            borderColor: 'rgb(255, 99, 132)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
-                            yAxisID: 'y1',
-                            pointRadius: 0,
-                            borderWidth: 2
-                        }},
-                        {{
-                            label: 'Precio Real',
-                            data: {precios_reales_grafico},
-                            borderColor: 'rgb(54, 162, 235)',
-                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                            yAxisID: 'y',
-                            pointRadius: 0,
-                            borderWidth: 2
-                        }},
-                        {{
-                            label: 'Precio Proyectado',
-                            data: {data_proyectada},
-                            borderColor: 'rgb(75, 192, 192)',
-                            borderDash: [5, 5],
-                            backgroundColor: 'rgba(75, 192, 192, 0.5)',
-                            yAxisID: 'y',
-                            pointRadius: 0,
-                            borderWidth: 2
-                        }}
-                    ]
-                }},
-                options: {{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {{
-                        mode: 'index',
-                        intersect: false,
-                    }},
-                    scales: {{
-                        y: {{
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {{
-                                display: true,
-                                text: 'Precio (EUR)'
-                            }}
-                        }},
-                        y1: {{
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {{
-                                display: true,
-                                text: 'Nuestro Logaritmo'
-                            }},
-                            grid: {{
-                                drawOnChartArea: false,
-                            }},
-                            min: -100,
-                            max: 100,
-                            ticks: {{
-                                stepSize: 20
-                            }}
-                        }}
-                    }},
-                    plugins: {{
-                        legend: {{
-                            display: true
-                        }},
-                        tooltip: {{
-                            callbacks: {{
-                                label: function(context) {{
-                                    let label = context.dataset.label || '';
-                                    if (label) {{
-                                        label += ': ';
-                                    }}
-                                    if (context.parsed.y !== null) {{
-                                        label += context.parsed.y.toFixed(2);
-                                    }}
-                                    return label;
-                                }}
-                            }}
-                        }},
-                        annotation: {{
-                            annotations: {{
-                                compra: {{
-                                    type: 'line',
-                                    mode: 'horizontal',
-                                    scaleID: 'y1',
-                                    value: 40,
-                                    borderColor: 'rgba(0, 128, 0, 0.5)',
-                                    borderWidth: 2,
-                                    label: {{
-                                        content: 'Sobrecompra (+40)',
-                                        enabled: true,
-                                        position: 'start',
-                                        backgroundColor: 'rgba(0, 128, 0, 0.5)'
-                                    }}
-                                }},
-                                venta: {{
-                                    type: 'line',
-                                    mode: 'horizontal',
-                                    scaleID: 'y1',
-                                    value: -40,
-                                    borderColor: 'rgba(255, 0, 0, 0.5)',
-                                    borderWidth: 2,
-                                    label: {{
-                                        content: 'Sobreventa (-40)',
-                                        enabled: true,
-                                        position: 'start',
-                                        backgroundColor: 'rgba(255, 0, 0, 0.5)'
-                                    }}
-                                }}
-                            }}
-                        }}
-                    }}
-                }}
-            }});
-        </script>
-        """
-    else:
-        chart_html = "<p>No hay suficientes datos para generar el gráfico.</p>"
-    
-    # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
+    # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS
     # Llamamos a la nueva función para obtener el HTML y las listas de compras/ventas
     ganancias_html, compras_simuladas, ventas_simuladas = calcular_ganancias_simuladas(
         precios=data['PRECIOS_PARA_SIMULACION'],
@@ -862,6 +642,59 @@ def construir_prompt_formateado(data):
 <br/>
 """
 
+    analisis_detallado_logaritmo_html = f"""
+<h2>Análisis Detallado del Logaritmo</h2>
+<p>A continuación, analizaremos los movimientos clave del logaritmo y cómo se reflejaron en el precio de la acción:</p>
+"""
+    precios = data['PRECIOS_PARA_SIMULACION']
+    smis = data['SMI_PARA_SIMULACION']
+    fechas = data['FECHAS_PARA_SIMULACION']
+    
+    def get_trend_str(smi_val):
+        if smi_val > 40:
+            return "sobrecompra"
+        elif smi_val < -40:
+            return "sobreventa"
+        elif smi_val > 0.1:
+            return "alcista"
+        elif smi_val < -0.1:
+            return "bajista"
+        else:
+            return "consolidación"
+
+    pendientes_smi = [0] * len(smis)
+    for i in range(1, len(smis)):
+        pendientes_smi[i] = smis[i] - smis[i-1]
+
+    i = 1
+    while i < len(smis):
+        tendencia_actual_smi = get_trend_str(pendientes_smi[i])
+        start_index = i - 1
+        
+        while i < len(smis) and get_trend_str(pendientes_smi[i]) == tendencia_actual_smi:
+            i += 1
+        
+        end_index = i - 1
+        
+        if tendencia_actual_smi == "alcista":
+            analisis_detallado_logaritmo_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, el logaritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+        elif tendencia_actual_smi == "bajista":
+            analisis_detallado_logaritmo_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, el logaritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+        elif tendencia_actual_smi == "consolidación":
+            analisis_detallado_logaritmo_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. El logaritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+
+    ultima_tendencia = get_trend_str(pendientes_smi[-1])
+    if ultima_tendencia == "alcista":
+        analisis_detallado_logaritmo_html += f"<p>Actualmente, el logaritmo muestra una tendencia <strong>alcista</strong>. Nos mantendremos en posición y atentos a los próximos movimientos para futuras ventas.</p>"
+    elif ultima_tendencia == "bajista":
+        analisis_detallado_logaritmo_html += f"<p>En estos momentos, el logaritmo tiene una pendiente <strong>bajista</strong>. Esto no es momento de comprar, por lo que esperaremos una señal de giro más adelante.</p>"
+    elif ultima_tendencia == "consolidación":
+        analisis_detallado_logaritmo_html += f"<p>El logaritmo se encuentra en una fase de <strong>consolidación</strong>, moviéndose de forma lateral. Nos mantendremos atentos para entrar o salir del mercado cuando se detecte un giro claro.</p>"
+    elif ultima_tendencia == "sobrecompra":
+        analisis_detallado_logaritmo_html += f"<p>El logaritmo ha entrado en una zona de <strong>sobrecompra</strong>. Esto indica que la tendencia alcista podría estar agotándose y podríamos ver una señal de venta o un giro en cualquier momento.</p>"
+    elif ultima_tendencia == "sobreventa":
+        analisis_detallado_logaritmo_html += f"<p>El logaritmo se encuentra en una zona de <strong>sobreventa</strong>. Esto indica que la tendencia bajista está llegando a su fin y podríamos ver un giro y una señal de compra en breve.</p>"
+
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio.
 
@@ -904,17 +737,13 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 </ul>
 <p>Más allá de la sobrecompra o sobreventa, la señal de compra más clara es cuando el logaritmo <strong>gira hacia arriba</strong>. Si ves que sube, es un buen momento para comprar (siempre y cuando no esté en una zona extrema de sobrecompra). Si gira a la baja, es mejor esperar.</p>
 
-{chart_html}
+{analisis_detallado_logaritmo_html}
 
 <h2>Historial de Operaciones</h2>
 {ganancias_html}
 
 {tabla_resumen}
-
-
-
 """
-
     return prompt, titulo_post
 
 
