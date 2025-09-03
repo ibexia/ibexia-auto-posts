@@ -379,7 +379,8 @@ def obtener_datos_yfinance(ticker):
             
         smi_history_last_30 = hist['SMI'].dropna().tail(30).tolist()
         
-        # --- Lógica FINAL sin Precio Objetivo: Movimiento lineal constante ---
+
+        # --- NUEVA Lógica: Proyección lineal sin soportes/resistencias ---
         precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
@@ -387,7 +388,7 @@ def obtener_datos_yfinance(ticker):
         # Usamos la pendiente del SMI para determinar si la tendencia es alcista o bajista
         smi_history_full = hist_extended['SMI'].dropna()
         smi_ultimos_5 = smi_history_full.tail(5).dropna()
-        
+
         pendiente_smi = 0
         if len(smi_ultimos_5) >= 2:
             x = np.arange(len(smi_ultimos_5))
@@ -401,39 +402,14 @@ def obtener_datos_yfinance(ticker):
             movimiento_diario = 0.01  # +1% de subida diaria
         elif pendiente_smi < -0.1 or smi_actual > 40: # Si SMI baja o está en sobrecompra
             movimiento_diario = -0.01 # -1% de bajada diaria
-        
-        # Ordenar soportes y resistencias para la comprobación
-        soportes_ordenados_desc = sorted([soporte_1, soporte_2, soporte_3], reverse=True)
-        resistencias_ordenadas_asc = sorted([resistencia_1, resistencia_2, resistencia_3])
 
-        proyeccion_detenida = False
-        
         for _ in range(PROYECCION_FUTURA_DIAS):
-            if proyeccion_detenida:
-                siguiente_precio = ultimo_precio_conocido
-            else:
-                siguiente_precio_tentativo = ultimo_precio_conocido * (1 + movimiento_diario)
-                siguiente_precio = siguiente_precio_tentativo
-
-                # Comprobar si ha cruzado algún nivel y detener la proyección
-                if movimiento_diario > 0:  # Tendencia alcista
-                    for r in resistencias_ordenadas_asc:
-                        if siguiente_precio_tentativo > r:
-                            siguiente_precio = r
-                            proyeccion_detenida = True
-                            break
-                elif movimiento_diario < 0: # Tendencia bajista
-                    for s in soportes_ordenados_desc:
-                        if siguiente_precio_tentativo < s:
-                            siguiente_precio = s
-                            proyeccion_detenida = True
-                            break
-
+            siguiente_precio = ultimo_precio_conocido * (1 + movimiento_diario)
             siguiente_precio = round(siguiente_precio, 2)
             precios_proyectados.append(siguiente_precio)
             ultimo_precio_conocido = siguiente_precio
 
-        # --- Fin de la lógica lineal sin Precio Objetivo ---
+        # --- Fin de la NUEVA lógica lineal ---
 
 
 
