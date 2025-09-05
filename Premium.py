@@ -167,6 +167,16 @@ def enviar_email(html_body, asunto_email):
     except Exception as e:
         print("❌ Error al enviar el correo:", e)
 
+def clasificar_fuerza_senial(variacion):
+    """Clasifica la fuerza de la señal en base a la variación del SMI."""
+    abs_variacion = abs(variacion)
+    if abs_variacion <= 0.5:
+        return "Sin confirmación clara"
+    elif abs_variacion <= 1.6:
+        return "Señal moderada"
+    else:
+        return "Buena señal"
+
 def detectar_giros_y_alertar(tickers):
     alertas = []
     
@@ -193,16 +203,11 @@ def detectar_giros_y_alertar(tickers):
     else:
         print(f"✅ Se detectaron {len(alertas)} giros hoy.")
         
-        # --- NUEVO CÓDIGO AÑADIDO ---
-        # 1. Calcular la variación del logaritmo para cada alerta.
         for alerta in alertas:
             alerta['variacion_logaritmo'] = alerta['SMI_HOY'] - alerta['SMI_AYER']
         
-        # 2. Ordenar las alertas por la variación del logaritmo (en valor absoluto) de mayor a menor.
         alertas.sort(key=lambda x: abs(x['variacion_logaritmo']), reverse=True)
-        # -----------------------------
 
-        # Construir la tabla HTML
         html_tabla = """
         <html>
         <head>
@@ -220,25 +225,26 @@ def detectar_giros_y_alertar(tickers):
         </head>
         <body>
             <h2>Alertas de Giros del Logaritmo - {hoy}</h2>
-            <p>Se han detectado los siguientes giros en nuestro logaritmo que podrían indicar posibles oportunidades de trading. Los giros están ordenados por su fuerza (variación), siendo los primeros los más claros:</p>
+            <p>Se han detectado los siguientes giros en nuestro logaritmo que podrían indicar posibles oportunidades de trading. Los giros están ordenados por su fuerza, siendo los primeros los más claros:</p>
             <table>
                 <tr>
                     <th>Empresa</th>
                     <th>Tipo de Giro</th>
                     <th>Precio Actual</th>
-                    <th>Variación Logaritmo</th>
+                    <th>FUERZA DE LA SEÑAL</th>
                 </tr>
         """.format(hoy=datetime.today().strftime('%d/%m/%Y'))
 
         for alerta in alertas:
             tipo_giro = alerta['TIPO_GIRO']
             clase_giro = "compra" if tipo_giro == "Compra" else "venta"
+            fuerza_senial = clasificar_fuerza_senial(alerta['variacion_logaritmo'])
             html_tabla += f"""
                 <tr>
                     <td>{alerta['NOMBRE_EMPRESA']}</td>
                     <td class="{clase_giro}">{tipo_giro}</td>
                     <td>{formatear_numero(alerta['PRECIO_ACTUAL'])}€</td>
-                    <td>{alerta['variacion_logaritmo']:.2f}</td>
+                    <td>{fuerza_senial}</td>
                 </tr>
             """
         
