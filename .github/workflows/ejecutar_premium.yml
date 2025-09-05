@@ -1,29 +1,33 @@
-name: Ejecutar Premium
+name: EJECUTAR PREMIUM
 
 on:
-  workflow_dispatch: # Este es el disparador manual
+  workflow_dispatch: # Trigger manual
+  schedule:
+    # Se ejecuta todos los días a las 04:00 AM UTC (que equivale a las 06:00 AM CEST en verano)
+    # y a las 05:00 AM CET en invierno.
+    - cron: '0 4 * * *' 
 
 jobs:
-  run-script: # Nombre del trabajo
+  leer_y_generar:
     runs-on: ubuntu-latest
 
     steps:
       - name: Descargar código
-        uses: actions/checkout@v4 # Actualizado a la versión más reciente (v4)
+        uses: actions/checkout@v3
 
       - name: Instalar Python y dependencias
         run: |
           python -m pip install --upgrade pip
           pip install --upgrade google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client google-generativeai
-          pip install yfinance pandas
-          pip install yfinance pandas feedparser # Incluido según tu workflow funcional
 
-      - name: Ejecutar script de análisis de ticker manual
+          pip install yfinance pandas
+          pip install yfinance pandas feedparser
+
+      - name: Ejecutar script para leer Google Sheets y generar contenido con Gemini
         env:
-          # ¡Ahora se incluyen TODAS las variables de entorno, igual que en tu workflow funcional!
           GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }} # Re-incluida
-          RANGE_NAME: 'A1:C10' # Re-incluida, ajusta si es necesario en tus secretos
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          RANGE_NAME: 'A1:C10' # Ajusta si lo deseas
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python Premium.py # Ejecuta el nuevo script
+          python Premium.py
