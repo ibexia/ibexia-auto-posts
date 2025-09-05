@@ -182,7 +182,7 @@ def detectar_giros_y_alertar(tickers):
         html_body = f"""
         <html>
         <body>
-            <h2>Resumen de Alertas de Giros del SMI - {datetime.today().strftime('%d/%m/%Y')}</h2>
+            <h2>Resumen de Alertas de Giros del Logaritmo - {datetime.today().strftime('%d/%m/%Y')}</h2>
             <p>No se detectaron giros significativos de compra o venta en ninguna de las empresas analizadas hoy.</p>
             <p>Se mantendrá la vigilancia para futuras oportunidades.</p>
         </body>
@@ -192,6 +192,16 @@ def detectar_giros_y_alertar(tickers):
         enviar_email(html_body, asunto)
     else:
         print(f"✅ Se detectaron {len(alertas)} giros hoy.")
+        
+        # --- NUEVO CÓDIGO AÑADIDO ---
+        # 1. Calcular la variación del logaritmo para cada alerta.
+        for alerta in alertas:
+            alerta['variacion_logaritmo'] = alerta['SMI_HOY'] - alerta['SMI_AYER']
+        
+        # 2. Ordenar las alertas por la variación del logaritmo (en valor absoluto) de mayor a menor.
+        alertas.sort(key=lambda x: abs(x['variacion_logaritmo']), reverse=True)
+        # -----------------------------
+
         # Construir la tabla HTML
         html_tabla = """
         <html>
@@ -209,16 +219,14 @@ def detectar_giros_y_alertar(tickers):
             </style>
         </head>
         <body>
-            <h2>Alertas de Giros del SMI - {hoy}</h2>
-            <p>Se han detectado los siguientes giros en nuestro logaritmo que podrían indicar posibles oportunidades de trading:</p>
+            <h2>Alertas de Giros del Logaritmo - {hoy}</h2>
+            <p>Se han detectado los siguientes giros en nuestro logaritmo que podrían indicar posibles oportunidades de trading. Los giros están ordenados por su fuerza (variación), siendo los primeros los más claros:</p>
             <table>
                 <tr>
                     <th>Empresa</th>
-                    <th>Ticker</th>
                     <th>Tipo de Giro</th>
                     <th>Precio Actual</th>
-                    <th>SMI (Ayer)</th>
-                    <th>SMI (Hoy)</th>
+                    <th>Variación Logaritmo</th>
                 </tr>
         """.format(hoy=datetime.today().strftime('%d/%m/%Y'))
 
@@ -228,11 +236,9 @@ def detectar_giros_y_alertar(tickers):
             html_tabla += f"""
                 <tr>
                     <td>{alerta['NOMBRE_EMPRESA']}</td>
-                    <td><strong>{alerta['TICKER']}</strong></td>
                     <td class="{clase_giro}">{tipo_giro}</td>
                     <td>{formatear_numero(alerta['PRECIO_ACTUAL'])}€</td>
-                    <td>{alerta['SMI_AYER']:.2f}</td>
-                    <td>{alerta['SMI_HOY']:.2f}</td>
+                    <td>{alerta['variacion_logaritmo']:.2f}</td>
                 </tr>
             """
         
