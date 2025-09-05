@@ -81,157 +81,114 @@ def calculate_smi_tv(df):
     )
     smi_raw = np.clip(smi_raw, -100, 100)
     smi_smoothed = pd.Series(smi_raw, index=df.index).rolling(window=smooth_period).mean()
+    smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
     df['SMI'] = smi_smoothed
     return df
 
-def obtener_datos_yfinance(ticker, periodo="1d", intervalo="1d"):
+def obtener_datos_yfinance(ticker, intervalo, periodo):
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
-        hist = stock.history(period=period, interval=interval)
-        if hist.empty or len(hist) < 2:
-            print(f"⚠️ Advertencia: No hay suficientes datos para {ticker} en el periodo {periodo} e intervalo {intervalo}. Saltando...")
+        hist_extended = stock.history(period=periodo, interval=intervalo)
+        
+        if hist_extended.empty:
+            print(f"⚠️ Advertencia: No se encontraron datos históricos para {ticker} en el intervalo {intervalo}. Saltando...")
             return None, None
-        hist = calculate_smi_tv(hist)
-        return info, hist
-    except Exception as e:
-        print(f"❌ Error al obtener datos de {ticker}: {e}")
-        return None, None
+        
+        hist_extended = calculate_smi_tv(hist_extended)
+        smi_series = hist_extended['SMI'].dropna()
+        
+        if len(smi_series) < 2:
+            print(f"⚠️ Advertencia: No hay suficientes datos de SMI para {ticker} en el intervalo {intervalo}. Saltando...")
+            return None, None
+            
+        current_price = info.get("currentPrice", "N/A")
+        
+        smi_yesterday = smi_series.iloc[-2]
+        smi_today = smi_series.iloc[-1]
+        
+        pendientes_smi = smi_series.diff()
+        pendiente_yesterday = pendientes_smi.iloc[-1]
+        
+        tendencia_hoy = "alcista" if pendiente_yesterday > 0 else "bajista"
+        
+        giro = "No"
+        tipo_giro = "N/A"
+        
+        if len(smi_series) >= 3:
+            pendiente_anteayer = smi_series.diff().iloc[-2]
+            
+            if pendiente_yesterday > 0 and pendiente_anteayer <= 0:
+                giro = "Sí"
+                tipo_giro = "Compra"
+            elif pendiente_yesterday < 0 and pendiente_anteayer >= 0:
+                giro = "Sí"
+                tipo_giro = "Venta"
 
-def analizar_giro_diario(ticker):
-    info, hist_diario = obtener_datos_yfinance(ticker, periodo="60d", intervalo="1d")
-    if not info or hist_diario is None:
-        return None
-
-    smi_series = hist_diario['SMI'].dropna()
-    if len(smi_series) < 2:
-        return None
-
-    smi_yesterday = smi_series.iloc[-2]
-    smi_today = smi_series.iloc[-1]
-    
-    pendientes_smi = smi_series.diff()
-    pendiente_hoy = pendientes_smi.iloc[-1]
-    pendiente_ayer = pendientes_smi.iloc[-2] if len(pendientes_smi) > 1 else 0
-
-    giro = "No"
-    tipo_giro = "N/A"
-    if pendiente_hoy > 0 and pendiente_ayer <= 0:
-        giro = "Sí"
-        tipo_giro = "Compra"
-    elif pendiente_hoy < 0 and pendiente_ayer >= 0:
-        giro = "Sí"
-        tipo_giro = "Venta"
-
-    if giro == "Sí":
         return {
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
-            "PRECIO_ACTUAL": info.get("currentPrice", "N/A"),
-            "SMI_ANTERIOR": smi_yesterday,
-            "SMI_ACTUAL": smi_today,
-            "TIPO_GIRO": tipo_giro
-        }
-    return None
+            "PRECIO_ACTUAL": current_price,
+            "SMI_AYER": smi_yesterday,
+            "SMI_HOY": smi_today,
+            "GIRO_DETECTADO": giro,
+            "TIPO_GIRO": tipo_giro,
+            "TENDENCIA_ACTUAL": tendencia_hoy,
+            "INTERVALO": intervalo
+        }, hist_extended
+        
+    except Exception as e:
+        print(f"❌ Error al obtener datos de {ticker} en el intervalo {intervalo}: {e}. Saltando a la siguiente empresa...")
+        return None, None
 
-def analizar_giro_horario(ticker):
-    info, hist_horario = obtener_datos_yfinance(ticker, periodo="5d", intervalo="15m")
-    if not info or hist_horario is None:
-        return None
-
-    smi_series = hist_horario['SMI'].dropna()
-    if len(smi_series) < 16:  # 4 horas = 16 intervalos de 15m
-        return None
-
-    smi_hace_4h = smi_series.iloc[-16]
-    smi_actual = smi_series.iloc[-1]
+def detectar_giros_diarios(tickers):
+    giros_diarios = []
     
-    pendientes_smi = smi_series.diff()
-    pendiente_hace_4h_atras = pendientes_smi.iloc[-16]
-    pendiente_ahora = pendientes_smi.iloc[-1]
+    for ticker in tickers:
+        print(f"🔎 Analizando {ticker} para giros del SMI (diario)...")
+        data, _ = obtener_datos_yfinance(ticker, '1d', '60d')
+        if data and data['GIRO_DETECTADO'] == "Sí":
+            giros_diarios.append(data)
+        time.sleep(1)
+        
+    return giros_diarios
 
-    giro = "No"
-    tipo_giro = "N/A"
-    if pendiente_ahora > 0 and pendiente_hace_4h_atras <= 0:
-        giro = "Sí"
-        tipo_giro = "Compra"
-    elif pendiente_ahora < 0 and pendiente_hace_4h_atras >= 0:
-        giro = "Sí"
-        tipo_giro = "Venta"
+def analizar_detalles_horarios(tickers_con_giro):
+    detalles_horarios = []
     
-    return {
-        "TICKER": ticker,
-        "NOMBRE_EMPRESA": info.get("longName", ticker),
-        "PRECIO_ACTUAL": info.get("currentPrice", "N/A"),
-        "SMI_ANTERIOR": smi_hace_4h,
-        "SMI_ACTUAL": smi_actual,
-        "GIRO_DETECTADO": giro,
-        "TIPO_GIRO": tipo_giro
-    }
+    for ticker_data in tickers_con_giro:
+        ticker = ticker_data['TICKER']
+        print(f"📈 Analizando detalles horarios para {ticker}...")
+        data, _ = obtener_datos_yfinance(ticker, '4h', '5d')
+        if data:
+            detalles_horarios.append(data)
+        time.sleep(1)
+        
+    return detalles_horarios
 
-
-def enviar_email(html_body, asunto_email):
+def enviar_email(alertas_diarias, detalles_horarios):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
     password = "kdgz lvdo wqvt vfkt"
-    msg = MIMEMultipart("alternative")
-    msg['From'] = remitente
-    msg['To'] = destinatario
-    msg['Subject'] = asunto_email
-    msg.attach(MIMEText(html_body, 'html'))
-
-    try:
-        servidor = smtplib.SMTP('smtp.gmail.com', 587)
-        servidor.starttls()
-        servidor.login(remitente, password)
-        servidor.sendmail(remitente, destinatario, msg.as_string())
-        servidor.quit()
-        print(f"✅ Correo enviado con el asunto: {asunto_email}")
-    except Exception as e:
-        print("❌ Error al enviar el correo:", e)
-
-def procesar_y_alertar(tickers):
-    alertas_diarias = []
     
-    # PRIMERA FASE: Filtrado diario
-    for ticker in tickers:
-        print(f"🔎 Analizando {ticker} para giros diarios del SMI...")
-        alerta_diaria = analizar_giro_diario(ticker)
-        if alerta_diaria:
-            alertas_diarias.append(alerta_diaria)
-        time.sleep(1)
-
-    alertas_horarias = []
-    if alertas_diarias:
-        # SEGUNDA FASE: Análisis horario solo de las empresas filtradas
-        for alerta_diaria in alertas_diarias:
-            ticker = alerta_diaria['TICKER']
-            print(f"🔬 Analizando {ticker} con más detalle (horario)...")
-            alerta_horaria = analizar_giro_horario(ticker)
-            if alerta_horaria:
-                alertas_horarias.append(alerta_horaria)
-            time.sleep(1)
-
-    # Construir el cuerpo del correo
-    html_body = f"""
-    <html>
-    <head>
-        <style>
-            body {{ font-family: Arial, sans-serif; }}
-            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-            th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
-            th {{ background-color: #f2f2f2; }}
-            .compra {{ color: #1abc9c; font-weight: bold; }}
-            .venta {{ color: #e74c3c; font-weight: bold; }}
-        </style>
-    </head>
-    <body>
-        <h2>Resumen de Alertas de Giros del SMI - {datetime.today().strftime('%d/%m/%Y %H:%M')}</h2>
+    if not alertas_diarias:
+        asunto = f"📊 Alertas IBEXIA: Sin giros significativos hoy {datetime.today().strftime('%d/%m/%Y')}"
+        html_body = f"""
+        <html>
+        <body>
+            <h2>Resumen de Alertas de Giros del SMI - {datetime.today().strftime('%d/%m/%Y')}</h2>
+            <p>No se detectaron giros significativos de compra o venta en ninguna de las empresas analizadas hoy en el análisis diario.</p>
+            <p>Se mantendrá la vigilancia para futuras oportunidades.</p>
+        </body>
+        </html>
+        """
+    else:
+        asunto = f"🔔 Alertas IBEXIA: Giros en {len(alertas_diarias)} empresas hoy {datetime.today().strftime('%d/%m/%Y')}"
         
-    """
-    if alertas_diarias:
-        html_body += """
-        <h3>Empresas con Giros Diarios (vs. Ayer)</h3>
+        # Construir tabla de giros diarios
+        html_tabla_diaria = """
+        <h3>Resumen de Giros Diarios (Fase 1)</h3>
+        <p>Se han detectado los siguientes giros en el análisis diario que activan el análisis granular por horas:</p>
         <table>
             <tr>
                 <th>Empresa</th>
@@ -243,60 +200,91 @@ def procesar_y_alertar(tickers):
             </tr>
         """
         for alerta in alertas_diarias:
-            clase_giro = "compra" if alerta['TIPO_GIRO'] == "Compra" else "venta"
-            html_body += f"""
+            tipo_giro = alerta['TIPO_GIRO']
+            clase_giro = "compra" if tipo_giro == "Compra" else "venta"
+            html_tabla_diaria += f"""
             <tr>
                 <td>{alerta['NOMBRE_EMPRESA']}</td>
                 <td><strong>{alerta['TICKER']}</strong></td>
-                <td class="{clase_giro}">{alerta['TIPO_GIRO']}</td>
+                <td class="{clase_giro}">{tipo_giro}</td>
                 <td>{formatear_numero(alerta['PRECIO_ACTUAL'])}€</td>
-                <td>{alerta['SMI_ANTERIOR']:.2f}</td>
-                <td>{alerta['SMI_ACTUAL']:.2f}</td>
+                <td>{alerta['SMI_AYER']:.2f}</td>
+                <td>{alerta['SMI_HOY']:.2f}</td>
             </tr>
             """
-        html_body += "</table>"
-    else:
-        html_body += "<p>No se detectaron giros significativos diarios.</p>"
+        html_tabla_diaria += "</table>"
+        
+        # Construir tabla de detalles horarios
+        if detalles_horarios:
+            html_tabla_horaria = """
+            <br>
+            <h3>Análisis Detallado Horario (Fase 2)</h3>
+            <p>A continuación, el comportamiento del SMI en las últimas 4 horas para las empresas filtradas:</p>
+            <table>
+                <tr>
+                    <th>Empresa</th>
+                    <th>Ticker</th>
+                    <th>Tendencia 4H</th>
+                    <th>SMI (Último)</th>
+                </tr>
+            """
+            for detalle in detalles_horarios:
+                tipo_giro = detalle['TIPO_GIRO']
+                clase_giro = "compra" if tipo_giro == "Compra" else "venta"
+                html_tabla_horaria += f"""
+                <tr>
+                    <td>{detalle['NOMBRE_EMPRESA']}</td>
+                    <td><strong>{detalle['TICKER']}</strong></td>
+                    <td class="{clase_giro}">{detalle['TENDENCIA_ACTUAL']}</td>
+                    <td>{detalle['SMI_HOY']:.2f}</td>
+                </tr>
+                """
+            html_tabla_horaria += "</table>"
+        else:
+            html_tabla_horaria = "<br><p>No se encontraron datos horarios para el análisis detallado.</p>"
 
-    html_body += "<br/>"
-
-    if alertas_horarias:
-        html_body += """
-        <h3>Detalle Horario de las Empresas Filtradas (vs. 4 horas atrás)</h3>
-        <table>
-            <tr>
-                <th>Empresa</th>
-                <th>Ticker</th>
-                <th>Tipo de Giro</th>
-                <th>Precio Actual</th>
-                <th>SMI (Hace 4h)</th>
-                <th>SMI (Ahora)</th>
-            </tr>
+        # Unir ambas tablas en el cuerpo del email
+        html_body = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+                th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
+                th {{ background-color: #f2f2f2; }}
+                .compra {{ color: #1abc9c; font-weight: bold; }}
+                .venta {{ color: #e74c3c; font-weight: bold; }}
+                .neutral {{ color: #34495e; }}
+                .header-compra {{ background-color: #d1f2eb; }}
+                .header-venta {{ background-color: #fadbd8; }}
+            </style>
+        </head>
+        <body>
+            <h2>Alertas de Giros del SMI - {datetime.today().strftime('%d/%m/%Y')}</h2>
+            <p>Se ha completado el análisis de dos fases. Aquí están los resultados:</p>
+            {html_tabla_diaria}
+            {html_tabla_horaria}
+            <p><strong>Recuerda:</strong> Un giro del logaritmo es una señal, no una garantía. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
+        </body>
+        </html>
         """
-        for alerta in alertas_horarias:
-            clase_giro = "compra" if alerta['TIPO_GIRO'] == "Compra" else "venta"
-            html_body += f"""
-            <tr>
-                <td>{alerta['NOMBRE_EMPRESA']}</td>
-                <td><strong>{alerta['TICKER']}</strong></td>
-                <td class="{clase_giro}">{alerta['TIPO_GIRO']}</td>
-                <td>{formatear_numero(alerta['PRECIO_ACTUAL'])}€</td>
-                <td>{alerta['SMI_ANTERIOR']:.2f}</td>
-                <td>{alerta['SMI_ACTUAL']:.2f}</td>
-            </tr>
-            """
-        html_body += "</table>"
-    else:
-        html_body += "<p>No hay datos horarios para mostrar de las empresas filtradas.</p>"
 
-    html_body += """
-        <p><strong>Recuerda:</strong> Un giro del logaritmo es una señal, no una garantía. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
-    </body>
-    </html>
-    """
+    msg = MIMEMultipart("alternative")
+    msg['From'] = remitente
+    msg['To'] = destinatario
+    msg['Subject'] = asunto
+    msg.attach(MIMEText(html_body, 'html'))
 
-    asunto = f"📊 Alertas IBEXIA: Giros detectados hoy {datetime.today().strftime('%d/%m/%Y')}"
-    enviar_email(html_body, asunto)
+    try:
+        servidor = smtplib.SMTP('smtp.gmail.com', 587)
+        servidor.starttls()
+        servidor.login(remitente, password)
+        servidor.sendmail(remitente, destinatario, msg.as_string())
+        servidor.quit()
+        print(f"✅ Correo enviado con el asunto: {asunto}")
+    except Exception as e:
+        print("❌ Error al enviar el correo:", e)
+
 
 def main():
     try:
@@ -304,9 +292,17 @@ def main():
         if not all_tickers:
             print("No hay tickers para procesar.")
             return
-        
-        # Se elimina el filtro de 10 tickers al día y se analizan todos
-        procesar_y_alertar(all_tickers)
+
+        # Fase 1: Análisis diario para filtrar
+        alertas_diarias = detectar_giros_diarios(all_tickers)
+
+        # Fase 2: Análisis horario para las empresas filtradas
+        detalles_horarios = []
+        if alertas_diarias:
+            detalles_horarios = analizar_detalles_horarios(alertas_diarias)
+
+        # Enviar el único correo con ambas tablas
+        enviar_email(alertas_diarias, detalles_horarios)
 
     except Exception as e:
         print(f"❌ Error al ejecutar el script principal: {e}")
