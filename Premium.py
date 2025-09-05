@@ -84,98 +84,91 @@ def calculate_smi_tv(df):
     df['SMI'] = smi_smoothed
     return df
 
-def obtener_datos_yfinance_diario(ticker):
+def obtener_datos_yfinance(ticker, periodo="1d", intervalo="1d"):
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
-        hist_diario = stock.history(period="60d", interval="1d")
-        if hist_diario.empty or len(hist_diario) < 2:
-            print(f"⚠️ Advertencia: No hay suficientes datos diarios para {ticker}. Saltando...")
-            return None
-        hist_diario = calculate_smi_tv(hist_diario)
+        hist = stock.history(period=period, interval=interval)
+        if hist.empty or len(hist) < 2:
+            print(f"⚠️ Advertencia: No hay suficientes datos para {ticker} en el periodo {periodo} e intervalo {intervalo}. Saltando...")
+            return None, None
+        hist = calculate_smi_tv(hist)
+        return info, hist
+    except Exception as e:
+        print(f"❌ Error al obtener datos de {ticker}: {e}")
+        return None, None
 
-        smi_series = hist_diario['SMI'].dropna()
-        if len(smi_series) < 2:
-            print(f"⚠️ Advertencia: No hay suficientes datos de SMI diarios para {ticker}. Saltando...")
-            return None
+def analizar_giro_diario(ticker):
+    info, hist_diario = obtener_datos_yfinance(ticker, periodo="60d", intervalo="1d")
+    if not info or hist_diario is None:
+        return None
 
-        smi_yesterday = smi_series.iloc[-2]
-        smi_today = smi_series.iloc[-1]
-        
-        pendientes_smi = smi_series.diff()
-        pendiente_hoy = pendientes_smi.iloc[-1]
-        pendiente_ayer = pendientes_smi.iloc[-2] if len(pendientes_smi) > 1 else 0
+    smi_series = hist_diario['SMI'].dropna()
+    if len(smi_series) < 2:
+        return None
 
-        giro = "No"
-        tipo_giro = "N/A"
-        if pendiente_hoy > 0 and pendiente_ayer <= 0:
-            giro = "Sí"
-            tipo_giro = "Compra"
-        elif pendiente_hoy < 0 and pendiente_ayer >= 0:
-            giro = "Sí"
-            tipo_giro = "Venta"
+    smi_yesterday = smi_series.iloc[-2]
+    smi_today = smi_series.iloc[-1]
+    
+    pendientes_smi = smi_series.diff()
+    pendiente_hoy = pendientes_smi.iloc[-1]
+    pendiente_ayer = pendientes_smi.iloc[-2] if len(pendientes_smi) > 1 else 0
 
+    giro = "No"
+    tipo_giro = "N/A"
+    if pendiente_hoy > 0 and pendiente_ayer <= 0:
+        giro = "Sí"
+        tipo_giro = "Compra"
+    elif pendiente_hoy < 0 and pendiente_ayer >= 0:
+        giro = "Sí"
+        tipo_giro = "Venta"
+
+    if giro == "Sí":
         return {
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
             "PRECIO_ACTUAL": info.get("currentPrice", "N/A"),
             "SMI_ANTERIOR": smi_yesterday,
             "SMI_ACTUAL": smi_today,
-            "GIRO_DETECTADO": giro,
-            "TIPO_GIRO": tipo_giro,
-            "PERIODO": "Diario"
+            "TIPO_GIRO": tipo_giro
         }
+    return None
 
-    except Exception as e:
-        print(f"❌ Error al obtener datos diarios de {ticker}: {e}")
+def analizar_giro_horario(ticker):
+    info, hist_horario = obtener_datos_yfinance(ticker, periodo="5d", intervalo="15m")
+    if not info or hist_horario is None:
         return None
 
-def obtener_datos_yfinance_horario(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        # Usamos 15m para mayor granularidad, periodo de 2 días para tener margen
-        hist_horario = stock.history(period="2d", interval="15m")
-        if hist_horario.empty or len(hist_horario) < 16: # 4 horas = 16 intervalos de 15m
-            print(f"⚠️ Advertencia: No hay suficientes datos horarios para {ticker}. Saltando...")
-            return None
-        hist_horario = calculate_smi_tv(hist_horario)
-
-        smi_series = hist_horario['SMI'].dropna()
-        if len(smi_series) < 16:
-            print(f"⚠️ Advertencia: No hay suficientes datos de SMI horarios para {ticker}. Saltando...")
-            return None
-
-        smi_hace_4h = smi_series.iloc[-16]
-        smi_actual = smi_series.iloc[-1]
-        
-        pendientes_smi = smi_series.diff()
-        pendiente_hace_4h_atras = pendientes_smi.iloc[-16] if len(pendientes_smi) > 15 else 0
-        pendiente_ahora = pendientes_smi.iloc[-1]
-
-        giro = "No"
-        tipo_giro = "N/A"
-        if pendiente_ahora > 0 and pendiente_hace_4h_atras <= 0:
-            giro = "Sí"
-            tipo_giro = "Compra"
-        elif pendiente_ahora < 0 and pendiente_hace_4h_atras >= 0:
-            giro = "Sí"
-            tipo_giro = "Venta"
-
-        return {
-            "TICKER": ticker,
-            "NOMBRE_EMPRESA": info.get("longName", ticker),
-            "PRECIO_ACTUAL": info.get("currentPrice", "N/A"),
-            "SMI_ANTERIOR": smi_hace_4h,
-            "SMI_ACTUAL": smi_actual,
-            "GIRO_DETECTADO": giro,
-            "TIPO_GIRO": tipo_giro,
-            "PERIODO": "Horario (últimas 4h)"
-        }
-
-    except Exception as e:
-        print(f"❌ Error al obtener datos horarios de {ticker}: {e}")
+    smi_series = hist_horario['SMI'].dropna()
+    if len(smi_series) < 16:  # 4 horas = 16 intervalos de 15m
         return None
+
+    smi_hace_4h = smi_series.iloc[-16]
+    smi_actual = smi_series.iloc[-1]
+    
+    pendientes_smi = smi_series.diff()
+    pendiente_hace_4h_atras = pendientes_smi.iloc[-16]
+    pendiente_ahora = pendientes_smi.iloc[-1]
+
+    giro = "No"
+    tipo_giro = "N/A"
+    if pendiente_ahora > 0 and pendiente_hace_4h_atras <= 0:
+        giro = "Sí"
+        tipo_giro = "Compra"
+    elif pendiente_ahora < 0 and pendiente_hace_4h_atras >= 0:
+        giro = "Sí"
+        tipo_giro = "Venta"
+    
+    return {
+        "TICKER": ticker,
+        "NOMBRE_EMPRESA": info.get("longName", ticker),
+        "PRECIO_ACTUAL": info.get("currentPrice", "N/A"),
+        "SMI_ANTERIOR": smi_hace_4h,
+        "SMI_ACTUAL": smi_actual,
+        "GIRO_DETECTADO": giro,
+        "TIPO_GIRO": tipo_giro
+    }
+
 
 def enviar_email(html_body, asunto_email):
     remitente = "xumkox@gmail.com"
@@ -197,26 +190,48 @@ def enviar_email(html_body, asunto_email):
     except Exception as e:
         print("❌ Error al enviar el correo:", e)
 
-def detectar_giros_y_alertar(tickers):
+def procesar_y_alertar(tickers):
     alertas_diarias = []
-    alertas_horarias = []
     
+    # PRIMERA FASE: Filtrado diario
     for ticker in tickers:
-        print(f"🔎 Analizando {ticker} para giros del SMI (diario y horario)...")
-        data_diaria = obtener_datos_yfinance_diario(ticker)
-        if data_diaria and data_diaria['GIRO_DETECTADO'] == "Sí":
-            alertas_diarias.append(data_diaria)
-            
-        data_horaria = obtener_datos_yfinance_horario(ticker)
-        if data_horaria and data_horaria['GIRO_DETECTADO'] == "Sí":
-            alertas_horarias.append(data_horaria)
-
+        print(f"🔎 Analizando {ticker} para giros diarios del SMI...")
+        alerta_diaria = analizar_giro_diario(ticker)
+        if alerta_diaria:
+            alertas_diarias.append(alerta_diaria)
         time.sleep(1)
 
-    html_diario = ""
+    alertas_horarias = []
     if alertas_diarias:
-        html_diario = """
-        <h3>Alertas Diarias (Giro vs. Ayer)</h3>
+        # SEGUNDA FASE: Análisis horario solo de las empresas filtradas
+        for alerta_diaria in alertas_diarias:
+            ticker = alerta_diaria['TICKER']
+            print(f"🔬 Analizando {ticker} con más detalle (horario)...")
+            alerta_horaria = analizar_giro_horario(ticker)
+            if alerta_horaria:
+                alertas_horarias.append(alerta_horaria)
+            time.sleep(1)
+
+    # Construir el cuerpo del correo
+    html_body = f"""
+    <html>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+            th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
+            th {{ background-color: #f2f2f2; }}
+            .compra {{ color: #1abc9c; font-weight: bold; }}
+            .venta {{ color: #e74c3c; font-weight: bold; }}
+        </style>
+    </head>
+    <body>
+        <h2>Resumen de Alertas de Giros del SMI - {datetime.today().strftime('%d/%m/%Y %H:%M')}</h2>
+        
+    """
+    if alertas_diarias:
+        html_body += """
+        <h3>Empresas con Giros Diarios (vs. Ayer)</h3>
         <table>
             <tr>
                 <th>Empresa</th>
@@ -229,7 +244,7 @@ def detectar_giros_y_alertar(tickers):
         """
         for alerta in alertas_diarias:
             clase_giro = "compra" if alerta['TIPO_GIRO'] == "Compra" else "venta"
-            html_diario += f"""
+            html_body += f"""
             <tr>
                 <td>{alerta['NOMBRE_EMPRESA']}</td>
                 <td><strong>{alerta['TICKER']}</strong></td>
@@ -239,14 +254,15 @@ def detectar_giros_y_alertar(tickers):
                 <td>{alerta['SMI_ACTUAL']:.2f}</td>
             </tr>
             """
-        html_diario += "</table>"
+        html_body += "</table>"
     else:
-        html_diario = "<p>No se detectaron giros significativos diarios.</p>"
+        html_body += "<p>No se detectaron giros significativos diarios.</p>"
 
-    html_horario = ""
+    html_body += "<br/>"
+
     if alertas_horarias:
-        html_horario = """
-        <h3>Alertas Horarias (Giro vs. 4 horas atrás)</h3>
+        html_body += """
+        <h3>Detalle Horario de las Empresas Filtradas (vs. 4 horas atrás)</h3>
         <table>
             <tr>
                 <th>Empresa</th>
@@ -259,7 +275,7 @@ def detectar_giros_y_alertar(tickers):
         """
         for alerta in alertas_horarias:
             clase_giro = "compra" if alerta['TIPO_GIRO'] == "Compra" else "venta"
-            html_horario += f"""
+            html_body += f"""
             <tr>
                 <td>{alerta['NOMBRE_EMPRESA']}</td>
                 <td><strong>{alerta['TICKER']}</strong></td>
@@ -269,28 +285,11 @@ def detectar_giros_y_alertar(tickers):
                 <td>{alerta['SMI_ACTUAL']:.2f}</td>
             </tr>
             """
-        html_horario += "</table>"
+        html_body += "</table>"
     else:
-        html_horario = "<p>No se detectaron giros significativos horarios.</p>"
+        html_body += "<p>No hay datos horarios para mostrar de las empresas filtradas.</p>"
 
-    html_body = f"""
-    <html>
-    <head>
-        <style>
-            body {{ font-family: Arial, sans-serif; }}
-            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-            th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
-            th {{ background-color: #f2f2f2; }}
-            .compra {{ color: #1abc9c; font-weight: bold; }}
-            .venta {{ color: #e74c3c; font-weight: bold; }}
-            .neutral {{ color: #34495e; }}
-        </style>
-    </head>
-    <body>
-        <h2>Resumen de Alertas de Giros del SMI - {datetime.today().strftime('%d/%m/%Y %H:%M')}</h2>
-        {html_diario}
-        <br/>
-        {html_horario}
+    html_body += """
         <p><strong>Recuerda:</strong> Un giro del logaritmo es una señal, no una garantía. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
     </body>
     </html>
@@ -305,8 +304,9 @@ def main():
         if not all_tickers:
             print("No hay tickers para procesar.")
             return
-
-        detectar_giros_y_alertar(all_tickers)
+        
+        # Se elimina el filtro de 10 tickers al día y se analizan todos
+        procesar_y_alertar(all_tickers)
 
     except Exception as e:
         print(f"❌ Error al ejecutar el script principal: {e}")
