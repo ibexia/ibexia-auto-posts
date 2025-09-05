@@ -3,9 +3,10 @@ name: EJECUTAR PREMIUM
 on:
   workflow_dispatch: # Trigger manual
   schedule:
-    # Se ejecuta todos los días a las 04:00 AM UTC (que equivale a las 06:00 AM CEST en verano)
-    # y a las 05:00 AM CET en invierno.
-    - cron: '0 4 * * *' 
+    # Horario de invierno (CET): 9:30, 12:30, 17:00
+    - cron: '30 8,11,16 * * *'
+    # Horario de verano (CEST): 9:30, 12:30, 17:00
+    - cron: '30 7,10,15 * * *'
 
 jobs:
   leer_y_generar:
