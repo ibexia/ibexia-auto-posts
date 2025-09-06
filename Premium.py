@@ -86,86 +86,53 @@ def calculate_smi_tv(df):
     return df
 
 def calcular_precio_aplanamiento(df):
-    """
-    Calcula el precio necesario para aplanar la curva del SMI.
-    Se basa en el último cálculo del SMI y busca un precio 'close'
-    que haga que el nuevo SMI sea igual al SMI anterior.
-    """
     try:
-        # Asegúrate de que el dataframe tiene al menos los 3 últimos días
         if len(df) < 3:
             return "N/A"
 
-        # Obtener los valores necesarios del cálculo SMI
-        df_temp = df.copy()
-        df_temp['Close'] = 0 # Valor de prueba
-        df_temp = calculate_smi_tv(df_temp)
-        
-        # Últimos valores del SMI y sus promedios móviles
-        smi_last = df_temp['SMI'].iloc[-1]
-        smi_prev = df_temp['SMI'].iloc[-2]
-        
-        # Valores de rdiff y diff de los últimos días
-        # Los promedios móviles exponenciales son cruciales aquí
-        
-        # Primero, recalcula los valores que dependen del close
-        length_k = 10
         length_d = 3
         smooth_period = 5
+
+        # Valores SMI de la vela anterior
+        smi_smoothed_prev = df['SMI'].iloc[-2]
+
+        # Recalcular componentes para la vela actual, asumiendo un precio de cierre variable
+        close_actual = df['Close'].iloc[-1]
+        high_actual = df['High'].iloc[-1]
+        low_actual = df['Low'].iloc[-1]
         
-        high = df['High']
-        low = df['Low']
-        
-        hh = high.rolling(window=length_k).max()
-        ll = low.rolling(window=length_k).min()
-        diff = hh - ll
-        
-        # Valores de avgrel y avgdiff sin el último punto
-        # Se necesita replicar el cálculo del EWM hasta el penúltimo día
-        close_prev = df['Close'].iloc[:-1]
-        rdiff_prev = close_prev - (hh[:-1] + ll[:-1]) / 2
-        avgrel_prev = rdiff_prev.ewm(span=length_d, adjust=False).mean()
-        avgdiff_prev = diff[:-1].ewm(span=length_d, adjust=False).mean()
-        
-        avgrel_prev_last = avgrel_prev.iloc[-1]
-        avgdiff_prev_last = avgdiff_prev.iloc[-1]
-        
+        # Calcular los promedios móviles exponenciales de los días anteriores
+        df_prev = df.iloc[:-1]
+        df_prev = calculate_smi_tv(df_prev)
+
+        avgrel_prev_last = (df_prev['Close'] - (df_prev['High'].rolling(window=10).max() + df_prev['Low'].rolling(window=10).min()) / 2).ewm(span=length_d, adjust=False).mean().iloc[-1]
+        avgdiff_prev_last = (df_prev['High'].rolling(window=10).max() - df_prev['Low'].rolling(window=10).min()).ewm(span=length_d, adjust=False).mean().iloc[-1]
+
         alpha_ema = 2 / (length_d + 1)
         
-        # Objetivo: smi_smoothed_today = smi_smoothed_yesterday
-        # Esto es equivalente a smi_raw_today = smi_raw_yesterday, asumiendo el mismo suavizado
+        # Objetivo: smi_raw_today = smi_raw_yesterday (asumiendo que el suavizado no cambia bruscamente)
+        df_temp = df.copy()
+        df_temp['SMI'] = pd.Series(df_temp['SMI'], index=df_temp.index).rolling(window=smooth_period).mean()
+        smi_raw_yesterday = df_temp['SMI'].iloc[-2]
+
+        # Los valores HH y LL se calculan sobre un rango, no cambian con el último close
+        hh_today = df['High'].rolling(window=10).max().iloc[-1]
+        ll_today = df['Low'].rolling(window=10).min().iloc[-1]
+        diff_today = hh_today - ll_today
         
-        smi_raw_yesterday = pd.Series(df_temp['SMI'].iloc[:-1], index=df.index[:-1]).rolling(window=smooth_period).mean().iloc[-1]
+        avgdiff_today = (1 - alpha_ema) * avgdiff_prev_last + alpha_ema * diff_today
         
-        # Si SMI_raw_today = SMI_raw_yesterday
-        # (avgrel_today / (avgdiff_today / 2)) * 100 = smi_raw_yesterday
+        # Despejamos el avgrel_today de la fórmula del SMI
+        avgrel_today_target = (smi_raw_yesterday / 100) * (avgdiff_today / 2)
         
-        # avgdiff_today = (1-alpha_ema)*avgdiff_prev_last + alpha_ema * diff_today
-        # diff_today = hh_today - ll_today
-        # Asumiendo hh y ll no cambian significativamente con el nuevo close
-        diff_today = diff.iloc[-1]
-        avgdiff_today = (1-alpha_ema)*avgdiff_prev_last + alpha_ema * diff_today
+        # Despejamos el rdiff_today de la fórmula del promedio exponencial
+        rdiff_today_target = (avgrel_today_target - (1 - alpha_ema) * avgrel_prev_last) / alpha_ema
         
-        # avgrel_today = (1-alpha_ema)*avgrel_prev_last + alpha_ema * rdiff_today
-        
-        # Reordenamos la fórmula para encontrar rdiff_today
-        # rdiff_today = close_today - (hh_today + ll_today) / 2
-        
-        # ( (1-alpha_ema)*avgrel_prev_last + alpha_ema * rdiff_today ) / (avgdiff_today / 2) * 100 = smi_raw_yesterday
-        
-        # ( (1-alpha_ema)*avgrel_prev_last + alpha_ema * rdiff_today ) = (smi_raw_yesterday * avgdiff_today / 2) / 100
-        
-        numerador_izq = (smi_raw_yesterday * avgdiff_today / 2) / 100
-        
-        alpha_ema_safe = alpha_ema if alpha_ema != 0 else 1e-9
-        
-        rdiff_today_target = (numerador_izq - (1-alpha_ema)*avgrel_prev_last) / alpha_ema_safe
-        
-        # Finalmente, el precio de cierre objetivo
-        close_target = rdiff_today_target + (hh.iloc[-1] + ll.iloc[-1]) / 2
+        # Finalmente, despejamos el close del rdiff
+        close_target = rdiff_today_target + (hh_today + ll_today) / 2
         
         return close_target
-        
+
     except Exception as e:
         print(f"❌ Error en el cálculo de precio de aplanamiento: {e}")
         return "N/A"
@@ -187,37 +154,25 @@ def obtener_datos_yfinance(ticker):
 
         current_price = info.get("currentPrice", "N/A")
         
-        # Últimos dos valores de SMI para detectar el giro
         smi_yesterday = smi_series.iloc[-2]
         smi_today = smi_series.iloc[-1]
         
-        # Calcular las pendientes
-        pendientes_smi = smi_series.diff()
-        pendiente_yesterday = pendientes_smi.iloc[-1] # Pendiente de hoy (cambio de ayer a hoy)
+        pendiente_hoy = smi_today - smi_yesterday
         
-        tendencia_hoy = "alcista" if pendiente_yesterday > 0 else "bajista"
+        tendencia_hoy = "alcista" if pendiente_hoy > 0 else "bajista"
         
-        # Se requiere un historial de 3 días para un giro robusto
+        giro = "No"
+        tipo_giro = "N/A"
         if len(smi_series) >= 3:
-            pendiente_anteayer = smi_series.diff().iloc[-2]
+            pendiente_anteayer = smi_series.iloc[-2] - smi_series.iloc[-3]
             
-            giro = "No"
-            tipo_giro = "N/A"
-            
-            # Giro de compra (pendiente cambia de negativa a positiva)
-            if pendiente_yesterday > 0 and pendiente_anteayer <= 0:
+            if pendiente_hoy > 0 and pendiente_anteayer <= 0:
                 giro = "Sí"
                 tipo_giro = "Compra"
-            # Giro de venta (pendiente cambia de positiva a negativa)
-            elif pendiente_yesterday < 0 and pendiente_anteayer >= 0:
+            elif pendiente_hoy < 0 and pendiente_anteayer >= 0:
                 giro = "Sí"
                 tipo_giro = "Venta"
-
-        else:
-            giro = "No"
-            tipo_giro = "N/A"
-            
-        # Calcular precio para aplanar
+        
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
 
         return {
@@ -229,7 +184,8 @@ def obtener_datos_yfinance(ticker):
             "GIRO_DETECTADO": giro,
             "TIPO_GIRO": tipo_giro,
             "TENDENCIA_ACTUAL": tendencia_hoy,
-            "PRECIO_APLANAMIENTO": precio_aplanamiento
+            "PRECIO_APLANAMIENTO": precio_aplanamiento,
+            "PENDIENTE": pendiente_hoy
         }
 
     except Exception as e:
@@ -257,7 +213,6 @@ def enviar_email(html_body, asunto_email):
         print("❌ Error al enviar el correo:", e)
 
 def clasificar_fuerza_senial(variacion):
-    """Clasifica la fuerza de la señal en base a la variación del SMI."""
     abs_variacion = abs(variacion)
     if abs_variacion <= 0.5:
         return "Sin confirmación clara"
@@ -277,9 +232,8 @@ def detectar_giros_y_alertar(tickers):
             datos_completos.append(data)
             if data['GIRO_DETECTADO'] == "Sí":
                 alertas_giros.append(data)
-        time.sleep(1) # Pequeña pausa para evitar sobrecargar la API
+        time.sleep(1)
 
-    # Construir el HTML del informe
     html_body = f"""
     <html>
     <head>
@@ -337,15 +291,15 @@ def detectar_giros_y_alertar(tickers):
             """
         html_body += "</table>"
     
-    # --- Segunda tabla con los precios de aplanamiento para todas las empresas ---
     html_body += """
         <hr>
         <h3>Análisis de Proximidad al Giro</h3>
-        <p>Esta tabla muestra la distancia del precio actual al punto de aplanamiento del SMI, un indicador de cuán cerca podría estar una empresa de un cambio de tendencia:</p>
+        <p>Esta tabla muestra la distancia del precio actual al punto de aplanamiento del SMI. Un valor positivo indica que el precio debe subir para aplanar la curva, y un valor negativo que debe bajar:</p>
         <table>
             <tr>
                 <th>Empresa</th>
                 <th>Precio Actual</th>
+                <th>TENDENCIA ACTUAL</th>
                 <th>Precio para Aplanar el SMI</th>
                 <th>Diferencia %</th>
             </tr>
@@ -354,6 +308,7 @@ def detectar_giros_y_alertar(tickers):
     for data in datos_completos:
         precio_actual = data['PRECIO_ACTUAL']
         precio_aplanamiento = data['PRECIO_APLANAMIENTO']
+        tendencia_actual = "Subiendo (Alcista)" if data['TENDENCIA_ACTUAL'] == "alcista" else "Bajando (Bajista)"
         
         if precio_actual != "N/A" and precio_aplanamiento != "N/A":
             try:
@@ -368,6 +323,7 @@ def detectar_giros_y_alertar(tickers):
             <tr>
                 <td>{data['NOMBRE_EMPRESA']}</td>
                 <td>{formatear_numero(precio_actual)}€</td>
+                <td>{tendencia_actual}</td>
                 <td>{formatear_numero(precio_aplanamiento)}€</td>
                 <td>{diferencia_str}</td>
             </tr>
