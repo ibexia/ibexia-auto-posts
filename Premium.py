@@ -58,7 +58,7 @@ def formatear_numero(numero):
             return f"{num:,.2f}"
     except (ValueError, TypeError):
         return "N/A"
-
+        
 def calculate_smi_tv(df):
     high = df['High']
     low = df['Low']
@@ -125,6 +125,22 @@ def calcular_precio_aplanamiento(df):
         print(f"❌ Error en el cálculo de precio de aplanamiento: {e}")
         return "N/A"
 
+def calcular_smi_simulado(df, nuevo_precio):
+    try:
+        temp_df = df.copy()
+        
+        # Simular el nuevo precio de cierre
+        temp_df.loc[temp_df.index[-1], 'Close'] = nuevo_precio
+        
+        # Volver a calcular el SMI para el DataFrame modificado
+        temp_df = calculate_smi_tv(temp_df)
+        
+        # Devolver el SMI de hoy
+        return temp_df['SMI'].iloc[-1]
+    except Exception as e:
+        print(f"❌ Error en la simulación del SMI: {e}")
+        return "N/A"
+
 def obtener_datos_yfinance(ticker):
     try:
         stock = yf.Ticker(ticker)
@@ -165,6 +181,13 @@ def obtener_datos_yfinance(ticker):
         
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
 
+        # Cálculos de SMI simulados
+        smi_mismo_precio = calcular_smi_simulado(hist_extended, hist_extended['Close'].iloc[-1])
+        smi_mas_1 = calcular_smi_simulado(hist_extended, hist_extended['Close'].iloc[-1] * 1.01)
+        smi_menos_1 = calcular_smi_simulado(hist_extended, hist_extended['Close'].iloc[-1] * 0.99)
+        smi_mas_2 = calcular_smi_simulado(hist_extended, hist_extended['Close'].iloc[-1] * 1.02)
+        smi_menos_2 = calcular_smi_simulado(hist_extended, hist_extended['Close'].iloc[-1] * 0.98)
+
         return {
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
@@ -176,7 +199,14 @@ def obtener_datos_yfinance(ticker):
             "TENDENCIA_ACTUAL": tendencia_hoy,
             "ESTADO_SMI": estado_smi,
             "PRECIO_APLANAMIENTO": precio_aplanamiento,
-            "PENDIENTE": pendiente_hoy
+            "PENDIENTE": pendiente_hoy,
+            "SMI_SIMULADO": {
+                "mismo": smi_mismo_precio,
+                "+1%": smi_mas_1,
+                "-1%": smi_menos_1,
+                "+2%": smi_mas_2,
+                "-2%": smi_menos_2
+            }
         }
 
     except Exception as e:
@@ -229,22 +259,18 @@ def generar_recomendacion(data):
 
     diferencia_porcentual = (precio_aplanamiento_float - precio_actual_float) / precio_actual_float if precio_actual_float != 0 else 0
 
-    # Lógica de recomendación mejorada para los extremos
     if estado_smi == "Sobrecompra":
-        # En sobrecompra, solo nos interesan las señales de Venta
         if precio_actual_float > precio_aplanamiento_float:
             return f"Vende si baja de {formatear_numero(precio_aplanamiento_float)}€"
         else:
             return f"Vendido desde {formatear_numero(precio_aplanamiento_float)}€"
     
     if estado_smi == "Sobreventa":
-        # En sobreventa, solo nos interesan las señales de Compra
         if precio_actual_float < precio_aplanamiento_float:
             return f"Compra si supera {formatear_numero(precio_aplanamiento_float)}€"
         else:
             return f"Comprado desde {formatear_numero(precio_aplanamiento_float)}€"
 
-    # Lógica de recomendación para el tramo intermedio
     if estado_smi == "Intermedio":
         if abs(diferencia_porcentual) <= 0.005:
             if tendencia == "alcista":
@@ -339,6 +365,12 @@ def detectar_giros_y_alertar(tickers):
                 <th>Empresa</th>
                 <th>Precio Actual</th>
                 <th>Estado y Tendencia</th>
+                <th>SMI Ayer</th>
+                <th>SMI Hoy (+/- 0%)</th>
+                <th>SMI Hoy (+1%)</th>
+                <th>SMI Hoy (-1%)</th>
+                <th>SMI Hoy (+2%)</th>
+                <th>SMI Hoy (-2%)</th>
                 <th>Diferencia %</th>
                 <th>Acción Recomendada</th>
             </tr>
@@ -355,7 +387,18 @@ def detectar_giros_y_alertar(tickers):
             color_style = "background-color: #ffcccc;"
         elif data['ESTADO_SMI'] == "Sobreventa":
             color_style = "background-color: #ccffcc;"
+
+        smi_simulados = data['SMI_SIMULADO']
+        smi_ayer = data['SMI_AYER']
         
+        def get_color(smi_val, smi_ref):
+            if smi_val > smi_ref:
+                return "background-color: #ccffcc;"
+            elif smi_val < smi_ref:
+                return "background-color: #ffcccc;"
+            else:
+                return ""
+
         if precio_actual != "N/A" and precio_aplanamiento != "N/A":
             try:
                 diferencia_porcentual = ((precio_aplanamiento - precio_actual) / precio_actual) * 100
@@ -370,6 +413,12 @@ def detectar_giros_y_alertar(tickers):
                 <td>{data['NOMBRE_EMPRESA']}</td>
                 <td>{formatear_numero(precio_actual)}€</td>
                 <td style="{color_style}">{estado_y_tendencia}</td>
+                <td>{smi_ayer:,.2f}</td>
+                <td style="{get_color(smi_simulados['mismo'], smi_ayer)}">{smi_simulados['mismo']:,.2f}</td>
+                <td style="{get_color(smi_simulados['+1%'], smi_ayer)}">{smi_simulados['+1%']:,.2f}</td>
+                <td style="{get_color(smi_simulados['-1%'], smi_ayer)}">{smi_simulados['-1%']:,.2f}</td>
+                <td style="{get_color(smi_simulados['+2%'], smi_ayer)}">{smi_simulados['+2%']:,.2f}</td>
+                <td style="{get_color(smi_simulados['-2%'], smi_ayer)}">{smi_simulados['-2%']:,.2f}</td>
                 <td>{diferencia_str}</td>
                 <td>{recomendacion}</td>
             </tr>
@@ -401,3 +450,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+    
