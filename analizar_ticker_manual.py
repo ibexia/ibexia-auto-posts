@@ -154,7 +154,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
     if not compras:  # No se realizaron compras en el período
         html_resultados = f"""
-        <p>No se encontraron señales de compra o venta significativas en el período analizado para Nuestro logaritmo.</p>
+        <p>No se encontraron señales de compra o venta significativas en el período analizado para Nuestro Algoritmo.</p>
         <p>Esto podría deberse a una baja volatilidad, a que el SMI no generó las señales esperadas, o a que el período de análisis es demasiado corto.</p>
         """
     else:  # Hubo al menos una compra
@@ -180,7 +180,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 """
         else:  # Todas las posiciones se cerraron
             html_resultados = f"""
-            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro logaritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
+            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro Algoritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
             """
             # Siempre mostramos las operaciones detalladas si hay alguna
             if operaciones_html:
@@ -436,11 +436,11 @@ def obtener_datos_yfinance(ticker):
             if slope > 0.1:
                 tendencia_ibexia = "mejorando (alcista)"
                 recomendacion = "Comprar"
-                motivo_recomendacion = f"Nuestro logaritmo muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
+                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
             elif slope < -0.1:
                 tendencia_ibexia = "empeorando (bajista)"
                 recomendacion = "Vender"
-                motivo_recomendacion = f"Nuestro logaritmo muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
+                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
             else:
                 tendencia_ibexia = "cambio de tendencia"
                 recomendacion = "Atención máxima"
@@ -525,11 +525,11 @@ def construir_prompt_formateado(data):
                 if volumen_promedio_30d > 0:
                     cambio_porcentual_volumen = ((volumen_actual - volumen_promedio_30d) / volumen_promedio_30d) * 100
                     if cambio_porcentual_volumen > 50:
-                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia de Nuestro logaritmo ({data['tendencia_ibexia']})."
+                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia de Nuestro Algoritmo ({data['tendencia_ibexia']})."
                     elif cambio_porcentual_volumen < -30:
-                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es inferior a lo habitual, lo que podría sugerir cautela en la actual tendencia. Una confirmación de la señal de Nuestro logaritmo ({data['tendencia_ibexia']}) requeriría un aumento en la participación del mercado."
+                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es inferior a lo habitual, lo que podría sugerir cautela en la actual tendencia. Una confirmación de la señal de Nuestro Algoritmo ({data['tendencia_ibexia']}) requeriría un aumento en la participación del mercado."
                     else:
-                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> se mantiene en línea con el promedio. Es un volumen adecuado, pero no excepcional, para confirmar de manera contundente la señal de Nuestro logaritmo ({data['tendencia_ibexia']})."
+                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> se mantiene en línea con el promedio. Es un volumen adecuado, pero no excepcional, para confirmar de manera contundente la señal de Nuestro Algoritmo ({data['tendencia_ibexia']})."
                 else:
                     volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. "
             else:
@@ -638,7 +638,7 @@ def construir_prompt_formateado(data):
         smis = data['SMI_PARA_SIMULACION']
         fechas = data['FECHAS_PARA_SIMULACION']
         
-        analisis_grafico_html += f"<p>A continuación, analizaremos los movimientos clave de nuestro logaritmo y cómo se reflejaron en el precio de la acción:</p>"
+        analisis_grafico_html += f"<p>A continuación, analizaremos los movimientos clave de nuestro Algoritmo y cómo se reflejaron en el precio de la acción:</p>"
 
         def get_trend(smi_val):
             if smi_val > 40:
@@ -668,16 +668,16 @@ def construir_prompt_formateado(data):
             
             # Descripción narrativa del tramo
             if tendencia_actual_smi == "alcista":
-                analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, nuestro logaritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, nuestro Algoritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
             elif tendencia_actual_smi == "bajista":
-                analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, nuestro logaritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, nuestro Algoritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
             elif tendencia_actual_smi == "consolidación":
-                analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. Nuestro logaritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. Nuestro Algoritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.2f}€</strong>.</p>"
             
             # Chequeo de compra o venta en el cambio de tramo
             compra_en_giro = next((c for c in compras_simuladas if c['fecha'] == fechas[end_index]), None)
             if compra_en_giro:
-                analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! Nuestro logaritmo mostró un giro y se compró en <strong>{compra_en_giro['precio']:,.2f}€</strong>.</p>"
+                analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! Nuestro Algoritmo mostró un giro y se compró en <strong>{compra_en_giro['precio']:,.2f}€</strong>.</p>"
             
             venta_en_giro = next((v for v in ventas_simuladas if v['fecha'] == fechas[end_index]), None)
             if venta_en_giro:
@@ -686,15 +686,15 @@ def construir_prompt_formateado(data):
         # Conclusión basada en la última tendencia
         ultima_tendencia = get_trend(pendientes_smi[-1])
         if ultima_tendencia == "alcista":
-            analisis_grafico_html += f"<p>Actualmente, nuestro logaritmo muestra una tendencia <strong>alcista</strong>. Nos mantendremos en posición y atentos a los próximos movimientos para futuras ventas.</p>"
+            analisis_grafico_html += f"<p>Actualmente, nuestro Algoritmo muestra una tendencia <strong>alcista</strong>. Nos mantendremos en posición y atentos a los próximos movimientos para futuras ventas.</p>"
         elif ultima_tendencia == "bajista":
-            analisis_grafico_html += f"<p>En estos momentos, nuestro logaritmo tiene una pendiente <strong>bajista</strong>. Esto no es momento de comprar, por lo que esperaremos una señal de giro más adelante.</p>"
+            analisis_grafico_html += f"<p>En estos momentos, nuestro Algoritmo tiene una pendiente <strong>bajista</strong>. Esto no es momento de comprar, por lo que esperaremos una señal de giro más adelante.</p>"
         elif ultima_tendencia == "consolidación":
-            analisis_grafico_html += f"<p>Nuestro logaritmo se encuentra en una fase de <strong>consolidación</strong>, moviéndose de forma lateral. Nos mantendremos atentos para entrar o salir del mercado cuando se detecte un giro claro.</p>"
+            analisis_grafico_html += f"<p>Nuestro Algoritmo se encuentra en una fase de <strong>consolidación</strong>, moviéndose de forma lateral. Nos mantendremos atentos para entrar o salir del mercado cuando se detecte un giro claro.</p>"
         elif ultima_tendencia == "sobrecompra":
-            analisis_grafico_html += f"<p>Nuestro logaritmo ha entrado en una zona de <strong>sobrecompra</strong>. Esto indica que la tendencia alcista podría estar agotándose y podríamos ver una señal de venta o un giro en cualquier momento.</p>"
+            analisis_grafico_html += f"<p>Nuestro Algoritmo ha entrado en una zona de <strong>sobrecompra</strong>. Esto indica que la tendencia alcista podría estar agotándose y podríamos ver una señal de venta o un giro en cualquier momento.</p>"
         elif ultima_tendencia == "sobreventa":
-            analisis_grafico_html += f"<p>Nuestro logaritmo se encuentra en una zona de <strong>sobreventa</strong>. Esto indica que la tendencia bajista está llegando a su fin y podríamos ver un giro y una señal de compra en breve.</p>"
+            analisis_grafico_html += f"<p>Nuestro Algoritmo se encuentra en una zona de <strong>sobreventa</strong>. Esto indica que la tendencia bajista está llegando a su fin y podríamos ver un giro y una señal de compra en breve.</p>"
 
         chart_html = f"""
         {analisis_grafico_html}
@@ -712,7 +712,7 @@ def construir_prompt_formateado(data):
                     labels: {labels_total},
                     datasets: [
                         {{
-                            label: 'Nuestro Logaritmo',
+                            label: 'Nuestro Algoritmo',
                             data: {smi_desplazados_para_grafico},
                             borderColor: 'rgb(255, 99, 132)',
                             backgroundColor: 'rgba(255, 99, 132, 0.5)',
@@ -764,7 +764,7 @@ def construir_prompt_formateado(data):
                             position: 'left',
                             title: {{
                                 display: true,
-                                text: 'Nuestro Logaritmo'
+                                text: 'Nuestro Algoritmo'
                             }},
                             grid: {{
                                 drawOnChartArea: false,
@@ -865,17 +865,17 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <h2>Análisis Inicial y Recomendación</h2>
 <p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Nuestra recomendación es <strong>{data['RECOMENDACION']}</strong>. Según nuestras proyecciones, el precio podría situarse en <strong>{data['PRECIO_PROYECTADO_5DIAS']:,}€</strong> en los próximos 5 días. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']}.</p>
 
-<h2>La Clave: El Logaritmo como tu "Guía de Compra"</h2>
-<p>Nuestro sistema se basa en un <strong>logaritmo</strong> que funciona como una brújula que te dice si es un buen momento para comprar o no. La clave está en cómo se mueve:</p>
+<h2>La Clave: El Algoritmo como tu "Guía de Compra"</h2>
+<p>Nuestro sistema se basa en un <strong>Algoritmo</strong> que funciona como una brújula que te dice si es un buen momento para comprar o no. La clave está en cómo se mueve:</p>
 <ul>
     <li>
-        <strong>Si el logaritmo está en sobreventa (muy abajo):</strong> La acción podría estar "demasiado barata". Es probable que el logaritmo gire hacia arriba, lo que sería una <strong>señal de compra</strong>.
+        <strong>Si el Algoritmo está en sobreventa (muy abajo):</strong> La acción podría estar "demasiado barata". Es probable que el Algoritmo gire hacia arriba, lo que sería una <strong>señal de compra</strong>.
     </li>
     <li>
-        <strong>Si el logaritmo está en sobrecompra (muy arriba):</strong> La acción podría estar "demasiado cara". El logaritmo podría girar a la baja, lo que sería una <strong>señal para no comprar</strong>.
+        <strong>Si el Algoritmo está en sobrecompra (muy arriba):</strong> La acción podría estar "demasiado cara". El Algoritmo podría girar a la baja, lo que sería una <strong>señal para no comprar</strong>.
     </li>
 </ul>
-<p>Más allá de la sobrecompra o sobreventa, la señal de compra más clara es cuando el logaritmo <strong>gira hacia arriba</strong>. Si ves que sube, es un buen momento para comprar (siempre y cuando no esté en una zona extrema de sobrecompra). Si gira a la baja, es mejor esperar.</p>
+<p>Más allá de la sobrecompra o sobreventa, la señal de compra más clara es cuando el Algoritmo <strong>gira hacia arriba</strong>. Si ves que sube, es un buen momento para comprar (siempre y cuando no esté en una zona extrema de sobrecompra). Si gira a la baja, es mejor esperar.</p>
 
 {chart_html}
 
