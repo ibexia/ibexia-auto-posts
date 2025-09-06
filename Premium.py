@@ -229,7 +229,7 @@ def generar_recomendacion(data):
 
     diferencia_porcentual = (precio_aplanamiento_float - precio_actual_float) / precio_actual_float if precio_actual_float != 0 else 0
 
-    if abs(diferencia_porcentual) <= 0.005:
+    if abs(diferencia_porcentual) <= 0.005 and estado_smi == "Intermedio":
         if tendencia == "alcista":
             return "Señal de VENTA ACTIVADA"
         else:
@@ -238,24 +238,23 @@ def generar_recomendacion(data):
     if estado_smi == "Sobrecompra":
         if tendencia == "alcista":
             return "Mantente comprado"
-        else:
-            # Sobrecompra bajando, ya por encima del precio de aplanamiento
+        else: # bajista
             if precio_actual_float > precio_aplanamiento_float:
-                return f"Vendido desde {formatear_numero(precio_aplanamiento_float)}€"
-            else:
                 return f"Vende si baja de {formatear_numero(precio_aplanamiento_float)}€"
-
-    elif estado_smi == "Sobreventa":
+            else:
+                return f"Vendido desde {formatear_numero(precio_aplanamiento_float)}€"
+    
+    if estado_smi == "Sobreventa":
         if tendencia == "bajista":
             return "Mantente vendido"
-        else:
-            # Sobreventa subiendo, ya por encima del precio de aplanamiento
-            if precio_actual_float > precio_aplanamiento_float:
-                return f"Comprado desde {formatear_numero(precio_aplanamiento_float)}€"
-            else:
+        else: # alcista
+            if precio_actual_float < precio_aplanamiento_float:
                 return f"Compra si supera {formatear_numero(precio_aplanamiento_float)}€"
+            else:
+                return f"Comprado desde {formatear_numero(precio_aplanamiento_float)}€"
 
-    else: # Tramo Intermedio
+    # Caso del tramo intermedio sin señal activada
+    if estado_smi == "Intermedio":
         if tendencia == "bajista":
             return f"Compra si supera {formatear_numero(precio_aplanamiento_float)}€"
         elif tendencia == "alcista":
@@ -353,6 +352,12 @@ def detectar_giros_y_alertar(tickers):
         precio_aplanamiento = data['PRECIO_APLANAMIENTO']
         estado_y_tendencia = f"{data['ESTADO_SMI']} ({'Subiendo' if data['TENDENCIA_ACTUAL'] == 'alcista' else 'Bajando'})"
         recomendacion = generar_recomendacion(data)
+
+        color_style = ""
+        if data['ESTADO_SMI'] == "Sobrecompra":
+            color_style = "background-color: #ffcccc;"
+        elif data['ESTADO_SMI'] == "Sobreventa":
+            color_style = "background-color: #ccffcc;"
         
         if precio_actual != "N/A" and precio_aplanamiento != "N/A":
             try:
@@ -367,7 +372,7 @@ def detectar_giros_y_alertar(tickers):
             <tr>
                 <td>{data['NOMBRE_EMPRESA']}</td>
                 <td>{formatear_numero(precio_actual)}€</td>
-                <td>{estado_y_tendencia}</td>
+                <td style="{color_style}">{estado_y_tendencia}</td>
                 <td>{diferencia_str}</td>
                 <td>{recomendacion}</td>
             </tr>
