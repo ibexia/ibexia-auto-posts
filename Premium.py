@@ -192,7 +192,7 @@ def detectar_giros_y_alertar(tickers):
         html_body = f"""
         <html>
         <body>
-            <h2>Resumen de Alertas de Giros del Logaritmo - {datetime.today().strftime('%d/%m/%Y')}</h2>
+            <h2>Resumen de Alertas de Giros del Algoritmo - {datetime.today().strftime('%d/%m/%Y')}</h2>
             <p>No se detectaron giros significativos de compra o venta en ninguna de las empresas analizadas hoy.</p>
             <p>Se mantendrá la vigilancia para futuras oportunidades.</p>
         </body>
@@ -204,9 +204,9 @@ def detectar_giros_y_alertar(tickers):
         print(f"✅ Se detectaron {len(alertas)} giros hoy.")
         
         for alerta in alertas:
-            alerta['variacion_logaritmo'] = alerta['SMI_HOY'] - alerta['SMI_AYER']
+            alerta['variacion_Algoritmo'] = alerta['SMI_HOY'] - alerta['SMI_AYER']
         
-        alertas.sort(key=lambda x: abs(x['variacion_logaritmo']), reverse=True)
+        alertas.sort(key=lambda x: abs(x['variacion_Algoritmo']), reverse=True)
 
         html_tabla = """
         <html>
@@ -224,8 +224,8 @@ def detectar_giros_y_alertar(tickers):
             </style>
         </head>
         <body>
-            <h2>Alertas de Giros del Logaritmo - {hoy}</h2>
-            <p>Se han detectado los siguientes giros en nuestro logaritmo que podrían indicar posibles oportunidades de trading. Los giros están ordenados por su fuerza, siendo los primeros los más claros:</p>
+            <h2>Alertas de Giros del Algoritmo - {hoy}</h2>
+            <p>Se han detectado los siguientes giros en nuestro Algoritmo que podrían indicar posibles oportunidades de trading. Los giros están ordenados por su fuerza, siendo los primeros los más claros:</p>
             <table>
                 <tr>
                     <th>Empresa</th>
@@ -238,7 +238,7 @@ def detectar_giros_y_alertar(tickers):
         for alerta in alertas:
             tipo_giro = alerta['TIPO_GIRO']
             clase_giro = "compra" if tipo_giro == "Compra" else "venta"
-            fuerza_senial = clasificar_fuerza_senial(alerta['variacion_logaritmo'])
+            fuerza_senial = clasificar_fuerza_senial(alerta['variacion_Algoritmo'])
             html_tabla += f"""
                 <tr>
                     <td>{alerta['NOMBRE_EMPRESA']}</td>
@@ -250,7 +250,7 @@ def detectar_giros_y_alertar(tickers):
         
         html_tabla += """
             </table>
-            <p><strong>Recuerda:</strong> Un giro del logaritmo es una señal, no una garantía. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
+            <p><strong>Recuerda:</strong> Un giro del Algoritmo es una señal, no una garantía. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
         </body>
         </html>
         """
