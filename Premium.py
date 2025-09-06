@@ -93,15 +93,8 @@ def calcular_precio_aplanamiento(df):
         length_d = 3
         smooth_period = 5
 
-        # Valores SMI de la vela anterior
         smi_smoothed_prev = df['SMI'].iloc[-2]
 
-        # Recalcular componentes para la vela actual, asumiendo un precio de cierre variable
-        close_actual = df['Close'].iloc[-1]
-        high_actual = df['High'].iloc[-1]
-        low_actual = df['Low'].iloc[-1]
-        
-        # Calcular los promedios móviles exponenciales de los días anteriores
         df_prev = df.iloc[:-1]
         df_prev = calculate_smi_tv(df_prev)
 
@@ -110,25 +103,20 @@ def calcular_precio_aplanamiento(df):
 
         alpha_ema = 2 / (length_d + 1)
         
-        # Objetivo: smi_raw_today = smi_raw_yesterday (asumiendo que el suavizado no cambia bruscamente)
         df_temp = df.copy()
         df_temp['SMI'] = pd.Series(df_temp['SMI'], index=df_temp.index).rolling(window=smooth_period).mean()
         smi_raw_yesterday = df_temp['SMI'].iloc[-2]
 
-        # Los valores HH y LL se calculan sobre un rango, no cambian con el último close
         hh_today = df['High'].rolling(window=10).max().iloc[-1]
         ll_today = df['Low'].rolling(window=10).min().iloc[-1]
         diff_today = hh_today - ll_today
         
         avgdiff_today = (1 - alpha_ema) * avgdiff_prev_last + alpha_ema * diff_today
         
-        # Despejamos el avgrel_today de la fórmula del SMI
         avgrel_today_target = (smi_raw_yesterday / 100) * (avgdiff_today / 2)
         
-        # Despejamos el rdiff_today de la fórmula del promedio exponencial
         rdiff_today_target = (avgrel_today_target - (1 - alpha_ema) * avgrel_prev_last) / alpha_ema
         
-        # Finalmente, despejamos el close del rdiff
         close_target = rdiff_today_target + (hh_today + ll_today) / 2
         
         return close_target
@@ -161,6 +149,8 @@ def obtener_datos_yfinance(ticker):
         
         tendencia_hoy = "alcista" if pendiente_hoy > 0 else "bajista"
         
+        estado_smi = "Sobrecompra" if smi_today > 60 else ("Sobreventa" if smi_today < -60 else "Intermedio")
+        
         giro = "No"
         tipo_giro = "N/A"
         if len(smi_series) >= 3:
@@ -184,6 +174,7 @@ def obtener_datos_yfinance(ticker):
             "GIRO_DETECTADO": giro,
             "TIPO_GIRO": tipo_giro,
             "TENDENCIA_ACTUAL": tendencia_hoy,
+            "ESTADO_SMI": estado_smi,
             "PRECIO_APLANAMIENTO": precio_aplanamiento,
             "PENDIENTE": pendiente_hoy
         }
@@ -220,6 +211,29 @@ def clasificar_fuerza_senial(variacion):
         return "Señal moderada"
     else:
         return "Buena señal"
+        
+def generar_recomendacion(data):
+    tendencia = data['TENDENCIA_ACTUAL']
+    precio_actual = data['PRECIO_ACTUAL']
+    precio_aplanamiento = data['PRECIO_APLANAMIENTO']
+    diferencia_porcentual = (precio_aplanamiento - precio_actual) / precio_actual if precio_actual != "N/A" and precio_aplanamiento != "N/A" and precio_actual != 0 else 0
+
+    if abs(diferencia_porcentual) <= 0.005:  # Si está dentro del 0.5%
+        if tendencia == "alcista":
+            return "Señal de VENTA ACTIVADA"
+        else:
+            return "Señal de COMPRA ACTIVADA"
+    
+    if tendencia == "bajista":
+        # SMI bajando, necesita subir para aplanarse -> Recomendación de COMPRA si se supera un precio
+        return f"Compra si supera {formatear_numero(precio_aplanamiento)}€"
+    
+    if tendencia == "alcista":
+        # SMI subiendo, necesita bajar para aplanarse -> Recomendación de VENTA si se baja de un precio
+        return f"Vende si baja de {formatear_numero(precio_aplanamiento)}€"
+
+    return "No aplica"
+
 
 def detectar_giros_y_alertar(tickers):
     alertas_giros = []
@@ -299,16 +313,19 @@ def detectar_giros_y_alertar(tickers):
             <tr>
                 <th>Empresa</th>
                 <th>Precio Actual</th>
+                <th>Estado del SMI</th>
                 <th>TENDENCIA ACTUAL</th>
                 <th>Precio para Aplanar el SMI</th>
                 <th>Diferencia %</th>
+                <th>Acción Recomendada</th>
             </tr>
     """
 
     for data in datos_completos:
         precio_actual = data['PRECIO_ACTUAL']
         precio_aplanamiento = data['PRECIO_APLANAMIENTO']
-        tendencia_actual = "Subiendo (Alcista)" if data['TENDENCIA_ACTUAL'] == "alcista" else "Bajando (Bajista)"
+        tendencia_actual_str = "Subiendo (Alcista)" if data['TENDENCIA_ACTUAL'] == "alcista" else "Bajando (Bajista)"
+        recomendacion = generar_recomendacion(data)
         
         if precio_actual != "N/A" and precio_aplanamiento != "N/A":
             try:
@@ -323,9 +340,11 @@ def detectar_giros_y_alertar(tickers):
             <tr>
                 <td>{data['NOMBRE_EMPRESA']}</td>
                 <td>{formatear_numero(precio_actual)}€</td>
-                <td>{tendencia_actual}</td>
+                <td>{data['ESTADO_SMI']}</td>
+                <td>{tendencia_actual_str}</td>
                 <td>{formatear_numero(precio_aplanamiento)}€</td>
                 <td>{diferencia_str}</td>
+                <td>{recomendacion}</td>
             </tr>
         """
     
