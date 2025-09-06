@@ -85,6 +85,91 @@ def calculate_smi_tv(df):
     df['SMI'] = smi_smoothed
     return df
 
+def calcular_precio_aplanamiento(df):
+    """
+    Calcula el precio necesario para aplanar la curva del SMI.
+    Se basa en el último cálculo del SMI y busca un precio 'close'
+    que haga que el nuevo SMI sea igual al SMI anterior.
+    """
+    try:
+        # Asegúrate de que el dataframe tiene al menos los 3 últimos días
+        if len(df) < 3:
+            return "N/A"
+
+        # Obtener los valores necesarios del cálculo SMI
+        df_temp = df.copy()
+        df_temp['Close'] = 0 # Valor de prueba
+        df_temp = calculate_smi_tv(df_temp)
+        
+        # Últimos valores del SMI y sus promedios móviles
+        smi_last = df_temp['SMI'].iloc[-1]
+        smi_prev = df_temp['SMI'].iloc[-2]
+        
+        # Valores de rdiff y diff de los últimos días
+        # Los promedios móviles exponenciales son cruciales aquí
+        
+        # Primero, recalcula los valores que dependen del close
+        length_k = 10
+        length_d = 3
+        smooth_period = 5
+        
+        high = df['High']
+        low = df['Low']
+        
+        hh = high.rolling(window=length_k).max()
+        ll = low.rolling(window=length_k).min()
+        diff = hh - ll
+        
+        # Valores de avgrel y avgdiff sin el último punto
+        # Se necesita replicar el cálculo del EWM hasta el penúltimo día
+        close_prev = df['Close'].iloc[:-1]
+        rdiff_prev = close_prev - (hh[:-1] + ll[:-1]) / 2
+        avgrel_prev = rdiff_prev.ewm(span=length_d, adjust=False).mean()
+        avgdiff_prev = diff[:-1].ewm(span=length_d, adjust=False).mean()
+        
+        avgrel_prev_last = avgrel_prev.iloc[-1]
+        avgdiff_prev_last = avgdiff_prev.iloc[-1]
+        
+        alpha_ema = 2 / (length_d + 1)
+        
+        # Objetivo: smi_smoothed_today = smi_smoothed_yesterday
+        # Esto es equivalente a smi_raw_today = smi_raw_yesterday, asumiendo el mismo suavizado
+        
+        smi_raw_yesterday = pd.Series(df_temp['SMI'].iloc[:-1], index=df.index[:-1]).rolling(window=smooth_period).mean().iloc[-1]
+        
+        # Si SMI_raw_today = SMI_raw_yesterday
+        # (avgrel_today / (avgdiff_today / 2)) * 100 = smi_raw_yesterday
+        
+        # avgdiff_today = (1-alpha_ema)*avgdiff_prev_last + alpha_ema * diff_today
+        # diff_today = hh_today - ll_today
+        # Asumiendo hh y ll no cambian significativamente con el nuevo close
+        diff_today = diff.iloc[-1]
+        avgdiff_today = (1-alpha_ema)*avgdiff_prev_last + alpha_ema * diff_today
+        
+        # avgrel_today = (1-alpha_ema)*avgrel_prev_last + alpha_ema * rdiff_today
+        
+        # Reordenamos la fórmula para encontrar rdiff_today
+        # rdiff_today = close_today - (hh_today + ll_today) / 2
+        
+        # ( (1-alpha_ema)*avgrel_prev_last + alpha_ema * rdiff_today ) / (avgdiff_today / 2) * 100 = smi_raw_yesterday
+        
+        # ( (1-alpha_ema)*avgrel_prev_last + alpha_ema * rdiff_today ) = (smi_raw_yesterday * avgdiff_today / 2) / 100
+        
+        numerador_izq = (smi_raw_yesterday * avgdiff_today / 2) / 100
+        
+        alpha_ema_safe = alpha_ema if alpha_ema != 0 else 1e-9
+        
+        rdiff_today_target = (numerador_izq - (1-alpha_ema)*avgrel_prev_last) / alpha_ema_safe
+        
+        # Finalmente, el precio de cierre objetivo
+        close_target = rdiff_today_target + (hh.iloc[-1] + ll.iloc[-1]) / 2
+        
+        return close_target
+        
+    except Exception as e:
+        print(f"❌ Error en el cálculo de precio de aplanamiento: {e}")
+        return "N/A"
+
 def obtener_datos_yfinance(ticker):
     try:
         stock = yf.Ticker(ticker)
@@ -131,6 +216,9 @@ def obtener_datos_yfinance(ticker):
         else:
             giro = "No"
             tipo_giro = "N/A"
+            
+        # Calcular precio para aplanar
+        precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
 
         return {
             "TICKER": ticker,
@@ -140,7 +228,8 @@ def obtener_datos_yfinance(ticker):
             "SMI_HOY": smi_today,
             "GIRO_DETECTADO": giro,
             "TIPO_GIRO": tipo_giro,
-            "TENDENCIA_ACTUAL": tendencia_hoy
+            "TENDENCIA_ACTUAL": tendencia_hoy,
+            "PRECIO_APLANAMIENTO": precio_aplanamiento
         }
 
     except Exception as e:
@@ -178,53 +267,53 @@ def clasificar_fuerza_senial(variacion):
         return "Buena señal"
 
 def detectar_giros_y_alertar(tickers):
-    alertas = []
-    
+    alertas_giros = []
+    datos_completos = []
+
     for ticker in tickers:
         print(f"🔎 Analizando {ticker} para giros del SMI...")
         data = obtener_datos_yfinance(ticker)
-        if data and data['GIRO_DETECTADO'] == "Sí":
-            alertas.append(data)
+        if data:
+            datos_completos.append(data)
+            if data['GIRO_DETECTADO'] == "Sí":
+                alertas_giros.append(data)
         time.sleep(1) # Pequeña pausa para evitar sobrecargar la API
 
-    if not alertas:
-        print("No se detectaron giros de SMI hoy.")
-        html_body = f"""
-        <html>
-        <body>
-            <h2>Resumen de Alertas de Giros del Algoritmo - {datetime.today().strftime('%d/%m/%Y')}</h2>
-            <p>No se detectaron giros significativos de compra o venta en ninguna de las empresas analizadas hoy.</p>
-            <p>Se mantendrá la vigilancia para futuras oportunidades.</p>
-        </body>
-        </html>
-        """
-        asunto = f"📊 Alertas IBEXIA: Sin giros significativos hoy {datetime.today().strftime('%d/%m/%Y')}"
-        enviar_email(html_body, asunto)
-    else:
-        print(f"✅ Se detectaron {len(alertas)} giros hoy.")
+    # Construir el HTML del informe
+    html_body = f"""
+    <html>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; }}
+            h2 {{ color: #2c3e50; }}
+            p {{ color: #7f8c8d; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+            th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
+            th {{ background-color: #f2f2f2; }}
+            .compra {{ color: #1abc9c; font-weight: bold; }}
+            .venta {{ color: #e74c3c; font-weight: bold; }}
+            .neutral {{ color: #34495e; }}
+            .header-compra {{ background-color: #d1f2eb; }}
+            .header-venta {{ background-color: #fadbd8; }}
+        </style>
+    </head>
+    <body>
+        <h2>Resumen Diario de Alertas y Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</h2>
         
-        for alerta in alertas:
+        <h3>Alerta de Giros del Algoritmo</h3>
+    """
+
+    if not alertas_giros:
+        html_body += """
+            <p>No se detectaron giros significativos de compra o venta en las empresas analizadas hoy.</p>
+        """
+    else:
+        for alerta in alertas_giros:
             alerta['variacion_Algoritmo'] = alerta['SMI_HOY'] - alerta['SMI_AYER']
         
-        alertas.sort(key=lambda x: abs(x['variacion_Algoritmo']), reverse=True)
+        alertas_giros.sort(key=lambda x: abs(x['variacion_Algoritmo']), reverse=True)
 
-        html_tabla = """
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; }}
-                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-                th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
-                th {{ background-color: #f2f2f2; }}
-                .compra {{ color: #1abc9c; font-weight: bold; }}
-                .venta {{ color: #e74c3c; font-weight: bold; }}
-                .neutral {{ color: #34495e; }}
-                .header-compra {{ background-color: #d1f2eb; }}
-                .header-venta {{ background-color: #fadbd8; }}
-            </style>
-        </head>
-        <body>
-            <h2>Alertas de Giros del Algoritmo - {hoy}</h2>
+        html_body += """
             <p>Se han detectado los siguientes giros en nuestro Algoritmo que podrían indicar posibles oportunidades de trading. Los giros están ordenados por su fuerza, siendo los primeros los más claros:</p>
             <table>
                 <tr>
@@ -233,13 +322,12 @@ def detectar_giros_y_alertar(tickers):
                     <th>Precio Actual</th>
                     <th>FUERZA DE LA SEÑAL</th>
                 </tr>
-        """.format(hoy=datetime.today().strftime('%d/%m/%Y'))
-
-        for alerta in alertas:
+        """
+        for alerta in alertas_giros:
             tipo_giro = alerta['TIPO_GIRO']
             clase_giro = "compra" if tipo_giro == "Compra" else "venta"
             fuerza_senial = clasificar_fuerza_senial(alerta['variacion_Algoritmo'])
-            html_tabla += f"""
+            html_body += f"""
                 <tr>
                     <td>{alerta['NOMBRE_EMPRESA']}</td>
                     <td class="{clase_giro}">{tipo_giro}</td>
@@ -247,16 +335,54 @@ def detectar_giros_y_alertar(tickers):
                     <td>{fuerza_senial}</td>
                 </tr>
             """
+        html_body += "</table>"
+    
+    # --- Segunda tabla con los precios de aplanamiento para todas las empresas ---
+    html_body += """
+        <hr>
+        <h3>Análisis de Proximidad al Giro</h3>
+        <p>Esta tabla muestra la distancia del precio actual al punto de aplanamiento del SMI, un indicador de cuán cerca podría estar una empresa de un cambio de tendencia:</p>
+        <table>
+            <tr>
+                <th>Empresa</th>
+                <th>Precio Actual</th>
+                <th>Precio para Aplanar el SMI</th>
+                <th>Diferencia %</th>
+            </tr>
+    """
+
+    for data in datos_completos:
+        precio_actual = data['PRECIO_ACTUAL']
+        precio_aplanamiento = data['PRECIO_APLANAMIENTO']
         
-        html_tabla += """
-            </table>
-            <p><strong>Recuerda:</strong> Un giro del Algoritmo es una señal, no una garantía. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
-        </body>
-        </html>
+        if precio_actual != "N/A" and precio_aplanamiento != "N/A":
+            try:
+                diferencia_porcentual = ((precio_aplanamiento - precio_actual) / precio_actual) * 100
+                diferencia_str = f"{diferencia_porcentual:.2f}%"
+            except (ValueError, TypeError, ZeroDivisionError):
+                diferencia_str = "N/A"
+        else:
+            diferencia_str = "N/A"
+            
+        html_body += f"""
+            <tr>
+                <td>{data['NOMBRE_EMPRESA']}</td>
+                <td>{formatear_numero(precio_actual)}€</td>
+                <td>{formatear_numero(precio_aplanamiento)}€</td>
+                <td>{diferencia_str}</td>
+            </tr>
         """
-        
-        asunto = f"🔔 Alertas IBEXIA: Giros de {len(alertas)} empresas hoy {datetime.today().strftime('%d/%m/%Y')}"
-        enviar_email(html_tabla, asunto)
+    
+    html_body += """
+        </table>
+        <br>
+        <p><strong>Recuerda:</strong> Un aplanamiento de la curva no garantiza un giro inmediato, pero puede señalar que la fuerza de la tendencia actual está disminuyendo. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
+    </body>
+    </html>
+    """
+    
+    asunto = f"🔔 Alertas y Proximidad IBEXIA: {len(alertas_giros)} giros detectados hoy {datetime.today().strftime('%d/%m/%Y')}"
+    enviar_email(html_body, asunto)
 
 
 def main():
