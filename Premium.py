@@ -44,7 +44,7 @@ def leer_google_sheets():
     return [row[0] for row in values if row]
 
 def formatear_numero(numero):
-    if pd.isna(numero) or numero == "N/A" or numero is None:
+    if pd.isna(numero) or numero is None:
         return "N/A"
     try:
         num = float(numero)
@@ -93,10 +93,10 @@ def calcular_precio_aplanamiento(df):
         length_d = 3
         smooth_period = 5
 
-        smi_smoothed_prev = df['SMI'].iloc[-2]
-
-        df_prev = df.iloc[:-1]
+        df_prev = df.iloc[:-1].copy()
         df_prev = calculate_smi_tv(df_prev)
+
+        smi_smoothed_prev = df['SMI'].iloc[-2]
 
         avgrel_prev_last = (df_prev['Close'] - (df_prev['High'].rolling(window=10).max() + df_prev['Low'].rolling(window=10).min()) / 2).ewm(span=length_d, adjust=False).mean().iloc[-1]
         avgdiff_prev_last = (df_prev['High'].rolling(window=10).max() - df_prev['Low'].rolling(window=10).min()).ewm(span=length_d, adjust=False).mean().iloc[-1]
@@ -229,32 +229,29 @@ def generar_recomendacion(data):
 
     diferencia_porcentual = (precio_aplanamiento_float - precio_actual_float) / precio_actual_float if precio_actual_float != 0 else 0
 
-    if abs(diferencia_porcentual) <= 0.005 and estado_smi == "Intermedio":
-        if tendencia == "alcista":
-            return "Señal de VENTA ACTIVADA"
-        else:
-            return "Señal de COMPRA ACTIVADA"
-    
+    # Lógica de recomendación mejorada para los extremos
     if estado_smi == "Sobrecompra":
-        if tendencia == "alcista":
-            return "Mantente comprado"
-        else: # bajista
-            if precio_actual_float > precio_aplanamiento_float:
-                return f"Vende si baja de {formatear_numero(precio_aplanamiento_float)}€"
-            else:
-                return f"Vendido desde {formatear_numero(precio_aplanamiento_float)}€"
+        # En sobrecompra, solo nos interesan las señales de Venta
+        if precio_actual_float > precio_aplanamiento_float:
+            return f"Vende si baja de {formatear_numero(precio_aplanamiento_float)}€"
+        else:
+            return f"Vendido desde {formatear_numero(precio_aplanamiento_float)}€"
     
     if estado_smi == "Sobreventa":
-        if tendencia == "bajista":
-            return "Mantente vendido"
-        else: # alcista
-            if precio_actual_float < precio_aplanamiento_float:
-                return f"Compra si supera {formatear_numero(precio_aplanamiento_float)}€"
-            else:
-                return f"Comprado desde {formatear_numero(precio_aplanamiento_float)}€"
+        # En sobreventa, solo nos interesan las señales de Compra
+        if precio_actual_float < precio_aplanamiento_float:
+            return f"Compra si supera {formatear_numero(precio_aplanamiento_float)}€"
+        else:
+            return f"Comprado desde {formatear_numero(precio_aplanamiento_float)}€"
 
-    # Caso del tramo intermedio sin señal activada
+    # Lógica de recomendación para el tramo intermedio
     if estado_smi == "Intermedio":
+        if abs(diferencia_porcentual) <= 0.005:
+            if tendencia == "alcista":
+                return "Señal de VENTA ACTIVADA"
+            else:
+                return "Señal de COMPRA ACTIVADA"
+        
         if tendencia == "bajista":
             return f"Compra si supera {formatear_numero(precio_aplanamiento_float)}€"
         elif tendencia == "alcista":
