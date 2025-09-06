@@ -217,7 +217,17 @@ def generar_recomendacion(data):
     estado_smi = data['ESTADO_SMI']
     precio_actual = data['PRECIO_ACTUAL']
     precio_aplanamiento = data['PRECIO_APLANAMIENTO']
-    diferencia_porcentual = (precio_aplanamiento - precio_actual) / precio_actual if precio_actual != "N/A" and precio_aplanamiento != "N/A" and precio_actual != 0 else 0
+
+    if precio_actual == "N/A" or precio_aplanamiento == "N/A":
+        return "Datos no disponibles"
+
+    try:
+        precio_actual_float = float(precio_actual)
+        precio_aplanamiento_float = float(precio_aplanamiento)
+    except (ValueError, TypeError):
+        return "Datos no válidos"
+
+    diferencia_porcentual = (precio_aplanamiento_float - precio_actual_float) / precio_actual_float if precio_actual_float != 0 else 0
 
     if abs(diferencia_porcentual) <= 0.005:
         if tendencia == "alcista":
@@ -229,20 +239,28 @@ def generar_recomendacion(data):
         if tendencia == "alcista":
             return "Mantente comprado"
         else:
-            return f"Vende si baja de {formatear_numero(precio_aplanamiento)}€"
-    
-    if estado_smi == "Sobreventa":
+            # Sobrecompra bajando, ya por encima del precio de aplanamiento
+            if precio_actual_float > precio_aplanamiento_float:
+                return f"Vendido desde {formatear_numero(precio_aplanamiento_float)}€"
+            else:
+                return f"Vende si baja de {formatear_numero(precio_aplanamiento_float)}€"
+
+    elif estado_smi == "Sobreventa":
         if tendencia == "bajista":
             return "Mantente vendido"
         else:
-            return f"Compra si supera {formatear_numero(precio_aplanamiento)}€"
+            # Sobreventa subiendo, ya por encima del precio de aplanamiento
+            if precio_actual_float > precio_aplanamiento_float:
+                return f"Comprado desde {formatear_numero(precio_aplanamiento_float)}€"
+            else:
+                return f"Compra si supera {formatear_numero(precio_aplanamiento_float)}€"
 
-    if tendencia == "bajista":
-        return f"Compra si supera {formatear_numero(precio_aplanamiento)}€"
+    else: # Tramo Intermedio
+        if tendencia == "bajista":
+            return f"Compra si supera {formatear_numero(precio_aplanamiento_float)}€"
+        elif tendencia == "alcista":
+            return f"Vende si baja de {formatear_numero(precio_aplanamiento_float)}€"
     
-    if tendencia == "alcista":
-        return f"Vende si baja de {formatear_numero(precio_aplanamiento)}€"
-
     return "No aplica"
 
 
@@ -324,8 +342,7 @@ def detectar_giros_y_alertar(tickers):
             <tr>
                 <th>Empresa</th>
                 <th>Precio Actual</th>
-                <th>Estado del SMI</th>
-                <th>TENDENCIA ACTUAL</th>
+                <th>Estado y Tendencia</th>
                 <th>Diferencia %</th>
                 <th>Acción Recomendada</th>
             </tr>
@@ -334,7 +351,7 @@ def detectar_giros_y_alertar(tickers):
     for data in datos_completos:
         precio_actual = data['PRECIO_ACTUAL']
         precio_aplanamiento = data['PRECIO_APLANAMIENTO']
-        tendencia_actual_str = "Subiendo (Alcista)" if data['TENDENCIA_ACTUAL'] == "alcista" else "Bajando (Bajista)"
+        estado_y_tendencia = f"{data['ESTADO_SMI']} ({'Subiendo' if data['TENDENCIA_ACTUAL'] == 'alcista' else 'Bajando'})"
         recomendacion = generar_recomendacion(data)
         
         if precio_actual != "N/A" and precio_aplanamiento != "N/A":
@@ -350,8 +367,7 @@ def detectar_giros_y_alertar(tickers):
             <tr>
                 <td>{data['NOMBRE_EMPRESA']}</td>
                 <td>{formatear_numero(precio_actual)}€</td>
-                <td>{data['ESTADO_SMI']}</td>
-                <td>{tendencia_actual_str}</td>
+                <td>{estado_y_tendencia}</td>
                 <td>{diferencia_str}</td>
                 <td>{recomendacion}</td>
             </tr>
