@@ -214,22 +214,33 @@ def clasificar_fuerza_senial(variacion):
         
 def generar_recomendacion(data):
     tendencia = data['TENDENCIA_ACTUAL']
+    estado_smi = data['ESTADO_SMI']
     precio_actual = data['PRECIO_ACTUAL']
     precio_aplanamiento = data['PRECIO_APLANAMIENTO']
     diferencia_porcentual = (precio_aplanamiento - precio_actual) / precio_actual if precio_actual != "N/A" and precio_aplanamiento != "N/A" and precio_actual != 0 else 0
 
-    if abs(diferencia_porcentual) <= 0.005:  # Si está dentro del 0.5%
+    if abs(diferencia_porcentual) <= 0.005:
         if tendencia == "alcista":
             return "Señal de VENTA ACTIVADA"
         else:
             return "Señal de COMPRA ACTIVADA"
     
+    if estado_smi == "Sobrecompra":
+        if tendencia == "alcista":
+            return "Mantente comprado"
+        else:
+            return f"Vende si baja de {formatear_numero(precio_aplanamiento)}€"
+    
+    if estado_smi == "Sobreventa":
+        if tendencia == "bajista":
+            return "Mantente vendido"
+        else:
+            return f"Compra si supera {formatear_numero(precio_aplanamiento)}€"
+
     if tendencia == "bajista":
-        # SMI bajando, necesita subir para aplanarse -> Recomendación de COMPRA si se supera un precio
         return f"Compra si supera {formatear_numero(precio_aplanamiento)}€"
     
     if tendencia == "alcista":
-        # SMI subiendo, necesita bajar para aplanarse -> Recomendación de VENTA si se baja de un precio
         return f"Vende si baja de {formatear_numero(precio_aplanamiento)}€"
 
     return "No aplica"
@@ -308,14 +319,13 @@ def detectar_giros_y_alertar(tickers):
     html_body += """
         <hr>
         <h3>Análisis de Proximidad al Giro</h3>
-        <p>Esta tabla muestra la distancia del precio actual al punto de aplanamiento del SMI. Un valor positivo indica que el precio debe subir para aplanar la curva, y un valor negativo que debe bajar:</p>
+        <p>Esta tabla muestra el estado actual del SMI y una recomendación para posibles puntos de giro:</p>
         <table>
             <tr>
                 <th>Empresa</th>
                 <th>Precio Actual</th>
                 <th>Estado del SMI</th>
                 <th>TENDENCIA ACTUAL</th>
-                <th>Precio para Aplanar el SMI</th>
                 <th>Diferencia %</th>
                 <th>Acción Recomendada</th>
             </tr>
@@ -342,7 +352,6 @@ def detectar_giros_y_alertar(tickers):
                 <td>{formatear_numero(precio_actual)}€</td>
                 <td>{data['ESTADO_SMI']}</td>
                 <td>{tendencia_actual_str}</td>
-                <td>{formatear_numero(precio_aplanamiento)}€</td>
                 <td>{diferencia_str}</td>
                 <td>{recomendacion}</td>
             </tr>
