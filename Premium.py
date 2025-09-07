@@ -162,7 +162,9 @@ def obtener_datos_yfinance(ticker):
         
         tendencia_hoy = "alcista" if pendiente_hoy > 0 else "bajista"
         
-        estado_smi = "Sobrecompra" if smi_today > 60 else ("Sobreventa" if smi_today < -60 else "Intermedio")
+        # --- CAMBIO AQUI ---
+        estado_smi = "Sobrecompra" if smi_today > 40 else ("Sobreventa" if smi_today < -40 else "Intermedio")
+        # --- FIN DEL CAMBIO ---
         
         giro = "No"
         tipo_giro = "N/A"
