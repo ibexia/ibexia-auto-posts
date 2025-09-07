@@ -380,7 +380,7 @@ def detectar_giros_y_alertar(tickers):
                 <th>SMI Hoy (+2%)</th>
                 <th>SMI Hoy (-1%)</th>
                 <th>SMI Hoy (-2%)</th>
-                <th>Diferencia %</th>
+                <th>% Necesario</th>
                 <th>Acción Recomendada</th>
             </tr>
     """
@@ -423,12 +423,12 @@ def detectar_giros_y_alertar(tickers):
                 <td>{formatear_numero(precio_actual)}€</td>
                 <td style="{color_style}">{estado_y_tendencia}</td>
                 <td>{smi_ayer:,.2f}</td>
-                <td style="{get_color(smi_simulados['mismo']['valor'], smi_ayer)}">{smi_simulados['mismo']['valor']:,.2f}</td>
-                <td style="{get_color(smi_simulados['+1%']['valor'], smi_ayer)}">{smi_simulados['+1%']['valor']:,.2f}</td>
-                <td style="{get_color(smi_simulados['+2%']['valor'], smi_ayer)}">{smi_simulados['+2%']['valor']:,.2f}</td>
-                <td style="{get_color(smi_simulados['-1%']['valor'], smi_ayer)}">{smi_simulados['-1%']['valor']:,.2f}</td>
-                <td style="{get_color(smi_simulados['-2%']['valor'], smi_ayer)}">{smi_simulados['-2%']['valor']:,.2f}</td>
-                <td>{diferencia_str}</td>
+                <td style="{get_color(smi_simulados['mismo']['valor'], smi_ayer)}">{smi_simulados['mismo']['valor']:,.2f}<br>{formatear_numero(smi_simulados['mismo']['precio'])}€</td>
+                <td style="{get_color(smi_simulados['+1%']['valor'], smi_ayer)}">{smi_simulados['+1%']['valor']:,.2f}<br>{formatear_numero(smi_simulados['+1%']['precio'])}€</td>
+                <td style="{get_color(smi_simulados['+2%']['valor'], smi_ayer)}">{smi_simulados['+2%']['valor']:,.2f}<br>{formatear_numero(smi_simulados['+2%']['precio'])}€</td>
+                <td style="{get_color(smi_simulados['-1%']['valor'], smi_ayer)}">{smi_simulados['-1%']['valor']:,.2f}<br>{formatear_numero(smi_simulados['-1%']['precio'])}€</td>
+                <td style="{get_color(smi_simulados['-2%']['valor'], smi_ayer)}">{smi_simulados['-2%']['valor']:,.2f}<br>{formatear_numero(smi_simulados['-2%']['precio'])}€</td>
+                <td>{diferencia_str}<br>{formatear_numero(precio_aplanamiento)}€</td>
                 <td>{recomendacion}</td>
             </tr>
         """
