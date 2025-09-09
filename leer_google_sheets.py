@@ -607,10 +607,6 @@ def construir_prompt_formateado(data):
         <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
     </tr>
     <tr>
-        <td style="padding: 8px;">Recomendación</td>
-        <td style="padding: 8px;"><strong>{data['RECOMENDACION']}</strong></td>
-    </tr>
-    <tr>
         <td style="padding: 8px;">Precio Objetivo de Compra</td>
         <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
     </tr>
