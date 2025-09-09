@@ -122,6 +122,13 @@ def obtener_datos_yfinance(ticker):
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
+        
+        # Filtro para empresas sin precio actual
+        current_price = info.get("currentPrice")
+        if not current_price:
+            print(f"⚠️ Advertencia: No se encontró precio actual para {ticker}. Saltando...")
+            return None
+
         hist_extended = stock.history(period="60d", interval="1d")
         if hist_extended.empty:
             print(f"⚠️ Advertencia: No se encontraron datos históricos para {ticker}. Saltando...")
@@ -132,8 +139,6 @@ def obtener_datos_yfinance(ticker):
         if len(smi_series) < 2:
             print(f"⚠️ Advertencia: No hay suficientes datos de SMI para {ticker}. Saltando...")
             return None
-
-        current_price = info.get("currentPrice", "N/A")
         
         smi_yesterday = smi_series.iloc[-2]
         smi_today = smi_series.iloc[-1]
@@ -146,8 +151,7 @@ def obtener_datos_yfinance(ticker):
         
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
         
-        # --- INICIO DE LA MODIFICACIÓN (Actualizada) ---
-        # Lógica para determinar la última acción de compra/venta y su fecha
+        # --- Lógica para determinar la última acción de compra/venta y su fecha
         comprado_status = "N/A"
         precio_compra = "N/A"
         fecha_compra = "N/A"
@@ -175,7 +179,6 @@ def obtener_datos_yfinance(ticker):
                 precio_compra = hist_extended['Close'].iloc[i-1]
                 fecha_compra = hist_extended.index[i-1].strftime('%d/%m/%Y')
                 break # Encontrada la última acción, salimos del bucle
-        # --- FIN DE LA MODIFICACIÓN ---
 
         return {
             "TICKER": ticker,
@@ -289,10 +292,10 @@ def generar_reporte():
                 datos_completos.append(clasificar_empresa(data))
             time.sleep(1)
 
-        # Ordenar la lista de datos según la prioridad
-        datos_completos.sort(key=lambda x: x.get('ORDEN_PRIORIDAD', 99))
+        # Ordenar la lista alfabéticamente por el nombre de la empresa
+        datos_completos.sort(key=lambda x: x.get('NOMBRE_EMPRESA', ''))
         
-        # Filtrar para no mostrar las que tienen orden 99
+        # Filtrar para no mostrar las que tienen orden 99 (no relevantes)
         datos_completos = [d for d in datos_completos if d.get('ORDEN_PRIORIDAD') != 99]
 
         html_body = f"""
@@ -302,17 +305,26 @@ def generar_reporte():
                 body {{ font-family: Arial, sans-serif; }}
                 h2 {{ color: #2c3e50; }}
                 p {{ color: #7f8c8d; }}
-                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-                th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
+                table {{ 
+                    width: auto; 
+                    border-collapse: collapse; 
+                    margin-top: 20px; 
+                }}
+                th, td {{ 
+                    border: 1px solid #ddd; 
+                    padding: 8px; 
+                    text-align: left;
+                }}
                 th {{ background-color: #f2f2f2; }}
                 .compra {{ color: #1abc9c; font-weight: bold; }}
                 .venta {{ color: #e74c3c; font-weight: bold; }}
+                .comprado-si {{ background-color: #2ecc71; color: white; font-weight: bold; }}
             </style>
         </head>
         <body>
             <h2>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</h2>
             
-            <p>Se ha generado un resumen de las empresas según su estado y tendencia del SMI. La tabla está ordenada por la relevancia de la oportunidad, de mayor a menor.</p>
+            <p>Se ha generado un resumen de las empresas según su estado y tendencia del SMI. La tabla está ordenada alfabéticamente.</p>
             
             <table>
                 <tr>
@@ -336,12 +348,18 @@ def generar_reporte():
                 
                 oportunidad = data['OPORTUNIDAD']
                 clase_oportunidad = "compra" if "compra" in oportunidad.lower() else ("venta" if "venta" in oportunidad.lower() else "")
+
+                # Lógica para ocultar el precio de compra si el estado es NO
+                precio_compra_display = data['PRECIO_COMPRA'] if data['COMPRADO'] == 'SI' else ''
                 
+                # Lógica para aplicar el estilo de celda si está comprado
+                comprado_class = "comprado-si" if data['COMPRADO'] == 'SI' else ''
+
                 html_body += f"""
                     <tr>
                         <td>{nombre_con_precio}</td>
-                        <td>{data['COMPRADO']}</td>
-                        <td>{data['PRECIO_COMPRA']}</td>
+                        <td class="{comprado_class}">{data['COMPRADO']}</td>
+                        <td>{precio_compra_display}</td>
                         <td>{data['FECHA_COMPRA']}</td>
                         <td>{data['TENDENCIA_ACTUAL']}</td>
                         <td class="{clase_oportunidad}">{oportunidad}</td>
