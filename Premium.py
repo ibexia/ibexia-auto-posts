@@ -145,6 +145,30 @@ def obtener_datos_yfinance(ticker):
         estado_smi = "Sobrecompra" if smi_today > 40 else ("Sobreventa" if smi_today < -40 else "Intermedio")
         
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
+        
+        # Lógica para determinar la última acción de compra/venta y su fecha
+        comprado_status = "NO"
+        precio_compra = "N/A"
+        fecha_compra = "N/A"
+        
+        pendientes_smi = hist_extended['SMI'].diff().dropna()
+        if len(pendientes_smi) > 1:
+            for i in range(1, len(pendientes_smi)):
+                smi_prev = hist_extended['SMI'].iloc[i]
+                pendiente_prev = pendientes_smi.iloc[i-1]
+                pendiente_curr = pendientes_smi.iloc[i]
+                
+                # Señal de compra: cambio de tendencia de negativa a positiva en zona de sobreventa o intermedia
+                if pendiente_curr > 0 and pendiente_prev <= 0 and smi_prev < 40:
+                    comprado_status = "SI"
+                    precio_compra = hist_extended['Close'].iloc[i]
+                    fecha_compra = hist_extended.index[i].strftime('%d/%m/%Y')
+                
+                # Señal de venta: cambio de tendencia de positiva a negativa
+                elif pendiente_curr < 0 and pendiente_prev >= 0:
+                    comprado_status = "NO"
+                    precio_compra = "N/A"
+                    fecha_compra = "N/A"
 
         return {
             "TICKER": ticker,
@@ -156,9 +180,9 @@ def obtener_datos_yfinance(ticker):
             "ESTADO_SMI": estado_smi,
             "PRECIO_APLANAMIENTO": precio_aplanamiento,
             "PENDIENTE": pendiente_hoy,
-            "COMPRADO": "NO",
-            "PRECIO_COMPRA": "N/A",
-            "FECHA_COMPRA": "N/A",
+            "COMPRADO": comprado_status,
+            "PRECIO_COMPRA": formatear_numero(precio_compra),
+            "FECHA_COMPRA": fecha_compra,
         }
 
     except Exception as e:
