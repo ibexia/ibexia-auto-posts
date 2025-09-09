@@ -146,7 +146,7 @@ def obtener_datos_yfinance(ticker):
         
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
         
-        # --- INICIO DE LA MODIFICACIÓN ---
+        # --- INICIO DE LA MODIFICACIÓN (Actualizada) ---
         # Lógica para determinar la última acción de compra/venta y su fecha
         comprado_status = "N/A"
         precio_compra = "N/A"
@@ -165,15 +165,15 @@ def obtener_datos_yfinance(ticker):
             # Señal de venta: cambio de tendencia de positiva a negativa
             if pendiente_curr < 0 and pendiente_prev >= 0:
                 comprado_status = "NO"
-                precio_compra = hist_extended['Close'].iloc[i]
-                fecha_compra = hist_extended.index[i].strftime('%d/%m/%Y')
+                precio_compra = hist_extended['Close'].iloc[i-1]
+                fecha_compra = hist_extended.index[i-1].strftime('%d/%m/%Y')
                 break # Encontrada la última acción, salimos del bucle
             
             # Señal de compra: cambio de tendencia de negativa a positiva en zona de sobreventa o intermedia
             elif pendiente_curr > 0 and pendiente_prev <= 0 and smi_prev < 40:
                 comprado_status = "SI"
-                precio_compra = hist_extended['Close'].iloc[i]
-                fecha_compra = hist_extended.index[i].strftime('%d/%m/%Y')
+                precio_compra = hist_extended['Close'].iloc[i-1]
+                fecha_compra = hist_extended.index[i-1].strftime('%d/%m/%Y')
                 break # Encontrada la última acción, salimos del bucle
         # --- FIN DE LA MODIFICACIÓN ---
 
