@@ -13,6 +13,8 @@ import numpy as np
 import time
 import re
 import random
+from email.mime.base import MIMEBase
+from email import encoders
 
 def leer_google_sheets():
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
@@ -257,15 +259,31 @@ def clasificar_empresa(data):
 
     return data
 
-def enviar_email(html_body, asunto_email):
+def enviar_email_con_adjunto(html_body, asunto_email):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
     password = "kdgz lvdo wqvt vfkt"
-    msg = MIMEMultipart("alternative")
+    msg = MIMEMultipart()
     msg['From'] = remitente
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
-    msg.attach(MIMEText(html_body, 'html'))
+
+    # Crea el archivo HTML
+    html_filename = "analisis-empresas.html"
+    with open(html_filename, "w", encoding="utf-8") as f:
+        f.write(html_body)
+
+    # Adjunta el archivo HTML al correo
+    with open(html_filename, "rb") as attachment:
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(attachment.read())
+
+    encoders.encode_base64(part)
+    part.add_header(
+        "Content-Disposition",
+        f"attachment; filename={html_filename}",
+    )
+    msg.attach(part)
 
     try:
         servidor = smtplib.SMTP('smtp.gmail.com', 587)
@@ -274,6 +292,8 @@ def enviar_email(html_body, asunto_email):
         servidor.sendmail(remitente, destinatario, msg.as_string())
         servidor.quit()
         print(f"✅ Correo enviado con el asunto: {asunto_email}")
+        # Elimina el archivo después de enviarlo
+        os.remove(html_filename)
     except Exception as e:
         print("❌ Error al enviar el correo:", e)
 
@@ -301,10 +321,20 @@ def generar_reporte():
         html_body = f"""
         <html>
         <head>
+            <title>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</title>
             <style>
                 body {{ font-family: Arial, sans-serif; }}
                 h2 {{ color: #2c3e50; }}
                 p {{ color: #7f8c8d; }}
+                #search-container {{ margin-bottom: 20px; }}
+                #searchInput {{
+                    width: 100%;
+                    padding: 10px;
+                    font-size: 16px;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    box-sizing: border-box;
+                }}
                 table {{ 
                     width: auto; 
                     border-collapse: collapse; 
@@ -324,9 +354,13 @@ def generar_reporte():
         <body>
             <h2>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</h2>
             
-            <p>Se ha generado un resumen de las empresas según su estado y tendencia del SMI. La tabla está ordenada alfabéticamente.</p>
+            <p>Se ha generado un resumen de las empresas según su estado y tendencia del SMI. La tabla está ordenada alfabéticamente. Usa el buscador para encontrar una empresa rápidamente.</p>
             
-            <table>
+            <div id="search-container">
+                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa...">
+            </div>
+
+            <table id="myTable">
                 <tr>
                     <th>Empresa (Precio)</th>
                     <th>¿Estamos comprados?</th>
@@ -344,15 +378,13 @@ def generar_reporte():
             """
         else:
             for data in datos_completos:
-                nombre_con_precio = f"{data['NOMBRE_EMPRESA']} ({formatear_numero(data['PRECIO_ACTUAL'])}€)"
+                nombre_con_precio = f"<b>{data['NOMBRE_EMPRESA']}</b> ({formatear_numero(data['PRECIO_ACTUAL'])}€)"
                 
                 oportunidad = data['OPORTUNIDAD']
                 clase_oportunidad = "compra" if "compra" in oportunidad.lower() else ("venta" if "venta" in oportunidad.lower() else "")
 
-                # Lógica para ocultar el precio de compra si el estado es NO
                 precio_compra_display = data['PRECIO_COMPRA'] if data['COMPRADO'] == 'SI' else ''
                 
-                # Lógica para aplicar el estilo de celda si está comprado
                 comprado_class = "comprado-si" if data['COMPRADO'] == 'SI' else ''
 
                 html_body += f"""
@@ -372,12 +404,33 @@ def generar_reporte():
             </table>
             <br>
             <p><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
+
+            <script>
+                function filterTable() {
+                    var input, filter, table, tr, td, i, txtValue;
+                    input = document.getElementById("searchInput");
+                    filter = input.value.toUpperCase();
+                    table = document.getElementById("myTable");
+                    tr = table.getElementsByTagName("tr");
+                    for (i = 1; i < tr.length; i++) {
+                        td = tr[i].getElementsByTagName("td")[0];
+                        if (td) {
+                            txtValue = td.textContent || td.innerText;
+                            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                                tr[i].style.display = "";
+                            } else {
+                                tr[i].style.display = "none";
+                            }
+                        }
+                    }
+                }
+            </script>
         </body>
         </html>
         """
         
         asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_completos)} oportunidades detectadas hoy {datetime.today().strftime('%d/%m/%Y')}"
-        enviar_email(html_body, asunto)
+        enviar_email_con_adjunto(html_body, asunto)
 
     except Exception as e:
         print(f"❌ Error al ejecutar el script principal: {e}")
