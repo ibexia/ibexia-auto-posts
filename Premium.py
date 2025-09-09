@@ -323,9 +323,22 @@ def generar_reporte():
         <head>
             <title>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</title>
             <style>
-                body {{ font-family: Arial, sans-serif; }}
-                h2 {{ color: #2c3e50; }}
-                p {{ color: #7f8c8d; }}
+                body {{ 
+                    font-family: Arial, sans-serif; 
+                    background-color: #f4f4f4;
+                    margin: 0;
+                    padding: 20px;
+                }}
+                .main-container {{
+                    max-width: 900px;
+                    margin: 0 auto;
+                    background-color: #fff;
+                    padding: 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                }}
+                h2 {{ color: #2c3e50; text-align: center; }}
+                p {{ color: #7f8c8d; text-align: center; }}
                 #search-container {{ margin-bottom: 20px; }}
                 #searchInput {{
                     width: 100%;
@@ -343,7 +356,7 @@ def generar_reporte():
                     width: 800px;
                     min-width: 800px;
                     border-collapse: collapse; 
-                    margin-top: 20px; 
+                    margin: 20px auto 0 auto;
                 }}
                 th, td {{ 
                     border: 1px solid #ddd; 
@@ -356,40 +369,43 @@ def generar_reporte():
                 .compra {{ color: #1abc9c; font-weight: bold; }}
                 .venta {{ color: #e74c3c; font-weight: bold; }}
                 .comprado-si {{ background-color: #2ecc71; color: white; font-weight: bold; }}
+                .text-center {{ text-align: center; }}
+                .disclaimer {{ font-size: 12px; text-align: center; color: #95a5a6; }}
             </style>
         </head>
         <body>
-            <h2>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</h2>
-            
-            <p>Se ha generado un resumen de las empresas según su estado y tendencia del SMI. La tabla está ordenada alfabéticamente. Usa el buscador para encontrar una empresa rápidamente.</p>
-            
-            <div id="search-container">
-                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa...">
-            </div>
-            
-            <div id="scroll-top" style="overflow-x: auto;">
-                <div style="width: 800px;">&nbsp;</div>
-            </div>
-            
-            <div class="table-container">
-                <table id="myTable">
-                    <thead>
-                        <tr>
-                            <th>Empresa (Precio)</th>
-                            <th>¿Estamos comprados?</th>
-                            <th>Precio de compra</th>
-                            <th>Fecha de compra</th>
-                            <th>Tendencia Actual</th>
-                            <th>Oportunidad</th>
-                            <th>Compra si...</th>
-                            <th>Vende si...</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+            <div class="main-container">
+                <h2 class="text-center">Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</h2>
+                
+                <p class="text-center">Se ha generado un resumen de las empresas según su estado y tendencia del SMI. La tabla está ordenada alfabéticamente. Usa el buscador para encontrar una empresa rápidamente.</p>
+                
+                <div id="search-container">
+                    <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa...">
+                </div>
+                
+                <div id="scroll-top" style="overflow-x: auto;">
+                    <div style="width: 800px;">&nbsp;</div>
+                </div>
+                
+                <div class="table-container">
+                    <table id="myTable">
+                        <thead>
+                            <tr>
+                                <th>Empresa (Precio)</th>
+                                <th>¿Estamos comprados?</th>
+                                <th>Precio de compra</th>
+                                <th>Fecha de compra</th>
+                                <th>Tendencia Actual</th>
+                                <th>Oportunidad</th>
+                                <th>Compra si...</th>
+                                <th>Vende si...</th>
+                            </tr>
+                        </thead>
+                        <tbody>
         """
         if not datos_completos:
             html_body += """
-                        <tr><td colspan="8">No se encontraron empresas con oportunidades claras hoy.</td></tr>
+                            <tr><td colspan="8">No se encontraron empresas con oportunidades claras hoy.</td></tr>
             """
         else:
             for data in datos_completos:
@@ -404,25 +420,26 @@ def generar_reporte():
                 comprado_class = "comprado-si" if data['COMPRADO'] == 'SI' else ''
 
                 html_body += f"""
-                        <tr>
-                            <td>{nombre_con_precio}</td>
-                            <td class="{comprado_class}">{data['COMPRADO']}</td>
-                            <td>{precio_compra_display}</td>
-                            <td>{fecha_compra_display}</td>
-                            <td>{data['TENDENCIA_ACTUAL']}</td>
-                            <td class="{clase_oportunidad}">{oportunidad}</td>
-                            <td>{data['COMPRA_SI']}</td>
-                            <td>{data['VENDE_SI']}</td>
-                        </tr>
+                            <tr>
+                                <td>{nombre_con_precio}</td>
+                                <td class="{comprado_class}">{data['COMPRADO']}</td>
+                                <td>{precio_compra_display}</td>
+                                <td>{fecha_compra_display}</td>
+                                <td>{data['TENDENCIA_ACTUAL']}</td>
+                                <td class="{clase_oportunidad}">{oportunidad}</td>
+                                <td>{data['COMPRA_SI']}</td>
+                                <td>{data['VENDE_SI']}</td>
+                            </tr>
                 """
         
         html_body += """
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <br>
+                <p class="disclaimer"><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
             </div>
-            
-            <br>
-            <p><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
 
             <script>
                 function filterTable() {
