@@ -337,9 +337,10 @@ def generar_reporte():
                 }}
                 .table-container {{
                     overflow-x: auto;
+                    overflow-y: auto;
                 }}
                 table {{ 
-                    width: 100%; 
+                    width: 800px;
                     min-width: 800px;
                     border-collapse: collapse; 
                     margin-top: 20px; 
@@ -348,7 +349,8 @@ def generar_reporte():
                     border: 1px solid #ddd; 
                     padding: 8px; 
                     text-align: left;
-                    white-space: nowrap;
+                    vertical-align: top;
+                    white-space: normal;
                 }}
                 th {{ background-color: #f2f2f2; }}
                 .compra {{ color: #1abc9c; font-weight: bold; }}
@@ -364,7 +366,11 @@ def generar_reporte():
             <div id="search-container">
                 <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa...">
             </div>
-
+            
+            <div id="scroll-top" style="overflow-x: auto;">
+                <div style="width: 800px;">&nbsp;</div>
+            </div>
+            
             <div class="table-container">
                 <table id="myTable">
                     <thead>
@@ -392,9 +398,7 @@ def generar_reporte():
                 oportunidad = data['OPORTUNIDAD']
                 clase_oportunidad = "compra" if "compra" in oportunidad.lower() else ("venta" if "venta" in oportunidad.lower() else "")
 
-                # Lógica para ocultar el precio de compra si el estado es NO
-                precio_compra_display = data['PRECIO_COMPRA'] if data['COMPRADO'] == 'SI' else ''
-                # Lógica para ocultar la fecha de compra si el estado es NO
+                precio_compra_display = f"{data['PRECIO_COMPRA']}€" if data['COMPRADO'] == 'SI' and data['PRECIO_COMPRA'] != 'N/A' else ''
                 fecha_compra_display = data['FECHA_COMPRA'] if data['COMPRADO'] == 'SI' else ''
                 
                 comprado_class = "comprado-si" if data['COMPRADO'] == 'SI' else ''
@@ -427,7 +431,7 @@ def generar_reporte():
                     filter = input.value.toUpperCase();
                     table = document.getElementById("myTable");
                     tr = table.getElementsByTagName("tr");
-                    for (i = 0; i < tr.length; i++) { // Cambiado a 0 para incluir thead en la búsqueda
+                    for (i = 0; i < tr.length; i++) {
                         td = tr[i].getElementsByTagName("td")[0];
                         if (td) {
                             txtValue = td.textContent || td.innerText;
@@ -439,6 +443,18 @@ def generar_reporte():
                         }
                     }
                 }
+                
+                // Sincronizar el scroll de las dos barras
+                const tableContainer = document.querySelector('.table-container');
+                const scrollTop = document.getElementById('scroll-top');
+                
+                scrollTop.addEventListener('scroll', () => {
+                    tableContainer.scrollLeft = scrollTop.scrollLeft;
+                });
+                
+                tableContainer.addEventListener('scroll', () => {
+                    scrollTop.scrollLeft = tableContainer.scrollLeft;
+                });
             </script>
         </body>
         </html>
