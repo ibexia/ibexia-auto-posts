@@ -5,8 +5,7 @@ on:
   schedule:
     # Horario de invierno (CET): 9:30, 12:30, 17:00
     - cron: '30 8,11,16 * * *'
-    # Horario de verano (CEST): 9:30, 12:30, 17:00
-    - cron: '30 7,10,15 * * *'
+
 
 jobs:
   leer_y_generar:
