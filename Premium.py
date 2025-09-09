@@ -156,6 +156,9 @@ def obtener_datos_yfinance(ticker):
             "ESTADO_SMI": estado_smi,
             "PRECIO_APLANAMIENTO": precio_aplanamiento,
             "PENDIENTE": pendiente_hoy,
+            "COMPRADO": "NO",
+            "PRECIO_COMPRA": "N/A",
+            "FECHA_COMPRA": "N/A",
         }
 
     except Exception as e:
@@ -169,53 +172,53 @@ def clasificar_empresa(data):
 
     if estado_smi == "Sobreventa":
         if tendencia == "Subiendo":
-            data['OPORTUNIDAD'] = "Compra Activada"
-            data['COMPRA_SI'] = "AHORA"
-            data['VENDE_SI'] = "NO"
+            data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
+            data['COMPRA_SI'] = "COMPRA AHORA"
+            data['VENDE_SI'] = "NO VENDAS"
             data['ORDEN_PRIORIDAD'] = 1
         elif tendencia == "Bajando":
-            data['OPORTUNIDAD'] = "Compra"
-            data['COMPRA_SI'] = f"Si supera {formatear_numero(precio_aplanamiento)}€ ⬆️"
-            data['VENDE_SI'] = "NO"
+            data['OPORTUNIDAD'] = "Posibilidad de Compra"
+            data['COMPRA_SI'] = f"COMPRA si supera {formatear_numero(precio_aplanamiento)}€ ⬆️"
+            data['VENDE_SI'] = "NO VENDAS"
             data['ORDEN_PRIORIDAD'] = 2
         else: # Tendencia Plana
             data['OPORTUNIDAD'] = "Intermedio"
-            data['COMPRA_SI'] = "NA"
-            data['VENDE_SI'] = "NA"
+            data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
+            data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['ORDEN_PRIORIDAD'] = 99 # Baja prioridad
     
     elif estado_smi == "Intermedio":
         if tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Seguirá bajando"
-            data['COMPRA_SI'] = f"Si supera {formatear_numero(precio_aplanamiento)}€ ⬆️"
-            data['VENDE_SI'] = "YA ES TARDE"
+            data['COMPRA_SI'] = f"COMPRA si supera {formatear_numero(precio_aplanamiento)}€ ⬆️"
+            data['VENDE_SI'] = "YA ES TARDE PARA VENDER"
             data['ORDEN_PRIORIDAD'] = 4
         elif tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Seguirá subiendo"
-            data['COMPRA_SI'] = "YA ES TARDE"
-            data['VENDE_SI'] = f"Si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
+            data['COMPRA_SI'] = "YA ES TARDE PARA COMPRAR"
+            data['VENDE_SI'] = f"VENDE si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
             data['ORDEN_PRIORIDAD'] = 3
         else: # Tendencia Plana
             data['OPORTUNIDAD'] = "Intermedio"
-            data['COMPRA_SI'] = "NA"
-            data['VENDE_SI'] = "NA"
+            data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
+            data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['ORDEN_PRIORIDAD'] = 99 # Baja prioridad
             
     elif estado_smi == "Sobrecompra":
         if tendencia == "Subiendo":
-            data['OPORTUNIDAD'] = "Venta"
-            data['COMPRA_SI'] = "NO"
-            data['VENDE_SI'] = f"Si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
+            data['OPORTUNIDAD'] = "Riesgo de Venta"
+            data['COMPRA_SI'] = "NO COMPRES"
+            data['VENDE_SI'] = f"VENDE si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
             data['ORDEN_PRIORIDAD'] = 5
         elif tendencia == "Bajando":
-            data['OPORTUNIDAD'] = "Venta Activada"
-            data['COMPRA_SI'] = "NO"
-            data['VENDE_SI'] = "AHORA"
+            data['OPORTUNIDAD'] = "Riesgo de Venta Activada"
+            data['COMPRA_SI'] = "NO COMPRES"
+            data['VENDE_SI'] = "VENDE AHORA"
             data['ORDEN_PRIORIDAD'] = 6
         else: # Tendencia Plana
             data['OPORTUNIDAD'] = "Intermedio"
-            data['COMPRA_SI'] = "NA"
-            data['VENDE_SI'] = "NA"
+            data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
+            data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['ORDEN_PRIORIDAD'] = 99 # Baja prioridad
 
     return data
@@ -283,6 +286,9 @@ def generar_reporte():
             <table>
                 <tr>
                     <th>Empresa (Precio)</th>
+                    <th>¿Estamos comprados?</th>
+                    <th>Precio de compra</th>
+                    <th>Fecha de compra</th>
                     <th>Tendencia Actual</th>
                     <th>Oportunidad</th>
                     <th>Compra si...</th>
@@ -291,7 +297,7 @@ def generar_reporte():
         """
         if not datos_completos:
             html_body += """
-                <tr><td colspan="5">No se encontraron empresas con oportunidades claras hoy.</td></tr>
+                <tr><td colspan="8">No se encontraron empresas con oportunidades claras hoy.</td></tr>
             """
         else:
             for data in datos_completos:
@@ -303,6 +309,9 @@ def generar_reporte():
                 html_body += f"""
                     <tr>
                         <td>{nombre_con_precio}</td>
+                        <td>{data['COMPRADO']}</td>
+                        <td>{data['PRECIO_COMPRA']}</td>
+                        <td>{data['FECHA_COMPRA']}</td>
                         <td>{data['TENDENCIA_ACTUAL']}</td>
                         <td class="{clase_oportunidad}">{oportunidad}</td>
                         <td>{data['COMPRA_SI']}</td>
