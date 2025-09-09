@@ -335,8 +335,12 @@ def generar_reporte():
                     border-radius: 4px;
                     box-sizing: border-box;
                 }}
+                .table-container {{
+                    overflow-x: auto;
+                }}
                 table {{ 
-                    width: auto; 
+                    width: 100%; 
+                    min-width: 800px;
                     border-collapse: collapse; 
                     margin-top: 20px; 
                 }}
@@ -344,6 +348,7 @@ def generar_reporte():
                     border: 1px solid #ddd; 
                     padding: 8px; 
                     text-align: left;
+                    white-space: nowrap;
                 }}
                 th {{ background-color: #f2f2f2; }}
                 .compra {{ color: #1abc9c; font-weight: bold; }}
@@ -360,21 +365,25 @@ def generar_reporte():
                 <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa...">
             </div>
 
-            <table id="myTable">
-                <tr>
-                    <th>Empresa (Precio)</th>
-                    <th>¿Estamos comprados?</th>
-                    <th>Precio de compra</th>
-                    <th>Fecha de compra</th>
-                    <th>Tendencia Actual</th>
-                    <th>Oportunidad</th>
-                    <th>Compra si...</th>
-                    <th>Vende si...</th>
-                </tr>
+            <div class="table-container">
+                <table id="myTable">
+                    <thead>
+                        <tr>
+                            <th>Empresa (Precio)</th>
+                            <th>¿Estamos comprados?</th>
+                            <th>Precio de compra</th>
+                            <th>Fecha de compra</th>
+                            <th>Tendencia Actual</th>
+                            <th>Oportunidad</th>
+                            <th>Compra si...</th>
+                            <th>Vende si...</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         """
         if not datos_completos:
             html_body += """
-                <tr><td colspan="8">No se encontraron empresas con oportunidades claras hoy.</td></tr>
+                        <tr><td colspan="8">No se encontraron empresas con oportunidades claras hoy.</td></tr>
             """
         else:
             for data in datos_completos:
@@ -383,25 +392,31 @@ def generar_reporte():
                 oportunidad = data['OPORTUNIDAD']
                 clase_oportunidad = "compra" if "compra" in oportunidad.lower() else ("venta" if "venta" in oportunidad.lower() else "")
 
+                # Lógica para ocultar el precio de compra si el estado es NO
                 precio_compra_display = data['PRECIO_COMPRA'] if data['COMPRADO'] == 'SI' else ''
+                # Lógica para ocultar la fecha de compra si el estado es NO
+                fecha_compra_display = data['FECHA_COMPRA'] if data['COMPRADO'] == 'SI' else ''
                 
                 comprado_class = "comprado-si" if data['COMPRADO'] == 'SI' else ''
 
                 html_body += f"""
-                    <tr>
-                        <td>{nombre_con_precio}</td>
-                        <td class="{comprado_class}">{data['COMPRADO']}</td>
-                        <td>{precio_compra_display}</td>
-                        <td>{data['FECHA_COMPRA']}</td>
-                        <td>{data['TENDENCIA_ACTUAL']}</td>
-                        <td class="{clase_oportunidad}">{oportunidad}</td>
-                        <td>{data['COMPRA_SI']}</td>
-                        <td>{data['VENDE_SI']}</td>
-                    </tr>
+                        <tr>
+                            <td>{nombre_con_precio}</td>
+                            <td class="{comprado_class}">{data['COMPRADO']}</td>
+                            <td>{precio_compra_display}</td>
+                            <td>{fecha_compra_display}</td>
+                            <td>{data['TENDENCIA_ACTUAL']}</td>
+                            <td class="{clase_oportunidad}">{oportunidad}</td>
+                            <td>{data['COMPRA_SI']}</td>
+                            <td>{data['VENDE_SI']}</td>
+                        </tr>
                 """
         
         html_body += """
-            </table>
+                    </tbody>
+                </table>
+            </div>
+            
             <br>
             <p><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
 
@@ -412,7 +427,7 @@ def generar_reporte():
                     filter = input.value.toUpperCase();
                     table = document.getElementById("myTable");
                     tr = table.getElementsByTagName("tr");
-                    for (i = 1; i < tr.length; i++) {
+                    for (i = 0; i < tr.length; i++) { // Cambiado a 0 para incluir thead en la búsqueda
                         td = tr[i].getElementsByTagName("td")[0];
                         if (td) {
                             txtValue = td.textContent || td.innerText;
