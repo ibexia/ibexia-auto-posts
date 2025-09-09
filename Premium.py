@@ -377,7 +377,7 @@ def generar_reporte():
             <div class="main-container">
                 <h2 class="text-center">Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</h2>
                 
-                <p class="text-center">Se ha generado un resumen de las empresas según su estado y tendencia del SMI. La tabla está ordenada alfabéticamente. Usa el buscador para encontrar una empresa rápidamente.</p>
+                <p class="text-center">Se ha generado un resumen de las empresas según su estado y tendencia del Logaritmo Ibexia. La tabla está ordenada alfabéticamente. Usa el buscador para encontrar una empresa rápidamente.</p>
                 
                 <div id="search-container">
                     <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa...">
