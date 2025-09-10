@@ -148,7 +148,7 @@ def obtener_datos_yfinance(ticker):
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
         
         comprado_status = "NO"
-        precio_compra = "N/A"
+        precio_compra = None  # Cambiado a None
         fecha_compra = "N/A"
         
         smi_series_copy = hist_extended['SMI'].copy()
@@ -182,7 +182,7 @@ def obtener_datos_yfinance(ticker):
             "PRECIO_APLANAMIENTO": precio_aplanamiento,
             "PENDIENTE": pendiente_hoy,
             "COMPRADO": comprado_status,
-            "PRECIO_COMPRA": formatear_numero(precio_compra),
+            "PRECIO_COMPRA": precio_compra,
             "FECHA_COMPRA": fecha_compra,
         }
 
@@ -513,8 +513,8 @@ def generar_reporte():
                 if data['COMPRADO'] == 'SI':
                     # Cálculo de la ganancia/pérdida total en euros
                     try:
-                        precio_compra_float = float(data['PRECIO_COMPRA'].replace('.', '').replace(',', '.'))
-                        if precio_compra_float > 0:
+                        precio_compra_float = data['PRECIO_COMPRA']
+                        if precio_compra_float and precio_compra_float > 0:
                             num_acciones = int(10000 / precio_compra_float)
                             ganancia_o_perdida = num_acciones * (data['PRECIO_ACTUAL'] - precio_compra_float)
                             signo = "+" if ganancia_o_perdida >= 0 else ""
@@ -524,7 +524,7 @@ def generar_reporte():
                     except (ValueError, TypeError, ZeroDivisionError):
                         ganancia_display = ""
 
-                    comprado_display = f"SI<br><span class='small-text'>({data['PRECIO_COMPRA']}€ el {data['FECHA_COMPRA']})</span>{ganancia_display}"
+                    comprado_display = f"SI<br><span class='small-text'>({formatear_numero(data['PRECIO_COMPRA'])}€ el {data['FECHA_COMPRA']})</span>{ganancia_display}"
                     comprado_class = "comprado-si"
                 else:
                     comprado_display = "NO"
