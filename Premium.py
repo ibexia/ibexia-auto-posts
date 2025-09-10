@@ -384,7 +384,7 @@ def generar_reporte():
             categoria = empresa['OPORTUNIDAD']
             
             orden_grupo = 99
-            orden_interna = float('inf')  # Por defecto para el orden interno
+            orden_interna = float('inf')
             
             if categoria == "Posibilidad de Compra" and empresa['TENDENCIA_ACTUAL'] == "Bajando":
                 orden_grupo = 1
@@ -400,7 +400,7 @@ def generar_reporte():
                     precio_actual = empresa['PRECIO_ACTUAL']
                     precio_vende = empresa['PRECIO_APLANAMIENTO']
                     porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                    orden_interna = -porcentaje # mayor bajada (negativo) primero
+                    orden_interna = -porcentaje # Se ordena en forma descendente
             
             elif categoria == "Seguirá subiendo" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Intermedio":
                 orden_grupo = 3
@@ -408,7 +408,7 @@ def generar_reporte():
                     precio_actual = empresa['PRECIO_ACTUAL']
                     precio_vende = empresa['PRECIO_APLANAMIENTO']
                     porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                    orden_interna = -porcentaje
+                    orden_interna = -porcentaje # Se ordena en forma descendente
             
             elif categoria == "Riesgo de Venta" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobrecompra":
                 orden_grupo = 4
@@ -416,7 +416,7 @@ def generar_reporte():
                     precio_actual = empresa['PRECIO_ACTUAL']
                     precio_vende = empresa['PRECIO_APLANAMIENTO']
                     porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                    orden_interna = -porcentaje
+                    orden_interna = -porcentaje # Se ordena en forma descendente
             
             elif categoria == "Riesgo de Venta Activada" and empresa['TENDENCIA_ACTUAL'] == "Bajando" and empresa['ESTADO_SMI'] == "Sobrecompra":
                 orden_grupo = 5
