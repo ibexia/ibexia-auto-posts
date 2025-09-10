@@ -154,7 +154,7 @@ def obtener_datos_yfinance(ticker):
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
         
         # --- Lógica para determinar la última acción de compra/venta y su fecha
-        comprado_status = "N/A"
+        comprado_status = "NO"
         precio_compra = "N/A"
         fecha_compra = "N/A"
         
@@ -298,39 +298,22 @@ def clasificar_empresa(data, hist_df):
             data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
 
     # Calcular y añadir el análisis de porcentajes
-    if tendencia == "Subiendo":
-        data['SUBIDA_1'] = (np.nan, np.nan)
-        data['SUBIDA_2'] = (np.nan, np.nan)
-        data['SUBIDA_3'] = (np.nan, np.nan)
-        data['SUBIDA_4'] = (np.nan, np.nan)
-        data['SUBIDA_5'] = (np.nan, np.nan)
-        data['BAJADA_1'] = calcular_nuevo_smi(hist_df, -1)
-        data['BAJADA_2'] = calcular_nuevo_smi(hist_df, -2)
-        data['BAJADA_3'] = calcular_nuevo_smi(hist_df, -3)
-        data['BAJADA_4'] = calcular_nuevo_smi(hist_df, -4)
-        data['BAJADA_5'] = calcular_nuevo_smi(hist_df, -5)
-    elif tendencia == "Bajando":
-        data['SUBIDA_1'] = calcular_nuevo_smi(hist_df, 1)
-        data['SUBIDA_2'] = calcular_nuevo_smi(hist_df, 2)
-        data['SUBIDA_3'] = calcular_nuevo_smi(hist_df, 3)
-        data['SUBIDA_4'] = calcular_nuevo_smi(hist_df, 4)
-        data['SUBIDA_5'] = calcular_nuevo_smi(hist_df, 5)
-        data['BAJADA_1'] = (np.nan, np.nan)
-        data['BAJADA_2'] = (np.nan, np.nan)
-        data['BAJADA_3'] = (np.nan, np.nan)
-        data['BAJADA_4'] = (np.nan, np.nan)
-        data['BAJADA_5'] = (np.nan, np.nan)
-    else: # Tendencia Plana
-        data['SUBIDA_1'] = (np.nan, np.nan)
-        data['SUBIDA_2'] = (np.nan, np.nan)
-        data['SUBIDA_3'] = (np.nan, np.nan)
-        data['SUBIDA_4'] = (np.nan, np.nan)
-        data['SUBIDA_5'] = (np.nan, np.nan)
-        data['BAJADA_1'] = (np.nan, np.nan)
-        data['BAJADA_2'] = (np.nan, np.nan)
-        data['BAJADA_3'] = (np.nan, np.nan)
-        data['BAJADA_4'] = (np.nan, np.nan)
-        data['BAJADA_5'] = (np.nan, np.nan)
+    data['ANALISIS_SUBIDA'] = []
+    data['ANALISIS_BAJADA'] = []
+
+    if data['COMPRA_SI'] != "NO COMPRES":
+        for p in range(1, 6):
+            data['ANALISIS_SUBIDA'].append(calcular_nuevo_smi(hist_df, p))
+    else:
+        for p in range(1, 6):
+            data['ANALISIS_SUBIDA'].append((np.nan, np.nan))
+
+    if data['VENDE_SI'] != "NO VENDAS":
+        for p in range(1, 6):
+            data['ANALISIS_BAJADA'].append(calcular_nuevo_smi(hist_df, -p))
+    else:
+        for p in range(1, 6):
+            data['ANALISIS_BAJADA'].append((np.nan, np.nan))
 
     return data
 
@@ -487,15 +470,13 @@ def generar_reporte():
                             <tr>
                                 <th rowspan="2">Empresa (Precio)</th>
                                 <th rowspan="2">¿Estamos comprados?</th>
-                                <th rowspan="2">Precio de compra</th>
-                                <th rowspan="2">Fecha de compra</th>
                                 <th rowspan="2">Tendencia Actual</th>
                                 <th rowspan="2">Oportunidad</th>
                                 <th rowspan="2">Compra si...</th>
                                 <th rowspan="2">Vende si...</th>
                                 <th rowspan="2">Algoritmo Actual</th>
-                                <th colspan="5">Si el precio sube</th>
-                                <th colspan="5">Si el precio baja</th>
+                                <th colspan="5">Análisis si el precio sube</th>
+                                <th colspan="5">Análisis si el precio baja</th>
                             </tr>
                             <tr>
                                 <th>+1%</th>
@@ -514,7 +495,7 @@ def generar_reporte():
         """
         if not datos_completos:
             html_body += """
-                            <tr><td colspan="18">No se encontraron empresas con oportunidades claras hoy.</td></tr>
+                            <tr><td colspan="16">No se encontraron empresas con oportunidades claras hoy.</td></tr>
             """
         else:
             for data in datos_completos:
@@ -524,39 +505,34 @@ def generar_reporte():
 
                 oportunidad = data['OPORTUNIDAD']
                 clase_oportunidad = "compra" if "compra" in oportunidad.lower() else ("venta" if "venta" in oportunidad.lower() else "")
-
-                precio_compra_display = f"{data['PRECIO_COMPRA']}€" if data['COMPRADO'] == 'SI' and data['PRECIO_COMPRA'] != 'N/A' else ''
-                fecha_compra_display = data['FECHA_COMPRA'] if data['COMPRADO'] == 'SI' else ''
                 
-                comprado_class = "comprado-si" if data['COMPRADO'] == 'SI' else ''
+                if data['COMPRADO'] == 'SI':
+                    comprado_display = f"SI<br><span class='small-text'>({data['PRECIO_COMPRA']}€ el {data['FECHA_COMPRA']})</span>"
+                    comprado_class = "comprado-si"
+                else:
+                    comprado_display = "NO"
+                    comprado_class = ""
                 
                 def get_smi_cell(smi_value, price_value, smi_actual):
                     if pd.isna(smi_value):
                         return "<td>N/A</td>"
                     clase_smi = "bg-green" if smi_value >= smi_actual else "bg-red"
                     return f'<td class="{clase_smi}"><b>{formatear_numero(smi_value)}</b><br><span class="small-text">{formatear_numero(price_value)}€</span></td>'
+                
+                html_subida = "".join(get_smi_cell(smi, price, data['SMI_HOY']) for smi, price in data['ANALISIS_SUBIDA'])
+                html_bajada = "".join(get_smi_cell(smi, price, data['SMI_HOY']) for smi, price in data['ANALISIS_BAJADA'])
 
                 html_body += f"""
                             <tr>
                                 <td class="{clase_nombre}">{nombre_con_precio}</td>
-                                <td class="{comprado_class}">{data['COMPRADO']}</td>
-                                <td>{precio_compra_display}</td>
-                                <td>{fecha_compra_display}</td>
+                                <td class="{comprado_class}">{comprado_display}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
                                 <td class="{clase_oportunidad}">{oportunidad}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
                                 <td><b>{formatear_numero(data['SMI_HOY'])}</b></td>
-                                {get_smi_cell(data['SUBIDA_1'][0], data['SUBIDA_1'][1], data['SMI_HOY'])}
-                                {get_smi_cell(data['SUBIDA_2'][0], data['SUBIDA_2'][1], data['SMI_HOY'])}
-                                {get_smi_cell(data['SUBIDA_3'][0], data['SUBIDA_3'][1], data['SMI_HOY'])}
-                                {get_smi_cell(data['SUBIDA_4'][0], data['SUBIDA_4'][1], data['SMI_HOY'])}
-                                {get_smi_cell(data['SUBIDA_5'][0], data['SUBIDA_5'][1], data['SMI_HOY'])}
-                                {get_smi_cell(data['BAJADA_1'][0], data['BAJADA_1'][1], data['SMI_HOY'])}
-                                {get_smi_cell(data['BAJADA_2'][0], data['BAJADA_2'][1], data['SMI_HOY'])}
-                                {get_smi_cell(data['BAJADA_3'][0], data['BAJADA_3'][1], data['SMI_HOY'])}
-                                {get_smi_cell(data['BAJADA_4'][0], data['BAJADA_4'][1], data['SMI_HOY'])}
-                                {get_smi_cell(data['BAJADA_5'][0], data['BAJADA_5'][1], data['SMI_HOY'])}
+                                {html_subida}
+                                {html_bajada}
                             </tr>
                 """
         
