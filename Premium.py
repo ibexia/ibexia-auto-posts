@@ -117,7 +117,8 @@ def calcular_precio_aplanamiento(df):
         
 def calcular_beneficio_perdida(precio_compra, precio_actual, inversion=10000):
     try:
-        precio_compra = float(precio_compra.replace(',', ''))
+        # Se elimina el .replace(',', '') para evitar el error
+        precio_compra = float(precio_compra)
         precio_actual = float(precio_actual)
         
         if precio_compra <= 0 or precio_actual <= 0:
@@ -196,7 +197,7 @@ def obtener_datos_yfinance(ticker):
             "PRECIO_APLANAMIENTO": precio_aplanamiento,
             "PENDIENTE": pendiente_hoy,
             "COMPRADO": comprado_status,
-            "PRECIO_COMPRA": formatear_numero(precio_compra),
+            "PRECIO_COMPRA": precio_compra,  # Se mantiene como float para el cálculo
             "FECHA_COMPRA": fecha_compra,
         }
 
@@ -347,7 +348,7 @@ def generar_reporte():
                 orden_grupo = 1
                 if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
                     try:
-                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'].replace(',', ''))
+                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'])
                         precio_actual = float(empresa['PRECIO_ACTUAL'])
                         porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
                         orden_interna = porcentaje
@@ -358,7 +359,7 @@ def generar_reporte():
                 orden_grupo = 2
                 if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
                     try:
-                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'].replace(',', ''))
+                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
                         precio_actual = float(empresa['PRECIO_ACTUAL'])
                         porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
                         orden_interna = -porcentaje
@@ -369,7 +370,7 @@ def generar_reporte():
                 orden_grupo = 3
                 if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
                     try:
-                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'].replace(',', ''))
+                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
                         precio_actual = float(empresa['PRECIO_ACTUAL'])
                         porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
                         orden_interna = -porcentaje
@@ -380,7 +381,7 @@ def generar_reporte():
                 orden_grupo = 4
                 if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
                     try:
-                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'].replace(',', ''))
+                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
                         precio_actual = float(empresa['PRECIO_ACTUAL'])
                         porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
                         orden_interna = -porcentaje
@@ -391,7 +392,7 @@ def generar_reporte():
                 orden_grupo = 5
                 if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
                     try:
-                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'].replace(',', ''))
+                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'])
                         precio_actual = float(empresa['PRECIO_ACTUAL'])
                         porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
                         orden_interna = porcentaje
@@ -552,7 +553,9 @@ def generar_reporte():
                     celda_empresa_class = "red-cell"
                 
                 if data['COMPRADO'] == 'SI':
-                    comprado_display = f"SI<br><span class='small-text'>({data['PRECIO_COMPRA']}€ el {data['FECHA_COMPRA']})</span>"
+                    # Ahora formateamos el precio para el display
+                    precio_compra_formateado = formatear_numero(data['PRECIO_COMPRA'])
+                    comprado_display = f"SI<br><span class='small-text'>({precio_compra_formateado}€ el {data['FECHA_COMPRA']})</span>"
                     comprado_class = "comprado-si"
                     beneficio_perdida = calcular_beneficio_perdida(data['PRECIO_COMPRA'], data['PRECIO_ACTUAL'])
                     beneficio_clase = "compra" if beneficio_perdida != "N/A" and float(beneficio_perdida.replace(',', '')) >= 0 else "venta"
