@@ -201,33 +201,57 @@ def obtener_datos_yfinance(ticker):
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
+# --- Función corregida para el cálculo simulado del SMI
 def calcular_nuevo_smi(df, percentage_change):
     try:
-        df_copy = df.copy()
+        length_d = 3
+        smooth_period = 5
         
-        # Obtener los precios del último día
-        close_today = df_copy.loc[df_copy.index[-1], 'Close']
-        high_today = df_copy.loc[df_copy.index[-1], 'High']
-        low_today = df_copy.loc[df_copy.index[-1], 'Low']
+        # Obtenemos los valores de las EMAs del día anterior, que son necesarios
+        # para simular correctamente el cálculo del SMI hoy.
+        df_prev = df.iloc[:-1].copy()
+        df_prev = calculate_smi_tv(df_prev)
+        avgrel_prev_last = (df_prev['Close'] - (df_prev['High'].rolling(window=10).max() + df_prev['Low'].rolling(window=10).min()) / 2).ewm(span=length_d, adjust=False).mean().iloc[-1]
+        avgdiff_prev_last = (df_prev['High'].rolling(window=10).max() - df_prev['Low'].rolling(window=10).min()).ewm(span=length_d, adjust=False).mean().iloc[-1]
         
-        # Calcular los nuevos precios
-        new_close = close_today * (1 + percentage_change / 100)
-        new_high = high_today * (1 + percentage_change / 100)
-        new_low = low_today * (1 + percentage_change / 100)
+        # Obtenemos los precios del último día del df original
+        df_today = df.iloc[-1].copy()
         
-        # Asignar los nuevos precios al último día del DataFrame
-        df_copy.loc[df_copy.index[-1], 'Close'] = new_close
-        df_copy.loc[df_copy.index[-1], 'High'] = new_high
-        df_copy.loc[df_copy.index[-1], 'Low'] = new_low
-
-        df_copy = calculate_smi_tv(df_copy)
+        # Calculamos los nuevos precios simulados
+        new_close = df_today['Close'] * (1 + percentage_change / 100)
+        new_high = df_today['High'] * (1 + percentage_change / 100)
+        new_low = df_today['Low'] * (1 + percentage_change / 100)
         
-        new_smi = df_copy['SMI'].iloc[-1]
-        new_price = new_close # Usamos el nuevo precio de cierre
+        # Calculamos los nuevos valores del rdiff y diff para el día actual con los precios simulados
+        hh_today = df['High'].rolling(window=10).max().iloc[-1] # Se usa el high/low original para el cálculo del rango
+        ll_today = df['Low'].rolling(window=10).min().iloc[-1]
         
-        return new_smi, new_price
+        rdiff_today = new_close - (hh_today + ll_today) / 2
+        diff_today = hh_today - ll_today
+        
+        # Calculamos los nuevos avgrel y avgdiff utilizando los valores del día anterior
+        alpha_ema = 2 / (length_d + 1)
+        avgrel_today = (1 - alpha_ema) * avgrel_prev_last + alpha_ema * rdiff_today
+        avgdiff_today = (1 - alpha_ema) * avgdiff_prev_last + alpha_ema * diff_today
+        
+        # Calculamos el SMI RAW del día actual con los nuevos avgrel y avgdiff
+        epsilon = 1e-9
+        smi_raw_today = np.where(
+            (avgdiff_today / 2 + epsilon) != 0,
+            (avgrel_today / (avgdiff_today / 2 + epsilon)) * 100,
+            0.0
+        )
+        smi_raw_today = np.clip(smi_raw_today, -100, 100)
+        
+        # Finalmente, aplicamos el suavizado final del SMI
+        smi_smoothed_prev = df['SMI'].iloc[-2]
+        smi_new = (smi_raw_today + smi_smoothed_prev * (smooth_period - 1)) / smooth_period
+        
+        return smi_new, new_close
     except Exception as e:
+        print(f"❌ Error en el cálculo de nuevo SMI: {e}")
         return np.nan, np.nan
+
 
 def clasificar_empresa(data, hist_df):
     estado_smi = data['ESTADO_SMI']
