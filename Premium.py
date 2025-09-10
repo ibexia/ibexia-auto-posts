@@ -234,6 +234,7 @@ def clasificar_empresa(data, hist_df):
     tendencia = data['TENDENCIA_ACTUAL']
     precio_aplanamiento = data['PRECIO_APLANAMIENTO']
     smi_actual = data['SMI_HOY']
+    smi_ayer = data['SMI_AYER']
 
     # Diccionario para las prioridades de orden
     prioridad = {
@@ -301,21 +302,10 @@ def clasificar_empresa(data, hist_df):
     data['ANALISIS_SUBIDA'] = []
     data['ANALISIS_BAJADA'] = []
 
-    if tendencia == "Bajando":
-        for p in range(1, 6):
-            data['ANALISIS_SUBIDA'].append(calcular_nuevo_smi(hist_df, p))
-        for p in range(1, 6):
-            data['ANALISIS_BAJADA'].append((np.nan, np.nan))
-    elif tendencia == "Subiendo":
-        for p in range(1, 6):
-            data['ANALISIS_SUBIDA'].append((np.nan, np.nan))
-        for p in range(1, 6):
-            data['ANALISIS_BAJADA'].append(calcular_nuevo_smi(hist_df, -p))
-    else: # Tendencia Plana
-        for p in range(1, 6):
-            data['ANALISIS_SUBIDA'].append((np.nan, np.nan))
-        for p in range(1, 6):
-            data['ANALISIS_BAJADA'].append((np.nan, np.nan))
+    # Se genera un rango completo para ambas listas, luego se actualizan
+    for p in range(1, 6):
+        data['ANALISIS_SUBIDA'].append(calcular_nuevo_smi(hist_df, p))
+        data['ANALISIS_BAJADA'].append(calcular_nuevo_smi(hist_df, -p))
 
     return data
 
@@ -515,15 +505,33 @@ def generar_reporte():
                     comprado_display = "NO"
                     comprado_class = ""
                 
-                # Lógica de coloración basada en el SMI calculado vs. SMI actual
-                def get_smi_cell(smi_value, price_value, smi_actual):
+                # --- Lógica de coloración basada en la tendencia actual ---
+                def get_smi_cell_with_logic(smi_value, price_value, smi_actual, smi_ayer, tendencia):
                     if pd.isna(smi_value):
                         return "<td>N/A</td>"
-                    clase_smi = "bg-green" if smi_value >= smi_actual else "bg-red"
+                    
+                    # Punto de referencia para el cambio de tendencia (SMI del día anterior)
+                    ref_smi = smi_ayer
+                    
+                    clase_smi = ""
+                    
+                    if tendencia == "Bajando":
+                        if smi_value >= ref_smi: # Si el SMI sube por encima del de ayer
+                            clase_smi = "bg-green"
+                        else:
+                            clase_smi = "bg-red"
+                    elif tendencia == "Subiendo":
+                        if smi_value <= ref_smi: # Si el SMI baja por debajo del de ayer
+                            clase_smi = "bg-green"
+                        else:
+                            clase_smi = "bg-red"
+                    else: # Tendencia Plana
+                        clase_smi = "" # o un color neutro
+
                     return f'<td class="{clase_smi}"><b>{formatear_numero(smi_value)}</b><br><span class="small-text">{formatear_numero(price_value)}€</span></td>'
                 
-                html_subida = "".join(get_smi_cell(smi, price, data['SMI_HOY']) for smi, price in data['ANALISIS_SUBIDA'])
-                html_bajada = "".join(get_smi_cell(smi, price, data['SMI_HOY']) for smi, price in data['ANALISIS_BAJADA'])
+                html_subida = "".join(get_smi_cell_with_logic(smi, price, data['SMI_HOY'], data['SMI_AYER'], data['TENDENCIA_ACTUAL']) for smi, price in data['ANALISIS_SUBIDA'])
+                html_bajada = "".join(get_smi_cell_with_logic(smi, price, data['SMI_HOY'], data['SMI_AYER'], data['TENDENCIA_ACTUAL']) for smi, price in data['ANALISIS_BAJADA'])
 
                 html_body += f"""
                             <tr>
