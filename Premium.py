@@ -114,6 +114,20 @@ def calcular_precio_aplanamiento(df):
     except Exception as e:
         print(f"❌ Error en el cálculo de precio de aplanamiento: {e}")
         return "N/A"
+        
+def calcular_beneficio_perdida(precio_compra, precio_actual, inversion=10000):
+    try:
+        precio_compra = float(precio_compra.replace(',', ''))
+        precio_actual = float(precio_actual)
+        
+        if precio_compra <= 0 or precio_actual <= 0:
+            return "N/A"
+
+        acciones = inversion / precio_compra
+        beneficio_perdida = (precio_actual - precio_compra) * acciones
+        return f"{beneficio_perdida:,.2f}"
+    except (ValueError, TypeError):
+        return "N/A"
 
 def obtener_datos_yfinance(ticker):
     try:
@@ -331,49 +345,63 @@ def generar_reporte():
             
             if categoria == "Posibilidad de Compra" and empresa['TENDENCIA_ACTUAL'] == "Bajando":
                 orden_grupo = 1
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A":
-                    precio_actual = empresa['PRECIO_ACTUAL']
-                    precio_compra = empresa['PRECIO_APLANAMIENTO']
-                    porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
-                    orden_interna = porcentaje
-            
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
+                    try:
+                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'].replace(',', ''))
+                        precio_actual = float(empresa['PRECIO_ACTUAL'])
+                        porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
+                        orden_interna = porcentaje
+                    except (ValueError, TypeError):
+                        pass
+
             elif categoria == "Posibilidad de Compra Activada" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobreventa":
                 orden_grupo = 2
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A":
-                    precio_actual = empresa['PRECIO_ACTUAL']
-                    precio_vende = empresa['PRECIO_APLANAMIENTO']
-                    porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                    orden_interna = -porcentaje # Se ordena en forma descendente
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
+                    try:
+                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'].replace(',', ''))
+                        precio_actual = float(empresa['PRECIO_ACTUAL'])
+                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
+                        orden_interna = -porcentaje
+                    except (ValueError, TypeError):
+                        pass
             
             elif categoria == "Seguirá subiendo" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Intermedio":
                 orden_grupo = 3
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A":
-                    precio_actual = empresa['PRECIO_ACTUAL']
-                    precio_vende = empresa['PRECIO_APLANAMIENTO']
-                    porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                    orden_interna = -porcentaje # Se ordena en forma descendente
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
+                    try:
+                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'].replace(',', ''))
+                        precio_actual = float(empresa['PRECIO_ACTUAL'])
+                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
+                        orden_interna = -porcentaje
+                    except (ValueError, TypeError):
+                        pass
             
             elif categoria == "Riesgo de Venta" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobrecompra":
                 orden_grupo = 4
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A":
-                    precio_actual = empresa['PRECIO_ACTUAL']
-                    precio_vende = empresa['PRECIO_APLANAMIENTO']
-                    porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                    orden_interna = -porcentaje # Se ordena en forma descendente
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
+                    try:
+                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'].replace(',', ''))
+                        precio_actual = float(empresa['PRECIO_ACTUAL'])
+                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
+                        orden_interna = -porcentaje
+                    except (ValueError, TypeError):
+                        pass
             
             elif categoria == "Riesgo de Venta Activada" and empresa['TENDENCIA_ACTUAL'] == "Bajando" and empresa['ESTADO_SMI'] == "Sobrecompra":
                 orden_grupo = 5
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A":
-                    precio_actual = empresa['PRECIO_ACTUAL']
-                    precio_compra = empresa['PRECIO_APLANAMIENTO']
-                    porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
-                    orden_interna = porcentaje
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
+                    try:
+                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'].replace(',', ''))
+                        precio_actual = float(empresa['PRECIO_ACTUAL'])
+                        porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
+                        orden_interna = porcentaje
+                    except (ValueError, TypeError):
+                        pass
 
             return (orden_grupo, orden_interna)
 
         datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
         
-        # Filtrar las empresas que no entran en las categorías principales
         datos_ordenados = [d for d in datos_ordenados if obtener_clave_ordenacion(d)[0] != 99]
         
         # --- Fin de la lógica de ordenación integrada ---
@@ -411,6 +439,8 @@ def generar_reporte():
                 .table-container {{
                     overflow-x: auto;
                     overflow-y: auto;
+                    height: 80vh;
+                    position: relative;
                 }}
                 table {{ 
                     width: 100%;
@@ -425,7 +455,12 @@ def generar_reporte():
                     vertical-align: top;
                     white-space: normal;
                 }}
-                th {{ background-color: #f2f2f2; }}
+                th {{ 
+                    background-color: #f2f2f2;
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                }}
                 .compra {{ color: #1abc9c; font-weight: bold; }}
                 .venta {{ color: #e74c3c; font-weight: bold; }}
                 .comprado-si {{ background-color: #2ecc71; color: white; font-weight: bold; }}
@@ -438,6 +473,20 @@ def generar_reporte():
                 .green-cell {{ background-color: #d4edda; }}
                 .red-cell {{ background-color: #f8d7da; }}
                 .separator-row td {{ background-color: black; height: 5px; padding: 0; border: none; }}
+                .category-header td {{
+                    background-color: #34495e;
+                    color: white;
+                    font-size: 1.5em;
+                    font-weight: bold;
+                    text-align: center;
+                    padding: 15px;
+                    border: none;
+                }}
+                .stacked-text {{ 
+                    line-height: 1.2;
+                    font-size: 12px;
+                }}
+                th:first-child, td:first-child {{ width: 100px; }}
             </style>
         </head>
         <body>
@@ -464,7 +513,7 @@ def generar_reporte():
                                 <th>Oportunidad</th>
                                 <th>Compra si...</th>
                                 <th>Vende si...</th>
-                                <th>Algoritmo Actual</th>
+                                <th>Ganancia/Pérdida</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -476,14 +525,23 @@ def generar_reporte():
             """
         else:
             previous_oportunidad = None
-            for data in datos_ordenados:
+            for i, data in enumerate(datos_ordenados):
+                
+                if i == 0:
+                    html_body += """
+                        <tr class="category-header"><td colspan="7">OPORTUNIDADES DE COMPRA</td></tr>
+                    """
                 
                 if previous_oportunidad is not None and data['OPORTUNIDAD'] != previous_oportunidad:
+                    if data['ORDEN_PRIORIDAD'] >= 3 and previous_oportunidad in ["Posibilidad de Compra", "Posibilidad de Compra Activada"]:
+                         html_body += """
+                            <tr class="category-header"><td colspan="7">ATENTOS A VENDER</td></tr>
+                        """
                     html_body += """
                         <tr class="separator-row"><td colspan="7"></td></tr>
                     """
 
-                nombre_con_precio = f"<b>{data['NOMBRE_EMPRESA']}</b> ({formatear_numero(data['PRECIO_ACTUAL'])}€)"
+                nombre_con_precio = f"<div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div>"
                 
                 clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else "")
                 
@@ -496,9 +554,13 @@ def generar_reporte():
                 if data['COMPRADO'] == 'SI':
                     comprado_display = f"SI<br><span class='small-text'>({data['PRECIO_COMPRA']}€ el {data['FECHA_COMPRA']})</span>"
                     comprado_class = "comprado-si"
+                    beneficio_perdida = calcular_beneficio_perdida(data['PRECIO_COMPRA'], data['PRECIO_ACTUAL'])
+                    beneficio_clase = "compra" if beneficio_perdida != "N/A" and float(beneficio_perdida.replace(',', '')) >= 0 else "venta"
+                    beneficio_display = f"<span class='{beneficio_clase}'>{beneficio_perdida}€</span>"
                 else:
                     comprado_display = "NO"
                     comprado_class = ""
+                    beneficio_display = "N/A"
 
                 html_body += f"""
                             <tr>
@@ -508,7 +570,7 @@ def generar_reporte():
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
-                                <td><b>{formatear_numero(data['SMI_HOY'])}</b></td>
+                                <td>{beneficio_display}</td>
                             </tr>
                 """
                 previous_oportunidad = data['OPORTUNIDAD']
