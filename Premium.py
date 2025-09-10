@@ -198,17 +198,22 @@ def obtener_datos_yfinance(ticker):
             "COMPRADO": comprado_status,
             "PRECIO_COMPRA": precio_compra,
             "FECHA_COMPRA": fecha_compra,
+            "HIST_DF": hist_extended,
         }
 
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
-def clasificar_empresa(data, hist_df):
+def clasificar_empresa(data):
     estado_smi = data['ESTADO_SMI']
     tendencia = data['TENDENCIA_ACTUAL']
     precio_aplanamiento = data['PRECIO_APLANAMIENTO']
     smi_actual = data['SMI_HOY']
+    hist_df = data['HIST_DF']
+
+    high_today = hist_df['High'].iloc[-1]
+    low_today = hist_df['Low'].iloc[-1]
 
     prioridad = {
         "Posibilidad de Compra Activada": 1,
@@ -224,12 +229,12 @@ def clasificar_empresa(data, hist_df):
         if tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
             data['COMPRA_SI'] = "COMPRA AHORA"
-            data['VENDE_SI'] = "ZONA DE COMPRA"
+            data['VENDE_SI'] = f"ZONA DE COMPRA<br><span class='small-text'>PRECIO COMPRA IDEAL HOY: {low_today:,.2f}€</span>"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
         elif tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Posibilidad de Compra"
             data['COMPRA_SI'] = f"COMPRA si supera {formatear_numero(precio_aplanamiento)}€ ⬆️"
-            data['VENDE_SI'] = "ZONA DE COMPRA"
+            data['VENDE_SI'] = f"ZONA DE COMPRA<br><span class='small-text'>PRECIO COMPRA IDEAL HOY: {low_today:,.2f}€</span>"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
         else:
             data['OPORTUNIDAD'] = "Intermedio"
@@ -249,7 +254,7 @@ def clasificar_empresa(data, hist_df):
             if smi_actual > 0:
                  data['VENDE_SI'] = f"VENDE si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
             else:
-                 data['VENDE_SI'] = "ZONA DE COMPRA"
+                 data['VENDE_SI'] = f"ZONA DE COMPRA<br><span class='small-text'>PRECIO COMPRA IDEAL HOY: {low_today:,.2f}€</span>"
             data['ORDEN_PRIORIDAD'] = prioridad["Seguirá subiendo"]
         else:
             data['OPORTUNIDAD'] = "Intermedio"
@@ -261,7 +266,7 @@ def clasificar_empresa(data, hist_df):
         if tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Riesgo de Venta"
             data['COMPRA_SI'] = "NO COMPRES"
-            data['VENDE_SI'] = "ZONA DE VENTA"
+            data['VENDE_SI'] = f"ZONA DE VENTA<br><span class='small-text'>PRECIO IDEAL VENTA HOY: {high_today:,.2f}€</span>"
             data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta"]
         elif tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Riesgo de Venta Activada"
@@ -332,7 +337,8 @@ def generar_reporte():
                 
                 data = obtener_datos_yfinance(ticker)
                 if data:
-                    datos_completos.append(clasificar_empresa(data, hist_df))
+                    data['HIST_DF'] = hist_df
+                    datos_completos.append(clasificar_empresa(data))
             except Exception as e:
                 print(f"❌ Error al procesar {ticker}: {e}. Saltando a la siguiente empresa...")
                 continue
