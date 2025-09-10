@@ -329,21 +329,21 @@ def generar_reporte():
             orden_grupo = 99
             orden_interna = float('inf')
             
-            if categoria == "Posibilidad de Compra" and empresa['TENDENCIA_ACTUAL'] == "Bajando":
+            if categoria == "Posibilidad de Compra Activada" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobreventa":
                 orden_grupo = 1
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A":
-                    precio_actual = empresa['PRECIO_ACTUAL']
-                    precio_compra = empresa['PRECIO_APLANAMIENTO']
-                    porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
-                    orden_interna = porcentaje
-            
-            elif categoria == "Posibilidad de Compra Activada" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobreventa":
-                orden_grupo = 2
                 if empresa['PRECIO_APLANAMIENTO'] != "N/A":
                     precio_actual = empresa['PRECIO_ACTUAL']
                     precio_vende = empresa['PRECIO_APLANAMIENTO']
                     porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
                     orden_interna = -porcentaje # Se ordena en forma descendente
+
+            elif categoria == "Posibilidad de Compra" and empresa['TENDENCIA_ACTUAL'] == "Bajando":
+                orden_grupo = 2
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A":
+                    precio_actual = empresa['PRECIO_ACTUAL']
+                    precio_compra = empresa['PRECIO_APLANAMIENTO']
+                    porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
+                    orden_interna = porcentaje
             
             elif categoria == "Seguirá subiendo" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Intermedio":
                 orden_grupo = 3
@@ -353,8 +353,16 @@ def generar_reporte():
                     porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
                     orden_interna = -porcentaje # Se ordena en forma descendente
             
-            elif categoria == "Riesgo de Venta" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobrecompra":
+            elif categoria == "Seguirá bajando" and empresa['TENDENCIA_ACTUAL'] == "Bajando" and empresa['ESTADO_SMI'] == "Intermedio":
                 orden_grupo = 4
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A":
+                    precio_actual = empresa['PRECIO_ACTUAL']
+                    precio_compra = empresa['PRECIO_APLANAMIENTO']
+                    porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
+                    orden_interna = porcentaje
+            
+            elif categoria == "Riesgo de Venta" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobrecompra":
+                orden_grupo = 5
                 if empresa['PRECIO_APLANAMIENTO'] != "N/A":
                     precio_actual = empresa['PRECIO_ACTUAL']
                     precio_vende = empresa['PRECIO_APLANAMIENTO']
@@ -362,7 +370,7 @@ def generar_reporte():
                     orden_interna = -porcentaje # Se ordena en forma descendente
             
             elif categoria == "Riesgo de Venta Activada" and empresa['TENDENCIA_ACTUAL'] == "Bajando" and empresa['ESTADO_SMI'] == "Sobrecompra":
-                orden_grupo = 5
+                orden_grupo = 6
                 if empresa['PRECIO_APLANAMIENTO'] != "N/A":
                     precio_actual = empresa['PRECIO_ACTUAL']
                     precio_compra = empresa['PRECIO_APLANAMIENTO']
@@ -411,10 +419,11 @@ def generar_reporte():
                 .table-container {{
                     overflow-x: auto;
                     overflow-y: auto;
+                    max-height: 70vh;
                 }}
                 table {{ 
                     width: 100%;
-                    min-width: 1400px;
+                    min-width: 1000px;
                     border-collapse: collapse; 
                     margin: 20px auto 0 auto;
                 }}
@@ -425,7 +434,12 @@ def generar_reporte():
                     vertical-align: top;
                     white-space: normal;
                 }}
-                th {{ background-color: #f2f2f2; }}
+                th {{ 
+                    background-color: #f2f2f2; 
+                    position: sticky;
+                    top: 0;
+                    z-index: 1;
+                }}
                 .compra {{ color: #1abc9c; font-weight: bold; }}
                 .venta {{ color: #e74c3c; font-weight: bold; }}
                 .comprado-si {{ background-color: #2ecc71; color: white; font-weight: bold; }}
@@ -438,6 +452,8 @@ def generar_reporte():
                 .green-cell {{ background-color: #d4edda; }}
                 .red-cell {{ background-color: #f8d7da; }}
                 .separator-row td {{ background-color: black; height: 5px; padding: 0; border: none; }}
+                .banner-row td {{ background-color: #eaf1f8; color: #2c3e50; font-size: 18px; font-weight: bold; padding: 10px; }}
+                .first-col {{ width: 100px; font-size: 12px; }}
             </style>
         </head>
         <body>
@@ -451,12 +467,13 @@ def generar_reporte():
                 </div>
                 
                 <div id="scroll-top" style="overflow-x: auto;">
-                    <div style="min-width: 1400px;">&nbsp;</div>
+                    <div style="min-width: 1000px;">&nbsp;</div>
                 </div>
                 
                 <div class="table-container">
                     <table id="myTable">
                         <thead>
+                            <tr class="banner-row"><td colspan="6">OPORTUNIDADES DE COMPRA</td></tr>
                             <tr>
                                 <th>Empresa (Precio)</th>
                                 <th>¿Estamos comprados?</th>
@@ -464,7 +481,6 @@ def generar_reporte():
                                 <th>Oportunidad</th>
                                 <th>Compra si...</th>
                                 <th>Vende si...</th>
-                                <th>Algoritmo Actual</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -472,18 +488,19 @@ def generar_reporte():
         
         if not datos_ordenados:
             html_body += """
-                            <tr><td colspan="7">No se encontraron empresas con oportunidades claras hoy.</td></tr>
+                            <tr><td colspan="6">No se encontraron empresas con oportunidades claras hoy.</td></tr>
             """
         else:
             previous_oportunidad = None
             for data in datos_ordenados:
                 
-                if previous_oportunidad is not None and data['OPORTUNIDAD'] != previous_oportunidad:
+                # Insertar banner "ATENTOS A VENDER" antes de los grupos 3 en adelante
+                if previous_oportunidad in ["Posibilidad de Compra", "Posibilidad de Compra Activada"] and data['OPORTUNIDAD'] not in ["Posibilidad de Compra", "Posibilidad de Compra Activada"]:
                     html_body += """
-                        <tr class="separator-row"><td colspan="7"></td></tr>
+                        <tr class="banner-row"><td colspan="6">ATENTOS A VENDER</td></tr>
                     """
 
-                nombre_con_precio = f"<b>{data['NOMBRE_EMPRESA']}</b> ({formatear_numero(data['PRECIO_ACTUAL'])}€)"
+                nombre_con_precio = f"<b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)"
                 
                 clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else "")
                 
@@ -494,7 +511,16 @@ def generar_reporte():
                     celda_empresa_class = "red-cell"
                 
                 if data['COMPRADO'] == 'SI':
-                    comprado_display = f"SI<br><span class='small-text'>({data['PRECIO_COMPRA']}€ el {data['FECHA_COMPRA']})</span>"
+                    # Cálculo de la ganancia/pérdida en euros
+                    try:
+                        precio_compra_float = float(data['PRECIO_COMPRA'].replace('.', '').replace(',', '.'))
+                        ganancia_o_perdida = data['PRECIO_ACTUAL'] - precio_compra_float
+                        signo = "+" if ganancia_o_perdida >= 0 else ""
+                        ganancia_display = f"<br><b>{signo}{ganancia_o_perdida:,.2f}€</b>"
+                    except (ValueError, TypeError):
+                        ganancia_display = ""
+
+                    comprado_display = f"SI<br><span class='small-text'>({data['PRECIO_COMPRA']}€ el {data['FECHA_COMPRA']})</span>{ganancia_display}"
                     comprado_class = "comprado-si"
                 else:
                     comprado_display = "NO"
@@ -502,13 +528,12 @@ def generar_reporte():
 
                 html_body += f"""
                             <tr>
-                                <td class="{celda_empresa_class}">{nombre_con_precio}</td>
+                                <td class="first-col {celda_empresa_class}">{nombre_con_precio}</td>
                                 <td class="{comprado_class}">{comprado_display}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
-                                <td><b>{formatear_numero(data['SMI_HOY'])}</b></td>
                             </tr>
                 """
                 previous_oportunidad = data['OPORTUNIDAD']
