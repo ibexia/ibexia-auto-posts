@@ -190,44 +190,6 @@ def obtener_datos_yfinance(ticker):
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
-def calcular_nuevo_smi(df, percentage_change):
-    try:
-        last_day_prices = df.iloc[-1].copy()
-        close_today = last_day_prices['Close']
-        high_today = last_day_prices['High']
-        low_today = last_day_prices['Low']
-        
-        new_close = close_today * (1 + percentage_change / 100)
-        new_high = high_today * (1 + percentage_change / 100)
-        new_low = low_today * (1 + percentage_change / 100)
-
-        length_d = 3
-        alpha_ema = 2 / (length_d + 1)
-
-        df_prev = df.iloc[:-1].copy()
-        df_prev = calculate_smi_tv(df_prev)
-        avgrel_prev_last = (df_prev['Close'] - (df_prev['High'].rolling(window=10).max() + df_prev['Low'].rolling(window=10).min()) / 2).ewm(span=length_d, adjust=False).mean().iloc[-1]
-        avgdiff_prev_last = (df_prev['High'].rolling(window=10).max() - df_prev['Low'].rolling(window=10).min()).ewm(span=length_d, adjust=False).mean().iloc[-1]
-
-        hh_today = max(df['High'].rolling(window=9).max().iloc[-1], new_high)
-        ll_today = min(df['Low'].rolling(window=9).min().iloc[-1], new_low)
-        diff_today = hh_today - ll_today
-        rdiff_today = new_close - (hh_today + ll_today) / 2
-
-        avgrel_today = (1 - alpha_ema) * avgrel_prev_last + alpha_ema * rdiff_today
-        avgdiff_today = (1 - alpha_ema) * avgdiff_prev_last + alpha_ema * diff_today
-
-        epsilon = 1e-9
-        smi_raw = (avgrel_today / (avgdiff_today / 2 + epsilon)) * 100
-        smi_raw = np.clip(smi_raw, -100, 100)
-        
-        new_smi = smi_raw
-
-        return new_smi, new_close
-    except Exception as e:
-        print(f"❌ Error en el cálculo del nuevo SMI: {e}")
-        return np.nan, np.nan
-
 def clasificar_empresa(data, hist_df):
     estado_smi = data['ESTADO_SMI']
     tendencia = data['TENDENCIA_ACTUAL']
@@ -294,26 +256,7 @@ def clasificar_empresa(data, hist_df):
             data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
-
-    data['ANALISIS_SUBIDA'] = []
-    data['ANALISIS_BAJADA'] = []
-
-    if tendencia == "Bajando":
-        for p in range(1, 6):
-            data['ANALISIS_SUBIDA'].append(calcular_nuevo_smi(hist_df, p))
-        for p in range(1, 6):
-            data['ANALISIS_BAJADA'].append((np.nan, np.nan))
-    elif tendencia == "Subiendo":
-        for p in range(1, 6):
-            data['ANALISIS_SUBIDA'].append((np.nan, np.nan))
-        for p in range(1, 6):
-            data['ANALISIS_BAJADA'].append(calcular_nuevo_smi(hist_df, -p))
-    else:
-        for p in range(1, 6):
-            data['ANALISIS_SUBIDA'].append((np.nan, np.nan))
-        for p in range(1, 6):
-            data['ANALISIS_BAJADA'].append((np.nan, np.nan))
-
+    
     return data
 
 def enviar_email_con_adjunto(html_body, asunto_email):
@@ -492,6 +435,9 @@ def generar_reporte():
                 .text-center {{ text-align: center; }}
                 .disclaimer {{ font-size: 12px; text-align: center; color: #95a5a6; }}
                 .small-text {{ font-size: 10px; color: #555; }}
+                .green-cell {{ background-color: #d4edda; }}
+                .red-cell {{ background-color: #f8d7da; }}
+                .separator-row td {{ background-color: black; height: 5px; padding: 0; border: none; }}
             </style>
         </head>
         <body>
@@ -512,41 +458,40 @@ def generar_reporte():
                     <table id="myTable">
                         <thead>
                             <tr>
-                                <th rowspan="2">Empresa (Precio)</th>
-                                <th rowspan="2">¿Estamos comprados?</th>
-                                <th rowspan="2">Tendencia Actual</th>
-                                <th rowspan="2">Oportunidad</th>
-                                <th rowspan="2">Compra si...</th>
-                                <th rowspan="2">Vende si...</th>
-                                <th rowspan="2">Algoritmo Actual</th>
-                                <th colspan="5">Análisis si el precio sube</th>
-                                <th colspan="5">Análisis si el precio baja</th>
-                            </tr>
-                            <tr>
-                                <th>+1%</th>
-                                <th>+2%</th>
-                                <th>+3%</th>
-                                <th>+4%</th>
-                                <th>+5%</th>
-                                <th>-1%</th>
-                                <th>-2%</th>
-                                <th>-3%</th>
-                                <th>-4%</th>
-                                <th>-5%</th>
+                                <th>Empresa (Precio)</th>
+                                <th>¿Estamos comprados?</th>
+                                <th>Tendencia Actual</th>
+                                <th>Oportunidad</th>
+                                <th>Compra si...</th>
+                                <th>Vende si...</th>
+                                <th>Algoritmo Actual</th>
                             </tr>
                         </thead>
                         <tbody>
         """
+        
         if not datos_ordenados:
             html_body += """
-                            <tr><td colspan="16">No se encontraron empresas con oportunidades claras hoy.</td></tr>
+                            <tr><td colspan="7">No se encontraron empresas con oportunidades claras hoy.</td></tr>
             """
         else:
+            previous_oportunidad = None
             for data in datos_ordenados:
                 
+                if previous_oportunidad is not None and data['OPORTUNIDAD'] != previous_oportunidad:
+                    html_body += """
+                        <tr class="separator-row"><td colspan="7"></td></tr>
+                    """
+
                 nombre_con_precio = f"<b>{data['NOMBRE_EMPRESA']}</b> ({formatear_numero(data['PRECIO_ACTUAL'])}€)"
                 
                 clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else "")
+                
+                celda_empresa_class = ""
+                if "compra" in data['OPORTUNIDAD'].lower():
+                    celda_empresa_class = "green-cell"
+                elif "venta" in data['OPORTUNIDAD'].lower():
+                    celda_empresa_class = "red-cell"
                 
                 if data['COMPRADO'] == 'SI':
                     comprado_display = f"SI<br><span class='small-text'>({data['PRECIO_COMPRA']}€ el {data['FECHA_COMPRA']})</span>"
@@ -554,29 +499,19 @@ def generar_reporte():
                 else:
                     comprado_display = "NO"
                     comprado_class = ""
-                
-                def get_smi_cell(smi_value, price_value, smi_actual):
-                    if pd.isna(smi_value):
-                        return "<td>N/A</td>"
-                    clase_smi = "bg-green" if smi_value >= smi_actual else "bg-red"
-                    return f'<td class="{clase_smi}"><b>{formatear_numero(smi_value)}</b><br><span class="small-text">{formatear_numero(price_value)}€</span></td>'
-                
-                html_subida = "".join(get_smi_cell(smi, price, data['SMI_HOY']) for smi, price in data['ANALISIS_SUBIDA'])
-                html_bajada = "".join(get_smi_cell(smi, price, data['SMI_HOY']) for smi, price in data['ANALISIS_BAJADA'])
 
                 html_body += f"""
                             <tr>
-                                <td>{nombre_con_precio}</td>
+                                <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td class="{comprado_class}">{comprado_display}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
                                 <td><b>{formatear_numero(data['SMI_HOY'])}</b></td>
-                                {html_subida}
-                                {html_bajada}
                             </tr>
                 """
+                previous_oportunidad = data['OPORTUNIDAD']
         
         html_body += """
                         </tbody>
