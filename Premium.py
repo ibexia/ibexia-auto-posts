@@ -201,61 +201,122 @@ def obtener_datos_yfinance(ticker):
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
-def clasificar_empresa(data):
+def calcular_nuevo_smi(df, percentage_change):
+    try:
+        df_copy = df.copy()
+        df_copy.loc[df_copy.index[-1], 'Close'] = df_copy.loc[df_copy.index[-1], 'Close'] * (1 + percentage_change / 100)
+        df_copy.loc[df_copy.index[-1], 'High'] = df_copy.loc[df_copy.index[-1], 'High'] * (1 + percentage_change / 100)
+        df_copy.loc[df_copy.index[-1], 'Low'] = df_copy.loc[df_copy.index[-1], 'Low'] * (1 + percentage_change / 100)
+
+        df_copy = calculate_smi_tv(df_copy)
+        
+        return df_copy['SMI'].iloc[-1]
+    except Exception as e:
+        return np.nan
+
+
+def clasificar_empresa(data, hist_df):
     estado_smi = data['ESTADO_SMI']
     tendencia = data['TENDENCIA_ACTUAL']
     precio_aplanamiento = data['PRECIO_APLANAMIENTO']
+    smi_actual = data['SMI_HOY']
+
+    # Diccionario para las prioridades de orden
+    prioridad = {
+        "Posibilidad de Compra Activada": 1,
+        "Posibilidad de Compra": 2,
+        "Seguirá subiendo": 3,
+        "Seguirá bajando": 4,
+        "Riesgo de Venta": 5,
+        "Riesgo de Venta Activada": 6,
+        "Intermedio": 99
+    }
 
     if estado_smi == "Sobreventa":
         if tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
             data['COMPRA_SI'] = "COMPRA AHORA"
             data['VENDE_SI'] = "NO VENDAS"
-            data['ORDEN_PRIORIDAD'] = 1
+            data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
         elif tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Posibilidad de Compra"
             data['COMPRA_SI'] = f"COMPRA si supera {formatear_numero(precio_aplanamiento)}€ ⬆️"
             data['VENDE_SI'] = "NO VENDAS"
-            data['ORDEN_PRIORIDAD'] = 2
+            data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
         else: # Tendencia Plana
             data['OPORTUNIDAD'] = "Intermedio"
             data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
-            data['ORDEN_PRIORIDAD'] = 99 # Baja prioridad
+            data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
     
     elif estado_smi == "Intermedio":
         if tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Seguirá bajando"
             data['COMPRA_SI'] = f"COMPRA si supera {formatear_numero(precio_aplanamiento)}€ ⬆️"
             data['VENDE_SI'] = "YA ES TARDE PARA VENDER"
-            data['ORDEN_PRIORIDAD'] = 4
+            data['ORDEN_PRIORIDAD'] = prioridad["Seguirá bajando"]
         elif tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Seguirá subiendo"
             data['COMPRA_SI'] = "YA ES TARDE PARA COMPRAR"
             data['VENDE_SI'] = f"VENDE si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
-            data['ORDEN_PRIORIDAD'] = 3
+            data['ORDEN_PRIORIDAD'] = prioridad["Seguirá subiendo"]
         else: # Tendencia Plana
             data['OPORTUNIDAD'] = "Intermedio"
             data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
-            data['ORDEN_PRIORIDAD'] = 99 # Baja prioridad
+            data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
             
     elif estado_smi == "Sobrecompra":
         if tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Riesgo de Venta"
             data['COMPRA_SI'] = "NO COMPRES"
             data['VENDE_SI'] = f"VENDE si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
-            data['ORDEN_PRIORIDAD'] = 5
+            data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta"]
         elif tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Riesgo de Venta Activada"
             data['COMPRA_SI'] = "NO COMPRES"
             data['VENDE_SI'] = "VENDE AHORA"
-            data['ORDEN_PRIORIDAD'] = 6
+            data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta Activada"]
         else: # Tendencia Plana
             data['OPORTUNIDAD'] = "Intermedio"
             data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
-            data['ORDEN_PRIORIDAD'] = 99 # Baja prioridad
+            data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
+
+    # Calcular y añadir el análisis de porcentajes
+    if tendencia == "Subiendo":
+        data['SUBIDA_1'] = "N/A"
+        data['SUBIDA_2'] = "N/A"
+        data['SUBIDA_3'] = "N/A"
+        data['SUBIDA_4'] = "N/A"
+        data['SUBIDA_5'] = "N/A"
+        data['BAJADA_1'] = calcular_nuevo_smi(hist_df, -1)
+        data['BAJADA_2'] = calcular_nuevo_smi(hist_df, -2)
+        data['BAJADA_3'] = calcular_nuevo_smi(hist_df, -3)
+        data['BAJADA_4'] = calcular_nuevo_smi(hist_df, -4)
+        data['BAJADA_5'] = calcular_nuevo_smi(hist_df, -5)
+    elif tendencia == "Bajando":
+        data['SUBIDA_1'] = calcular_nuevo_smi(hist_df, 1)
+        data['SUBIDA_2'] = calcular_nuevo_smi(hist_df, 2)
+        data['SUBIDA_3'] = calcular_nuevo_smi(hist_df, 3)
+        data['SUBIDA_4'] = calcular_nuevo_smi(hist_df, 4)
+        data['SUBIDA_5'] = calcular_nuevo_smi(hist_df, 5)
+        data['BAJADA_1'] = "N/A"
+        data['BAJADA_2'] = "N/A"
+        data['BAJADA_3'] = "N/A"
+        data['BAJADA_4'] = "N/A"
+        data['BAJADA_5'] = "N/A"
+    else: # Tendencia Plana
+        data['SUBIDA_1'] = "N/A"
+        data['SUBIDA_2'] = "N/A"
+        data['SUBIDA_3'] = "N/A"
+        data['SUBIDA_4'] = "N/A"
+        data['SUBIDA_5'] = "N/A"
+        data['BAJADA_1'] = "N/A"
+        data['BAJADA_2'] = "N/A"
+        data['BAJADA_3'] = "N/A"
+        data['BAJADA_4'] = "N/A"
+        data['BAJADA_5'] = "N/A"
 
     return data
 
@@ -307,17 +368,32 @@ def generar_reporte():
         datos_completos = []
         for ticker in all_tickers:
             print(f"🔎 Analizando {ticker}...")
-            data = obtener_datos_yfinance(ticker)
-            if data:
-                datos_completos.append(clasificar_empresa(data))
+            
+            # Obtener datos históricos para los cálculos de porcentajes
+            try:
+                stock = yf.Ticker(ticker)
+                hist_df = stock.history(period="60d", interval="1d")
+                if hist_df.empty:
+                    print(f"⚠️ Advertencia: No se encontraron datos históricos para {ticker}. Saltando...")
+                    continue
+                hist_df = calculate_smi_tv(hist_df)
+                
+                # Obtener los datos del día
+                data = obtener_datos_yfinance(ticker)
+                if data:
+                    datos_completos.append(clasificar_empresa(data, hist_df))
+            except Exception as e:
+                print(f"❌ Error al procesar {ticker}: {e}. Saltando a la siguiente empresa...")
+                continue
+                
             time.sleep(1)
 
-        # Ordenar la lista alfabéticamente por el nombre de la empresa
-        datos_completos.sort(key=lambda x: x.get('NOMBRE_EMPRESA', ''))
+        # Ordenar la lista por la nueva prioridad
+        datos_completos.sort(key=lambda x: (x.get('ORDEN_PRIORIDAD', 99), x.get('NOMBRE_EMPRESA', '')))
         
         # Filtrar para no mostrar las que tienen orden 99 (no relevantes)
         datos_completos = [d for d in datos_completos if d.get('ORDEN_PRIORIDAD') != 99]
-
+        
         html_body = f"""
         <html>
         <head>
@@ -330,7 +406,7 @@ def generar_reporte():
                     padding: 20px;
                 }}
                 .main-container {{
-                    max-width: 900px;
+                    max-width: 1300px;
                     margin: 0 auto;
                     background-color: #fff;
                     padding: 20px;
@@ -353,15 +429,15 @@ def generar_reporte():
                     overflow-y: auto;
                 }}
                 table {{ 
-                    width: 800px;
-                    min-width: 800px;
+                    width: 100%;
+                    min-width: 1200px;
                     border-collapse: collapse; 
                     margin: 20px auto 0 auto;
                 }}
                 th, td {{ 
                     border: 1px solid #ddd; 
                     padding: 8px; 
-                    text-align: left;
+                    text-align: center;
                     vertical-align: top;
                     white-space: normal;
                 }}
@@ -369,6 +445,9 @@ def generar_reporte():
                 .compra {{ color: #1abc9c; font-weight: bold; }}
                 .venta {{ color: #e74c3c; font-weight: bold; }}
                 .comprado-si {{ background-color: #2ecc71; color: white; font-weight: bold; }}
+                .bg-green {{ background-color: #d4edda; color: #155724; }}
+                .bg-red {{ background-color: #f8d7da; color: #721c24; }}
+                .bg-highlight {{ background-color: #2ecc71; color: white; font-weight: bold; }}
                 .text-center {{ text-align: center; }}
                 .disclaimer {{ font-size: 12px; text-align: center; color: #95a5a6; }}
             </style>
@@ -377,40 +456,56 @@ def generar_reporte():
             <div class="main-container">
                 <h2 class="text-center">Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</h2>
                 
-                <p class="text-center">Se ha generado un resumen de las empresas según su estado y tendencia del Logaritmo Ibexia. La tabla está ordenada alfabéticamente. Usa el buscador para encontrar una empresa rápidamente.</p>
+                <p class="text-center">Se ha generado un resumen de las empresas según su estado y tendencia del Algoritmo IBEXIA. La tabla está ordenada por oportunidad. Usa el buscador para encontrar una empresa rápidamente.</p>
                 
                 <div id="search-container">
                     <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa...">
                 </div>
                 
                 <div id="scroll-top" style="overflow-x: auto;">
-                    <div style="width: 800px;">&nbsp;</div>
+                    <div style="min-width: 1200px;">&nbsp;</div>
                 </div>
                 
                 <div class="table-container">
                     <table id="myTable">
                         <thead>
                             <tr>
-                                <th>Empresa (Precio)</th>
-                                <th>¿Estamos comprados?</th>
-                                <th>Precio de compra</th>
-                                <th>Fecha de compra</th>
-                                <th>Tendencia Actual</th>
-                                <th>Oportunidad</th>
-                                <th>Compra si...</th>
-                                <th>Vende si...</th>
+                                <th rowspan="2">Empresa (Precio)</th>
+                                <th rowspan="2">¿Estamos comprados?</th>
+                                <th rowspan="2">Precio de compra</th>
+                                <th rowspan="2">Fecha de compra</th>
+                                <th rowspan="2">Tendencia Actual</th>
+                                <th rowspan="2">Oportunidad</th>
+                                <th rowspan="2">Compra si...</th>
+                                <th rowspan="2">Vende si...</th>
+                                <th colspan="5">Si el precio sube</th>
+                                <th colspan="5">Si el precio baja</th>
+                            </tr>
+                            <tr>
+                                <th>+1%</th>
+                                <th>+2%</th>
+                                <th>+3%</th>
+                                <th>+4%</th>
+                                <th>+5%</th>
+                                <th>-1%</th>
+                                <th>-2%</th>
+                                <th>-3%</th>
+                                <th>-4%</th>
+                                <th>-5%</th>
                             </tr>
                         </thead>
                         <tbody>
         """
         if not datos_completos:
             html_body += """
-                            <tr><td colspan="8">No se encontraron empresas con oportunidades claras hoy.</td></tr>
+                            <tr><td colspan="18">No se encontraron empresas con oportunidades claras hoy.</td></tr>
             """
         else:
             for data in datos_completos:
-                nombre_con_precio = f"<b>{data['NOMBRE_EMPRESA']}</b> ({formatear_numero(data['PRECIO_ACTUAL'])}€)"
                 
+                nombre_con_precio = f"<b>{data['NOMBRE_EMPRESA']}</b> ({formatear_numero(data['PRECIO_ACTUAL'])}€)"
+                clase_nombre = "bg-highlight" if data.get('ORDEN_PRIORIDAD') == 1 else ""
+
                 oportunidad = data['OPORTUNIDAD']
                 clase_oportunidad = "compra" if "compra" in oportunidad.lower() else ("venta" if "venta" in oportunidad.lower() else "")
 
@@ -418,10 +513,16 @@ def generar_reporte():
                 fecha_compra_display = data['FECHA_COMPRA'] if data['COMPRADO'] == 'SI' else ''
                 
                 comprado_class = "comprado-si" if data['COMPRADO'] == 'SI' else ''
+                
+                def get_smi_cell(smi_value, smi_actual):
+                    if smi_value == "N/A" or pd.isna(smi_value):
+                        return "<td>N/A</td>"
+                    clase_smi = "bg-green" if smi_value >= smi_actual else "bg-red"
+                    return f'<td class="{clase_smi}">{formatear_numero(smi_value)}</td>'
 
                 html_body += f"""
                             <tr>
-                                <td>{nombre_con_precio}</td>
+                                <td class="{clase_nombre}">{nombre_con_precio}</td>
                                 <td class="{comprado_class}">{data['COMPRADO']}</td>
                                 <td>{precio_compra_display}</td>
                                 <td>{fecha_compra_display}</td>
@@ -429,6 +530,16 @@ def generar_reporte():
                                 <td class="{clase_oportunidad}">{oportunidad}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
+                                {get_smi_cell(data['SUBIDA_1'], data['SMI_HOY'])}
+                                {get_smi_cell(data['SUBIDA_2'], data['SMI_HOY'])}
+                                {get_smi_cell(data['SUBIDA_3'], data['SMI_HOY'])}
+                                {get_smi_cell(data['SUBIDA_4'], data['SMI_HOY'])}
+                                {get_smi_cell(data['SUBIDA_5'], data['SMI_HOY'])}
+                                {get_smi_cell(data['BAJADA_1'], data['SMI_HOY'])}
+                                {get_smi_cell(data['BAJADA_2'], data['SMI_HOY'])}
+                                {get_smi_cell(data['BAJADA_3'], data['SMI_HOY'])}
+                                {get_smi_cell(data['BAJADA_4'], data['SMI_HOY'])}
+                                {get_smi_cell(data['BAJADA_5'], data['SMI_HOY'])}
                             </tr>
                 """
         
