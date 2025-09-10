@@ -511,13 +511,17 @@ def generar_reporte():
                     celda_empresa_class = "red-cell"
                 
                 if data['COMPRADO'] == 'SI':
-                    # Cálculo de la ganancia/pérdida en euros
+                    # Cálculo de la ganancia/pérdida total en euros
                     try:
                         precio_compra_float = float(data['PRECIO_COMPRA'].replace('.', '').replace(',', '.'))
-                        ganancia_o_perdida = data['PRECIO_ACTUAL'] - precio_compra_float
-                        signo = "+" if ganancia_o_perdida >= 0 else ""
-                        ganancia_display = f"<br><b>{signo}{ganancia_o_perdida:,.2f}€</b>"
-                    except (ValueError, TypeError):
+                        if precio_compra_float > 0:
+                            num_acciones = int(10000 / precio_compra_float)
+                            ganancia_o_perdida = num_acciones * (data['PRECIO_ACTUAL'] - precio_compra_float)
+                            signo = "+" if ganancia_o_perdida >= 0 else ""
+                            ganancia_display = f"<br><b>{signo}{ganancia_o_perdida:,.2f}€</b>"
+                        else:
+                            ganancia_display = ""
+                    except (ValueError, TypeError, ZeroDivisionError):
                         ganancia_display = ""
 
                     comprado_display = f"SI<br><span class='small-text'>({data['PRECIO_COMPRA']}€ el {data['FECHA_COMPRA']})</span>{ganancia_display}"
