@@ -301,17 +301,19 @@ def clasificar_empresa(data, hist_df):
     data['ANALISIS_SUBIDA'] = []
     data['ANALISIS_BAJADA'] = []
 
-    if data['COMPRA_SI'] != "NO COMPRES":
+    if tendencia == "Bajando":
         for p in range(1, 6):
             data['ANALISIS_SUBIDA'].append(calcular_nuevo_smi(hist_df, p))
-    else:
+        for p in range(1, 6):
+            data['ANALISIS_BAJADA'].append((np.nan, np.nan))
+    elif tendencia == "Subiendo":
         for p in range(1, 6):
             data['ANALISIS_SUBIDA'].append((np.nan, np.nan))
-
-    if data['VENDE_SI'] != "NO VENDAS":
         for p in range(1, 6):
             data['ANALISIS_BAJADA'].append(calcular_nuevo_smi(hist_df, -p))
-    else:
+    else: # Tendencia Plana
+        for p in range(1, 6):
+            data['ANALISIS_SUBIDA'].append((np.nan, np.nan))
         for p in range(1, 6):
             data['ANALISIS_BAJADA'].append((np.nan, np.nan))
 
