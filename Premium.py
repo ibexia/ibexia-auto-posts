@@ -91,17 +91,12 @@ def calcular_precio_aplanamiento(df):
         df_prev = df.iloc[:-1].copy()
         df_prev = calculate_smi_tv(df_prev)
 
-        smi_smoothed_prev = df['SMI'].iloc[-2]
-
         avgrel_prev_last = (df_prev['Close'] - (df_prev['High'].rolling(window=10).max() + df_prev['Low'].rolling(window=10).min()) / 2).ewm(span=length_d, adjust=False).mean().iloc[-1]
         avgdiff_prev_last = (df_prev['High'].rolling(window=10).max() - df_prev['Low'].rolling(window=10).min()).ewm(span=length_d, adjust=False).mean().iloc[-1]
+        smi_raw_yesterday = df['SMI'].iloc[-2]
 
         alpha_ema = 2 / (length_d + 1)
         
-        df_temp = df.copy()
-        df_temp['SMI'] = pd.Series(df_temp['SMI'], index=df_temp.index).rolling(window=smooth_period).mean()
-        smi_raw_yesterday = df_temp['SMI'].iloc[-2]
-
         hh_today = df['High'].rolling(window=10).max().iloc[-1]
         ll_today = df['Low'].rolling(window=10).min().iloc[-1]
         diff_today = hh_today - ll_today
@@ -125,7 +120,6 @@ def obtener_datos_yfinance(ticker):
         stock = yf.Ticker(ticker)
         info = stock.info
         
-        # Filtro para empresas sin precio actual
         current_price = info.get("currentPrice")
         if not current_price:
             print(f"⚠️ Advertencia: No se encontró precio actual para {ticker}. Saltando...")
@@ -153,34 +147,29 @@ def obtener_datos_yfinance(ticker):
         
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
         
-        # --- Lógica para determinar la última acción de compra/venta y su fecha
         comprado_status = "NO"
         precio_compra = "N/A"
         fecha_compra = "N/A"
         
-        # Copiamos la serie de SMI para evitar modificar el original
         smi_series_copy = hist_extended['SMI'].copy()
         pendientes_smi = smi_series_copy.diff()
         
-        # Recorremos el historial desde el final para encontrar la última acción
         for i in range(len(hist_extended) - 1, 0, -1):
             smi_prev = hist_extended['SMI'].iloc[i - 1]
             pendiente_prev = pendientes_smi.iloc[i - 1]
             pendiente_curr = pendientes_smi.iloc[i]
             
-            # Señal de venta: cambio de tendencia de positiva a negativa
             if pendiente_curr < 0 and pendiente_prev >= 0:
                 comprado_status = "NO"
                 precio_compra = hist_extended['Close'].iloc[i-1]
                 fecha_compra = hist_extended.index[i-1].strftime('%d/%m/%Y')
-                break # Encontrada la última acción, salimos del bucle
+                break
             
-            # Señal de compra: cambio de tendencia de negativa a positiva en zona de sobreventa o intermedia
             elif pendiente_curr > 0 and pendiente_prev <= 0 and smi_prev < 40:
                 comprado_status = "SI"
                 precio_compra = hist_extended['Close'].iloc[i-1]
                 fecha_compra = hist_extended.index[i-1].strftime('%d/%m/%Y')
-                break # Encontrada la última acción, salimos del bucle
+                break
 
         return {
             "TICKER": ticker,
@@ -201,57 +190,43 @@ def obtener_datos_yfinance(ticker):
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
-# --- Función corregida para el cálculo simulado del SMI
 def calcular_nuevo_smi(df, percentage_change):
     try:
-        length_d = 3
-        smooth_period = 5
+        last_day_prices = df.iloc[-1].copy()
+        close_today = last_day_prices['Close']
+        high_today = last_day_prices['High']
+        low_today = last_day_prices['Low']
         
-        # Obtenemos los valores de las EMAs del día anterior, que son necesarios
-        # para simular correctamente el cálculo del SMI hoy.
+        new_close = close_today * (1 + percentage_change / 100)
+        new_high = high_today * (1 + percentage_change / 100)
+        new_low = low_today * (1 + percentage_change / 100)
+
+        length_d = 3
+        alpha_ema = 2 / (length_d + 1)
+
         df_prev = df.iloc[:-1].copy()
         df_prev = calculate_smi_tv(df_prev)
         avgrel_prev_last = (df_prev['Close'] - (df_prev['High'].rolling(window=10).max() + df_prev['Low'].rolling(window=10).min()) / 2).ewm(span=length_d, adjust=False).mean().iloc[-1]
         avgdiff_prev_last = (df_prev['High'].rolling(window=10).max() - df_prev['Low'].rolling(window=10).min()).ewm(span=length_d, adjust=False).mean().iloc[-1]
-        
-        # Obtenemos los precios del último día del df original
-        df_today = df.iloc[-1].copy()
-        
-        # Calculamos los nuevos precios simulados
-        new_close = df_today['Close'] * (1 + percentage_change / 100)
-        new_high = df_today['High'] * (1 + percentage_change / 100)
-        new_low = df_today['Low'] * (1 + percentage_change / 100)
-        
-        # Calculamos los nuevos valores del rdiff y diff para el día actual con los precios simulados
-        hh_today = df['High'].rolling(window=10).max().iloc[-1] # Se usa el high/low original para el cálculo del rango
-        ll_today = df['Low'].rolling(window=10).min().iloc[-1]
-        
-        rdiff_today = new_close - (hh_today + ll_today) / 2
+
+        hh_today = max(df['High'].rolling(window=9).max().iloc[-1], new_high)
+        ll_today = min(df['Low'].rolling(window=9).min().iloc[-1], new_low)
         diff_today = hh_today - ll_today
-        
-        # Calculamos los nuevos avgrel y avgdiff utilizando los valores del día anterior
-        alpha_ema = 2 / (length_d + 1)
+        rdiff_today = new_close - (hh_today + ll_today) / 2
+
         avgrel_today = (1 - alpha_ema) * avgrel_prev_last + alpha_ema * rdiff_today
         avgdiff_today = (1 - alpha_ema) * avgdiff_prev_last + alpha_ema * diff_today
-        
-        # Calculamos el SMI RAW del día actual con los nuevos avgrel y avgdiff
-        epsilon = 1e-9
-        smi_raw_today = np.where(
-            (avgdiff_today / 2 + epsilon) != 0,
-            (avgrel_today / (avgdiff_today / 2 + epsilon)) * 100,
-            0.0
-        )
-        smi_raw_today = np.clip(smi_raw_today, -100, 100)
-        
-        # Finalmente, aplicamos el suavizado final del SMI
-        smi_smoothed_prev = df['SMI'].iloc[-2]
-        smi_new = (smi_raw_today + smi_smoothed_prev * (smooth_period - 1)) / smooth_period
-        
-        return smi_new, new_close
-    except Exception as e:
-        print(f"❌ Error en el cálculo de nuevo SMI: {e}")
-        return np.nan, np.nan
 
+        epsilon = 1e-9
+        smi_raw = (avgrel_today / (avgdiff_today / 2 + epsilon)) * 100
+        smi_raw = np.clip(smi_raw, -100, 100)
+        
+        new_smi = smi_raw
+
+        return new_smi, new_close
+    except Exception as e:
+        print(f"❌ Error en el cálculo del nuevo SMI: {e}")
+        return np.nan, np.nan
 
 def clasificar_empresa(data, hist_df):
     estado_smi = data['ESTADO_SMI']
@@ -259,7 +234,6 @@ def clasificar_empresa(data, hist_df):
     precio_aplanamiento = data['PRECIO_APLANAMIENTO']
     smi_actual = data['SMI_HOY']
 
-    # Diccionario para las prioridades de orden
     prioridad = {
         "Posibilidad de Compra Activada": 1,
         "Posibilidad de Compra": 2,
@@ -281,7 +255,7 @@ def clasificar_empresa(data, hist_df):
             data['COMPRA_SI'] = f"COMPRA si supera {formatear_numero(precio_aplanamiento)}€ ⬆️"
             data['VENDE_SI'] = "NO VENDAS"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
-        else: # Tendencia Plana
+        else:
             data['OPORTUNIDAD'] = "Intermedio"
             data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
@@ -298,7 +272,7 @@ def clasificar_empresa(data, hist_df):
             data['COMPRA_SI'] = "YA ES TARDE PARA COMPRAR"
             data['VENDE_SI'] = f"VENDE si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
             data['ORDEN_PRIORIDAD'] = prioridad["Seguirá subiendo"]
-        else: # Tendencia Plana
+        else:
             data['OPORTUNIDAD'] = "Intermedio"
             data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
@@ -315,13 +289,12 @@ def clasificar_empresa(data, hist_df):
             data['COMPRA_SI'] = "NO COMPRES"
             data['VENDE_SI'] = "VENDE AHORA"
             data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta Activada"]
-        else: # Tendencia Plana
+        else:
             data['OPORTUNIDAD'] = "Intermedio"
             data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
 
-    # Calcular y añadir el análisis de porcentajes
     data['ANALISIS_SUBIDA'] = []
     data['ANALISIS_BAJADA'] = []
 
@@ -335,7 +308,7 @@ def clasificar_empresa(data, hist_df):
             data['ANALISIS_SUBIDA'].append((np.nan, np.nan))
         for p in range(1, 6):
             data['ANALISIS_BAJADA'].append(calcular_nuevo_smi(hist_df, -p))
-    else: # Tendencia Plana
+    else:
         for p in range(1, 6):
             data['ANALISIS_SUBIDA'].append((np.nan, np.nan))
         for p in range(1, 6):
@@ -352,12 +325,10 @@ def enviar_email_con_adjunto(html_body, asunto_email):
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
 
-    # Crea el archivo HTML
     html_filename = "analisis-empresas.html"
     with open(html_filename, "w", encoding="utf-8") as f:
         f.write(html_body)
 
-    # Adjunta el archivo HTML al correo
     with open(html_filename, "rb") as attachment:
         part = MIMEBase("application", "octet-stream")
         part.set_payload(attachment.read())
@@ -376,7 +347,6 @@ def enviar_email_con_adjunto(html_body, asunto_email):
         servidor.sendmail(remitente, destinatario, msg.as_string())
         servidor.quit()
         print(f"✅ Correo enviado con el asunto: {asunto_email}")
-        # Elimina el archivo después de enviarlo
         os.remove(html_filename)
     except Exception as e:
         print("❌ Error al enviar el correo:", e)
@@ -392,7 +362,6 @@ def generar_reporte():
         for ticker in all_tickers:
             print(f"🔎 Analizando {ticker}...")
             
-            # Obtener datos históricos para los cálculos de porcentajes
             try:
                 stock = yf.Ticker(ticker)
                 hist_df = stock.history(period="60d", interval="1d")
@@ -401,7 +370,6 @@ def generar_reporte():
                     continue
                 hist_df = calculate_smi_tv(hist_df)
                 
-                # Obtener los datos del día
                 data = obtener_datos_yfinance(ticker)
                 if data:
                     datos_completos.append(clasificar_empresa(data, hist_df))
@@ -411,10 +379,8 @@ def generar_reporte():
                 
             time.sleep(1)
 
-        # Ordenar la lista por la nueva prioridad
         datos_completos.sort(key=lambda x: (x.get('ORDEN_PRIORIDAD', 99), x.get('NOMBRE_EMPRESA', '')))
         
-        # Filtrar para no mostrar las que tienen orden 99 (no relevantes)
         datos_completos = [d for d in datos_completos if d.get('ORDEN_PRIORIDAD') != 99]
         
         html_body = f"""
@@ -539,7 +505,6 @@ def generar_reporte():
                     comprado_display = "NO"
                     comprado_class = ""
                 
-                # Lógica de coloración basada en el SMI calculado vs. SMI actual
                 def get_smi_cell(smi_value, price_value, smi_actual):
                     if pd.isna(smi_value):
                         return "<td>N/A</td>"
@@ -573,36 +538,35 @@ def generar_reporte():
             </div>
 
             <script>
-                function filterTable() {
+                function filterTable() {{
                     var input, filter, table, tr, td, i, txtValue;
                     input = document.getElementById("searchInput");
                     filter = input.value.toUpperCase();
                     table = document.getElementById("myTable");
                     tr = table.getElementsByTagName("tr");
-                    for (i = 0; i < tr.length; i++) {
+                    for (i = 0; i < tr.length; i++) {{
                         td = tr[i].getElementsByTagName("td")[0];
-                        if (td) {
+                        if (td) {{
                             txtValue = td.textContent || td.innerText;
-                            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                            if (txtValue.toUpperCase().indexOf(filter) > -1) {{
                                 tr[i].style.display = "";
-                            } else {
+                            }} else {{
                                 tr[i].style.display = "none";
-                            }
-                        }
-                    }
-                }
+                            }}
+                        }}
+                    }}
+                }}
                 
-                // Sincronizar el scroll de las dos barras
                 const tableContainer = document.querySelector('.table-container');
                 const scrollTop = document.getElementById('scroll-top');
                 
-                scrollTop.addEventListener('scroll', () => {
+                scrollTop.addEventListener('scroll', () => {{
                     tableContainer.scrollLeft = scrollTop.scrollLeft;
-                });
+                }});
                 
-                tableContainer.addEventListener('scroll', () => {
+                tableContainer.addEventListener('scroll', () => {{
                     scrollTop.scrollLeft = tableContainer.scrollLeft;
-                });
+                }});
             </script>
         </body>
         </html>
