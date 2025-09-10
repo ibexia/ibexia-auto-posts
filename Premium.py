@@ -224,12 +224,12 @@ def clasificar_empresa(data, hist_df):
         if tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
             data['COMPRA_SI'] = "COMPRA AHORA"
-            data['VENDE_SI'] = "NO VENDAS"
+            data['VENDE_SI'] = "ZONA DE COMPRA"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
         elif tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Posibilidad de Compra"
             data['COMPRA_SI'] = f"COMPRA si supera {formatear_numero(precio_aplanamiento)}€ ⬆️"
-            data['VENDE_SI'] = "NO VENDAS"
+            data['VENDE_SI'] = "ZONA DE COMPRA"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
         else:
             data['OPORTUNIDAD'] = "Intermedio"
@@ -245,8 +245,11 @@ def clasificar_empresa(data, hist_df):
             data['ORDEN_PRIORIDAD'] = prioridad["Seguirá bajando"]
         elif tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Seguirá subiendo"
-            data['COMPRA_SI'] = "YA ES TARDE PARA COMPRAR"
-            data['VENDE_SI'] = f"VENDE si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
+            data['COMPRA_SI'] = "COMPRA"
+            if smi_actual > 0:
+                 data['VENDE_SI'] = f"VENDE si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
+            else:
+                 data['VENDE_SI'] = "ZONA DE COMPRA"
             data['ORDEN_PRIORIDAD'] = prioridad["Seguirá subiendo"]
         else:
             data['OPORTUNIDAD'] = "Intermedio"
@@ -258,7 +261,7 @@ def clasificar_empresa(data, hist_df):
         if tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Riesgo de Venta"
             data['COMPRA_SI'] = "NO COMPRES"
-            data['VENDE_SI'] = f"VENDE si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
+            data['VENDE_SI'] = "ZONA DE VENTA"
             data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta"]
         elif tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Riesgo de Venta Activada"
