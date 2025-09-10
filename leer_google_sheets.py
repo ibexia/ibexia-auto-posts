@@ -582,39 +582,9 @@ def construir_prompt_formateado(data):
                           f"el segundo en <strong>{soportes_unicos[1]:,.2f}€</strong>, y el tercero en <strong>{soportes_unicos[2]:,.2f}€</strong>.")
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
-
-    tabla_resumen = f"""
-<h2>Resumen de Puntos Clave</h2>
-<table border="1" style="width:100%; border-collapse: collapse;">
-    <tr>
-        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Métrica</th>
-        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Valor</th>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Precio Actual</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Volumen</td>
-        <td style="padding: 8px;"><strong>{data['VOLUMEN']:,} acciones</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Soporte Clave</td>
-        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.2f}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Resistencia Clave</td>
-        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Precio Objetivo de Compra</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
-    </tr>
-</table>
-<br/>
-"""
     
     # Nuevo HTML del gráfico (incluyendo el análisis detallado)
+    analisis_grafico_html = ""
     chart_html = ""
     if smi_historico_para_grafico and cierres_para_grafico_total:
         labels_historial = data.get("FECHAS_HISTORIAL", [])
@@ -628,7 +598,7 @@ def construir_prompt_formateado(data):
         if len(smi_desplazados_para_grafico) < len(labels_total):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
         
-        # 2. Generación del análisis dinámico del gráfico
+        # Generación del análisis dinámico del gráfico
         analisis_grafico_html = "<h2>Análisis Detallado del Gráfico</h2>"
         precios = data['PRECIOS_PARA_SIMULACION']
         smis = data['SMI_PARA_SIMULACION']
@@ -692,8 +662,8 @@ def construir_prompt_formateado(data):
         elif ultima_tendencia == "sobreventa":
             analisis_grafico_html += f"<p>Nuestro Algoritmo se encuentra en una zona de <strong>sobreventa</strong>. Esto indica que la tendencia bajista está llegando a su fin y podríamos ver un giro y una señal de compra en breve.</p>"
 
+        # El gráfico en sí, que debe ir antes que el análisis
         chart_html = f"""
-        {analisis_grafico_html}
         <div style="width: 100%; max-width: 800px; margin: auto;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
@@ -830,6 +800,37 @@ def construir_prompt_formateado(data):
     else:
         chart_html = "<p>No hay suficientes datos para generar el gráfico.</p>"
     
+    tabla_resumen = f"""
+<h2>Resumen de Puntos Clave</h2>
+<table border="1" style="width:100%; border-collapse: collapse;">
+    <tr>
+        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Métrica</th>
+        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Valor</th>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Precio Actual</td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}€</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Volumen</td>
+        <td style="padding: 8px;"><strong>{data['VOLUMEN']:,} acciones</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Soporte Clave</td>
+        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.2f}€</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Resistencia Clave</td>
+        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Precio Objetivo de Compra</td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
+    </tr>
+</table>
+<br/>
+"""
+
     
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio.
@@ -859,7 +860,14 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <h1>{titulo_post}</h1>
 
 <h2>Análisis Inicial y Recomendación</h2>
-<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>.  Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
+<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
+
+<h2>Historial de Operaciones</h2>
+{ganancias_html}
+
+<h2>Análisis Detallado del Gráfico</h2>
+{chart_html}
+{analisis_grafico_html}
 
 <h2>La Clave: El Algoritmo como tu "Guía de Compra"</h2>
 <p>Nuestro sistema se basa en un <strong>Algoritmo</strong> que funciona como una brújula que te dice si es un buen momento para comprar o no. La clave está en cómo se mueve:</p>
@@ -872,11 +880,6 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
     </li>
 </ul>
 <p>Más allá de la sobrecompra o sobreventa, la señal de compra más clara es cuando el Algoritmo <strong>gira hacia arriba</strong>. Si ves que sube, es un buen momento para comprar (siempre y cuando no esté en una zona extrema de sobrecompra). Si gira a la baja, es mejor esperar.</p>
-
-{chart_html}
-
-<h2>Historial de Operaciones</h2>
-{ganancias_html}
 
 {tabla_resumen}
 """
