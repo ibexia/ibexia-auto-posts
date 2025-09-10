@@ -154,7 +154,7 @@ def obtener_datos_yfinance(ticker):
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
         
         # --- Lógica para determinar la última acción de compra/venta y su fecha
-        comprado_status = "NO"
+        comprado_status = "N/A"
         precio_compra = "N/A"
         fecha_compra = "N/A"
         
@@ -515,14 +515,15 @@ def generar_reporte():
                     comprado_display = "NO"
                     comprado_class = ""
                 
-                def get_smi_cell(smi_value, price_value, smi_actual):
+                # Lógica de coloración basada en precio_aplanamiento
+                def get_smi_cell(smi_value, price_value, precio_aplanamiento):
                     if pd.isna(smi_value):
                         return "<td>N/A</td>"
-                    clase_smi = "bg-green" if smi_value >= smi_actual else "bg-red"
+                    clase_smi = "bg-green" if price_value > precio_aplanamiento else "bg-red"
                     return f'<td class="{clase_smi}"><b>{formatear_numero(smi_value)}</b><br><span class="small-text">{formatear_numero(price_value)}€</span></td>'
                 
-                html_subida = "".join(get_smi_cell(smi, price, data['SMI_HOY']) for smi, price in data['ANALISIS_SUBIDA'])
-                html_bajada = "".join(get_smi_cell(smi, price, data['SMI_HOY']) for smi, price in data['ANALISIS_BAJADA'])
+                html_subida = "".join(get_smi_cell(smi, price, data['PRECIO_APLANAMIENTO']) for smi, price in data['ANALISIS_SUBIDA'])
+                html_bajada = "".join(get_smi_cell(smi, price, data['PRECIO_APLANAMIENTO']) for smi, price in data['ANALISIS_BAJADA'])
 
                 html_body += f"""
                             <tr>
