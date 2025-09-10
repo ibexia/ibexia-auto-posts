@@ -379,7 +379,38 @@ def generar_reporte():
                 
             time.sleep(1)
 
-        datos_completos.sort(key=lambda x: (x.get('ORDEN_PRIORIDAD', 99), x.get('NOMBRE_EMPRESA', '')))
+        def get_sort_key(data):
+            oportunidad = data.get('OPORTUNIDAD', '')
+            smi_hoy = data.get('SMI_HOY', -101)
+            orden_prioridad = data.get('ORDEN_PRIORIDAD', 99)
+            
+            # Prioridad 1: Empresas que bajan y "NO VENDAS" (Riesgo de Venta)
+            # Ordenar por la cercanía al aplanamiento (menor subida para que SMI cambie)
+            if oportunidad == "Riesgo de Venta":
+                subida_aplanamiento = 6
+                for i, (smi, _) in enumerate(data['ANALISIS_SUBIDA']):
+                    # El umbral de cambio significativo es 0.5 puntos del SMI
+                    if not pd.isna(smi) and abs(smi - smi_hoy) > 0.5:
+                        subida_aplanamiento = i + 1
+                        break
+                return (1, subida_aplanamiento)
+
+            # Prioridad 2: Sobreventa y subiendo (Posibilidad de Compra Activada)
+            # Ordenar por la lejanía al aplanamiento (mayor porcentaje de bajada para que el SMI cambie)
+            if oportunidad == "Posibilidad de Compra Activada":
+                bajada_aplanamiento = -1
+                for i, (smi, _) in reversed(list(enumerate(data['ANALISIS_BAJADA']))):
+                    # El umbral de cambio significativo es 0.5 puntos del SMI
+                    if not pd.isna(smi) and abs(smi - smi_hoy) > 0.5:
+                        bajada_aplanamiento = -(i + 1)
+                        break
+                return (2, bajada_aplanamiento)
+            
+            # Resto de empresas con el orden original
+            else:
+                return (3, orden_prioridad, -smi_hoy)
+
+        datos_completos.sort(key=get_sort_key)
         
         datos_completos = [d for d in datos_completos if d.get('ORDEN_PRIORIDAD') != 99]
         
