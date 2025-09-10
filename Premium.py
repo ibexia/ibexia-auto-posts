@@ -381,50 +381,44 @@ def generar_reporte():
 
         def get_sort_key(data):
             oportunidad = data.get('OPORTUNIDAD', '')
-            smi_hoy = data.get('SMI_HOY', -101)
-            orden_prioridad = data.get('ORDEN_PRIORIDAD', 99)
             
-            # Función auxiliar para encontrar el porcentaje de aplanamiento en la subida
-            def get_subida_aplanamiento(data_dict):
-                subida_aplanamiento = 6
-                for i, (smi, _) in enumerate(data_dict['ANALISIS_SUBIDA']):
+            # Helper function to find the smallest positive percentage change for SMI
+            def get_subida_orden(data_dict):
+                for i, (smi, _) in enumerate(data_dict.get('ANALISIS_SUBIDA', [])):
                     if not pd.isna(smi) and abs(smi - data_dict['SMI_HOY']) > 0.5:
-                        subida_aplanamiento = i + 1
-                        break
-                return subida_aplanamiento
-            
-            # Función auxiliar para encontrar el porcentaje de aplanamiento en la bajada
-            def get_bajada_aplanamiento(data_dict):
-                bajada_aplanamiento = -1
-                for i, (smi, _) in reversed(list(enumerate(data_dict['ANALISIS_BAJADA']))):
-                    if not pd.isna(smi) and abs(smi - data_dict['SMI_HOY']) > 0.5:
-                        bajada_aplanamiento = -(i + 1)
-                        break
-                return bajada_aplanamiento
+                        return i + 1
+                return 99
 
-            # Prioridad 1
+            # Helper function to find the largest negative percentage change for SMI
+            def get_bajada_orden(data_dict):
+                for i, (smi, _) in reversed(list(enumerate(data_dict.get('ANALISIS_BAJADA', [])))):
+                    if not pd.isna(smi) and abs(smi - data_dict['SMI_HOY']) > 0.5:
+                        return -(i + 1)
+                return 99
+
+            # Priority 1: "Posibilidad de Compra" (Bajando)
             if oportunidad == "Posibilidad de Compra":
-                return (1, get_subida_aplanamiento(data))
+                return (1, get_subida_orden(data))
 
-            # Prioridad 2
+            # Priority 2: "Posibilidad de Compra Activada" (Sobreventa y Subiendo)
             elif oportunidad == "Posibilidad de Compra Activada":
-                return (2, get_bajada_aplanamiento(data))
+                return (2, get_bajada_orden(data))
             
-            # Prioridad 3: Subiendo (resto)
+            # Priority 3: "Seguirá subiendo" (Subiendo)
             elif oportunidad == "Seguirá subiendo":
-                return (3, get_bajada_aplanamiento(data))
+                return (3, get_bajada_orden(data))
 
-            # Prioridad 4: Sobrecompra y subiendo
+            # Priority 4: "Riesgo de Venta" (Sobrecompra y Subiendo)
             elif oportunidad == "Riesgo de Venta":
-                return (4, get_bajada_aplanamiento(data))
+                return (4, get_bajada_orden(data))
                 
-            # Prioridad 5: Sobrecompra y bajando
+            # Priority 5: "Riesgo de Venta Activada" (Sobrecompra y Bajando)
             elif oportunidad == "Riesgo de Venta Activada":
-                return (5, get_subida_aplanamiento(data))
+                return (5, get_subida_orden(data))
 
-            # Resto de empresas
+            # The rest of the companies
             else:
-                return (99, orden_prioridad, -smi_hoy)
+                return (99, data.get('ORDEN_PRIORIDAD', 99))
 
         datos_completos.sort(key=get_sort_key)
         
