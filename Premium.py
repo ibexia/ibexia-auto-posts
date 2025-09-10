@@ -117,7 +117,6 @@ def calcular_precio_aplanamiento(df):
         
 def calcular_beneficio_perdida(precio_compra, precio_actual, inversion=10000):
     try:
-        # Se elimina el .replace(',', '') para evitar el error
         precio_compra = float(precio_compra)
         precio_actual = float(precio_actual)
         
@@ -197,7 +196,7 @@ def obtener_datos_yfinance(ticker):
             "PRECIO_APLANAMIENTO": precio_aplanamiento,
             "PENDIENTE": pendiente_hoy,
             "COMPRADO": comprado_status,
-            "PRECIO_COMPRA": precio_compra,  # Se mantiene como float para el cálculo
+            "PRECIO_COMPRA": precio_compra,
             "FECHA_COMPRA": fecha_compra,
         }
 
@@ -444,10 +443,10 @@ def generar_reporte():
                     position: relative;
                 }}
                 table {{ 
-                    width: 100%;
-                    min-width: 1400px;
-                    border-collapse: collapse; 
+                    width: 90%;
+                    table-layout: fixed;
                     margin: 20px auto 0 auto;
+                    border-collapse: collapse;
                 }}
                 th, td {{ 
                     border: 1px solid #ddd; 
@@ -455,6 +454,8 @@ def generar_reporte():
                     text-align: center;
                     vertical-align: top;
                     white-space: normal;
+                    width: 140px;
+                    line-height: 1.2;
                 }}
                 th {{ 
                     background-color: #f2f2f2;
@@ -487,7 +488,6 @@ def generar_reporte():
                     line-height: 1.2;
                     font-size: 12px;
                 }}
-                th:first-child, td:first-child {{ width: 100px; }}
             </style>
         </head>
         <body>
@@ -553,7 +553,6 @@ def generar_reporte():
                     celda_empresa_class = "red-cell"
                 
                 if data['COMPRADO'] == 'SI':
-                    # Ahora formateamos el precio para el display
                     precio_compra_formateado = formatear_numero(data['PRECIO_COMPRA'])
                     comprado_display = f"SI<br><span class='small-text'>({precio_compra_formateado}€ el {data['FECHA_COMPRA']})</span>"
                     comprado_class = "comprado-si"
