@@ -204,16 +204,30 @@ def obtener_datos_yfinance(ticker):
 def calcular_nuevo_smi(df, percentage_change):
     try:
         df_copy = df.copy()
-        df_copy.loc[df_copy.index[-1], 'Close'] = df_copy.loc[df_copy.index[-1], 'Close'] * (1 + percentage_change / 100)
-        df_copy.loc[df_copy.index[-1], 'High'] = df_copy.loc[df_copy.index[-1], 'High'] * (1 + percentage_change / 100)
-        df_copy.loc[df_copy.index[-1], 'Low'] = df_copy.loc[df_copy.index[-1], 'Low'] * (1 + percentage_change / 100)
+        
+        # Obtener los precios del último día
+        close_today = df_copy.loc[df_copy.index[-1], 'Close']
+        high_today = df_copy.loc[df_copy.index[-1], 'High']
+        low_today = df_copy.loc[df_copy.index[-1], 'Low']
+        
+        # Calcular los nuevos precios
+        new_close = close_today * (1 + percentage_change / 100)
+        new_high = high_today * (1 + percentage_change / 100)
+        new_low = low_today * (1 + percentage_change / 100)
+        
+        # Asignar los nuevos precios al último día del DataFrame
+        df_copy.loc[df_copy.index[-1], 'Close'] = new_close
+        df_copy.loc[df_copy.index[-1], 'High'] = new_high
+        df_copy.loc[df_copy.index[-1], 'Low'] = new_low
 
         df_copy = calculate_smi_tv(df_copy)
         
-        return df_copy['SMI'].iloc[-1]
+        new_smi = df_copy['SMI'].iloc[-1]
+        new_price = new_close # Usamos el nuevo precio de cierre
+        
+        return new_smi, new_price
     except Exception as e:
-        return np.nan
-
+        return np.nan, np.nan
 
 def clasificar_empresa(data, hist_df):
     estado_smi = data['ESTADO_SMI']
@@ -285,11 +299,11 @@ def clasificar_empresa(data, hist_df):
 
     # Calcular y añadir el análisis de porcentajes
     if tendencia == "Subiendo":
-        data['SUBIDA_1'] = "N/A"
-        data['SUBIDA_2'] = "N/A"
-        data['SUBIDA_3'] = "N/A"
-        data['SUBIDA_4'] = "N/A"
-        data['SUBIDA_5'] = "N/A"
+        data['SUBIDA_1'] = (np.nan, np.nan)
+        data['SUBIDA_2'] = (np.nan, np.nan)
+        data['SUBIDA_3'] = (np.nan, np.nan)
+        data['SUBIDA_4'] = (np.nan, np.nan)
+        data['SUBIDA_5'] = (np.nan, np.nan)
         data['BAJADA_1'] = calcular_nuevo_smi(hist_df, -1)
         data['BAJADA_2'] = calcular_nuevo_smi(hist_df, -2)
         data['BAJADA_3'] = calcular_nuevo_smi(hist_df, -3)
@@ -301,22 +315,22 @@ def clasificar_empresa(data, hist_df):
         data['SUBIDA_3'] = calcular_nuevo_smi(hist_df, 3)
         data['SUBIDA_4'] = calcular_nuevo_smi(hist_df, 4)
         data['SUBIDA_5'] = calcular_nuevo_smi(hist_df, 5)
-        data['BAJADA_1'] = "N/A"
-        data['BAJADA_2'] = "N/A"
-        data['BAJADA_3'] = "N/A"
-        data['BAJADA_4'] = "N/A"
-        data['BAJADA_5'] = "N/A"
+        data['BAJADA_1'] = (np.nan, np.nan)
+        data['BAJADA_2'] = (np.nan, np.nan)
+        data['BAJADA_3'] = (np.nan, np.nan)
+        data['BAJADA_4'] = (np.nan, np.nan)
+        data['BAJADA_5'] = (np.nan, np.nan)
     else: # Tendencia Plana
-        data['SUBIDA_1'] = "N/A"
-        data['SUBIDA_2'] = "N/A"
-        data['SUBIDA_3'] = "N/A"
-        data['SUBIDA_4'] = "N/A"
-        data['SUBIDA_5'] = "N/A"
-        data['BAJADA_1'] = "N/A"
-        data['BAJADA_2'] = "N/A"
-        data['BAJADA_3'] = "N/A"
-        data['BAJADA_4'] = "N/A"
-        data['BAJADA_5'] = "N/A"
+        data['SUBIDA_1'] = (np.nan, np.nan)
+        data['SUBIDA_2'] = (np.nan, np.nan)
+        data['SUBIDA_3'] = (np.nan, np.nan)
+        data['SUBIDA_4'] = (np.nan, np.nan)
+        data['SUBIDA_5'] = (np.nan, np.nan)
+        data['BAJADA_1'] = (np.nan, np.nan)
+        data['BAJADA_2'] = (np.nan, np.nan)
+        data['BAJADA_3'] = (np.nan, np.nan)
+        data['BAJADA_4'] = (np.nan, np.nan)
+        data['BAJADA_5'] = (np.nan, np.nan)
 
     return data
 
@@ -430,7 +444,7 @@ def generar_reporte():
                 }}
                 table {{ 
                     width: 100%;
-                    min-width: 1200px;
+                    min-width: 1400px;
                     border-collapse: collapse; 
                     margin: 20px auto 0 auto;
                 }}
@@ -450,6 +464,7 @@ def generar_reporte():
                 .bg-highlight {{ background-color: #2ecc71; color: white; font-weight: bold; }}
                 .text-center {{ text-align: center; }}
                 .disclaimer {{ font-size: 12px; text-align: center; color: #95a5a6; }}
+                .small-text {{ font-size: 10px; color: #555; }}
             </style>
         </head>
         <body>
@@ -463,7 +478,7 @@ def generar_reporte():
                 </div>
                 
                 <div id="scroll-top" style="overflow-x: auto;">
-                    <div style="min-width: 1200px;">&nbsp;</div>
+                    <div style="min-width: 1400px;">&nbsp;</div>
                 </div>
                 
                 <div class="table-container">
@@ -478,6 +493,7 @@ def generar_reporte():
                                 <th rowspan="2">Oportunidad</th>
                                 <th rowspan="2">Compra si...</th>
                                 <th rowspan="2">Vende si...</th>
+                                <th rowspan="2">Algoritmo Actual</th>
                                 <th colspan="5">Si el precio sube</th>
                                 <th colspan="5">Si el precio baja</th>
                             </tr>
@@ -514,11 +530,11 @@ def generar_reporte():
                 
                 comprado_class = "comprado-si" if data['COMPRADO'] == 'SI' else ''
                 
-                def get_smi_cell(smi_value, smi_actual):
-                    if smi_value == "N/A" or pd.isna(smi_value):
+                def get_smi_cell(smi_value, price_value, smi_actual):
+                    if pd.isna(smi_value):
                         return "<td>N/A</td>"
                     clase_smi = "bg-green" if smi_value >= smi_actual else "bg-red"
-                    return f'<td class="{clase_smi}">{formatear_numero(smi_value)}</td>'
+                    return f'<td class="{clase_smi}"><b>{formatear_numero(smi_value)}</b><br><span class="small-text">{formatear_numero(price_value)}€</span></td>'
 
                 html_body += f"""
                             <tr>
@@ -530,16 +546,17 @@ def generar_reporte():
                                 <td class="{clase_oportunidad}">{oportunidad}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
-                                {get_smi_cell(data['SUBIDA_1'], data['SMI_HOY'])}
-                                {get_smi_cell(data['SUBIDA_2'], data['SMI_HOY'])}
-                                {get_smi_cell(data['SUBIDA_3'], data['SMI_HOY'])}
-                                {get_smi_cell(data['SUBIDA_4'], data['SMI_HOY'])}
-                                {get_smi_cell(data['SUBIDA_5'], data['SMI_HOY'])}
-                                {get_smi_cell(data['BAJADA_1'], data['SMI_HOY'])}
-                                {get_smi_cell(data['BAJADA_2'], data['SMI_HOY'])}
-                                {get_smi_cell(data['BAJADA_3'], data['SMI_HOY'])}
-                                {get_smi_cell(data['BAJADA_4'], data['SMI_HOY'])}
-                                {get_smi_cell(data['BAJADA_5'], data['SMI_HOY'])}
+                                <td><b>{formatear_numero(data['SMI_HOY'])}</b></td>
+                                {get_smi_cell(data['SUBIDA_1'][0], data['SUBIDA_1'][1], data['SMI_HOY'])}
+                                {get_smi_cell(data['SUBIDA_2'][0], data['SUBIDA_2'][1], data['SMI_HOY'])}
+                                {get_smi_cell(data['SUBIDA_3'][0], data['SUBIDA_3'][1], data['SMI_HOY'])}
+                                {get_smi_cell(data['SUBIDA_4'][0], data['SUBIDA_4'][1], data['SMI_HOY'])}
+                                {get_smi_cell(data['SUBIDA_5'][0], data['SUBIDA_5'][1], data['SMI_HOY'])}
+                                {get_smi_cell(data['BAJADA_1'][0], data['BAJADA_1'][1], data['SMI_HOY'])}
+                                {get_smi_cell(data['BAJADA_2'][0], data['BAJADA_2'][1], data['SMI_HOY'])}
+                                {get_smi_cell(data['BAJADA_3'][0], data['BAJADA_3'][1], data['SMI_HOY'])}
+                                {get_smi_cell(data['BAJADA_4'][0], data['BAJADA_4'][1], data['SMI_HOY'])}
+                                {get_smi_cell(data['BAJADA_5'][0], data['BAJADA_5'][1], data['SMI_HOY'])}
                             </tr>
                 """
         
