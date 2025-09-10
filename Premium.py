@@ -175,14 +175,14 @@ def obtener_datos_yfinance(ticker):
             
             if pendiente_curr < 0 and pendiente_prev >= 0:
                 comprado_status = "NO"
-                precio_compra = hist_extended['Close'].iloc[i-1]
-                fecha_compra = hist_extended.index[i-1].strftime('%d/%m/%Y')
+                precio_compra = hist_extended['Close'].iloc[i]
+                fecha_compra = hist_extended.index[i].strftime('%d/%m/%Y')
                 break
             
             elif pendiente_curr > 0 and pendiente_prev <= 0 and smi_prev < 40:
                 comprado_status = "SI"
-                precio_compra = hist_extended['Close'].iloc[i-1]
-                fecha_compra = hist_extended.index[i-1].strftime('%d/%m/%Y')
+                precio_compra = hist_extended['Close'].iloc[i]
+                fecha_compra = hist_extended.index[i].strftime('%d/%m/%Y')
                 break
 
         return {
