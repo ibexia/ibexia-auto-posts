@@ -266,17 +266,20 @@ def clasificar_empresa(data):
     prioridad = {
         "Posibilidad de Compra Activada": 1,
         "Posibilidad de Compra": 2,
-        "VIGILAR": 3,
-        "Riesgo de Venta": 4,
-        "Riesgo de Venta Activada": 5,
-        "Seguirá bajando": 6,
-        "Intermedio": 7
+        "Seguirá subiendo": 3,
+        "Seguirá bajando": 4,
+        "Riesgo de Venta": 5,
+        "Riesgo de Venta Activada": 6,
+        "Intermedio": 99
     }
 
     if estado_smi == "Sobreventa":
         if tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
-            data['COMPRA_SI'] = "COMPRA YA"
+            if current_price > close_yesterday:
+                data['COMPRA_SI'] = "COMPRA YA"
+            else:
+                data['COMPRA_SI'] = f"COMPRAR SI SUPERA {formatear_numero(close_yesterday)}€"
             data['VENDE_SI'] = "NO VENDER"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
         elif tendencia == "Bajando":
@@ -300,7 +303,7 @@ def clasificar_empresa(data):
             data['VENDE_SI'] = "YA ES TARDE PARA VENDER"
             data['ORDEN_PRIORIDAD'] = prioridad["Seguirá bajando"]
         elif tendencia == "Subiendo":
-            data['OPORTUNIDAD'] = "VIGILAR"
+            data['OPORTUNIDAD'] = "Seguirá subiendo"
             data['COMPRA_SI'] = "NO COMPRAR"
             
             trigger_price = close_yesterday * 0.99
@@ -309,7 +312,7 @@ def clasificar_empresa(data):
                  data['VENDE_SI'] = "VENDE YA"
             else:
                  data['VENDE_SI'] = f"VENDER SI PIERDE {formatear_numero(trigger_price)}€"
-            data['ORDEN_PRIORIDAD'] = prioridad["VIGILAR"]
+            data['ORDEN_PRIORIDAD'] = prioridad["Seguirá subiendo"]
         else:
             data['OPORTUNIDAD'] = "Intermedio"
             data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
@@ -334,50 +337,71 @@ def clasificar_empresa(data):
             data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
     
     return data
-    
+
 def generar_observaciones(data):
     nombre_empresa = data['NOMBRE_EMPRESA']
     precio_actual = formatear_numero(data['PRECIO_ACTUAL'])
     estado_smi = data['ESTADO_SMI']
     tendencia = data['TENDENCIA_ACTUAL']
     oportunidad = data['OPORTUNIDAD']
-    soporte1 = formatear_numero(data['SOPORTE_1'])
-    resistencia1 = formatear_numero(data['RESISTENCIA_1'])
+    soporte1 = data['SOPORTE_1']
+    resistencia1 = data['RESISTENCIA_1']
     compra_si = data['COMPRA_SI']
     vende_si = data['VENDE_SI']
 
     texto_observacion = f"<strong>Observaciones de {nombre_empresa}:</strong><br>"
-
+    
+    soporte1_formateado = formatear_numero(soporte1)
+    resistencia1_formateada = formatear_numero(resistencia1)
+    
     if oportunidad == "Posibilidad de Compra Activada":
-        texto = f"Con un precio de {precio_actual}€, la empresa se encuentra en una zona de **sobreventa** y muestra una tendencia **alcista**. Esta combinación activa una señal de compra fuerte, por lo que el algoritmo recomienda **comprar ahora**. Tenga en cuenta los niveles de soporte y resistencia cercanos en **{soporte1}€** y **{resistencia1}€**."
+        mensaje = f"Con un precio de {precio_actual}€, la empresa se encuentra en una zona de **{estado_smi}** y muestra una tendencia **{tendencia}**. Esta combinación activa una señal de compra fuerte, por lo que el algoritmo recomienda **{compra_si.lower()}**."
+        if soporte1_formateado != "N/A" and resistencia1_formateada != "N/A":
+            mensaje += f" Los soportes más cercanos a tener en cuenta son **{soporte1_formateado}€** y la primera resistencia clave está en **{resistencia1_formateada}€**."
+        elif soporte1_formateado != "N/A":
+            mensaje += f" El soporte más cercano a tener en cuenta es **{soporte1_formateado}€**."
+        elif resistencia1_formateada != "N/A":
+            mensaje += f" La primera resistencia clave está en **{resistencia1_formateada}€**."
     
     elif oportunidad == "Posibilidad de Compra":
+        mensaje = f"El valor está en una zona de **{estado_smi}** con una tendencia **{tendencia}**."
         if "COMPRA YA" in compra_si:
-            texto = f"El valor está en una zona de **sobreventa** con una tendencia **bajista**, lo que puede ser un indicador de reversión. El algoritmo ha detectado una oportunidad de **compra inmediata** para aprovechar un posible rebote. Se debe considerar el soporte clave en **{soporte1}€**."
+            mensaje += " Esto puede ser un indicador de reversión. El algoritmo ha detectado una oportunidad de **compra inmediata** para aprovechar un posible rebote."
+            if soporte1_formateado != "N/A":
+                mensaje += f" Se debe considerar el soporte clave en **{soporte1_formateado}€**."
         else:
             precio_objetivo = compra_si.split('€')[0].split()[-1]
-            texto = f"La empresa cotiza a {precio_actual}€ y se sitúa en una zona de **sobreventa**. A pesar de una tendencia **bajista**, nuestro algoritmo sugiere que podría haber una oportunidad de compra si el precio logra **superar el nivel de {precio_objetivo}€**."
-    
-    elif oportunidad == "VIGILAR":
-        texto = f"En este momento, la empresa se encuentra en una zona **intermedia** con una tendencia claramente **alcista**. Aunque no se recomienda comprar, es una situación para **vigilar de cerca**. Si el precio **{vende_si.replace('VENDER SI PIERDE', 'cae por debajo de').lower()}**, podría ser una señal para vender. El nivel de resistencia más cercano es **{resistencia1}€**."
+            mensaje += f" Nuestro algoritmo sugiere que podría haber una oportunidad de compra si el precio logra **superar el nivel de {precio_objetivo}€**."
+            if soporte1_formateado != "N/A":
+                mensaje += f" El soporte más cercano es **{soporte1_formateado}€**."
+
+    elif oportunidad == "Seguirá subiendo":
+        mensaje = f"En este momento, la empresa se encuentra en una zona **{estado_smi}** con una tendencia claramente **{tendencia}**. Aunque no se recomienda comprar, la situación requiere **vigilancia**. Si el precio **{vende_si.replace('VENDER SI PIERDE', 'cae por debajo de').lower()}**, podría ser una señal para vender."
+        if resistencia1_formateada != "N/A":
+            mensaje += f" El nivel de resistencia más cercano es **{resistencia1_formateada}€**."
 
     elif oportunidad == "Riesgo de Venta":
-        texto = f"Con una cotización actual de {precio_actual}€, la empresa ha entrado en una zona de **sobrecompra** con una tendencia **alcista**. Esto genera un **riesgo de venta**. El algoritmo recomienda considerar una venta en la zona de resistencia en **{resistencia1}€** para asegurar beneficios."
+        mensaje = f"Con una cotización actual de {precio_actual}€, la empresa ha entrado en una zona de **{estado_smi}** con una tendencia **{tendencia}**. Esto genera un **riesgo de venta**."
+        if resistencia1_formateada != "N/A":
+            mensaje += f" El algoritmo recomienda considerar una venta en la zona de resistencia en **{resistencia1_formateada}€** para asegurar beneficios."
+        else:
+            mensaje += f" El algoritmo recomienda considerar una venta para asegurar beneficios."
     
     elif oportunidad == "Riesgo de Venta Activada":
-        texto = f"La combinación de una zona de **sobrecompra** y una tendencia **bajista** ha activado una señal de **riesgo de venta**. El algoritmo recomienda **vender ahora** para evitar mayores pérdidas. El soporte más cercano a considerar es **{soporte1}€**."
+        mensaje = f"La combinación de una zona de **{estado_smi}** y una tendencia **{tendencia}** ha activado una señal de **{oportunidad}**. El algoritmo recomienda **vender ahora** para evitar mayores pérdidas."
+        if soporte1_formateado != "N/A":
+            mensaje += f" El soporte más cercano a considerar es **{soporte1_formateado}€**."
 
     elif oportunidad == "Seguirá bajando":
-        texto = f"La empresa se encuentra en una zona **intermedia** y con una tendencia **bajista**. Nuestro análisis sugiere que es probable que el precio **siga bajando** en el corto plazo. Por lo tanto, no se aconseja ni comprar ni vender en este momento."
+        mensaje = f"La empresa se encuentra en una zona **{estado_smi}** y con una tendencia **{tendencia}**. Nuestro análisis sugiere que es probable que el precio **siga bajando** en el corto plazo. Por lo tanto, no se aconseja ni comprar ni vender en este momento."
 
     elif oportunidad == "Intermedio":
-        texto = "Actualmente, la empresa se encuentra en una zona sin movimientos definidos. El algoritmo no emite recomendaciones de compra o venta en este momento, por lo que lo más prudente es **mantenerse al margen** y observar la evolución del mercado."
+        mensaje = "Actualmente, la empresa se encuentra en una zona sin movimientos definidos. El algoritmo no emite recomendaciones de compra o venta en este momento, por lo que lo más prudente es **mantenerse al margen** y observar la evolución del mercado."
     
     else:
-        texto = "No hay observaciones específicas disponibles para esta empresa en el día de hoy."
+        mensaje = "No hay observaciones específicas disponibles para esta empresa en el día de hoy."
     
-    return f'<p style="text-align:left; color:#000;">{texto_observacion.strip()}{texto.strip()}</p>'
-
+    return f'<p style="text-align:left; color:#000;">{texto_observacion.strip()}{mensaje.strip()}</p>'
 
 def enviar_email_con_adjunto(html_body, asunto_email):
     remitente = "xumkox@gmail.com"
@@ -450,16 +474,66 @@ def generar_reporte():
             orden_grupo = 99
             orden_interna = float('inf')
             
-            if categoria in ["Posibilidad de Compra Activada", "Posibilidad de Compra"]:
+            if categoria == "Posibilidad de Compra" and empresa['TENDENCIA_ACTUAL'] == "Bajando":
                 orden_grupo = 1
-            elif categoria in ["VIGILAR", "Riesgo de Venta", "Riesgo de Venta Activada", "Seguirá bajando"]:
-                orden_grupo = 2
-            elif categoria == "Intermedio":
-                orden_grupo = 3
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
+                    try:
+                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'])
+                        precio_actual = float(empresa['PRECIO_ACTUAL'])
+                        porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
+                        orden_interna = porcentaje
+                    except (ValueError, TypeError):
+                        pass
 
-            return (empresa['ORDEN_PRIORIDAD'], empresa['NOMBRE_EMPRESA'])
+            elif categoria == "Posibilidad de Compra Activada" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobreventa":
+                orden_grupo = 2
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
+                    try:
+                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
+                        precio_actual = float(empresa['PRECIO_ACTUAL'])
+                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
+                        orden_interna = -porcentaje
+                    except (ValueError, TypeError):
+                        pass
+            
+            elif categoria == "Seguirá subiendo" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Intermedio":
+                orden_grupo = 3
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
+                    try:
+                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
+                        precio_actual = float(empresa['PRECIO_ACTUAL'])
+                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
+                        orden_interna = -porcentaje
+                    except (ValueError, TypeError):
+                        pass
+            
+            elif categoria == "Riesgo de Venta" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobrecompra":
+                orden_grupo = 4
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
+                    try:
+                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
+                        precio_actual = float(empresa['PRECIO_ACTUAL'])
+                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
+                        orden_interna = -porcentaje
+                    except (ValueError, TypeError):
+                        pass
+            
+            elif categoria == "Riesgo de Venta Activada" and empresa['TENDENCIA_ACTUAL'] == "Bajando" and empresa['ESTADO_SMI'] == "Sobrecompra":
+                orden_grupo = 5
+                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
+                    try:
+                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'])
+                        precio_actual = float(empresa['PRECIO_ACTUAL'])
+                        porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
+                        orden_interna = porcentaje
+                    except (ValueError, TypeError):
+                        pass
+
+            return (orden_grupo, orden_interna)
 
         datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
+        
+        datos_ordenados = [d for d in datos_ordenados if obtener_clave_ordenacion(d)[0] != 99]
         
         # --- Fin de la lógica de ordenación integrada ---
 
@@ -586,36 +660,21 @@ def generar_reporte():
         
         if not datos_ordenados:
             html_body += """
-                            <tr><td colspan="9">No se encontraron empresas con datos válidos hoy.</td></tr>
+                            <tr><td colspan="9">No se encontraron empresas con oportunidades claras hoy.</td></tr>
             """
         else:
-            previous_orden_grupo = None
+            previous_oportunidad = None
             for i, data in enumerate(datos_ordenados):
                 
-                current_orden_grupo = data['ORDEN_PRIORIDAD']
+                if i == 0:
+                    html_body += """
+                        <tr class="category-header"><td colspan="9">OPORTUNIDADES DE COMPRA</td></tr>
+                    """
                 
-                if previous_orden_grupo is None:
-                     if current_orden_grupo in [1, 2]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="9">OPORTUNIDADES DE COMPRA</td></tr>
-                        """
-                     elif current_orden_grupo in [3, 4, 5]:
+                if previous_oportunidad is not None and data['OPORTUNIDAD'] != previous_oportunidad:
+                    if data['ORDEN_PRIORIDAD'] >= 3 and previous_oportunidad in ["Posibilidad de Compra", "Posibilidad de Compra Activada"]:
                          html_body += """
                             <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
-                        """
-                     elif current_orden_grupo in [6, 7]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
-                        """
-                
-                elif current_orden_grupo != previous_orden_grupo:
-                    if current_orden_grupo in [3, 4, 5] and previous_orden_grupo in [1, 2]:
-                        html_body += """
-                            <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
-                        """
-                    elif current_orden_grupo in [6, 7] and previous_orden_grupo in [1, 2, 3, 4, 5]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
                     html_body += """
                         <tr class="separator-row"><td colspan="9"></td></tr>
@@ -659,7 +718,7 @@ def generar_reporte():
                                 <td colspan="9">{observaciones}</td>
                             </tr>
                 """
-                previous_orden_grupo = current_orden_grupo
+                previous_oportunidad = data['OPORTUNIDAD']
         
         html_body += """
                         </tbody>
