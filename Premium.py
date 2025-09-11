@@ -542,90 +542,191 @@ def generar_reporte():
         <head>
             <title>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</title>
             <style>
-                body {{ 
-                    font-family: Arial, sans-serif; 
-                    background-color: #f4f4f4;
+                @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+                
+                :root {{
+                    --bg-dark: #1e1e1e;
+                    --bg-light: #ffffff;
+                    --text-color: #333;
+                    --green-buy: #2ecc71;
+                    --red-sell: #e74c3c;
+                    --yellow-alert: #f39c12;
+                    --blue-neutral: #3498db;
+                    --border-color: #f0f0f0;
+                    --hover-bg: #f5f5f5;
+                }}
+                
+                body {{
+                    font-family: 'Roboto', sans-serif;
+                    background-color: var(--bg-dark);
                     margin: 0;
                     padding: 20px;
                 }}
+                
                 .main-container {{
                     max-width: 1300px;
                     margin: 0 auto;
-                    background-color: #fff;
+                    background-color: var(--bg-light);
                     padding: 20px;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                    border-radius: 12px;
+                    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
                 }}
-                h2 {{ color: #2c3e50; text-align: center; }}
-                p {{ color: #7f8c8d; text-align: center; }}
-                #search-container {{ margin-bottom: 20px; }}
+                
+                h2 {{
+                    color: var(--text-color);
+                    text-align: center;
+                    font-weight: 700;
+                    margin-bottom: 20px;
+                }}
+                
+                p {{
+                    color: #7f8c8d;
+                    text-align: center;
+                }}
+                
+                #search-container {{
+                    margin-bottom: 20px;
+                }}
+                
                 #searchInput {{
                     width: 100%;
-                    padding: 10px;
+                    padding: 12px;
                     font-size: 16px;
                     border: 1px solid #ddd;
-                    border-radius: 4px;
+                    border-radius: 8px;
                     box-sizing: border-box;
+                    transition: border-color 0.3s;
                 }}
+                
+                #searchInput:focus {{
+                    outline: none;
+                    border-color: var(--blue-neutral);
+                }}
+                
                 .table-container {{
                     overflow-x: auto;
                     overflow-y: auto;
                     height: 80vh;
                     position: relative;
                 }}
-                table {{ 
+                
+                table {{
                     width: 90%;
                     table-layout: fixed;
                     margin: 20px auto 0 auto;
-                    border-collapse: collapse;
+                    border-collapse: separate;
+                    border-spacing: 0;
+                    border-radius: 8px;
+                    overflow: hidden;
                 }}
-                th, td {{ 
-                    border: 1px solid #ddd; 
-                    padding: 8px; 
+                
+                th, td {{
+                    border: 1px solid var(--border-color);
+                    padding: 12px 8px;
                     text-align: center;
-                    vertical-align: top;
+                    vertical-align: middle;
                     white-space: normal;
                     width: calc(140px * 0.80);
-                    line-height: 1.2;
+                    line-height: 1.4;
                 }}
-                th {{ 
-                    background-color: #f2f2f2;
+                
+                th {{
+                    background-color: #f9f9f9;
+                    color: var(--text-color);
+                    font-weight: 700;
                     position: sticky;
                     top: 0;
                     z-index: 10;
                 }}
-                .compra {{ color: #1abc9c; font-weight: bold; }}
-                .venta {{ color: #e74c3c; font-weight: bold; }}
-                .comprado-si {{ background-color: #2ecc71; color: white; font-weight: bold; }}
-                .bg-green {{ background-color: #d4edda; color: #155724; }}
-                .bg-red {{ background-color: #f8d7da; color: #721c24; }}
-                .bg-highlight {{ background-color: #2ecc71; color: white; font-weight: bold; }}
-                .text-center {{ text-align: center; }}
-                .disclaimer {{ font-size: 12px; text-align: center; color: #95a5a6; }}
-                .small-text {{ font-size: 10px; color: #555; }}
-                .green-cell {{ background-color: #d4edda; }}
-                .red-cell {{ background-color: #f8d7da; }}
-                .separator-row td {{ background-color: black; height: 5px; padding: 0; border: none; }}
+                
+                tr:hover:not(.category-header):not(.separator-row):not(.observaciones-row) {{
+                    background-color: var(--hover-bg);
+                    transition: background-color 0.2s ease-in-out;
+                }}
+                
+                .compra {{
+                    color: var(--green-buy);
+                    font-weight: bold;
+                }}
+                
+                .venta {{
+                    color: var(--red-sell);
+                    font-weight: bold;
+                }}
+                
+                .vigilar {{
+                    color: var(--yellow-alert);
+                    font-weight: bold;
+                }}
+                
+                .green-cell {{
+                    background-color: #e8f5e9;
+                }}
+                
+                .red-cell {{
+                    background-color: #ffebee;
+                }}
+                
+                .separator-row td {{
+                    background-color: var(--text-color);
+                    height: 2px;
+                    padding: 0;
+                    border: none;
+                }}
+                
                 .category-header td {{
                     background-color: #34495e;
                     color: white;
                     font-size: 1.5em;
-                    font-weight: bold;
+                    font-weight: 700;
                     text-align: center;
                     padding: 15px;
                     border: none;
                 }}
+                
                 .observaciones-row td {{
-                    background-color: #f9f9f9;
+                    background-color: #fbfbfb;
                     text-align: left;
                     font-size: 0.9em;
-                    border: 1px solid #ddd;
+                    border: 1px solid var(--border-color);
+                    padding: 15px;
                 }}
-                .stacked-text {{ 
+                
+                .stacked-text {{
                     line-height: 1.2;
                     font-size: 10px;
                 }}
-                .vigilar {{ color: #f39c12; font-weight: bold; }}
+                
+                .disclaimer {{
+                    font-size: 12px;
+                    text-align: center;
+                    color: #95a5a6;
+                }}
+                
+                .small-text {{
+                    font-size: 10px;
+                    color: #555;
+                }}
+                
+                @keyframes pulse-green {{
+                    0% {{ box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4); }}
+                    70% {{ box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }}
+                    100% {{ box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }}
+                }}
+
+                @keyframes pulse-red {{
+                    0% {{ box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }}
+                    70% {{ box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }}
+                    100% {{ box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }}
+                }}
+                
+                .pulse-green {{
+                    animation: pulse-green 2s infinite;
+                }}
+                
+                .pulse-red {{
+                    animation: pulse-red 2s infinite;
+                }}
             </style>
         </head>
         <body>
@@ -690,6 +791,14 @@ def generar_reporte():
                 elif "venta" in data['OPORTUNIDAD'].lower():
                     celda_empresa_class = "red-cell"
                 
+                compra_si_class = ""
+                if "COMPRA YA" in data['COMPRA_SI']:
+                    compra_si_class = "pulse-green"
+                
+                vende_si_class = ""
+                if "VENDE AHORA" in data['VENDE_SI']:
+                    vende_si_class = "pulse-red"
+
                 soportes = [data['SOPORTE_1'], data['SOPORTE_2']]
                 resistencias = [data['RESISTENCIA_1'], data['RESISTENCIA_2']]
                 
@@ -710,8 +819,8 @@ def generar_reporte():
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
-                                <td>{data['COMPRA_SI']}</td>
-                                <td>{data['VENDE_SI']}</td>
+                                <td class="{compra_si_class}">{data['COMPRA_SI']}</td>
+                                <td class="{vende_si_class}">{data['VENDE_SI']}</td>
                                 {sr_html}
                             </tr>
                             <tr class="observaciones-row">
