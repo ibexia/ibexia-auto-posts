@@ -266,20 +266,17 @@ def clasificar_empresa(data):
     prioridad = {
         "Posibilidad de Compra Activada": 1,
         "Posibilidad de Compra": 2,
-        "Seguirá subiendo": 3,
-        "Seguirá bajando": 4,
-        "Riesgo de Venta": 5,
-        "Riesgo de Venta Activada": 6,
-        "Intermedio": 99
+        "VIGILAR": 3,
+        "Riesgo de Venta": 4,
+        "Riesgo de Venta Activada": 5,
+        "Seguirá bajando": 6,
+        "Intermedio": 7
     }
 
     if estado_smi == "Sobreventa":
         if tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
-            if current_price > close_yesterday:
-                data['COMPRA_SI'] = "COMPRA YA"
-            else:
-                data['COMPRA_SI'] = f"COMPRAR SI SUPERA {formatear_numero(close_yesterday)}€"
+            data['COMPRA_SI'] = "COMPRA YA"
             data['VENDE_SI'] = "NO VENDER"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
         elif tendencia == "Bajando":
@@ -303,7 +300,7 @@ def clasificar_empresa(data):
             data['VENDE_SI'] = "YA ES TARDE PARA VENDER"
             data['ORDEN_PRIORIDAD'] = prioridad["Seguirá bajando"]
         elif tendencia == "Subiendo":
-            data['OPORTUNIDAD'] = "Seguirá subiendo"
+            data['OPORTUNIDAD'] = "VIGILAR"
             data['COMPRA_SI'] = "NO COMPRAR"
             
             trigger_price = close_yesterday * 0.99
@@ -312,7 +309,7 @@ def clasificar_empresa(data):
                  data['VENDE_SI'] = "VENDE YA"
             else:
                  data['VENDE_SI'] = f"VENDER SI PIERDE {formatear_numero(trigger_price)}€"
-            data['ORDEN_PRIORIDAD'] = prioridad["Seguirá subiendo"]
+            data['ORDEN_PRIORIDAD'] = prioridad["VIGILAR"]
         else:
             data['OPORTUNIDAD'] = "Intermedio"
             data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
@@ -337,71 +334,50 @@ def clasificar_empresa(data):
             data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
     
     return data
-
+    
 def generar_observaciones(data):
     nombre_empresa = data['NOMBRE_EMPRESA']
     precio_actual = formatear_numero(data['PRECIO_ACTUAL'])
     estado_smi = data['ESTADO_SMI']
     tendencia = data['TENDENCIA_ACTUAL']
     oportunidad = data['OPORTUNIDAD']
-    soporte1 = data['SOPORTE_1']
-    resistencia1 = data['RESISTENCIA_1']
+    soporte1 = formatear_numero(data['SOPORTE_1'])
+    resistencia1 = formatear_numero(data['RESISTENCIA_1'])
     compra_si = data['COMPRA_SI']
     vende_si = data['VENDE_SI']
 
     texto_observacion = f"<strong>Observaciones de {nombre_empresa}:</strong><br>"
-    
-    soporte1_formateado = formatear_numero(soporte1)
-    resistencia1_formateada = formatear_numero(resistencia1)
-    
+
     if oportunidad == "Posibilidad de Compra Activada":
-        mensaje = f"Con un precio de {precio_actual}€, la empresa se encuentra en una zona de **{estado_smi}** y muestra una tendencia **{tendencia}**. Esta combinación activa una señal de compra fuerte, por lo que el algoritmo recomienda **{compra_si.lower()}**."
-        if soporte1_formateado != "N/A" and resistencia1_formateada != "N/A":
-            mensaje += f" Los soportes más cercanos a tener en cuenta son **{soporte1_formateado}€** y la primera resistencia clave está en **{resistencia1_formateada}€**."
-        elif soporte1_formateado != "N/A":
-            mensaje += f" El soporte más cercano a tener en cuenta es **{soporte1_formateado}€**."
-        elif resistencia1_formateada != "N/A":
-            mensaje += f" La primera resistencia clave está en **{resistencia1_formateada}€**."
+        texto = f"Con un precio de {precio_actual}€, la empresa se encuentra en una zona de **sobreventa** y muestra una tendencia **alcista**. Esta combinación activa una señal de compra fuerte, por lo que el algoritmo recomienda **comprar ahora**. Tenga en cuenta los niveles de soporte y resistencia cercanos en **{soporte1}€** y **{resistencia1}€**."
     
     elif oportunidad == "Posibilidad de Compra":
-        mensaje = f"El valor está en una zona de **{estado_smi}** con una tendencia **{tendencia}**."
         if "COMPRA YA" in compra_si:
-            mensaje += " Esto puede ser un indicador de reversión. El algoritmo ha detectado una oportunidad de **compra inmediata** para aprovechar un posible rebote."
-            if soporte1_formateado != "N/A":
-                mensaje += f" Se debe considerar el soporte clave en **{soporte1_formateado}€**."
+            texto = f"El valor está en una zona de **sobreventa** con una tendencia **bajista**, lo que puede ser un indicador de reversión. El algoritmo ha detectado una oportunidad de **compra inmediata** para aprovechar un posible rebote. Se debe considerar el soporte clave en **{soporte1}€**."
         else:
             precio_objetivo = compra_si.split('€')[0].split()[-1]
-            mensaje += f" Nuestro algoritmo sugiere que podría haber una oportunidad de compra si el precio logra **superar el nivel de {precio_objetivo}€**."
-            if soporte1_formateado != "N/A":
-                mensaje += f" El soporte más cercano es **{soporte1_formateado}€**."
-
-    elif oportunidad == "Seguirá subiendo":
-        mensaje = f"En este momento, la empresa se encuentra en una zona **{estado_smi}** con una tendencia claramente **{tendencia}**. Aunque no se recomienda comprar, la situación requiere **vigilancia**. Si el precio **{vende_si.replace('VENDER SI PIERDE', 'cae por debajo de').lower()}**, podría ser una señal para vender."
-        if resistencia1_formateada != "N/A":
-            mensaje += f" El nivel de resistencia más cercano es **{resistencia1_formateada}€**."
+            texto = f"La empresa cotiza a {precio_actual}€ y se sitúa en una zona de **sobreventa**. A pesar de una tendencia **bajista**, nuestro algoritmo sugiere que podría haber una oportunidad de compra si el precio logra **superar el nivel de {precio_objetivo}€**."
+    
+    elif oportunidad == "VIGILAR":
+        texto = f"En este momento, la empresa se encuentra en una zona **intermedia** con una tendencia claramente **alcista**. Aunque no se recomienda comprar, es una situación para **vigilar de cerca**. Si el precio **{vende_si.replace('VENDER SI PIERDE', 'cae por debajo de').lower()}**, podría ser una señal para vender. El nivel de resistencia más cercano es **{resistencia1}€**."
 
     elif oportunidad == "Riesgo de Venta":
-        mensaje = f"Con una cotización actual de {precio_actual}€, la empresa ha entrado en una zona de **{estado_smi}** con una tendencia **{tendencia}**. Esto genera un **riesgo de venta**."
-        if resistencia1_formateada != "N/A":
-            mensaje += f" El algoritmo recomienda considerar una venta en la zona de resistencia en **{resistencia1_formateada}€** para asegurar beneficios."
-        else:
-            mensaje += f" El algoritmo recomienda considerar una venta para asegurar beneficios."
+        texto = f"Con una cotización actual de {precio_actual}€, la empresa ha entrado en una zona de **sobrecompra** con una tendencia **alcista**. Esto genera un **riesgo de venta**. El algoritmo recomienda considerar una venta en la zona de resistencia en **{resistencia1}€** para asegurar beneficios."
     
     elif oportunidad == "Riesgo de Venta Activada":
-        mensaje = f"La combinación de una zona de **{estado_smi}** y una tendencia **{tendencia}** ha activado una señal de **{oportunidad}**. El algoritmo recomienda **vender ahora** para evitar mayores pérdidas."
-        if soporte1_formateado != "N/A":
-            mensaje += f" El soporte más cercano a considerar es **{soporte1_formateado}€**."
+        texto = f"La combinación de una zona de **sobrecompra** y una tendencia **bajista** ha activado una señal de **riesgo de venta**. El algoritmo recomienda **vender ahora** para evitar mayores pérdidas. El soporte más cercano a considerar es **{soporte1}€**."
 
     elif oportunidad == "Seguirá bajando":
-        mensaje = f"La empresa se encuentra en una zona **{estado_smi}** y con una tendencia **{tendencia}**. Nuestro análisis sugiere que es probable que el precio **siga bajando** en el corto plazo. Por lo tanto, no se aconseja ni comprar ni vender en este momento."
+        texto = f"La empresa se encuentra en una zona **intermedia** y con una tendencia **bajista**. Nuestro análisis sugiere que es probable que el precio **siga bajando** en el corto plazo. Por lo tanto, no se aconseja ni comprar ni vender en este momento."
 
     elif oportunidad == "Intermedio":
-        mensaje = "Actualmente, la empresa se encuentra en una zona sin movimientos definidos. El algoritmo no emite recomendaciones de compra o venta en este momento, por lo que lo más prudente es **mantenerse al margen** y observar la evolución del mercado."
+        texto = "Actualmente, la empresa se encuentra en una zona sin movimientos definidos. El algoritmo no emite recomendaciones de compra o venta en este momento, por lo que lo más prudente es **mantenerse al margen** y observar la evolución del mercado."
     
     else:
-        mensaje = "No hay observaciones específicas disponibles para esta empresa en el día de hoy."
+        texto = "No hay observaciones específicas disponibles para esta empresa en el día de hoy."
     
-    return f'<p style="text-align:left; color:#000;">{texto_observacion.strip()}{mensaje.strip()}</p>'
+    return f'<p style="text-align:left; color:#000;">{texto_observacion.strip()}{texto.strip()}</p>'
+
 
 def enviar_email_con_adjunto(html_body, asunto_email):
     remitente = "xumkox@gmail.com"
@@ -474,66 +450,16 @@ def generar_reporte():
             orden_grupo = 99
             orden_interna = float('inf')
             
-            if categoria == "Posibilidad de Compra" and empresa['TENDENCIA_ACTUAL'] == "Bajando":
+            if categoria in ["Posibilidad de Compra Activada", "Posibilidad de Compra"]:
                 orden_grupo = 1
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
-                    try:
-                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'])
-                        precio_actual = float(empresa['PRECIO_ACTUAL'])
-                        porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
-                        orden_interna = porcentaje
-                    except (ValueError, TypeError):
-                        pass
-
-            elif categoria == "Posibilidad de Compra Activada" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobreventa":
+            elif categoria in ["VIGILAR", "Riesgo de Venta", "Riesgo de Venta Activada", "Seguirá bajando"]:
                 orden_grupo = 2
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
-                    try:
-                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
-                        precio_actual = float(empresa['PRECIO_ACTUAL'])
-                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                        orden_interna = -porcentaje
-                    except (ValueError, TypeError):
-                        pass
-            
-            elif categoria == "Seguirá subiendo" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Intermedio":
+            elif categoria == "Intermedio":
                 orden_grupo = 3
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
-                    try:
-                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
-                        precio_actual = float(empresa['PRECIO_ACTUAL'])
-                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                        orden_interna = -porcentaje
-                    except (ValueError, TypeError):
-                        pass
-            
-            elif categoria == "Riesgo de Venta" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobrecompra":
-                orden_grupo = 4
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
-                    try:
-                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
-                        precio_actual = float(empresa['PRECIO_ACTUAL'])
-                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                        orden_interna = -porcentaje
-                    except (ValueError, TypeError):
-                        pass
-            
-            elif categoria == "Riesgo de Venta Activada" and empresa['TENDENCIA_ACTUAL'] == "Bajando" and empresa['ESTADO_SMI'] == "Sobrecompra":
-                orden_grupo = 5
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
-                    try:
-                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'])
-                        precio_actual = float(empresa['PRECIO_ACTUAL'])
-                        porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
-                        orden_interna = porcentaje
-                    except (ValueError, TypeError):
-                        pass
 
-            return (orden_grupo, orden_interna)
+            return (empresa['ORDEN_PRIORIDAD'], empresa['NOMBRE_EMPRESA'])
 
         datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
-        
-        datos_ordenados = [d for d in datos_ordenados if obtener_clave_ordenacion(d)[0] != 99]
         
         # --- Fin de la lógica de ordenación integrada ---
 
@@ -542,178 +468,98 @@ def generar_reporte():
         <head>
             <title>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</title>
             <style>
-                @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
                 body {{ 
-                    font-family: 'Roboto', sans-serif; 
-                    background-color: #f0f2f5;
+                    font-family: Arial, sans-serif; 
+                    background-color: #f4f4f4;
                     margin: 0;
                     padding: 20px;
-                    color: #333;
                 }}
                 .main-container {{
-                    max-width: 1400px;
+                    max-width: 1300px;
                     margin: 0 auto;
                     background-color: #fff;
-                    padding: 30px;
-                    border-radius: 12px;
-                    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+                    padding: 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
                 }}
-                h2 {{ 
-                    color: #1a237e; 
-                    text-align: center; 
-                    font-weight: 700;
-                    margin-bottom: 5px;
-                }}
-                p.date {{ 
-                    color: #616161; 
-                    text-align: center; 
-                    font-size: 14px;
-                    margin-top: 0;
-                    margin-bottom: 20px;
-                }}
-                #search-container {{ 
-                    margin-bottom: 20px;
-                    position: relative;
-                }}
+                h2 {{ color: #2c3e50; text-align: center; }}
+                p {{ color: #7f8c8d; text-align: center; }}
+                #search-container {{ margin-bottom: 20px; }}
                 #searchInput {{
                     width: 100%;
-                    padding: 12px 15px;
+                    padding: 10px;
                     font-size: 16px;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 8px;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
                     box-sizing: border-box;
-                    transition: border-color 0.3s, box-shadow 0.3s;
-                }}
-                #searchInput:focus {{
-                    border-color: #42a5f5;
-                    box-shadow: 0 0 5px rgba(66, 165, 245, 0.5);
-                    outline: none;
                 }}
                 .table-container {{
                     overflow-x: auto;
                     overflow-y: auto;
                     height: 80vh;
                     position: relative;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 8px;
                 }}
                 table {{ 
-                    width: 100%;
+                    width: 90%;
                     table-layout: fixed;
-                    margin: 0;
-                    border-collapse: separate;
-                    border-spacing: 0;
+                    margin: 20px auto 0 auto;
+                    border-collapse: collapse;
                 }}
                 th, td {{ 
-                    padding: 12px 10px; 
+                    border: 1px solid #ddd; 
+                    padding: 8px; 
                     text-align: center;
-                    vertical-align: middle;
+                    vertical-align: top;
                     white-space: normal;
-                    line-height: 1.4;
-                    font-size: 14px;
-                    transition: background-color 0.3s;
+                    width: calc(140px * 0.80);
+                    line-height: 1.2;
                 }}
                 th {{ 
-                    background-color: #2c3e50;
-                    color: white;
-                    font-weight: 500;
+                    background-color: #f2f2f2;
                     position: sticky;
                     top: 0;
                     z-index: 10;
-                    border-bottom: 2px solid #1a237e;
                 }}
-                tr:nth-child(even) {{
-                    background-color: #f9f9f9;
-                }}
-                tr:hover {{
-                    background-color: #e8f5e9;
-                }}
-                .compra {{ 
-                    color: #2e7d32; 
-                    font-weight: bold;
-                    animation: pulse 1.5s infinite;
-                }}
-                .venta {{ 
-                    color: #c62828; 
-                    font-weight: bold;
-                    animation: pulse 1.5s infinite;
-                }}
-                .vigilar {{ color: #ff8f00; font-weight: bold; }}
+                .compra {{ color: #1abc9c; font-weight: bold; }}
+                .venta {{ color: #e74c3c; font-weight: bold; }}
                 .comprado-si {{ background-color: #2ecc71; color: white; font-weight: bold; }}
-                .bg-green {{ background-color: #e8f5e9; color: #1b5e20; }}
-                .bg-red {{ background-color: #ffebee; color: #b71c1c; }}
+                .bg-green {{ background-color: #d4edda; color: #155724; }}
+                .bg-red {{ background-color: #f8d7da; color: #721c24; }}
                 .bg-highlight {{ background-color: #2ecc71; color: white; font-weight: bold; }}
                 .text-center {{ text-align: center; }}
-                .disclaimer {{ 
-                    font-size: 12px; 
-                    text-align: center; 
-                    color: #9e9e9e; 
-                    margin-top: 30px;
-                    line-height: 1.5;
-                }}
-                .small-text {{ font-size: 11px; color: #666; }}
-                .green-cell {{ background-color: #e8f5e9; }}
-                .red-cell {{ background-color: #ffebee; }}
-                .separator-row td {{ background-color: #e0e0e0; height: 5px; padding: 0; border: none; }}
+                .disclaimer {{ font-size: 12px; text-align: center; color: #95a5a6; }}
+                .small-text {{ font-size: 10px; color: #555; }}
+                .green-cell {{ background-color: #d4edda; }}
+                .red-cell {{ background-color: #f8d7da; }}
+                .separator-row td {{ background-color: black; height: 5px; padding: 0; border: none; }}
                 .category-header td {{
-                    background-color: #42a5f5;
+                    background-color: #34495e;
                     color: white;
                     font-size: 1.5em;
                     font-weight: bold;
                     text-align: center;
                     padding: 15px;
                     border: none;
-                    text-transform: uppercase;
-                    letter-spacing: 1px;
                 }}
                 .observaciones-row td {{
-                    background-color: #f5f5f5;
+                    background-color: #f9f9f9;
                     text-align: left;
-                    font-size: 13px;
-                    line-height: 1.6;
-                    border: 1px solid #eee;
-                    padding: 15px;
+                    font-size: 0.9em;
+                    border: 1px solid #ddd;
                 }}
                 .stacked-text {{ 
-                    line-height: 1.3;
-                    font-size: 13px;
+                    line-height: 1.2;
+                    font-size: 10px;
                 }}
-                td.highlight-compra {{
-                    background-color: #d4edda;
-                    font-weight: bold;
-                }}
-                td.highlight-venta {{
-                    background-color: #f8d7da;
-                    font-weight: bold;
-                }}
-                .blink-compra {{
-                    animation: blink-compra 1.5s infinite;
-                }}
-                .blink-venta {{
-                    animation: blink-venta 1.5s infinite;
-                }}
-                @keyframes pulse {{
-                    0% {{ transform: scale(1); }}
-                    50% {{ transform: scale(1.05); }}
-                    100% {{ transform: scale(1); }}
-                }}
-                @keyframes blink-compra {{
-                    0%, 100% {{ background-color: #e8f5e9; }}
-                    50% {{ background-color: #c8e6c9; }}
-                }}
-                @keyframes blink-venta {{
-                    0%, 100% {{ background-color: #ffebee; }}
-                    50% {{ background-color: #ffcdd2; }}
-                }}
+                .vigilar {{ color: #f39c12; font-weight: bold; }}
             </style>
         </head>
         <body>
             <div class="main-container">
-                <h2 class="text-center">Resumen Diario de Oportunidades de Trading</h2>
-                <p class="date">Análisis del mercado de bolsa - {datetime.today().strftime('%d de %B de %Y')}</p>
+                <h2 class="text-center">Resumen Diario de Oportunidades ordenadas por prioridad - {datetime.today().strftime('%d/%m/%Y')}</h2>
                 
                 <div id="search-container">
-                    <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa o ticker...">
+                    <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa...">
                 </div>
                 
                 <div id="scroll-top" style="overflow-x: auto;">
@@ -724,13 +570,15 @@ def generar_reporte():
                     <table id="myTable">
                         <thead>
                             <tr>
-                                <th style="width: 15%;">Empresa (Precio)</th>
-                                <th style="width: 10%;">Tendencia Actual</th>
-                                <th style="width: 15%;">Oportunidad</th>
-                                <th style="width: 20%;">Compra si...</th>
-                                <th style="width: 20%;">Vende si...</th>
-                                <th style="width: 10%;">Soporte 1</th>
-                                <th style="width: 10%;">Resistencia 1</th>
+                                <th>Empresa (Precio)</th>
+                                <th>Tendencia Actual</th>
+                                <th>Oportunidad</th>
+                                <th>Compra si...</th>
+                                <th>Vende si...</th>
+                                <th>Soporte 1</th>
+                                <th>Soporte 2</th>
+                                <th>Resistencia 1</th>
+                                <th>Resistencia 2</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -738,61 +586,80 @@ def generar_reporte():
         
         if not datos_ordenados:
             html_body += """
-                            <tr><td colspan="7">No se encontraron empresas con oportunidades claras hoy.</td></tr>
+                            <tr><td colspan="9">No se encontraron empresas con datos válidos hoy.</td></tr>
             """
         else:
-            previous_oportunidad = None
+            previous_orden_grupo = None
             for i, data in enumerate(datos_ordenados):
                 
-                if i == 0:
-                    html_body += """
-                        <tr class="category-header"><td colspan="7">OPORTUNIDADES DE COMPRA</td></tr>
-                    """
+                current_orden_grupo = data['ORDEN_PRIORIDAD']
                 
-                if previous_oportunidad is not None and data['ORDEN_PRIORIDAD'] > 2 and previous_oportunidad in ["Posibilidad de Compra", "Posibilidad de Compra Activada"]:
-                     html_body += """
-                        <tr class="category-header"><td colspan="7">SEGUIMIENTO DE POSICIONES Y RIESGO DE VENTA</td></tr>
-                    """
+                if previous_orden_grupo is None:
+                     if current_orden_grupo in [1, 2]:
+                         html_body += """
+                            <tr class="category-header"><td colspan="9">OPORTUNIDADES DE COMPRA</td></tr>
+                        """
+                     elif current_orden_grupo in [3, 4, 5]:
+                         html_body += """
+                            <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
+                        """
+                     elif current_orden_grupo in [6, 7]:
+                         html_body += """
+                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                        """
                 
-                if previous_oportunidad is not None and data['OPORTUNIDAD'] != previous_oportunidad:
+                elif current_orden_grupo != previous_orden_grupo:
+                    if current_orden_grupo in [3, 4, 5] and previous_orden_grupo in [1, 2]:
+                        html_body += """
+                            <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
+                        """
+                    elif current_orden_grupo in [6, 7] and previous_orden_grupo in [1, 2, 3, 4, 5]:
+                         html_body += """
+                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                        """
                     html_body += """
-                        <tr class="separator-row"><td colspan="7"></td></tr>
+                        <tr class="separator-row"><td colspan="9"></td></tr>
                     """
 
                 nombre_con_precio = f"<div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div>"
                 
-                clase_oportunidad = ""
+                clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else ("vigilar" if "vigilar" in data['OPORTUNIDAD'].lower() else ""))
+                
+                celda_empresa_class = ""
                 if "compra" in data['OPORTUNIDAD'].lower():
-                    clase_oportunidad = "compra"
+                    celda_empresa_class = "green-cell"
                 elif "venta" in data['OPORTUNIDAD'].lower():
-                    clase_oportunidad = "venta"
-                elif "vigilancia" in data['OPORTUNIDAD'].lower():
-                    clase_oportunidad = "vigilar"
+                    celda_empresa_class = "red-cell"
                 
-                celda_compra_class = "highlight-compra" if "COMPRA YA" in data['COMPRA_SI'] else ""
-                celda_compra_class += " blink-compra" if "COMPRA YA" in data['COMPRA_SI'] else ""
+                soportes = [data['SOPORTE_1'], data['SOPORTE_2']]
+                resistencias = [data['RESISTENCIA_1'], data['RESISTENCIA_2']]
                 
-                celda_venta_class = "highlight-venta" if "VENDE AHORA" in data['VENDE_SI'] else ""
-                celda_venta_class += " blink-venta" if "VENDE AHORA" in data['VENDE_SI'] else ""
+                sr_html = ""
                 
-                soporte1 = data['SOPORTE_1']
-                resistencia1 = data['RESISTENCIA_1']
+                for s in soportes:
+                    s_clase = "red-cell" if s is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - s) / data['PRECIO_ACTUAL'] < 0.01 else ""
+                    sr_html += f'<td class="{s_clase}">{formatear_numero(s)}€</td>'
 
+                for r in resistencias:
+                    r_clase = "red-cell" if r is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - r) / data['PRECIO_ACTUAL'] < 0.01 else ""
+                    sr_html += f'<td class="{r_clase}">{formatear_numero(r)}€</td>'
+                
+                observaciones = generar_observaciones(data)
+                
                 html_body += f"""
                             <tr>
-                                <td>{nombre_con_precio}</td>
+                                <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
-                                <td class="{celda_compra_class}">{data['COMPRA_SI']}</td>
-                                <td class="{celda_venta_class}">{data['VENDE_SI']}</td>
-                                <td>{formatear_numero(soporte1)}€</td>
-                                <td>{formatear_numero(resistencia1)}€</td>
+                                <td>{data['COMPRA_SI']}</td>
+                                <td>{data['VENDE_SI']}</td>
+                                {sr_html}
                             </tr>
                             <tr class="observaciones-row">
-                                <td colspan="7">{generar_observaciones(data)}</td>
+                                <td colspan="9">{observaciones}</td>
                             </tr>
                 """
-                previous_oportunidad = data['OPORTUNIDAD']
+                previous_orden_grupo = current_orden_grupo
         
         html_body += """
                         </tbody>
@@ -811,7 +678,7 @@ def generar_reporte():
                     table = document.getElementById("myTable");
                     tr = table.getElementsByTagName("tr");
                     for (i = 0; i < tr.length; i++) {
-                        td = tr[i].getElementsByTagName("td")[0]; // Nombre de la empresa
+                        td = tr[i].getElementsByTagName("td")[0];
                         if (td) {
                             txtValue = td.textContent || td.innerText;
                             if (txtValue.toUpperCase().indexOf(filter) > -1) {
