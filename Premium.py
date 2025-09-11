@@ -334,54 +334,53 @@ def clasificar_empresa(data):
             data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
     
     return data
-
+    
 def generar_observaciones(data):
     nombre_empresa = data['NOMBRE_EMPRESA']
     precio_actual = formatear_numero(data['PRECIO_ACTUAL'])
     estado_smi = data['ESTADO_SMI']
     tendencia = data['TENDENCIA_ACTUAL']
-    compra_si = data['COMPRA_SI']
-    vende_si = data['VENDE_SI']
+    oportunidad = data['OPORTUNIDAD']
     soporte1 = formatear_numero(data['SOPORTE_1'])
     resistencia1 = formatear_numero(data['RESISTENCIA_1'])
-    
-    estado_txt = {
-        "Sobreventa": "se encuentra en una zona de sobreventa",
-        "Sobrecompra": "ha alcanzado un territorio de sobrecompra",
-        "Intermedio": "está en una zona intermedia sin señales claras de movimiento",
-    }
-    
-    tendencia_txt = {
-        "Subiendo": "alcista",
-        "Bajando": "bajista",
-        "Plano": "sin una tendencia definida",
-    }
-    
-    accion_txt = ""
-    if "COMPRA YA" in compra_si:
-        accion_txt = "el algoritmo indica que es un buen momento para una posible compra."
-    elif "COMPRAR SI SUPERA" in compra_si:
-        accion_txt = f"nuestro análisis sugiere que una compra sería oportuna si el precio supera el nivel de {compra_si.split('€')[0].split()[-1]}€."
-    elif "NO COMPRAR" in compra_si:
-        accion_txt = "en este momento, no se recomienda realizar compras."
-    
-    if "VENDE AHORA" in vende_si:
-        accion_txt += " Por otro lado, la señal de venta es clara y urgente."
-    elif "ZONA DE VENTA" in vende_si:
-        accion_txt += " Se ha activado una señal de posible venta, especialmente considerando la zona de precios."
-    elif "VENDER SI PIERDE" in vende_si:
-        accion_txt += f" Se debe considerar una venta si el precio cae por debajo de {vende_si.split('€')[0].split()[-1]}€."
-        
-    if not accion_txt:
-        accion_txt = "No hay recomendaciones de compra o venta en este momento."
+    compra_si = data['COMPRA_SI']
+    vende_si = data['VENDE_SI']
 
-    observaciones_html = f"""
-        <p><strong>Observaciones de {nombre_empresa}:</strong><br>
-        La empresa <strong>{nombre_empresa}</strong>, que actualmente cotiza a <strong>{precio_actual}€</strong>, {estado_txt.get(estado_smi, "se encuentra en un estado indeterminado")}. Nuestro algoritmo IBEXIA detecta que su tendencia actual es {tendencia_txt.get(tendencia, "sin definir")}. {accion_txt}
-        Es importante tener en cuenta los niveles clave de soporte en <strong>{soporte1}€</strong> y resistencia en <strong>{resistencia1}€</strong>, ya que podrían influir en futuros movimientos del precio.</p>
+    texto_base = f"""
+    <strong>Análisis de {nombre_empresa}:</strong>
+    La empresa {nombre_empresa}, con un precio actual de {precio_actual}€, se encuentra en un estado de **{estado_smi}** según nuestro algoritmo.
+    La tendencia observada es **{tendencia}**, lo que genera una señal de **{oportunidad}**.
     """
+
+    if oportunidad == "Posibilidad de Compra Activada":
+        texto_accion = f"En este momento, la señal es clara: el algoritmo sugiere **{compra_si}**. Sin embargo, es prudente considerar los niveles de soporte y resistencia. Los soportes más cercanos a tener en cuenta son **{soporte1}€** y la primera resistencia clave está en **{resistencia1}€**."
     
-    return observaciones_html
+    elif oportunidad == "Posibilidad de Compra":
+        if "COMPRA YA" in compra_si:
+            texto_accion = f"A pesar de la tendencia bajista, la zona de sobreventa indica una posible reversión. La señal para **comprar ya** está activada, pero es crucial vigilar los soportes. El primer soporte se encuentra en **{soporte1}€**."
+        else:
+            precio_objetivo = compra_si.split('€')[0].split()[-1]
+            texto_accion = f"La empresa está en zona de sobreventa con tendencia bajista, pero es un momento de **{oportunidad}**. La recomendación de nuestro algoritmo es **esperar a que supere el precio de {precio_objetivo}€** para confirmar el giro. El soporte más cercano es **{soporte1}€**."
+    
+    elif oportunidad == "VIGILAR":
+        texto_accion = f"El valor se encuentra en una zona intermedia con una tendencia **alcista**. Aunque no es un punto de entrada de compra, la situación requiere estar **{oportunidad}** ante posibles giros. Si el precio **{vende_si.lower()}**, podría ser el momento de vender. El nivel de resistencia más cercano es **{resistencia1}€**."
+
+    elif oportunidad == "Riesgo de Venta":
+        texto_accion = f"La empresa ha entrado en una zona de **{oportunidad}**, ya que se encuentra en sobrecompra con una tendencia alcista. El precio ideal de venta para hoy es de **{data['HIST_DF']['High'].iloc[-1]:,.2f}€**. La resistencia clave a vigilar es **{resistencia1}€**."
+    
+    elif oportunidad == "Riesgo de Venta Activada":
+        texto_accion = f"El algoritmo ha detectado una señal de **{oportunidad}**. La combinación de sobrecompra y tendencia bajista indica que es el momento de **{vende_si.lower()}**. El primer soporte a tener en cuenta es **{soporte1}€**."
+
+    elif oportunidad == "Seguirá bajando":
+        texto_accion = f"En este momento, la empresa se encuentra en una zona intermedia con una tendencia bajista, lo que sugiere que **{oportunidad}**. Nuestro análisis indica que **no es el momento de comprar**. Es importante no precipitarse en ventas, ya que podría ser tarde para obtener un buen precio."
+
+    elif oportunidad == "Intermedio":
+        texto_accion = "Actualmente, la empresa se encuentra en una zona sin movimientos definidos. El algoritmo no emite recomendaciones de compra o venta en este momento, por lo que es mejor mantenerse al margen y observar la evolución."
+    
+    else:
+        texto_accion = "No hay observaciones específicas disponibles para esta empresa en el día de hoy."
+
+    return f'<p>{texto_base.strip()}<br>{texto_accion.strip()}</p>'
 
 
 def enviar_email_con_adjunto(html_body, asunto_email):
