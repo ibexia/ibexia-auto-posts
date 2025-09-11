@@ -210,10 +210,15 @@ def clasificar_empresa(data):
     tendencia = data['TENDENCIA_ACTUAL']
     precio_aplanamiento = data['PRECIO_APLANAMIENTO']
     smi_actual = data['SMI_HOY']
+    smi_ayer = data['SMI_AYER']
     hist_df = data['HIST_DF']
 
     high_today = hist_df['High'].iloc[-1]
     low_today = hist_df['Low'].iloc[-1]
+    close_yesterday = hist_df['Close'].iloc[-2]
+    
+    pendiente_smi_hoy = data['PENDIENTE']
+    pendiente_smi_ayer = hist_df['SMI'].diff().iloc[-2]
 
     prioridad = {
         "Posibilidad de Compra Activada": 1,
@@ -228,13 +233,13 @@ def clasificar_empresa(data):
     if estado_smi == "Sobreventa":
         if tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
-            data['COMPRA_SI'] = "COMPRA AHORA"
-            data['VENDE_SI'] = f"ZONA DE COMPRA<br><span class='small-text'>PRECIO COMPRA IDEAL HOY: {low_today:,.2f}€</span>"
+            data['COMPRA_SI'] = "COMPRAR"
+            data['VENDE_SI'] = "NO VENDER"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
         elif tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Posibilidad de Compra"
-            data['COMPRA_SI'] = f"COMPRA si supera {formatear_numero(precio_aplanamiento)}€ ⬆️"
-            data['VENDE_SI'] = f"ZONA DE COMPRA<br><span class='small-text'>PRECIO COMPRA IDEAL HOY: {low_today:,.2f}€</span>"
+            data['COMPRA_SI'] = "COMPRAR"
+            data['VENDE_SI'] = "NO VENDER"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
         else:
             data['OPORTUNIDAD'] = "Intermedio"
@@ -245,16 +250,16 @@ def clasificar_empresa(data):
     elif estado_smi == "Intermedio":
         if tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Seguirá bajando"
-            data['COMPRA_SI'] = f"COMPRA si supera {formatear_numero(precio_aplanamiento)}€ ⬆️"
+            data['COMPRA_SI'] = "NO COMPRAR"
             data['VENDE_SI'] = "YA ES TARDE PARA VENDER"
             data['ORDEN_PRIORIDAD'] = prioridad["Seguirá bajando"]
         elif tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Seguirá subiendo"
-            data['COMPRA_SI'] = "COMPRA"
-            if smi_actual > 0:
-                 data['VENDE_SI'] = f"VENDE si baja de {formatear_numero(precio_aplanamiento)}€ ⬇️"
+            data['COMPRA_SI'] = "NO COMPRAR"
+            if abs(pendiente_smi_hoy) < abs(pendiente_smi_ayer):
+                 data['VENDE_SI'] = f"Vigilar posible venta si baja del precio de cierre de ayer ({formatear_numero(close_yesterday)}€)"
             else:
-                 data['VENDE_SI'] = f"ZONA DE COMPRA<br><span class='small-text'>PRECIO COMPRA IDEAL HOY: {low_today:,.2f}€</span>"
+                 data['VENDE_SI'] = "Mantener en vigilancia"
             data['ORDEN_PRIORIDAD'] = prioridad["Seguirá subiendo"]
         else:
             data['OPORTUNIDAD'] = "Intermedio"
@@ -265,12 +270,12 @@ def clasificar_empresa(data):
     elif estado_smi == "Sobrecompra":
         if tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "Riesgo de Venta"
-            data['COMPRA_SI'] = "NO COMPRES"
+            data['COMPRA_SI'] = "NO COMPRAR"
             data['VENDE_SI'] = f"ZONA DE VENTA<br><span class='small-text'>PRECIO IDEAL VENTA HOY: {high_today:,.2f}€</span>"
             data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta"]
         elif tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Riesgo de Venta Activada"
-            data['COMPRA_SI'] = "NO COMPRES"
+            data['COMPRA_SI'] = "NO COMPRAR"
             data['VENDE_SI'] = "VENDE AHORA"
             data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta Activada"]
         else:
@@ -518,12 +523,10 @@ def generar_reporte():
                         <thead>
                             <tr>
                                 <th>Empresa (Precio)</th>
-                                <th>¿Estamos comprados?</th>
                                 <th>Tendencia Actual</th>
                                 <th>Oportunidad</th>
                                 <th>Compra si...</th>
                                 <th>Vende si...</th>
-                                <th>Ganancia/Pérdida</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -531,7 +534,7 @@ def generar_reporte():
         
         if not datos_ordenados:
             html_body += """
-                            <tr><td colspan="7">No se encontraron empresas con oportunidades claras hoy.</td></tr>
+                            <tr><td colspan="5">No se encontraron empresas con oportunidades claras hoy.</td></tr>
             """
         else:
             previous_oportunidad = None
@@ -539,16 +542,16 @@ def generar_reporte():
                 
                 if i == 0:
                     html_body += """
-                        <tr class="category-header"><td colspan="7">OPORTUNIDADES DE COMPRA</td></tr>
+                        <tr class="category-header"><td colspan="5">OPORTUNIDADES DE COMPRA</td></tr>
                     """
                 
                 if previous_oportunidad is not None and data['OPORTUNIDAD'] != previous_oportunidad:
                     if data['ORDEN_PRIORIDAD'] >= 3 and previous_oportunidad in ["Posibilidad de Compra", "Posibilidad de Compra Activada"]:
                          html_body += """
-                            <tr class="category-header"><td colspan="7">ATENTOS A VENDER</td></tr>
+                            <tr class="category-header"><td colspan="5">ATENTOS A VENDER</td></tr>
                         """
                     html_body += """
-                        <tr class="separator-row"><td colspan="7"></td></tr>
+                        <tr class="separator-row"><td colspan="5"></td></tr>
                     """
 
                 nombre_con_precio = f"<div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div>"
@@ -561,27 +564,14 @@ def generar_reporte():
                 elif "venta" in data['OPORTUNIDAD'].lower():
                     celda_empresa_class = "red-cell"
                 
-                if data['COMPRADO'] == 'SI':
-                    precio_compra_formateado = formatear_numero(data['PRECIO_COMPRA'])
-                    comprado_display = f"SI<br><span class='small-text'>({precio_compra_formateado}€ el {data['FECHA_COMPRA']})</span>"
-                    comprado_class = "comprado-si"
-                    beneficio_perdida = calcular_beneficio_perdida(data['PRECIO_COMPRA'], data['PRECIO_ACTUAL'])
-                    beneficio_clase = "compra" if beneficio_perdida != "N/A" and float(beneficio_perdida.replace(',', '')) >= 0 else "venta"
-                    beneficio_display = f"<span class='{beneficio_clase}'>{beneficio_perdida}€</span>"
-                else:
-                    comprado_display = "NO"
-                    comprado_class = ""
-                    beneficio_display = "N/A"
 
                 html_body += f"""
                             <tr>
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
-                                <td class="{comprado_class}">{comprado_display}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
-                                <td>{beneficio_display}</td>
                             </tr>
                 """
                 previous_oportunidad = data['OPORTUNIDAD']
