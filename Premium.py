@@ -687,34 +687,36 @@ def generar_reporte():
             </div>
 
             <script>
-                window.onload = function() {
-                    function filterTable() {
-                        var input, filter, table, tr, td, i, txtValue;
-                        input = document.getElementById("searchInput");
-                        filter = input.value.toUpperCase();
-                        table = document.getElementById("myTable");
-                        tr = table.getElementsByTagName("tr");
-                        for (i = 0; i < tr.length; i++) {
-                            td = tr[i].getElementsByTagName("td")[0];
-                            if (td) {
-                                txtValue = td.textContent || td.innerText;
-                                if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                                    tr[i].style.display = "";
-                                    // Mostrar también la fila de observaciones si existe
-                                    if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
-                                        tr[i+1].style.display = "";
-                                    }
-                                } else {
-                                    tr[i].style.display = "none";
-                                    // Ocultar también la fila de observaciones si existe
-                                    if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
-                                        tr[i+1].style.display = "none";
-                                    }
+                // Función de filtrado declarada en el ámbito global
+                function filterTable() {
+                    var input, filter, table, tr, td, i, txtValue;
+                    input = document.getElementById("searchInput");
+                    filter = input.value.toUpperCase();
+                    table = document.getElementById("myTable");
+                    tr = table.getElementsByTagName("tr");
+                    for (i = 0; i < tr.length; i++) {
+                        td = tr[i].getElementsByTagName("td")[0];
+                        if (td) {
+                            txtValue = td.textContent || td.innerText;
+                            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                                tr[i].style.display = "";
+                                // Mostrar también la fila de observaciones si existe
+                                if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
+                                    tr[i+1].style.display = "";
+                                }
+                            } else {
+                                tr[i].style.display = "none";
+                                // Ocultar también la fila de observaciones si existe
+                                if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
+                                    tr[i+1].style.display = "none";
                                 }
                             }
                         }
                     }
-                    
+                }
+                
+                // Asegurar que los listeners se añaden después de que el DOM esté cargado
+                window.onload = function() {
                     const tableContainer = document.querySelector('.table-container');
                     const scrollTop = document.getElementById('scroll-top');
                     
@@ -725,8 +727,6 @@ def generar_reporte():
                     tableContainer.addEventListener('scroll', () => {
                         scrollTop.scrollLeft = tableContainer.scrollLeft;
                     });
-    
-                    window.filterTable = filterTable;
                 };
             </script>
         </body>
