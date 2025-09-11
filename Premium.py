@@ -335,6 +335,55 @@ def clasificar_empresa(data):
     
     return data
 
+def generar_observaciones(data):
+    nombre_empresa = data['NOMBRE_EMPRESA']
+    precio_actual = formatear_numero(data['PRECIO_ACTUAL'])
+    estado_smi = data['ESTADO_SMI']
+    tendencia = data['TENDENCIA_ACTUAL']
+    compra_si = data['COMPRA_SI']
+    vende_si = data['VENDE_SI']
+    soporte1 = formatear_numero(data['SOPORTE_1'])
+    resistencia1 = formatear_numero(data['RESISTENCIA_1'])
+    
+    estado_txt = {
+        "Sobreventa": "se encuentra en una zona de sobreventa",
+        "Sobrecompra": "ha alcanzado un territorio de sobrecompra",
+        "Intermedio": "está en una zona intermedia sin señales claras de movimiento",
+    }
+    
+    tendencia_txt = {
+        "Subiendo": "alcista",
+        "Bajando": "bajista",
+        "Plano": "sin una tendencia definida",
+    }
+    
+    accion_txt = ""
+    if "COMPRA YA" in compra_si:
+        accion_txt = "el algoritmo indica que es un buen momento para una posible compra."
+    elif "COMPRAR SI SUPERA" in compra_si:
+        accion_txt = f"nuestro análisis sugiere que una compra sería oportuna si el precio supera el nivel de {compra_si.split('€')[0].split()[-1]}€."
+    elif "NO COMPRAR" in compra_si:
+        accion_txt = "en este momento, no se recomienda realizar compras."
+    
+    if "VENDE AHORA" in vende_si:
+        accion_txt += " Por otro lado, la señal de venta es clara y urgente."
+    elif "ZONA DE VENTA" in vende_si:
+        accion_txt += " Se ha activado una señal de posible venta, especialmente considerando la zona de precios."
+    elif "VENDER SI PIERDE" in vende_si:
+        accion_txt += f" Se debe considerar una venta si el precio cae por debajo de {vende_si.split('€')[0].split()[-1]}€."
+        
+    if not accion_txt:
+        accion_txt = "No hay recomendaciones de compra o venta en este momento."
+
+    observaciones_html = f"""
+        <p><strong>Observaciones de {nombre_empresa}:</strong><br>
+        La empresa <strong>{nombre_empresa}</strong>, que actualmente cotiza a <strong>{precio_actual}€</strong>, {estado_txt.get(estado_smi, "se encuentra en un estado indeterminado")}. Nuestro algoritmo IBEXIA detecta que su tendencia actual es {tendencia_txt.get(tendencia, "sin definir")}. {accion_txt}
+        Es importante tener en cuenta los niveles clave de soporte en <strong>{soporte1}€</strong> y resistencia en <strong>{resistencia1}€</strong>, ya que podrían influir en futuros movimientos del precio.</p>
+    """
+    
+    return observaciones_html
+
+
 def enviar_email_con_adjunto(html_body, asunto_email):
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
@@ -497,6 +546,12 @@ def generar_reporte():
                     padding: 15px;
                     border: none;
                 }}
+                .observaciones-row td {{
+                    background-color: #f9f9f9;
+                    text-align: left;
+                    font-size: 0.9em;
+                    border: 1px solid #ddd;
+                }}
                 .stacked-text {{ 
                     line-height: 1.2;
                     font-size: 12px;
@@ -597,6 +652,8 @@ def generar_reporte():
                     r_clase = "red-cell" if r is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - r) / data['PRECIO_ACTUAL'] < 0.01 else ""
                     sr_html += f'<td class="{r_clase}">{formatear_numero(r)}€</td>'
                 
+                observaciones = generar_observaciones(data)
+                
                 html_body += f"""
                             <tr>
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
@@ -605,6 +662,9 @@ def generar_reporte():
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
                                 {sr_html}
+                            </tr>
+                            <tr class="observaciones-row">
+                                <td colspan="9">{observaciones}</td>
                             </tr>
                 """
                 previous_orden_grupo = current_orden_grupo
@@ -631,8 +691,14 @@ def generar_reporte():
                             txtValue = td.textContent || td.innerText;
                             if (txtValue.toUpperCase().indexOf(filter) > -1) {
                                 tr[i].style.display = "";
+                                if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
+                                    tr[i+1].style.display = "";
+                                }
                             } else {
                                 tr[i].style.display = "none";
+                                if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
+                                    tr[i+1].style.display = "none";
+                                }
                             }
                         }
                     }
