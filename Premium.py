@@ -270,7 +270,7 @@ def clasificar_empresa(data):
         "Seguirá bajando": 4,
         "Riesgo de Venta": 5,
         "Riesgo de Venta Activada": 6,
-        "Intermedio": 99
+        "Intermedio": 7
     }
 
     if estado_smi == "Sobreventa":
@@ -612,17 +612,17 @@ def generar_reporte():
                         """
                      elif current_orden_grupo == 7:
                          html_body += """
-                            <tr class="category-header"><td colspan="9">OTROS (SEGUIMIENTO)</td></tr>
+                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
                 
                 elif current_orden_grupo != previous_orden_grupo:
-                    if current_orden_grupo in [3, 4, 5] and previous_orden_grupo in [1, 2]:
+                    if current_orden_grupo in [3, 4, 5, 6] and previous_orden_grupo in [1, 2]:
                         html_body += """
                             <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
                         """
-                    elif current_orden_grupo in [7] and previous_orden_grupo in [1, 2, 3, 4, 5, 6]:
+                    elif current_orden_grupo == 7 and previous_orden_grupo in [1, 2, 3, 4, 5, 6]:
                          html_body += """
-                            <tr class="category-header"><td colspan="9">OTROS (SEGUIMIENTO)</td></tr>
+                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
                     html_body += """
                         <tr class="separator-row"><td colspan="9"></td></tr>
