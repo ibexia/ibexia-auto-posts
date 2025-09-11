@@ -267,9 +267,9 @@ def clasificar_empresa(data):
         "Posibilidad de Compra Activada": 1,
         "Posibilidad de Compra": 2,
         "VIGILAR": 3,
-        "Seguirá bajando": 4,
-        "Riesgo de Venta": 5,
-        "Riesgo de Venta Activada": 6,
+        "Riesgo de Venta": 4,
+        "Riesgo de Venta Activada": 5,
+        "Seguirá bajando": 6,
         "Intermedio": 7
     }
 
@@ -406,68 +406,14 @@ def generar_reporte():
             orden_grupo = 99
             orden_interna = float('inf')
             
-            if categoria == "Posibilidad de Compra" and empresa['TENDENCIA_ACTUAL'] == "Bajando":
+            if categoria in ["Posibilidad de Compra Activada", "Posibilidad de Compra"]:
                 orden_grupo = 1
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
-                    try:
-                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'])
-                        precio_actual = float(empresa['PRECIO_ACTUAL'])
-                        porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
-                        orden_interna = porcentaje
-                    except (ValueError, TypeError):
-                        pass
-
-            elif categoria == "Posibilidad de Compra Activada" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobreventa":
+            elif categoria in ["VIGILAR", "Riesgo de Venta", "Riesgo de Venta Activada", "Seguirá bajando"]:
                 orden_grupo = 2
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
-                    try:
-                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
-                        precio_actual = float(empresa['PRECIO_ACTUAL'])
-                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                        orden_interna = -porcentaje
-                    except (ValueError, TypeError):
-                        pass
-            
-            elif categoria == "VIGILAR" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Intermedio":
-                orden_grupo = 3
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
-                    try:
-                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
-                        precio_actual = float(empresa['PRECIO_ACTUAL'])
-                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                        orden_interna = -porcentaje
-                    except (ValueError, TypeError):
-                        pass
-            
-            elif categoria == "Riesgo de Venta" and empresa['TENDENCIA_ACTUAL'] == "Subiendo" and empresa['ESTADO_SMI'] == "Sobrecompra":
-                orden_grupo = 4
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
-                    try:
-                        precio_vende = float(empresa['PRECIO_APLANAMIENTO'])
-                        precio_actual = float(empresa['PRECIO_ACTUAL'])
-                        porcentaje = ((precio_vende - precio_actual) / precio_actual) * 100
-                        orden_interna = -porcentaje
-                    except (ValueError, TypeError):
-                        pass
-            
-            elif categoria == "Riesgo de Venta Activada" and empresa['TENDENCIA_ACTUAL'] == "Bajando" and empresa['ESTADO_SMI'] == "Sobrecompra":
-                orden_grupo = 5
-                if empresa['PRECIO_APLANAMIENTO'] != "N/A" and empresa['PRECIO_ACTUAL'] is not None:
-                    try:
-                        precio_compra = float(empresa['PRECIO_APLANAMIENTO'])
-                        precio_actual = float(empresa['PRECIO_ACTUAL'])
-                        porcentaje = ((precio_compra - precio_actual) / precio_actual) * 100
-                        orden_interna = porcentaje
-                    except (ValueError, TypeError):
-                        pass
-            
-            elif categoria == "Seguirá bajando":
-                orden_grupo = 6
-            
             elif categoria == "Intermedio":
-                orden_grupo = 7
+                orden_grupo = 3
 
-            return (orden_grupo, orden_interna)
+            return (empresa['ORDEN_PRIORIDAD'], empresa['NOMBRE_EMPRESA'])
 
         datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
         
@@ -599,28 +545,28 @@ def generar_reporte():
             previous_orden_grupo = None
             for i, data in enumerate(datos_ordenados):
                 
-                current_orden_grupo = obtener_clave_ordenacion(data)[0]
+                current_orden_grupo = data['ORDEN_PRIORIDAD']
                 
                 if previous_orden_grupo is None:
                      if current_orden_grupo in [1, 2]:
                          html_body += """
                             <tr class="category-header"><td colspan="9">OPORTUNIDADES DE COMPRA</td></tr>
                         """
-                     elif current_orden_grupo in [3, 4, 5, 6]:
+                     elif current_orden_grupo in [3, 4, 5]:
                          html_body += """
                             <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
                         """
-                     elif current_orden_grupo == 7:
+                     elif current_orden_grupo in [6, 7]:
                          html_body += """
                             <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
                 
                 elif current_orden_grupo != previous_orden_grupo:
-                    if current_orden_grupo in [3, 4, 5, 6] and previous_orden_grupo in [1, 2]:
+                    if current_orden_grupo in [3, 4, 5] and previous_orden_grupo in [1, 2]:
                         html_body += """
                             <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
                         """
-                    elif current_orden_grupo == 7 and previous_orden_grupo in [1, 2, 3, 4, 5, 6]:
+                    elif current_orden_grupo in [6, 7] and previous_orden_grupo in [1, 2, 3, 4, 5]:
                          html_body += """
                             <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
