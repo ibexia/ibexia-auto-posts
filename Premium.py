@@ -575,7 +575,7 @@ def generar_reporte():
                 <h2 class="text-center">Resumen Diario de Oportunidades ordenadas por prioridad - {datetime.today().strftime('%d/%m/%Y')}</h2>
                 
                 <div id="search-container">
-                    <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa...">
+                    <input type="text" id="searchInput" placeholder="Buscar por nombre de empresa...">
                 </div>
                 
                 <div id="scroll-top" style="overflow-x: auto;">
@@ -687,7 +687,7 @@ def generar_reporte():
             </div>
 
             <script>
-                // Función de filtrado declarada en el ámbito global
+                // Función de filtrado
                 function filterTable() {
                     var input, filter, table, tr, td, i, txtValue;
                     input = document.getElementById("searchInput");
@@ -700,13 +700,11 @@ def generar_reporte():
                             txtValue = td.textContent || td.innerText;
                             if (txtValue.toUpperCase().indexOf(filter) > -1) {
                                 tr[i].style.display = "";
-                                // Mostrar también la fila de observaciones si existe
                                 if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
                                     tr[i+1].style.display = "";
                                 }
                             } else {
                                 tr[i].style.display = "none";
-                                // Ocultar también la fila de observaciones si existe
                                 if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
                                     tr[i+1].style.display = "none";
                                 }
@@ -715,8 +713,10 @@ def generar_reporte():
                     }
                 }
                 
-                // Asegurar que los listeners se añaden después de que el DOM esté cargado
+                // Adjuntar el evento keyup a la barra de búsqueda
                 window.onload = function() {
+                    document.getElementById("searchInput").addEventListener("keyup", filterTable);
+                    
                     const tableContainer = document.querySelector('.table-container');
                     const scrollTop = document.getElementById('scroll-top');
                     
