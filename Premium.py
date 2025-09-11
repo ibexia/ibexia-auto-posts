@@ -542,199 +542,178 @@ def generar_reporte():
         <head>
             <title>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</title>
             <style>
-                @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
-                
-                :root {{
-                    --bg-dark: #1e1e1e;
-                    --bg-light: #ffffff;
-                    --text-color: #333;
-                    --green-buy: #2ecc71;
-                    --red-sell: #e74c3c;
-                    --yellow-alert: #f39c12;
-                    --blue-neutral: #3498db;
-                    --border-color: #f0f0f0;
-                    --hover-bg: #f5f5f5;
-                }}
-                
-                body {{
-                    font-family: 'Roboto', sans-serif;
-                    background-color: var(--bg-dark);
+                @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+                body {{ 
+                    font-family: 'Roboto', sans-serif; 
+                    background-color: #f0f2f5;
                     margin: 0;
                     padding: 20px;
+                    color: #333;
                 }}
-                
                 .main-container {{
-                    max-width: 1300px;
+                    max-width: 1400px;
                     margin: 0 auto;
-                    background-color: var(--bg-light);
-                    padding: 20px;
+                    background-color: #fff;
+                    padding: 30px;
                     border-radius: 12px;
-                    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+                    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
                 }}
-                
-                h2 {{
-                    color: var(--text-color);
-                    text-align: center;
+                h2 {{ 
+                    color: #1a237e; 
+                    text-align: center; 
                     font-weight: 700;
+                    margin-bottom: 5px;
+                }}
+                p.date {{ 
+                    color: #616161; 
+                    text-align: center; 
+                    font-size: 14px;
+                    margin-top: 0;
                     margin-bottom: 20px;
                 }}
-                
-                p {{
-                    color: #7f8c8d;
-                    text-align: center;
-                }}
-                
-                #search-container {{
+                #search-container {{ 
                     margin-bottom: 20px;
+                    position: relative;
                 }}
-                
                 #searchInput {{
                     width: 100%;
-                    padding: 12px;
+                    padding: 12px 15px;
                     font-size: 16px;
-                    border: 1px solid #ddd;
+                    border: 1px solid #e0e0e0;
                     border-radius: 8px;
                     box-sizing: border-box;
-                    transition: border-color 0.3s;
+                    transition: border-color 0.3s, box-shadow 0.3s;
                 }}
-                
                 #searchInput:focus {{
+                    border-color: #42a5f5;
+                    box-shadow: 0 0 5px rgba(66, 165, 245, 0.5);
                     outline: none;
-                    border-color: var(--blue-neutral);
                 }}
-                
                 .table-container {{
                     overflow-x: auto;
                     overflow-y: auto;
                     height: 80vh;
                     position: relative;
+                    border: 1px solid #e0e0e0;
+                    border-radius: 8px;
                 }}
-                
-                table {{
-                    width: 90%;
+                table {{ 
+                    width: 100%;
                     table-layout: fixed;
-                    margin: 20px auto 0 auto;
+                    margin: 0;
                     border-collapse: separate;
                     border-spacing: 0;
-                    border-radius: 8px;
-                    overflow: hidden;
                 }}
-                
-                th, td {{
-                    border: 1px solid var(--border-color);
-                    padding: 12px 8px;
+                th, td {{ 
+                    padding: 12px 10px; 
                     text-align: center;
                     vertical-align: middle;
                     white-space: normal;
-                    width: calc(140px * 0.80);
                     line-height: 1.4;
+                    font-size: 14px;
+                    transition: background-color 0.3s;
                 }}
-                
-                th {{
-                    background-color: #f9f9f9;
-                    color: var(--text-color);
-                    font-weight: 700;
+                th {{ 
+                    background-color: #2c3e50;
+                    color: white;
+                    font-weight: 500;
                     position: sticky;
                     top: 0;
                     z-index: 10;
+                    border-bottom: 2px solid #1a237e;
                 }}
-                
-                tr:hover:not(.category-header):not(.separator-row):not(.observaciones-row) {{
-                    background-color: var(--hover-bg);
-                    transition: background-color 0.2s ease-in-out;
+                tr:nth-child(even) {{
+                    background-color: #f9f9f9;
                 }}
-                
-                .compra {{
-                    color: var(--green-buy);
-                    font-weight: bold;
-                }}
-                
-                .venta {{
-                    color: var(--red-sell);
-                    font-weight: bold;
-                }}
-                
-                .vigilar {{
-                    color: var(--yellow-alert);
-                    font-weight: bold;
-                }}
-                
-                .green-cell {{
+                tr:hover {{
                     background-color: #e8f5e9;
                 }}
-                
-                .red-cell {{
-                    background-color: #ffebee;
+                .compra {{ 
+                    color: #2e7d32; 
+                    font-weight: bold;
+                    animation: pulse 1.5s infinite;
                 }}
-                
-                .separator-row td {{
-                    background-color: var(--text-color);
-                    height: 2px;
-                    padding: 0;
-                    border: none;
+                .venta {{ 
+                    color: #c62828; 
+                    font-weight: bold;
+                    animation: pulse 1.5s infinite;
                 }}
-                
+                .vigilar {{ color: #ff8f00; font-weight: bold; }}
+                .comprado-si {{ background-color: #2ecc71; color: white; font-weight: bold; }}
+                .bg-green {{ background-color: #e8f5e9; color: #1b5e20; }}
+                .bg-red {{ background-color: #ffebee; color: #b71c1c; }}
+                .bg-highlight {{ background-color: #2ecc71; color: white; font-weight: bold; }}
+                .text-center {{ text-align: center; }}
+                .disclaimer {{ 
+                    font-size: 12px; 
+                    text-align: center; 
+                    color: #9e9e9e; 
+                    margin-top: 30px;
+                    line-height: 1.5;
+                }}
+                .small-text {{ font-size: 11px; color: #666; }}
+                .green-cell {{ background-color: #e8f5e9; }}
+                .red-cell {{ background-color: #ffebee; }}
+                .separator-row td {{ background-color: #e0e0e0; height: 5px; padding: 0; border: none; }}
                 .category-header td {{
-                    background-color: #34495e;
+                    background-color: #42a5f5;
                     color: white;
                     font-size: 1.5em;
-                    font-weight: 700;
+                    font-weight: bold;
                     text-align: center;
                     padding: 15px;
                     border: none;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
                 }}
-                
                 .observaciones-row td {{
-                    background-color: #fbfbfb;
+                    background-color: #f5f5f5;
                     text-align: left;
-                    font-size: 0.9em;
-                    border: 1px solid var(--border-color);
+                    font-size: 13px;
+                    line-height: 1.6;
+                    border: 1px solid #eee;
                     padding: 15px;
                 }}
-                
-                .stacked-text {{
-                    line-height: 1.2;
-                    font-size: 10px;
+                .stacked-text {{ 
+                    line-height: 1.3;
+                    font-size: 13px;
                 }}
-                
-                .disclaimer {{
-                    font-size: 12px;
-                    text-align: center;
-                    color: #95a5a6;
+                td.highlight-compra {{
+                    background-color: #d4edda;
+                    font-weight: bold;
                 }}
-                
-                .small-text {{
-                    font-size: 10px;
-                    color: #555;
+                td.highlight-venta {{
+                    background-color: #f8d7da;
+                    font-weight: bold;
                 }}
-                
-                @keyframes pulse-green {{
-                    0% {{ box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4); }}
-                    70% {{ box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }}
-                    100% {{ box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }}
+                .blink-compra {{
+                    animation: blink-compra 1.5s infinite;
                 }}
-
-                @keyframes pulse-red {{
-                    0% {{ box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }}
-                    70% {{ box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }}
-                    100% {{ box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }}
+                .blink-venta {{
+                    animation: blink-venta 1.5s infinite;
                 }}
-                
-                .pulse-green {{
-                    animation: pulse-green 2s infinite;
+                @keyframes pulse {{
+                    0% {{ transform: scale(1); }}
+                    50% {{ transform: scale(1.05); }}
+                    100% {{ transform: scale(1); }}
                 }}
-                
-                .pulse-red {{
-                    animation: pulse-red 2s infinite;
+                @keyframes blink-compra {{
+                    0%, 100% {{ background-color: #e8f5e9; }}
+                    50% {{ background-color: #c8e6c9; }}
+                }}
+                @keyframes blink-venta {{
+                    0%, 100% {{ background-color: #ffebee; }}
+                    50% {{ background-color: #ffcdd2; }}
                 }}
             </style>
         </head>
         <body>
             <div class="main-container">
-                <h2 class="text-center">Resumen Diario de Oportunidades ordenadas por prioridad - {datetime.today().strftime('%d/%m/%Y')}</h2>
+                <h2 class="text-center">Resumen Diario de Oportunidades de Trading</h2>
+                <p class="date">Análisis del mercado de bolsa - {datetime.today().strftime('%d de %B de %Y')}</p>
                 
                 <div id="search-container">
-                    <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa...">
+                    <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por nombre de empresa o ticker...">
                 </div>
                 
                 <div id="scroll-top" style="overflow-x: auto;">
@@ -745,15 +724,13 @@ def generar_reporte():
                     <table id="myTable">
                         <thead>
                             <tr>
-                                <th>Empresa (Precio)</th>
-                                <th>Tendencia Actual</th>
-                                <th>Oportunidad</th>
-                                <th>Compra si...</th>
-                                <th>Vende si...</th>
-                                <th>Soporte 1</th>
-                                <th>Soporte 2</th>
-                                <th>Resistencia 1</th>
-                                <th>Resistencia 2</th>
+                                <th style="width: 15%;">Empresa (Precio)</th>
+                                <th style="width: 10%;">Tendencia Actual</th>
+                                <th style="width: 15%;">Oportunidad</th>
+                                <th style="width: 20%;">Compra si...</th>
+                                <th style="width: 20%;">Vende si...</th>
+                                <th style="width: 10%;">Soporte 1</th>
+                                <th style="width: 10%;">Resistencia 1</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -761,7 +738,7 @@ def generar_reporte():
         
         if not datos_ordenados:
             html_body += """
-                            <tr><td colspan="9">No se encontraron empresas con oportunidades claras hoy.</td></tr>
+                            <tr><td colspan="7">No se encontraron empresas con oportunidades claras hoy.</td></tr>
             """
         else:
             previous_oportunidad = None
@@ -769,62 +746,50 @@ def generar_reporte():
                 
                 if i == 0:
                     html_body += """
-                        <tr class="category-header"><td colspan="9">OPORTUNIDADES DE COMPRA</td></tr>
+                        <tr class="category-header"><td colspan="7">OPORTUNIDADES DE COMPRA</td></tr>
+                    """
+                
+                if previous_oportunidad is not None and data['ORDEN_PRIORIDAD'] > 2 and previous_oportunidad in ["Posibilidad de Compra", "Posibilidad de Compra Activada"]:
+                     html_body += """
+                        <tr class="category-header"><td colspan="7">SEGUIMIENTO DE POSICIONES Y RIESGO DE VENTA</td></tr>
                     """
                 
                 if previous_oportunidad is not None and data['OPORTUNIDAD'] != previous_oportunidad:
-                    if data['ORDEN_PRIORIDAD'] >= 3 and previous_oportunidad in ["Posibilidad de Compra", "Posibilidad de Compra Activada"]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
-                        """
                     html_body += """
-                        <tr class="separator-row"><td colspan="9"></td></tr>
+                        <tr class="separator-row"><td colspan="7"></td></tr>
                     """
 
                 nombre_con_precio = f"<div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div>"
                 
-                clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else ("vigilar" if "vigilar" in data['OPORTUNIDAD'].lower() else ""))
-                
-                celda_empresa_class = ""
+                clase_oportunidad = ""
                 if "compra" in data['OPORTUNIDAD'].lower():
-                    celda_empresa_class = "green-cell"
+                    clase_oportunidad = "compra"
                 elif "venta" in data['OPORTUNIDAD'].lower():
-                    celda_empresa_class = "red-cell"
+                    clase_oportunidad = "venta"
+                elif "vigilancia" in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "vigilar"
                 
-                compra_si_class = ""
-                if "COMPRA YA" in data['COMPRA_SI']:
-                    compra_si_class = "pulse-green"
+                celda_compra_class = "highlight-compra" if "COMPRA YA" in data['COMPRA_SI'] else ""
+                celda_compra_class += " blink-compra" if "COMPRA YA" in data['COMPRA_SI'] else ""
                 
-                vende_si_class = ""
-                if "VENDE AHORA" in data['VENDE_SI']:
-                    vende_si_class = "pulse-red"
+                celda_venta_class = "highlight-venta" if "VENDE AHORA" in data['VENDE_SI'] else ""
+                celda_venta_class += " blink-venta" if "VENDE AHORA" in data['VENDE_SI'] else ""
+                
+                soporte1 = data['SOPORTE_1']
+                resistencia1 = data['RESISTENCIA_1']
 
-                soportes = [data['SOPORTE_1'], data['SOPORTE_2']]
-                resistencias = [data['RESISTENCIA_1'], data['RESISTENCIA_2']]
-                
-                sr_html = ""
-                
-                for s in soportes:
-                    s_clase = "red-cell" if s is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - s) / data['PRECIO_ACTUAL'] < 0.01 else ""
-                    sr_html += f'<td class="{s_clase}">{formatear_numero(s)}€</td>'
-
-                for r in resistencias:
-                    r_clase = "red-cell" if r is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - r) / data['PRECIO_ACTUAL'] < 0.01 else ""
-                    sr_html += f'<td class="{r_clase}">{formatear_numero(r)}€</td>'
-                
-                observaciones = generar_observaciones(data)
-                
                 html_body += f"""
                             <tr>
-                                <td class="{celda_empresa_class}">{nombre_con_precio}</td>
+                                <td>{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
-                                <td class="{compra_si_class}">{data['COMPRA_SI']}</td>
-                                <td class="{vende_si_class}">{data['VENDE_SI']}</td>
-                                {sr_html}
+                                <td class="{celda_compra_class}">{data['COMPRA_SI']}</td>
+                                <td class="{celda_venta_class}">{data['VENDE_SI']}</td>
+                                <td>{formatear_numero(soporte1)}€</td>
+                                <td>{formatear_numero(resistencia1)}€</td>
                             </tr>
                             <tr class="observaciones-row">
-                                <td colspan="9">{observaciones}</td>
+                                <td colspan="7">{generar_observaciones(data)}</td>
                             </tr>
                 """
                 previous_oportunidad = data['OPORTUNIDAD']
@@ -846,7 +811,7 @@ def generar_reporte():
                     table = document.getElementById("myTable");
                     tr = table.getElementsByTagName("tr");
                     for (i = 0; i < tr.length; i++) {
-                        td = tr[i].getElementsByTagName("td")[0];
+                        td = tr[i].getElementsByTagName("td")[0]; // Nombre de la empresa
                         if (td) {
                             txtValue = td.textContent || td.innerText;
                             if (txtValue.toUpperCase().indexOf(filter) > -1) {
