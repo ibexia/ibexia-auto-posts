@@ -687,40 +687,44 @@ def generar_reporte():
             </div>
 
             <script>
-                function filterTable() {
-                    var input, filter, table, tr, td, i, txtValue;
-                    input = document.getElementById("searchInput");
-                    filter = input.value.toUpperCase();
-                    table = document.getElementById("myTable");
-                    tr = table.getElementsByTagName("tr");
-                    for (i = 0; i < tr.length; i++) {
-                        td = tr[i].getElementsByTagName("td")[0];
-                        if (td) {
-                            txtValue = td.textContent || td.innerText;
-                            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                                tr[i].style.display = "";
-                                if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
-                                    tr[i+1].style.display = "";
-                                }
-                            } else {
-                                tr[i].style.display = "none";
-                                if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
-                                    tr[i+1].style.display = "none";
+                jQuery(document).ready(function($) {
+                    function filterTable() {
+                        var input, filter, table, tr, td, i, txtValue;
+                        input = document.getElementById("searchInput");
+                        filter = input.value.toUpperCase();
+                        table = document.getElementById("myTable");
+                        tr = table.getElementsByTagName("tr");
+                        for (i = 0; i < tr.length; i++) {
+                            td = tr[i].getElementsByTagName("td")[0];
+                            if (td) {
+                                txtValue = td.textContent || td.innerText;
+                                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                                    tr[i].style.display = "";
+                                    if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
+                                        tr[i+1].style.display = "";
+                                    }
+                                } else {
+                                    tr[i].style.display = "none";
+                                    if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
+                                        tr[i+1].style.display = "none";
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                
-                const tableContainer = document.querySelector('.table-container');
-                const scrollTop = document.getElementById('scroll-top');
-                
-                scrollTop.addEventListener('scroll', () => {
-                    tableContainer.scrollLeft = scrollTop.scrollLeft;
-                });
-                
-                tableContainer.addEventListener('scroll', () => {
-                    scrollTop.scrollLeft = tableContainer.scrollLeft;
+                    
+                    const tableContainer = document.querySelector('.table-container');
+                    const scrollTop = document.getElementById('scroll-top');
+                    
+                    scrollTop.addEventListener('scroll', () => {
+                        tableContainer.scrollLeft = scrollTop.scrollLeft;
+                    });
+                    
+                    tableContainer.addEventListener('scroll', () => {
+                        scrollTop.scrollLeft = tableContainer.scrollLeft;
+                    });
+    
+                    window.filterTable = filterTable;
                 });
             </script>
         </body>
