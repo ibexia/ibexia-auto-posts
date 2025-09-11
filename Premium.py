@@ -693,41 +693,56 @@ def generar_reporte():
                     input = document.getElementById("searchInput");
                     filter = input.value.toUpperCase();
                     table = document.getElementById("myTable");
-                    tr = table.getElementsByTagName("tr");
+                    var tbody = table.querySelector('tbody');
+                    tr = tbody.getElementsByTagName("tr");
+
                     for (i = 0; i < tr.length; i++) {
+                        // Skip separator and category rows
+                        if (tr[i].classList.contains("separator-row") || tr[i].classList.contains("category-header")) {
+                            continue;
+                        }
+
+                        // Check the company name row
                         td = tr[i].getElementsByTagName("td")[0];
                         if (td) {
                             txtValue = td.textContent || td.innerText;
+                            var observationsRow = tr[i + 1];
+
                             if (txtValue.toUpperCase().indexOf(filter) > -1) {
                                 tr[i].style.display = "";
-                                if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
-                                    tr[i+1].style.display = "";
+                                if (observationsRow && observationsRow.classList.contains("observaciones-row")) {
+                                    observationsRow.style.display = "";
                                 }
                             } else {
                                 tr[i].style.display = "none";
-                                if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
-                                    tr[i+1].style.display = "none";
+                                if (observationsRow && observationsRow.classList.contains("observaciones-row")) {
+                                    observationsRow.style.display = "none";
                                 }
                             }
                         }
                     }
                 }
                 
-                // Adjuntar el evento keyup a la barra de búsqueda
-                window.onload = function() {
-                    document.getElementById("searchInput").addEventListener("keyup", filterTable);
-                    
+                // Asegurar que el script se ejecute cuando el DOM esté listo
+                document.addEventListener('DOMContentLoaded', function() {
+                    const searchInput = document.getElementById("searchInput");
+                    if (searchInput) {
+                        searchInput.addEventListener("keyup", filterTable);
+                    }
+
                     const tableContainer = document.querySelector('.table-container');
                     const scrollTop = document.getElementById('scroll-top');
                     
-                    scrollTop.addEventListener('scroll', () => {
-                        tableContainer.scrollLeft = scrollTop.scrollLeft;
-                    });
-                    
-                    tableContainer.addEventListener('scroll', () => {
-                        scrollTop.scrollLeft = tableContainer.scrollLeft;
-                    });
-                };
+                    if (tableContainer && scrollTop) {
+                        scrollTop.addEventListener('scroll', () => {
+                            tableContainer.scrollLeft = scrollTop.scrollLeft;
+                        });
+                        
+                        tableContainer.addEventListener('scroll', () => {
+                            scrollTop.scrollLeft = tableContainer.scrollLeft;
+                        });
+                    }
+                });
             </script>
         </body>
         </html>
