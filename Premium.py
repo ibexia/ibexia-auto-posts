@@ -687,7 +687,7 @@ def generar_reporte():
             </div>
 
             <script>
-                jQuery(document).ready(function($) {
+                window.onload = function() {
                     function filterTable() {
                         var input, filter, table, tr, td, i, txtValue;
                         input = document.getElementById("searchInput");
@@ -700,11 +700,13 @@ def generar_reporte():
                                 txtValue = td.textContent || td.innerText;
                                 if (txtValue.toUpperCase().indexOf(filter) > -1) {
                                     tr[i].style.display = "";
+                                    // Mostrar también la fila de observaciones si existe
                                     if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
                                         tr[i+1].style.display = "";
                                     }
                                 } else {
                                     tr[i].style.display = "none";
+                                    // Ocultar también la fila de observaciones si existe
                                     if (i + 1 < tr.length && tr[i+1].classList.contains("observaciones-row")) {
                                         tr[i+1].style.display = "none";
                                     }
@@ -725,7 +727,7 @@ def generar_reporte():
                     });
     
                     window.filterTable = filterTable;
-                });
+                };
             </script>
         </body>
         </html>
