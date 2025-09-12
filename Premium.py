@@ -478,11 +478,13 @@ def generar_reporte():
         datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
         
         # --- Fin de la lógica de ordenación integrada ---
-
+        now_utc = datetime.utcnow()
+        hora_actual = (now_utc + timedelta(hours=2)).strftime('%H:%M')
+        
         html_body = f"""
         <html>
         <head>
-            <title>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')}</title>
+            <title>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
             <style>
                 body {{ 
                     font-family: Arial, sans-serif; 
@@ -572,7 +574,7 @@ def generar_reporte():
         </head>
         <body>
             <div class="main-container">
-                <h2 class="text-center">Resumen Diario de Oportunidades ordenadas por prioridad - {datetime.today().strftime('%d/%m/%Y')}</h2>
+                <h2 class="text-center">Resumen Diario de Oportunidades ordenadas por prioridad - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</h2>
                 
                 <div id="search-container">
                     <input type="text" id="searchInput" placeholder="Buscar por nombre de empresa...">
@@ -637,8 +639,11 @@ def generar_reporte():
                         <tr class="separator-row"><td colspan="9"></td></tr>
                     """
 
-                nombre_con_precio = f"<div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div>"
+                nombre_empresa_url = data['NOMBRE_EMPRESA'].replace(' ', '-').replace('.', '').replace(',', '').replace('(', '').replace(')', '').replace('&', 'and').lower()
+                empresa_link = f'https://ibexia.es/category/{nombre_empresa_url}/'
                 
+                nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
+
                 clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else ("vigilar" if "vigilar" in data['OPORTUNIDAD'].lower() else ""))
                 
                 celda_empresa_class = ""
