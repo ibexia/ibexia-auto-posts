@@ -16,6 +16,81 @@ import random
 from email.mime.base import MIMEBase
 from email import encoders
 
+tickers = {
+    'Acciona': 'ANA.MC',
+    'Accionarenovables': 'ANE.MC',
+    'Acerinox': 'ACX.MC',
+    'ACS': 'ACS.MC',
+    'Aedas-Homes': 'AEDAS.MC',
+    'Aena': 'AENA.MC',
+    'Almirall': 'ALM.MC',
+    'Airbus': 'AIR.MC',
+    'AirTificial': 'AI.MC',
+    'Amadeus': 'AMS.MC',
+    'Amper': 'AMP.MC',
+    'Audax-Renovables': 'ADX.MC',
+    'Bankinter': 'BKT.MC',
+    'BBVA': 'BBVA.MC',
+    'Berkeley': 'BKY.MC',
+    'Biotechnology': 'BST.MC',
+    'CaixaBank': 'CABK.MC',
+    'Cellnex': 'CLNX.MC',
+    'DIA': 'DIA.MC',
+    'Ercros': 'ECR.MC',
+    'Endesa': 'ELE.MC',
+    'Elecnor': 'ENO.MC',
+    'ENCE': 'ENC.MC',
+    'Enagas': 'ENG.MC',
+    'Ezentis': 'EZE.MC',
+    'FacePhi': 'FACE.MC',
+    'Ferrovial': 'FER.MC',
+    'Fomento Construcciones y Contratas': 'FCC.MC',
+    'Fluidra': 'FDR.MC',
+    'GAM': 'GAM.MC',
+    'Gigas-Hosting': 'GIGA.MC',
+    'Grifols': 'GRF.MC',
+    'Holaluz': 'HLZ.MC',
+    'Neinor-homes': 'HOME.MC',
+    'IAG': 'IAG.MC',
+    'Iberdrola': 'IBE.MC',
+    'Iberpapel': 'IBG.MC',
+    'Inditex': 'ITX.MC',
+    'Indra': 'IDR.MC',
+    'Logista': 'LOG.MC',
+    'Linea-directa': 'LDA.MC',
+    'Mapfre': 'MAP.MC',
+    'duro-felguera': 'MDF.MC',
+    'melia': 'MEL.MC',
+    'Merlin': 'MRL.MC',
+    'arcelor-mittal': 'MTS.MC',
+    'Naturgy': 'NTGY.MC',
+    'nbi-bearings': 'NBI.MC',
+    'nextil': 'NXT.MC',
+    'nyesa': 'NYE.MC',
+    'ohla': 'OHLA.MC',
+    'Deoleo': 'OLE.MC',
+    'Oryzon': 'ORY.MC',
+    'Pharma-Mar': 'PHM.MC',
+    'Prosegur': 'PSG.MC',
+    'Puig-brands': 'PUIG.MC',
+    'Red-Electrica': 'RED.MC',
+    'Repsol': 'REP.MC',
+    'Laboratorios-rovi': 'ROVI.MC',
+    'Banco-sabadell': 'SAB.MC',
+    'Sacyr': 'SCYR.MC',
+    'Solaria': 'SLR.MC',
+    'Squirrel': 'SQRL.MC',
+    'Substrate': 'SAI.MC',
+    'banco-santander': 'SAN.MC',
+    'Talgo': 'TLGO.MC',
+    'Telefonica': 'TEF.MC',
+    'Tubos-Reunidos': 'TRG.MC',
+    'tubacex': 'TUB.MC',
+    'Unicaja': 'UNI.MC',
+    'Viscofan': 'VIS.MC',
+    'Urbas': 'URB.MC',
+}
+
 def leer_google_sheets():
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
     if not credentials_json:
@@ -608,82 +683,6 @@ def generar_reporte():
             """
         else:
             previous_orden_grupo = None
-            
-            tickers_slug = {
-                'Acciona': 'acciona',
-                'Accionarenovables': 'accionarenovables',
-                'Acerinox': 'acerinox',
-                'ACS': 'acs',
-                'Aedas-Homes': 'aedas-homes',
-                'Aena': 'aena',
-                'Almirall': 'almirall',
-                'Airbus': 'airbus',
-                'AirTificial': 'airtificial',
-                'Amadeus': 'amadeus',
-                'Amper': 'amper',
-                'Audax-Renovables': 'audax-renovables',
-                'Bankinter': 'bankinter',
-                'BBVA': 'bbva',
-                'Berkeley': 'berkeley',
-                'Biotechnology': 'biotechnology',
-                'CaixaBank': 'caixabank',
-                'Cellnex': 'cellnex',
-                'DIA': 'dia',
-                'Ercros': 'ercros',
-                'Endesa': 'endesa',
-                'Elecnor': 'elecnor',
-                'ENCE': 'ence',
-                'Enagas': 'enagas',
-                'Ezentis': 'ezentis',
-                'FacePhi': 'facephi',
-                'Ferrovial': 'ferrovial',
-                'Fomento Construcciones y Contratas': 'fomentoconstruccionesycontratas',
-                'Fluidra': 'fluidra',
-                'GAM': 'gam',
-                'Gigas-Hosting': 'gigas-hosting',
-                'Grifols': 'grifols',
-                'Holaluz': 'holaluz',
-                'Neinor-homes': 'neinor-homes',
-                'IAG': 'iag',
-                'Iberdrola': 'iberdrola',
-                'Iberpapel': 'iberpapel',
-                'Inditex': 'inditex',
-                'Indra': 'indra',
-                'Logista': 'logista',
-                'Linea-directa': 'linea-directa',
-                'Mapfre': 'mapfre',
-                'duro-felguera': 'duro-felguera',
-                'melia': 'melia',
-                'Merlin': 'merlin',
-                'arcelor-mittal': 'arcelor-mittal',
-                'Naturgy': 'naturgy',
-                'nbi-bearings': 'nbi-bearings',
-                'nextil': 'nextil',
-                'nyesa': 'nyesa',
-                'ohla': 'ohla',
-                'Deoleo': 'deoleo',
-                'Oryzon': 'oryzon',
-                'Pharma-Mar': 'pharma-mar',
-                'Prosegur': 'prosegur',
-                'Puig-brands': 'puig-brands',
-                'Red-Electrica': 'red-electrica',
-                'Repsol': 'repsol',
-                'Laboratorios-rovi': 'laboratorios-rovi',
-                'Banco-sabadell': 'banco-sabadell',
-                'Sacyr': 'sacyr',
-                'Solaria': 'solaria',
-                'Squirrel': 'squirrel',
-                'Substrate': 'substrate',
-                'banco-santander': 'banco-santander',
-                'Talgo': 'talgo',
-                'Telefonica': 'telefonica',
-                'Tubos-Reunidos': 'tubos-reunidos',
-                'tubacex': 'tubacex',
-                'Unicaja': 'unicaja',
-                'Viscofan': 'viscofan',
-                'Urbas': 'urbas',
-            }
-            
             for i, data in enumerate(datos_ordenados):
                 
                 current_orden_grupo = data['ORDEN_PRIORIDAD']
@@ -714,10 +713,20 @@ def generar_reporte():
                     html_body += """
                         <tr class="separator-row"><td colspan="9"></td></tr>
                     """
-                
-                nombre_empresa_url = tickers_slug.get(data['NOMBRE_EMPRESA'])
-                empresa_link = f'https://ibexia.es/category/{nombre_empresa_url}'
 
+                # Lógica de corrección para el enlace
+                # Buscar el nombre de la empresa en el diccionario 'tickers'
+                nombre_empresa_url = None
+                for nombre, ticker_val in tickers.items():
+                    if ticker_val == data['TICKER']:
+                        nombre_empresa_url = nombre
+                        break
+                
+                if nombre_empresa_url:
+                    empresa_link = f'https://ibexia.es/category/{nombre_empresa_url.lower()}/'
+                else:
+                    empresa_link = '#' # Enlace por defecto si no se encuentra en el diccionario
+                
                 nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
 
                 clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else ("vigilar" if "vigilar" in data['OPORTUNIDAD'].lower() else ""))
