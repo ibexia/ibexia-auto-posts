@@ -355,13 +355,16 @@ def clasificar_empresa(data):
             data['VENDE_SI'] = "NO VENDER"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
         elif tendencia == "Bajando":
-            data['OPORTUNIDAD'] = "Posibilidad de Compra"
             if current_price > close_yesterday:
-                data['COMPRA_SI'] = "COMPRA YA"
+                 data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
+                 data['COMPRA_SI'] = "COMPRA YA"
+                 data['VENDE_SI'] = "NO VENDER"
+                 data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
             else:
-                data['COMPRA_SI'] = f"COMPRAR SI SUPERA {formatear_numero(close_yesterday)}€"
-            data['VENDE_SI'] = "NO VENDER"
-            data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
+                 data['OPORTUNIDAD'] = "Posibilidad de Compra"
+                 data['COMPRA_SI'] = f"COMPRAR SI SUPERA {formatear_numero(close_yesterday)}€"
+                 data['VENDE_SI'] = "NO VENDER"
+                 data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
         else:
             data['OPORTUNIDAD'] = "Intermedio"
             data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
