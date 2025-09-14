@@ -427,10 +427,13 @@ def generar_observaciones(data):
         texto = f"El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda tener en cuenta los niveles de resistencia ({resistencia1}€) para determinar un objetivo de precio."
     
     elif oportunidad == "Posibilidad de Compra":
-        texto = f"El algoritmo detecta que el valor está en una zona de sobreventa, lo que puede ser un indicador de reversión. El algoritmo ha detectado una oportunidad de compra si el precio logra superar el nivel de cierre anterior."
+        if "COMPRA YA" in compra_si:
+            texto = f"El algoritmo detecta que el valor está en una zona de sobreventa, lo que puede ser un indicador de reversión. El algoritmo ha detectado una oportunidad de **compra inmediata** para aprovechar un posible rebote."
+        else:
+            texto = f"El algoritmo detecta que el valor está en una zona de sobreventa con una tendencia bajista. Se ha detectado una oportunidad de compra si el precio logra superar el nivel de cierre anterior."
     
     elif oportunidad == "VIGILAR":
-        texto = f"El algoritmo se encuentra en una zona intermedia y muestra una tendencia alcista en sus últimos valores. Aunque no se recomienda comprar, se sugiere vigilar de cerca, ya que una caída en el precio podría ser una señal de venta. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio."
+        texto = f"El algoritmo se encuentra en una zona intermedia y muestra una tendencia alcista en sus últimos valores. Aunque no se recomienda comprar, se sugiere vigilar de cerca, ya que una caída en el precio podría ser una señal de venta. El algoritmo recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio."
     
     elif oportunidad == "Riesgo de Venta":
         texto = f"El algoritmo ha entrado en una zona de sobrecompra. Esto genera un riesgo de venta. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio."
