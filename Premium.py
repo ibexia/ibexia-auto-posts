@@ -431,6 +431,83 @@ def enviar_email_con_adjunto(html_body, asunto_email):
         print("❌ Error al enviar el correo:", e)
 
 def generar_reporte():
+    
+    # Diccionario de nombres de empresa a slugs
+    slugs = {
+        'Acciona': 'acciona',
+        'Accionarenovables': 'accionarenovables',
+        'Acerinox': 'acerinox',
+        'ACS': 'acs',
+        'Aedas-Homes': 'aedas-homes',
+        'Aena': 'aena',
+        'Almirall': 'almirall',
+        'Airbus': 'airbus',
+        'AirTificial': 'airtificial',
+        'Amadeus': 'amadeus',
+        'Amper': 'amper',
+        'Audax-Renovables': 'audax-renovables',
+        'Bankinter': 'bankinter',
+        'BBVA': 'bbva',
+        'Berkeley': 'berkeley',
+        'Biotechnology': 'biotechnology',
+        'CaixaBank': 'caixabank',
+        'Cellnex': 'cellnex',
+        'DIA': 'dia',
+        'Ercros': 'ercros',
+        'Endesa': 'endesa',
+        'Elecnor': 'elecnor',
+        'ENCE': 'ence',
+        'Enagas': 'enagas',
+        'Ezentis': 'ezentis',
+        'FacePhi': 'facephi',
+        'Ferrovial': 'ferrovial',
+        'Fomento Construcciones y Contratas': 'fomento-construcciones-y-contratas',
+        'Fluidra': 'fluidra',
+        'GAM': 'gam',
+        'Gigas-Hosting': 'gigas-hosting',
+        'Grifols': 'grifols',
+        'Holaluz': 'holaluz',
+        'Neinor-homes': 'neinor-homes',
+        'IAG': 'iag',
+        'Iberdrola': 'iberdrola',
+        'Iberpapel': 'iberpapel',
+        'Inditex': 'inditex',
+        'Indra': 'indra',
+        'Logista': 'logista',
+        'Linea-directa': 'linea-directa',
+        'Mapfre': 'mapfre',
+        'duro-felguera': 'duro-felguera',
+        'melia': 'melia',
+        'Merlin': 'merlin',
+        'arcelor-mittal': 'arcelor-mittal',
+        'Naturgy': 'naturgy',
+        'nbi-bearings': 'nbi-bearings',
+        'nextil': 'nextil',
+        'nyesa': 'nyesa',
+        'ohla': 'ohla',
+        'Deoleo': 'deoleo',
+        'Oryzon': 'oryzon',
+        'Pharma-Mar': 'pharma-mar',
+        'Prosegur': 'prosegur',
+        'Puig-brands': 'puig-brands',
+        'Red-Electrica': 'red-electrica',
+        'Repsol': 'repsol',
+        'Laboratorios-rovi': 'laboratorios-rovi',
+        'Banco-sabadell': 'banco-sabadell',
+        'Sacyr': 'sacyr',
+        'Solaria': 'solaria',
+        'Squirrel': 'squirrel',
+        'Substrate': 'substrate',
+        'banco-santander': 'banco-santander',
+        'Talgo': 'talgo',
+        'Telefonica': 'telefonica',
+        'Tubos-Reunidos': 'tubos-reunidos',
+        'tubacex': 'tubacex',
+        'Unicaja': 'unicaja',
+        'Viscofan': 'viscofan',
+        'Urbas': 'urbas',
+    }
+
     try:
         all_tickers = leer_google_sheets()[1:]
         if not all_tickers:
@@ -639,9 +716,14 @@ def generar_reporte():
                         <tr class="separator-row"><td colspan="9"></td></tr>
                     """
 
-                nombre_empresa_url = data['NOMBRE_EMPRESA'].replace(' ', '-').replace('.', '').replace(',', '').replace('(', '').replace(')', '').replace('&', 'and').lower()
-                empresa_link = f'https://ibexia.es/category/{nombre_empresa_url}/'
-                
+                # Obtener el slug del diccionario
+                nombre_empresa_normalizado = data['NOMBRE_EMPRESA']
+                empresa_slug = slugs.get(nombre_empresa_normalizado)
+                if empresa_slug:
+                    empresa_link = f'https://ibexia.es/category/{empresa_slug}/'
+                else:
+                    empresa_link = '#' # Enlace por defecto si no se encuentra el slug
+
                 nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
 
                 clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else ("vigilar" if "vigilar" in data['OPORTUNIDAD'].lower() else ""))
