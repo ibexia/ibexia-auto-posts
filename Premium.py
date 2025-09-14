@@ -609,7 +609,6 @@ def generar_reporte():
         else:
             previous_orden_grupo = None
             
-            # Nuevo diccionario para obtener el slug del ticker, se asume que esta es la información correcta
             tickers_slug = {
                 'Acciona': 'acciona',
                 'Accionarenovables': 'accionarenovables',
@@ -638,7 +637,7 @@ def generar_reporte():
                 'Ezentis': 'ezentis',
                 'FacePhi': 'facephi',
                 'Ferrovial': 'ferrovial',
-                'Fomento Construcciones y Contratas': 'fomento-construcciones-y-contratas',
+                'Fomento Construcciones y Contratas': 'fomentoconstruccionesycontratas',
                 'Fluidra': 'fluidra',
                 'GAM': 'gam',
                 'Gigas-Hosting': 'gigas-hosting',
@@ -684,7 +683,7 @@ def generar_reporte():
                 'Viscofan': 'viscofan',
                 'Urbas': 'urbas',
             }
-
+            
             for i, data in enumerate(datos_ordenados):
                 
                 current_orden_grupo = data['ORDEN_PRIORIDAD']
@@ -716,7 +715,7 @@ def generar_reporte():
                         <tr class="separator-row"><td colspan="9"></td></tr>
                     """
                 
-                nombre_empresa_url = tickers_slug.get(data['NOMBRE_EMPRESA'], data['NOMBRE_EMPRESA'].replace(' ', '-').replace('.', '').replace(',', '').replace('(', '').replace(')', '').replace('&', 'and').lower())
+                nombre_empresa_url = tickers_slug.get(data['NOMBRE_EMPRESA'])
                 empresa_link = f'https://ibexia.es/category/{nombre_empresa_url}'
 
                 nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
