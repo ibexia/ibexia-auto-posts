@@ -426,7 +426,7 @@ def generar_observaciones(data):
             + (f" e incluso hasta **{formatear_numero(resistencia2)}€**." if resistencia2 is not None else "")
         ),
         "Posibilidad de Compra": (
-            f"Con una cotización actual de **{precio_actual}€**, el algoritmo ha detectado una posible oportunidad de compra, pero es necesario que el precio confirme la subida. Si el precio supera los **{formatear_numero(data['HIST_DF']['Close'].iloc[-2])}€**, se activará la señal de compra."
+            f"Con una cotización actual de **{precio_actual}€**, el algoritmo ha detectado una posible oportunidad de compra, pero es necesario que el precio confirme la subida. Si el precio supera los **{formatear_numero(data['COMPRA_SI'].split(' ')[-1].replace('€', ''))}€**, se activará la señal de compra."
         ),
         "Riesgo de Venta Activada": (
             f"Con una cotización actual de **{precio_actual}€**, el precio ha subido considerablemente y ahora muestra signos de debilidad. El algoritmo ha detectado una fuerte señal de venta, por lo que recomendamos vender a precios actuales para evitar una corrección mayor."
@@ -434,7 +434,7 @@ def generar_observaciones(data):
             + (f" e incluso hasta **{formatear_numero(soporte2)}€**." if soporte2 is not None else "")
         ),
         "Riesgo de Venta": (
-            f"Con una cotización actual de **{precio_actual}€**, el precio ha subido considerablemente, y el algoritmo detecta un riesgo de que pueda caer en breve. Es importante estar atento a una posible bajada del precio por debajo del valor actual para considerar una venta y asegurar beneficios."
+            f"Con una cotización actual de **{precio_actual}€**, la empresa se encuentra en una situación de alerta. El algoritmo detecta que el precio ha subido considerablemente y muestra un riesgo de que pueda caer en breve."
         ),
         "VIGILAR": (
             f"Con una cotización actual de **{precio_actual}€**, la empresa se encuentra en una situación para vigilar de cerca, ya que el análisis recomienda **{data['VENDE_SI']}**. Es importante estar atento a este nivel para una posible señal de salida."
