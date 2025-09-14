@@ -420,49 +420,29 @@ def generar_observaciones(data):
     resistencia1 = formatear_numero(data['RESISTENCIA_1'])
     compra_si = data['COMPRA_SI']
     vende_si = data['VENDE_SI']
-
+    
     texto_observacion = f"<strong>Observaciones de {nombre_empresa}:</strong><br>"
 
     if oportunidad == "Posibilidad de Compra Activada":
-        texto = f"Con un precio de {precio_actual}€, la empresa se encuentra en una zona de **sobreventa** y muestra una tendencia **alcista**. Esta combinación activa una señal de compra fuerte, por lo que el algoritmo recomienda **comprar ahora**."
-        if soporte1 != "N/A" and resistencia1 != "N/A":
-             texto += f" Tenga en cuenta los niveles de soporte y resistencia cercanos en **{soporte1}€** y **{resistencia1}€**."
-        elif soporte1 != "N/A":
-             texto += f" Se debe considerar el soporte clave en **{soporte1}€**."
-        elif resistencia1 != "N/A":
-             texto += f" Se debe considerar la resistencia clave en **{resistencia1}€**."
+        texto = f"El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda tener en cuenta los niveles de resistencia ({resistencia1}€) para determinar un objetivo de precio."
     
     elif oportunidad == "Posibilidad de Compra":
-        if "COMPRA YA" in compra_si:
-            texto = f"El valor está en una zona de **sobreventa** con una tendencia **bajista**, lo que puede ser un indicador de reversión. El algoritmo ha detectado una oportunidad de **compra inmediata** para aprovechar un posible rebote."
-            if soporte1 != "N/A":
-                 texto += f" Se debe considerar el soporte clave en **{soporte1}€**."
-        else:
-            precio_objetivo = compra_si.split('€')[0].split()[-1]
-            texto = f"La empresa cotiza a {precio_actual}€ y se sitúa en una zona de **sobreventa**. A pesar de una tendencia **bajista**, nuestro algoritmo sugiere que podría haber una oportunidad de compra si el precio logra **superar el nivel de {precio_objetivo}€**."
+        texto = f"El algoritmo detecta que el valor está en una zona de sobreventa, lo que puede ser un indicador de reversión. El algoritmo ha detectado una oportunidad de compra si el precio logra superar el nivel de cierre anterior."
     
     elif oportunidad == "VIGILAR":
-        texto = f"En este momento, la empresa se encuentra en una zona **intermedia** con una tendencia claramente **alcista**. Aunque no se recomienda comprar, es una situación para **vigilar de cerca**. Si el precio **{vende_si.replace('VENDER SI PIERDE', 'cae por debajo de').lower()}**, podría ser una señal para vender."
-        if resistencia1 != "N/A":
-             texto += f" El nivel de resistencia más cercano es **{resistencia1}€**."
-
+        texto = f"El algoritmo se encuentra en una zona intermedia y muestra una tendencia alcista en sus últimos valores. Aunque no se recomienda comprar, se sugiere vigilar de cerca, ya que una caída en el precio podría ser una señal de venta. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio."
+    
     elif oportunidad == "Riesgo de Venta":
-        texto = f"Con una cotización actual de {precio_actual}€, la empresa ha entrado en una zona de **sobrecompra** con una tendencia **alcista**. Esto genera un **riesgo de venta**."
-        if resistencia1 != "N/A":
-             texto += f" El algoritmo recomienda considerar una venta en la zona de resistencia en **{resistencia1}€** para asegurar beneficios."
-        else:
-            texto += f" El algoritmo recomienda considerar una venta para asegurar beneficios."
+        texto = f"El algoritmo ha entrado en una zona de sobrecompra. Esto genera un riesgo de venta. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio."
     
     elif oportunidad == "Riesgo de Venta Activada":
-        texto = f"La combinación de una zona de **sobrecompra** y una tendencia **bajista** ha activado una señal de **riesgo de venta**. El algoritmo recomienda **vender ahora** para evitar mayores pérdidas."
-        if soporte1 != "N/A":
-             texto += f" El soporte más cercano a considerar es **{soporte1}€**."
+        texto = f"La combinación de una zona de sobrecompra y una tendencia bajista en el algoritmo ha activado una señal de riesgo de venta. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio."
 
     elif oportunidad == "Seguirá bajando":
-        texto = f"La empresa se encuentra en una zona **intermedia** y con una tendencia **bajista**. Nuestro análisis sugiere que es probable que el precio **siga bajando** en el corto plazo. Por lo tanto, no se aconseja ni comprar ni vender en este momento."
+        texto = f"El algoritmo sugiere que es probable que el precio siga bajando en el corto plazo. No se aconseja ni comprar ni vender. Se recomienda observar los niveles de soporte ({soporte1}€)."
 
     elif oportunidad == "Intermedio":
-        texto = "Actualmente, la empresa se encuentra en una zona sin movimientos definidos. El algoritmo no emite recomendaciones de compra o venta en este momento, por lo que lo más prudente es **mantenerse al margen** y observar la evolución del mercado."
+        texto = "El algoritmo no emite recomendaciones de compra o venta en este momento, por lo que lo más prudente es mantenerse al margen."
     
     else:
         texto = "No hay observaciones específicas disponibles para esta empresa en el día de hoy."
