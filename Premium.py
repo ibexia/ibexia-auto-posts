@@ -421,29 +421,29 @@ def generar_observaciones(data):
 
     observaciones_map = {
         "Posibilidad de Compra Activada": (
-            f"Con una cotización actual de {precio_actual}€, el algoritmo ha detectado una fuerte señal de compra. El precio ha caído lo suficiente y ahora muestra un rebote, lo que genera una gran oportunidad para entrar. Recomendamos comprar a precios actuales."
-            + (f" Se espera que el precio suba hasta los **{formatear_numero(resistencia1)}€**" if resistencia1 is not None else "")
-            + (f" e incluso hasta los **{formatear_numero(resistencia2)}€**." if resistencia2 is not None else "")
+            f"Con una cotización actual de **{precio_actual}€**, el algoritmo ha detectado una fuerte señal de compra. El precio ha caído lo suficiente y ahora muestra un rebote, lo que genera una gran oportunidad para entrar. Recomendamos comprar a precios actuales."
+            + (f" Se espera que el precio suba hasta la resistencia de **{formatear_numero(resistencia1)}€**" if resistencia1 is not None else "")
+            + (f" e incluso hasta **{formatear_numero(resistencia2)}€**." if resistencia2 is not None else "")
         ),
         "Posibilidad de Compra": (
-            f"Con una cotización actual de {precio_actual}€, el algoritmo ha detectado una posible oportunidad de compra, pero es necesario que el precio confirme la subida. Si el precio supera los **{formatear_numero(data['HIST_DF']['Close'].iloc[-2])}€**, se activará la señal de compra."
+            f"Con una cotización actual de **{precio_actual}€**, el algoritmo ha detectado una posible oportunidad de compra, pero es necesario que el precio confirme la subida. Si el precio supera los **{formatear_numero(data['HIST_DF']['Close'].iloc[-2])}€**, se activará la señal de compra."
         ),
         "Riesgo de Venta Activada": (
-            f"Con una cotización actual de {precio_actual}€, el precio ha subido considerablemente y ahora muestra signos de debilidad. El algoritmo ha detectado una fuerte señal de venta, por lo que recomendamos vender a precios actuales para evitar una corrección mayor."
+            f"Con una cotización actual de **{precio_actual}€**, el precio ha subido considerablemente y ahora muestra signos de debilidad. El algoritmo ha detectado una fuerte señal de venta, por lo que recomendamos vender a precios actuales para evitar una corrección mayor."
             + (f" Se espera que el precio caiga hasta el soporte de **{formatear_numero(soporte1)}€**" if soporte1 is not None else "")
             + (f" e incluso hasta **{formatear_numero(soporte2)}€**." if soporte2 is not None else "")
         ),
         "Riesgo de Venta": (
-            f"Con una cotización actual de {precio_actual}€, el precio ha subido considerablemente, y el algoritmo detecta un riesgo de que pueda caer en breve. Es importante estar atento a un posible cambio de tendencia y no esperar a un precio objetivo. Si el precio cae por debajo del valor actual, se debe considerar una venta para asegurar beneficios."
+            f"Con una cotización actual de **{precio_actual}€**, el precio ha subido considerablemente, y el algoritmo detecta un riesgo de que pueda caer en breve. Es importante estar atento a una posible bajada del precio por debajo del valor actual para considerar una venta y asegurar beneficios."
         ),
         "VIGILAR": (
-            f"Con una cotización actual de {precio_actual}€, la empresa se encuentra en una situación para vigilar de cerca, ya que el algoritmo no ha encontrado una señal clara de compra. El análisis recomienda **{data['VENDE_SI']}**."
+            f"Con una cotización actual de **{precio_actual}€**, la empresa se encuentra en una situación para vigilar de cerca, ya que el algoritmo recomienda **VENDER SI PIERDE {formatear_numero(float(data['VENDE_SI'].split(' ')[-1].replace('€', '').replace('<br>', '')))}€**. Es importante estar atento a este nivel para una posible señal de salida."
         ),
         "Seguirá bajando": (
-            f"Con una cotización actual de {precio_actual}€, el análisis del algoritmo sugiere que el precio seguirá bajando en el corto plazo. Por lo tanto, no se recomienda ni comprar ni vender en este momento y lo más prudente es mantenerse al margen."
+            f"Con una cotización actual de **{precio_actual}€**, el análisis del algoritmo sugiere que el precio seguirá bajando en el corto plazo. No se recomienda ninguna acción en este momento y lo más prudente es mantenerse al margen."
         ),
         "Intermedio": (
-            f"Con una cotización actual de {precio_actual}€, el algoritmo no muestra movimientos definidos en esta empresa. Por lo tanto, no se emiten recomendaciones de compra o venta en este momento."
+            f"Con una cotización actual de **{precio_actual}€**, el algoritmo no muestra movimientos definidos en esta empresa. Por lo tanto, no se emiten recomendaciones de compra o venta en este momento."
         )
     }
 
