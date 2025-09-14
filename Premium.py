@@ -437,7 +437,7 @@ def generar_observaciones(data):
             f"Con una cotización actual de **{precio_actual}€**, el precio ha subido considerablemente, y el algoritmo detecta un riesgo de que pueda caer en breve. Es importante estar atento a una posible bajada del precio por debajo del valor actual para considerar una venta y asegurar beneficios."
         ),
         "VIGILAR": (
-            f"Con una cotización actual de **{precio_actual}€**, la empresa se encuentra en una situación para vigilar de cerca, ya que el algoritmo recomienda **VENDER SI PIERDE {formatear_numero(float(data['VENDE_SI'].split(' ')[-1].replace('€', '').replace('<br>', '')))}€**. Es importante estar atento a este nivel para una posible señal de salida."
+            f"Con una cotización actual de **{precio_actual}€**, la empresa se encuentra en una situación para vigilar de cerca, ya que el análisis recomienda **{data['VENDE_SI']}**. Es importante estar atento a este nivel para una posible señal de salida."
         ),
         "Seguirá bajando": (
             f"Con una cotización actual de **{precio_actual}€**, el análisis del algoritmo sugiere que el precio seguirá bajando en el corto plazo. No se recomienda ninguna acción en este momento y lo más prudente es mantenerse al margen."
