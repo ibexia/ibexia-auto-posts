@@ -350,7 +350,7 @@ def clasificar_empresa(data):
 
     if estado_smi == "Sobreventa":
         if tendencia == "Subiendo":
-            data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
+            data['OPORTUNIDAD'] = "Compra Activada"
             data['COMPRA_SI'] = "COMPRA YA"
             data['VENDE_SI'] = "NO VENDER"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
