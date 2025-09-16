@@ -448,7 +448,7 @@ def generar_observaciones(data):
         texto = "El algoritmo no emite recomendaciones de compra o venta en este momento, por lo que lo más prudente es mantenerse al margen."
     
     else:
-        texto = "No hay observaciones específicas disponibles para esta empresa en el día de hoy."
+        texto = "El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda comprar para aprovechar un posible rebote, con un objetivo de precio en la zona de resistencia."
     
     return f'<p style="text-align:left; color:#000;">{texto_observacion.strip()}{texto.strip()}</p>'
 
