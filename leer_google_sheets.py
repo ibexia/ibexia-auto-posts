@@ -859,7 +859,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 ---
 <h1>{titulo_post}</h1>
 
-<h2>Análisis Inicial y Recomendación</h2>
+<h2>Análisis Inicial</h2>
 <p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
 
 <h2>Historial de Operaciones</h2>
