@@ -50,13 +50,13 @@ def formatear_numero(numero):
     try:
         num = float(numero)
         if abs(num) >= 1_000_000_000:
-            return f"{num / 1_000_000_000:,.2f}B"
+            return f"{num / 1_000_000_000:,.3f}B"
         elif abs(num) >= 1_000_000:
-            return f"{num / 1_000_000:,.2f}M"
+            return f"{num / 1_000_000:,.3f}M"
         elif abs(num) >= 1_000:
-            return f"{num / 1_000:,.2f}K"
+            return f"{num / 1_000:,.3f}K"
         else:
-            return f"{num:,.2f}"
+            return f"{num:,.3f}"
     except (ValueError, TypeError):
         return "N/A"
 
@@ -109,7 +109,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
     # Iterar sobre los datos históricos para encontrar señales
     for i in range(2, len(smis)):
-        print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:.2f}, SMI[i]={smis[i]:.2f}, pendiente[i]={pendientes_smi[i]:.2f}, pendiente[i-1]={pendientes_smi[i-1]:.2f}")
+        print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:.3f}, SMI[i]={smis[i]:.3f}, pendiente[i]={pendientes_smi[i]:.3f}, pendiente[i-1]={pendientes_smi[i-1]:.3f}")
         # Señal de compra: la pendiente del SMI cambia de negativa a positiva y no está en sobrecompra
         # Se anticipa un día la compra y se añade la condición de sobrecompra
         if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0:
@@ -118,9 +118,9 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                     posicion_abierta = True
                     precio_compra_actual = precios[i-1]
                     compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
-                    print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.2f}")
+                    print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.3f}")
                 else:
-                    print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.2f})")
+                    print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.3f})")
             else:
                 print(f"❌ No compra en {fechas[i-1]}: Ya hay posición abierta")
 
@@ -131,7 +131,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
                 num_acciones = capital_inicial / precio_compra_actual
                 ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
-                print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.2f}")
+                print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.3f}")
             else:
                 print(f"❌ No venta en {fechas[i-1]}: No hay posición abierta")
 
@@ -148,7 +148,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
         estado_ganancia = "Ganancia" if ganancia_operacion >= 0 else "Pérdida"
 
-        operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{compra['precio']:,.2f}€</strong>, Venta en {venta['fecha']} a <strong>{venta['precio']:,.2f}€</strong> - {estado_ganancia}: <strong>{ganancia_operacion:,.2f}€</strong></li>"
+        operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{compra['precio']:,.3f}€</strong>, Venta en {venta['fecha']} a <strong>{venta['precio']:,.3f}€</strong> - {estado_ganancia}: <strong>{ganancia_operacion:,.3f}€</strong></li>"
 
     html_resultados = ""
 
@@ -166,12 +166,12 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
             html_resultados = f"""
             <p>Se encontraron señales de compra en el período. La última posición abierta no se ha cerrado todavía.</p>
-            <p>Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{ganancia_simulada_total_incl_abierta:,.2f}€</strong>.</p>
+            <p>Si hubieras invertido {capital_inicial:,.3f}€ en cada operación, tu ganancia simulada total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{ganancia_simulada_total_incl_abierta:,.3f}€</strong>.</p>
             """
             # Si hay operaciones completadas (ventas realizadas), las mostramos
             if compras and posicion_abierta: # NUEVA LÍNEA AÑADIDA
                 html_resultados += f"""
-                <p>La última posición comprada fue en {compras[-1]['fecha']} a <strong>{compras[-1]['precio']:,.2f}€</strong> y todavía no se ha vendido.</p>
+                <p>La última posición comprada fue en {compras[-1]['fecha']} a <strong>{compras[-1]['precio']:,.3f}€</strong> y todavía no se ha vendido.</p>
                 """
             if operaciones_html:
                 html_resultados += f"""
@@ -180,7 +180,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 """
         else:  # Todas las posiciones se cerraron
             html_resultados = f"""
-            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro Algoritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.2f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.2f}€</strong>.</p>
+            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro Algoritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.3f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.3f}€</strong>.</p>
             """
             # Siempre mostramos las operaciones detalladas si hay alguna
             if operaciones_html:
@@ -220,7 +220,7 @@ def obtener_datos_yfinance(ticker):
         # y asegurarnos de encontrar un día de trading completo anterior.
         hist_recent = stock.history(period="5d", interval="1d") 
         
-        current_price = round(info["currentPrice"], 2) # Este sigue siendo el precio actual
+        current_price = round(info["currentPrice"], 3) # Este sigue siendo el precio actual
 
         current_volume = "N/A" # Inicializamos a N/A
         if not hist_recent.empty:
@@ -236,7 +236,7 @@ def obtener_datos_yfinance(ticker):
         smi_actual_series = hist['SMI'].dropna() # Obtener las señales SMI sin NaN
 
         if not smi_actual_series.empty:
-            smi_actual = round(smi_actual_series.iloc[-1], 2)
+            smi_actual = round(smi_actual_series.iloc[-1], 3)
         else:
             # Si no hay datos SMI válidos, asignar un valor por defecto
             print(f"⚠️ Advertencia: No hay datos de SMI válidos para {ticker}. Asignando SMI neutral.")
@@ -263,35 +263,35 @@ def obtener_datos_yfinance(ticker):
 
         # Definir los 3 soportes
         if len(soportes) >= 3:
-            soporte_1 = round(soportes[0], 2)
-            soporte_2 = round(soportes[1], 2)
-            soporte_3 = round(soportes[2], 2)
+            soporte_1 = round(soportes[0], 3)
+            soporte_2 = round(soportes[1], 3)
+            soporte_3 = round(soportes[2], 3)
         elif len(soportes) == 2:
-            soporte_1 = round(soportes[0], 2)
-            soporte_2 = round(soportes[1], 2)
+            soporte_1 = round(soportes[0], 3)
+            soporte_2 = round(soportes[1], 3)
             soporte_3 = soporte_2 # Usar el mismo si no hay 3 distintos
         elif len(soportes) == 1:
-            soporte_1 = round(soportes[0], 2)
+            soporte_1 = round(soportes[0], 3)
             soporte_2 = soporte_1
             soporte_3 = soporte_1
         else:
-            soporte_1, soporte_2, soporte_3 = round(current_price * 0.95, 2), round(current_price * 0.9, 2), round(current_price * 0.85, 2) # Default si no hay datos
+            soporte_1, soporte_2, soporte_3 = round(current_price * 0.95, 3), round(current_price * 0.9, 3), round(current_price * 0.85, 3) # Default si no hay datos
 
         # Definir las 3 resistencias (similar a soportes)
         if len(resistencias) >= 3:
-            resistencia_1 = round(resistencias[0], 2)
-            resistencia_2 = round(resistencias[1], 2)
-            resistencia_3 = round(resistencias[2], 2)
+            resistencia_1 = round(resistencias[0], 3)
+            resistencia_2 = round(resistencias[1], 3)
+            resistencia_3 = round(resistencias[2], 3)
         elif len(resistencias) == 2:
-            resistencia_1 = round(resistencias[0], 2)
-            resistencia_2 = round(resistencias[1], 2)
+            resistencia_1 = round(resistencias[0], 3)
+            resistencia_2 = round(resistencias[1], 3)
             resistencia_3 = resistencia_2
         elif len(resistencias) == 1:
-            resistencia_1 = round(resistencias[0], 2)
+            resistencia_1 = round(resistencias[0], 3)
             resistencia_2 = resistencia_1
             resistencia_3 = resistencia_1
         else:
-            resistencia_1, resistencia_2, resistencia_3 = round(current_price * 1.05, 2), round(current_price * 1.1, 2), round(current_price * 1.15, 2) # Default si no hay datos
+            resistencia_1, resistencia_2, resistencia_3 = round(current_price * 1.05, 3), round(current_price * 1.1, 3), round(current_price * 1.15, 3) # Default si no hay datos
 
         # --- LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
         # --- NUEVA LÓGICA DE PRECIO OBJETIVO BASADA EN PENDIENTE DEL SMI ---
@@ -318,13 +318,13 @@ def obtener_datos_yfinance(ticker):
             # SMI sin dirección clara → mantener precio actual
             precio_objetivo = current_price
 
-        precio_objetivo = round(precio_objetivo, 2)
+        precio_objetivo = round(precio_objetivo, 3)
         # --- FIN NUEVA LÓGICA ---
         # --- FIN DE LA LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
 
         # Precio objetivo de compra (ejemplo simple, puedes refinarlo)
         # Este 'precio_objetivo_compra' es diferente al 'precio_objetivo' general
-        precio_objetivo_compra = round(current_price * 0.98, 2) # Un 2% por debajo del precio actual como ejemplo
+        precio_objetivo_compra = round(current_price * 0.98, 3) # Un 2% por debajo del precio actual como ejemplo
 
         
 
@@ -405,7 +405,7 @@ def obtener_datos_yfinance(ticker):
 
         for _ in range(PROYECCION_FUTURA_DIAS):
             siguiente_precio = ultimo_precio_conocido * (1 + movimiento_diario)
-            siguiente_precio = round(siguiente_precio, 2)
+            siguiente_precio = round(siguiente_precio, 3)
             precios_proyectados.append(siguiente_precio)
             ultimo_precio_conocido = siguiente_precio
 
@@ -420,7 +420,7 @@ def obtener_datos_yfinance(ticker):
         precio_proyectado_dia_5 = cierres_para_grafico_total[-1]  # Último precio proyectado a 5 días
 
         # Guarda los datos para la simulación
-        smi_historico_para_simulacion = [round(s, 2) for s in hist_extended['SMI'].dropna().tail(30).tolist()]
+        smi_historico_para_simulacion = [round(s, 3) for s in hist_extended['SMI'].dropna().tail(30).tolist()]
         precios_para_simulacion = precios_reales_para_grafico
         fechas_para_simulacion = hist_extended.tail(30).index.strftime("%d/%m/%Y").tolist() # CORREGIDO: ahora se aplica .tail() al DataFrame
         tendencia_ibexia = "No disponible"
@@ -436,11 +436,11 @@ def obtener_datos_yfinance(ticker):
             if slope > 0.1:
                 tendencia_ibexia = "mejorando (alcista)"
                 recomendacion = "Comprar"
-                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.2f}€."
+                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.3f}€."
             elif slope < -0.1:
                 tendencia_ibexia = "empeorando (bajista)"
                 recomendacion = "Vender"
-                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.2f}€."
+                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.3f}€."
             else:
                 tendencia_ibexia = "cambio de tendencia"
                 recomendacion = "Atención máxima"
@@ -485,16 +485,16 @@ def obtener_datos_yfinance(ticker):
         
         if diferencia_precio_porcentual > 3:
             recomendacion = "Comprar (Impulso Fuerte)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es significativamente superior al precio actual, indicando un fuerte impulso alcista."
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es significativamente superior al precio actual, indicando un fuerte impulso alcista."
         elif diferencia_precio_porcentual > 1:
             recomendacion = "Comprar (Impulso Moderado)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es superior al precio actual, sugiriendo un impulso alcista moderado."
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es superior al precio actual, sugiriendo un impulso alcista moderado."
         elif diferencia_precio_porcentual < -3:
             recomendacion = "Vender (Impulso Fuerte)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es significativamente inferior al precio actual, lo que indica una fuerte presión bajista."
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es significativamente inferior al precio actual, lo que indica una fuerte presión bajista."
         elif diferencia_precio_porcentual < -1:
             recomendacion = "Vender (Impulso Moderado)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.2f}€ es inferior al precio actual, sugiriendo un impulso bajista moderado."
+            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es inferior al precio actual, sugiriendo un impulso bajista moderado."
         
         # Sobrescribir las variables recomendacion y motivo_analisis
         datos['RECOMENDACION'] = recomendacion
@@ -539,7 +539,7 @@ def construir_prompt_formateado(data):
     else:
         volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
 
-    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.2f}€"
+    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.3f}€"
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
@@ -574,51 +574,17 @@ def construir_prompt_formateado(data):
 
     soportes_texto = ""
     if len(soportes_unicos) == 1:
-        soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,.2f}€</strong>."
+        soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,.3f}€</strong>."
     elif len(soportes_unicos) == 2:
-        soportes_texto = f"dos soportes importantes en <strong>{soportes_unicos[0]:,.2f}€</strong> y <strong>{soportes_unicos[1]:,.2f}€</strong>."
+        soportes_texto = f"dos soportes importantes en <strong>{soportes_unicos[0]:,.3f}€</strong> y <strong>{soportes_unicos[1]:,.3f}€</strong>."
     elif len(soportes_unicos) >= 3:
-        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{soportes_unicos[0]:,.2f}€</strong>, "
-                          f"el segundo en <strong>{soportes_unicos[1]:,.2f}€</strong>, y el tercero en <strong>{soportes_unicos[2]:,.2f}€</strong>.")
+        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{soportes_unicos[0]:,.3f}€</strong>, "
+                          f"el segundo en <strong>{soportes_unicos[1]:,.3f}€</strong>, y el tercero en <strong>{soportes_unicos[2]:,.3f}€</strong>.")
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
-
-    tabla_resumen = f"""
-<h2>Resumen de Puntos Clave</h2>
-<table border="1" style="width:100%; border-collapse: collapse;">
-    <tr>
-        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Métrica</th>
-        <th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Valor</th>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Precio Actual</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Volumen</td>
-        <td style="padding: 8px;"><strong>{data['VOLUMEN']:,} acciones</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Soporte Clave</td>
-        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.2f}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Resistencia Clave</td>
-        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Recomendación</td>
-        <td style="padding: 8px;"><strong>{data['RECOMENDACION']}</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Precio Objetivo de Compra</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
-    </tr>
-</table>
-<br/>
-"""
     
     # Nuevo HTML del gráfico (incluyendo el análisis detallado)
+    analisis_grafico_html = ""
     chart_html = ""
     if smi_historico_para_grafico and cierres_para_grafico_total:
         labels_historial = data.get("FECHAS_HISTORIAL", [])
@@ -632,7 +598,7 @@ def construir_prompt_formateado(data):
         if len(smi_desplazados_para_grafico) < len(labels_total):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
         
-        # 2. Generación del análisis dinámico del gráfico
+        # Generación del análisis dinámico del gráfico
         analisis_grafico_html = "<h2>Análisis Detallado del Gráfico</h2>"
         precios = data['PRECIOS_PARA_SIMULACION']
         smis = data['SMI_PARA_SIMULACION']
@@ -668,27 +634,27 @@ def construir_prompt_formateado(data):
             
             # Descripción narrativa del tramo
             if tendencia_actual_smi == "alcista":
-                analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, nuestro Algoritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, nuestro Algoritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.3f}€</strong>.</p>"
             elif tendencia_actual_smi == "bajista":
-                analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, nuestro Algoritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, nuestro Algoritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.3f}€</strong>.</p>"
             elif tendencia_actual_smi == "consolidación":
-                analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. Nuestro Algoritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.2f}€</strong>.</p>"
+                analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. Nuestro Algoritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.3f}€</strong>.</p>"
             
             # Chequeo de compra o venta en el cambio de tramo
             compra_en_giro = next((c for c in compras_simuladas if c['fecha'] == fechas[end_index]), None)
             if compra_en_giro:
-                analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! Nuestro Algoritmo mostró un giro y se compró en <strong>{compra_en_giro['precio']:,.2f}€</strong>.</p>"
+                analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! Nuestro Algoritmo mostró un giro y se compró en <strong>{compra_en_giro['precio']:,.3f}€</strong>.</p>"
             
             venta_en_giro = next((v for v in ventas_simuladas if v['fecha'] == fechas[end_index]), None)
             if venta_en_giro:
-                analisis_grafico_html += f"<p>❌ ¡Se detectó una señal de venta! Se vendió en el giro a <strong>{venta_en_giro['precio']:,.2f}€</strong>.</p>"
+                analisis_grafico_html += f"<p>❌ ¡Se detectó una señal de venta! Se vendió en el giro a <strong>{venta_en_giro['precio']:,.3f}€</strong>.</p>"
     
         # Conclusión basada en la última tendencia
         ultima_tendencia = get_trend(pendientes_smi[-1])
         if ultima_tendencia == "alcista":
             analisis_grafico_html += f"<p>Actualmente, nuestro Algoritmo muestra una tendencia <strong>alcista</strong>. Nos mantendremos en posición y atentos a los próximos movimientos para futuras ventas.</p>"
         elif ultima_tendencia == "bajista":
-            analisis_grafico_html += f"<p>En estos momentos, nuestro Algoritmo tiene una pendiente <strong>bajista</strong>. Esto no es momento de comprar, por lo que esperaremos una señal de giro más adelante.</p>"
+            analisis_grafico_html += f"<p>En estos momentos, nuestro Algoritmo tiene una pendiente <strong>bajista</strong>. Esperaremos una señal de giro más adelante.</p>"
         elif ultima_tendencia == "consolidación":
             analisis_grafico_html += f"<p>Nuestro Algoritmo se encuentra en una fase de <strong>consolidación</strong>, moviéndose de forma lateral. Nos mantendremos atentos para entrar o salir del mercado cuando se detecte un giro claro.</p>"
         elif ultima_tendencia == "sobrecompra":
@@ -696,8 +662,8 @@ def construir_prompt_formateado(data):
         elif ultima_tendencia == "sobreventa":
             analisis_grafico_html += f"<p>Nuestro Algoritmo se encuentra en una zona de <strong>sobreventa</strong>. Esto indica que la tendencia bajista está llegando a su fin y podríamos ver un giro y una señal de compra en breve.</p>"
 
+        # El gráfico en sí, que debe ir antes que el análisis
         chart_html = f"""
-        {analisis_grafico_html}
         <div style="width: 100%; max-width: 800px; margin: auto;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
@@ -834,6 +800,37 @@ def construir_prompt_formateado(data):
     else:
         chart_html = "<p>No hay suficientes datos para generar el gráfico.</p>"
     
+    tabla_resumen = f"""
+<h2>Resumen de Puntos Clave</h2>
+<table border="1" style="width:100%; border-collapse: collapse;">
+    <tr>
+        <th style="padding: 8px; text-align: left; background-color: #f3f3f2;">Métrica</th>
+        <th style="padding: 8px; text-align: left; background-color: #f3f3f2;">Valor</th>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Precio Actual</td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}€</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Volumen</td>
+        <td style="padding: 8px;"><strong>{data['VOLUMEN']:,} acciones</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Soporte Clave</td>
+        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.3f}€</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Resistencia Clave</td>
+        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
+    </tr>
+    <tr>
+        <td style="padding: 8px;">Precio Objetivo de Compra</td>
+        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
+    </tr>
+</table>
+<br/>
+"""
+
     
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio.
@@ -862,8 +859,15 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 ---
 <h1>{titulo_post}</h1>
 
-<h2>Análisis Inicial y Recomendación</h2>
-<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. Nuestra recomendación es <strong>{data['RECOMENDACION']}</strong>. Según nuestras proyecciones, el precio podría situarse en <strong>{data['PRECIO_PROYECTADO_5DIAS']:,}€</strong> en los próximos 5 días. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. {data['motivo_analisis']}.</p>
+<h2>Análisis Inicial</h2>
+<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
+
+<h2>Historial de Operaciones</h2>
+{ganancias_html}
+
+<h2>Análisis Detallado del Gráfico</h2>
+{chart_html}
+{analisis_grafico_html}
 
 <h2>La Clave: El Algoritmo como tu "Guía de Compra"</h2>
 <p>Nuestro sistema se basa en un <strong>Algoritmo</strong> que funciona como una brújula que te dice si es un buen momento para comprar o no. La clave está en cómo se mueve:</p>
@@ -876,11 +880,6 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
     </li>
 </ul>
 <p>Más allá de la sobrecompra o sobreventa, la señal de compra más clara es cuando el Algoritmo <strong>gira hacia arriba</strong>. Si ves que sube, es un buen momento para comprar (siempre y cuando no esté en una zona extrema de sobrecompra). Si gira a la baja, es mejor esperar.</p>
-
-{chart_html}
-
-<h2>Historial de Operaciones</h2>
-{ganancias_html}
 
 {tabla_resumen}
 """
@@ -983,7 +982,7 @@ def generar_contenido_con_gemini(tickers):
                     jitter = random.uniform(0.5, 1.5)
                     delay_with_jitter = current_delay * jitter
 
-                    print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay_with_jitter:.2f} segundos... (Intento {retries + 1}/{max_retries})")
+                    print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay_with_jitter:.3f} segundos... (Intento {retries + 1}/{max_retries})")
                     time.sleep(delay_with_jitter)
                     retries += 1
                 else:
@@ -999,9 +998,10 @@ def generar_contenido_con_gemini(tickers):
 
 
 
+
 def main():
     # Define el ticker que quieres analizar
-    ticker_deseado = "ENO.MC"
+    ticker_deseado = "AMP.MC"
 
     tickers_for_today = [ticker_deseado]
 
