@@ -654,7 +654,7 @@ def construir_prompt_formateado(data):
         if ultima_tendencia == "alcista":
             analisis_grafico_html += f"<p>Actualmente, nuestro Algoritmo muestra una tendencia <strong>alcista</strong>. Nos mantendremos en posición y atentos a los próximos movimientos para futuras ventas.</p>"
         elif ultima_tendencia == "bajista":
-            analisis_grafico_html += f"<p>En estos momentos, nuestro Algoritmo tiene una pendiente <strong>bajista</strong>. Esto no es momento de comprar, por lo que esperaremos una señal de giro más adelante.</p>"
+            analisis_grafico_html += f"<p>En estos momentos, nuestro Algoritmo tiene una pendiente <strong>bajista</strong>. Esperaremos una señal de giro más adelante.</p>"
         elif ultima_tendencia == "consolidación":
             analisis_grafico_html += f"<p>Nuestro Algoritmo se encuentra en una fase de <strong>consolidación</strong>, moviéndose de forma lateral. Nos mantendremos atentos para entrar o salir del mercado cuando se detecte un giro claro.</p>"
         elif ultima_tendencia == "sobrecompra":
