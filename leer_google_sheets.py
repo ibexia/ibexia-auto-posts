@@ -865,7 +865,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <h2>Historial de Operaciones</h2>
 {ganancias_html}
 
-<h2>Análisis Detallado del Gráfico</h2>
+
 {chart_html}
 {analisis_grafico_html}
 
