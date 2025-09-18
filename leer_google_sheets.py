@@ -109,7 +109,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
     # Iterar sobre los datos históricos para encontrar señales
     for i in range(2, len(smis)):
-        print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:,.3f}, SMI[i]={smis[i]:,.3f}, pendiente[i]={pendientes_smi[i]:,.3f}, pendiente[i-1]={pendientes_smi[i-1]:,.3f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:.3f}, SMI[i]={smis[i]:.3f}, pendiente[i]={pendientes_smi[i]:.3f}, pendiente[i-1]={pendientes_smi[i-1]:.3f}")
         # Señal de compra: la pendiente del SMI cambia de negativa a positiva y no está en sobrecompra
         # Se anticipa un día la compra y se añade la condición de sobrecompra
         if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0:
@@ -118,9 +118,9 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                     posicion_abierta = True
                     precio_compra_actual = precios[i-1]
                     compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
-                    print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:,.3f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                    print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.3f}")
                 else:
-                    print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:,.3f})".replace(",", "X").replace(".", ",").replace("X", "."))
+                    print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.3f})")
             else:
                 print(f"❌ No compra en {fechas[i-1]}: Ya hay posición abierta")
 
@@ -131,7 +131,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
                 num_acciones = capital_inicial / precio_compra_actual
                 ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
-                print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:,.3f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.3f}")
             else:
                 print(f"❌ No venta en {fechas[i-1]}: No hay posición abierta")
 
@@ -148,7 +148,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
         estado_ganancia = "Ganancia" if ganancia_operacion >= 0 else "Pérdida"
 
-        operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{compra['precio']:,.3f}€</strong>, Venta en {venta['fecha']} a <strong>{venta['precio']:,.3f}€</strong> - {estado_ganancia}: <strong>{ganancia_operacion:,.3f}€</strong></li>".replace(",", "X").replace(".", ",").replace("X", ".")
+        operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{formatear_numero(compra['precio'])}€</strong>, Venta en {venta['fecha']} a <strong>{formatear_numero(venta['precio'])}€</strong> - {estado_ganancia}: <strong>{formatear_numero(ganancia_operacion)}€</strong></li>"
 
     html_resultados = ""
 
@@ -166,16 +166,13 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
             html_resultados = f"""
             <p>Se encontraron señales de compra en el período. La última posición abierta no se ha cerrado todavía.</p>
-            <p>Si hubieras invertido {capital_inicial:,.3f}€ en cada operación, tu ganancia simulada total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{ganancia_simulada_total_incl_abierta:,.3f}€</strong>.</p>
+            <p>Si hubieras invertido {formatear_numero(capital_inicial)}€ en cada operación, tu ganancia simulada total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{formatear_numero(ganancia_simulada_total_incl_abierta)}€</strong>.</p>
             """
-            html_resultados = html_resultados.replace(",", "X").replace(".", ",").replace("X", ".")
-
             # Si hay operaciones completadas (ventas realizadas), las mostramos
             if compras and posicion_abierta: # NUEVA LÍNEA AÑADIDA
                 html_resultados += f"""
-                <p>La última posición comprada fue en {compras[-1]['fecha']} a <strong>{compras[-1]['precio']:,.3f}€</strong> y todavía no se ha vendido.</p>
+                <p>La última posición comprada fue en {compras[-1]['fecha']} a <strong>{formatear_numero(compras[-1]['precio'])}€</strong> y todavía no se ha vendido.</p>
                 """
-                html_resultados = html_resultados.replace(",", "X").replace(".", ",").replace("X", ".")
             if operaciones_html:
                 html_resultados += f"""
                 <p>A continuación, se detallan las operaciones completadas en el periodo analizado:</p>
@@ -183,9 +180,8 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 """
         else:  # Todas las posiciones se cerraron
             html_resultados = f"""
-            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro Algoritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.3f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.3f}€</strong>.</p>
+            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro Algoritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {formatear_numero(capital_inicial)}€ en cada operación, tu ganancia simulada total habría sido de <strong>{formatear_numero(ganancia_total)}€</strong>.</p>
             """
-            html_resultados = html_resultados.replace(",", "X").replace(".", ",").replace("X", ".")
             # Siempre mostramos las operaciones detalladas si hay alguna
             if operaciones_html:
                 html_resultados += f"""
@@ -440,11 +436,11 @@ def obtener_datos_yfinance(ticker):
             if slope > 0.1:
                 tendencia_ibexia = "mejorando (alcista)"
                 recomendacion = "Comprar"
-                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:,.3f}€.".replace(",", "X").replace(".", ",").replace("X", ".")
+                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {formatear_numero(resistencia_1)}€."
             elif slope < -0.1:
                 tendencia_ibexia = "empeorando (bajista)"
                 recomendacion = "Vender"
-                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:,.3f}€.".replace(",", "X").replace(".", ",").replace("X", ".")
+                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {formatear_numero(soporte_1)}€."
             else:
                 tendencia_ibexia = "cambio de tendencia"
                 recomendacion = "Atención máxima"
@@ -489,16 +485,16 @@ def obtener_datos_yfinance(ticker):
         
         if diferencia_precio_porcentual > 3:
             recomendacion = "Comprar (Impulso Fuerte)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es significativamente superior al precio actual, indicando un fuerte impulso alcista.".replace(",", "X").replace(".", ",").replace("X", ".")
+            motivo_analisis = f"El precio proyectado a 5 días de {formatear_numero(precio_proyectado_dia_5)}€ es significativamente superior al precio actual, indicando un fuerte impulso alcista."
         elif diferencia_precio_porcentual > 1:
             recomendacion = "Comprar (Impulso Moderado)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es superior al precio actual, sugiriendo un impulso alcista moderado.".replace(",", "X").replace(".", ",").replace("X", ".")
+            motivo_analisis = f"El precio proyectado a 5 días de {formatear_numero(precio_proyectado_dia_5)}€ es superior al precio actual, sugiriendo un impulso alcista moderado."
         elif diferencia_precio_porcentual < -3:
             recomendacion = "Vender (Impulso Fuerte)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es significativamente inferior al precio actual, lo que indica una fuerte presión bajista.".replace(",", "X").replace(".", ",").replace("X", ".")
+            motivo_analisis = f"El precio proyectado a 5 días de {formatear_numero(precio_proyectado_dia_5)}€ es significativamente inferior al precio actual, lo que indica una fuerte presión bajista."
         elif diferencia_precio_porcentual < -1:
             recomendacion = "Vender (Impulso Moderado)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es inferior al precio actual, sugiriendo un impulso bajista moderado.".replace(",", "X").replace(".", ",").replace("X", ".")
+            motivo_analisis = f"El precio proyectado a 5 días de {formatear_numero(precio_proyectado_dia_5)}€ es inferior al precio actual, sugiriendo un impulso bajista moderado."
         
         # Sobrescribir las variables recomendacion y motivo_analisis
         datos['RECOMENDACION'] = recomendacion
@@ -529,21 +525,21 @@ def construir_prompt_formateado(data):
                 if volumen_promedio_30d > 0:
                     cambio_porcentual_volumen = ((volumen_actual - volumen_promedio_30d) / volumen_promedio_30d) * 100
                     if cambio_porcentual_volumen > 50:
-                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia de Nuestro Algoritmo ({data['tendencia_ibexia']}).".replace(",", "X").replace(".", ",").replace("X", ".")
+                        volumen_analisis_text = f"El volumen negociado de <strong>{volumen_actual:,.0f} acciones</strong> es notablemente superior al promedio reciente, indicando un fuerte interés del mercado y validando la actual tendencia de Nuestro Algoritmo ({data['tendencia_ibexia']})."
                     elif cambio_porcentual_volumen < -30:
-                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es inferior a lo habitual, lo que podría sugerir cautela en la actual tendencia. Una confirmación de la señal de Nuestro Algoritmo ({data['tendencia_ibexia']}) requeriría un aumento en la participación del mercado.".replace(",", "X").replace(".", ",").replace("X", ".")
+                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es inferior a lo habitual, lo que podría sugerir cautela en la actual tendencia. Una confirmación de la señal de Nuestro Algoritmo ({data['tendencia_ibexia']}) requeriría un aumento en la participación del mercado."
                     else:
-                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> se mantiene en línea con el promedio. Es un volumen adecuado, pero no excepcional, para confirmar de manera contundente la señal de Nuestro Algoritmo ({data['tendencia_ibexia']}).".replace(",", "X").replace(".", ",").replace("X", ".")
+                        volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> se mantiene en línea con el promedio. Es un volumen adecuado, pero no excepcional, para confirmar de manera contundente la señal de Nuestro Algoritmo ({data['tendencia_ibexia']})."
                 else:
-                    volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. ".replace(",", "X").replace(".", ",").replace("X", ".")
+                    volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. "
             else:
-                volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. ".replace(",", "X").replace(".", ",").replace("X", ".")
+                volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. "
         except Exception as e:
-            volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. No fue posible comparar con el volumen promedio: {e}".replace(",", "X").replace(".", ",").replace("X", ".")
+            volumen_analisis_text = f"El volumen de <strong>{volumen_actual:,.0f} acciones</strong> es importante para confirmar cualquier movimiento. No fue posible comparar con el volumen promedio: {e}"
     else:
         volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
 
-    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.3f}€".replace(",", "X").replace(".", ",").replace("X", ".")
+    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {formatear_numero(data['PRECIO_PROYECTADO_5DIAS'])}€"
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
@@ -578,12 +574,12 @@ def construir_prompt_formateado(data):
 
     soportes_texto = ""
     if len(soportes_unicos) == 1:
-        soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,.3f}€</strong>.".replace(",", "X").replace(".", ",").replace("X", ".")
+        soportes_texto = f"un soporte clave en <strong>{formatear_numero(soportes_unicos[0])}€</strong>."
     elif len(soportes_unicos) == 2:
-        soportes_texto = f"dos soportes importantes en <strong>{soportes_unicos[0]:,.3f}€</strong> y <strong>{soportes_unicos[1]:,.3f}€</strong>.".replace(",", "X").replace(".", ",").replace("X", ".")
+        soportes_texto = f"dos soportes importantes en <strong>{formatear_numero(soportes_unicos[0])}€</strong> y <strong>{formatear_numero(soportes_unicos[1])}€</strong>."
     elif len(soportes_unicos) >= 3:
-        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{soportes_unicos[0]:,.3f}€</strong>, "
-                          f"el segundo en <strong>{soportes_unicos[1]:,.3f}€</strong>, y el tercero en <strong>{soportes_unicos[2]:,.3f}€</strong>.").replace(",", "X").replace(".", ",").replace("X", ".")
+        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{formatear_numero(soportes_unicos[0])}€</strong>, "
+                          f"el segundo en <strong>{formatear_numero(soportes_unicos[1])}€</strong>, y el tercero en <strong>{formatear_numero(soportes_unicos[2])}€</strong>.")
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
     
@@ -638,20 +634,20 @@ def construir_prompt_formateado(data):
             
             # Descripción narrativa del tramo
             if tendencia_actual_smi == "alcista":
-                analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, nuestro Algoritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.3f}€</strong>.</p>".replace(",", "X").replace(".", ",").replace("X", ".")
+                analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, nuestro Algoritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{formatear_numero(precios[end_index])}€</strong>.</p>"
             elif tendencia_actual_smi == "bajista":
-                analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, nuestro Algoritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.3f}€</strong>.</p>".replace(",", "X").replace(".", ",").replace("X", ".")
+                analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, nuestro Algoritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{formatear_numero(precios[end_index])}€</strong>.</p>"
             elif tendencia_actual_smi == "consolidación":
-                analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. Nuestro Algoritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.3f}€</strong>.</p>".replace(",", "X").replace(".", ",").replace("X", ".")
+                analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. Nuestro Algoritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{formatear_numero(precios[end_index])}€</strong>.</p>"
             
             # Chequeo de compra o venta en el cambio de tramo
             compra_en_giro = next((c for c in compras_simuladas if c['fecha'] == fechas[end_index]), None)
             if compra_en_giro:
-                analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! Nuestro Algoritmo mostró un giro y se compró en <strong>{compra_en_giro['precio']:,.3f}€</strong>.</p>".replace(",", "X").replace(".", ",").replace("X", ".")
+                analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! Nuestro Algoritmo mostró un giro y se compró en <strong>{formatear_numero(compra_en_giro['precio'])}€</strong>.</p>"
             
             venta_en_giro = next((v for v in ventas_simuladas if v['fecha'] == fechas[end_index]), None)
             if venta_en_giro:
-                analisis_grafico_html += f"<p>❌ ¡Se detectó una señal de venta! Se vendió en el giro a <strong>{venta_en_giro['precio']:,.3f}€</strong>.</p>".replace(",", "X").replace(".", ",").replace("X", ".")
+                analisis_grafico_html += f"<p>❌ ¡Se detectó una señal de venta! Se vendió en el giro a <strong>{formatear_numero(venta_en_giro['precio'])}€</strong>.</p>"
     
         # Conclusión basada en la última tendencia
         ultima_tendencia = get_trend(pendientes_smi[-1])
@@ -813,7 +809,7 @@ def construir_prompt_formateado(data):
     </tr>
     <tr>
         <td style="padding: 8px;">Precio Actual</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}€</strong></td>
+        <td style="padding: 8px;"><strong>{formatear_numero(data['PRECIO_ACTUAL'])}€</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Volumen</td>
@@ -821,19 +817,20 @@ def construir_prompt_formateado(data):
     </tr>
     <tr>
         <td style="padding: 8px;">Soporte Clave</td>
-        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.3f}€</strong></td>
+        <td style="padding: 8px;"><strong>{formatear_numero(soportes_unicos[0])}€</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Resistencia Clave</td>
-        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
+        <td style="padding: 8px;"><strong>{formatear_numero(data['RESISTENCIA'])}€</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Precio Objetivo de Compra</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
+        <td style="padding: 8px;"><strong>{formatear_numero(data['PRECIO_OBJETIVO_COMPRA'])}€</strong></td>
     </tr>
 </table>
 <br/>
-""".replace(",", "X").replace(".", ",").replace("X", ".")
+"""
+
     
     prompt = f"""
 Actúa como un trader profesional con amplia experiencia en análisis técnico y mercados financieros. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio.
@@ -845,15 +842,15 @@ Genera un análisis técnico completo de aproximadamente 800 palabras sobre la e
 ¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y Único para TODOS sus gráficos solicitados. Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
 
 **Datos clave:**
-- Precio actual: {data['PRECIO_ACTUAL']:,}€
-- Volumen del último día completo: {data['VOLUMEN']:,}
-- Soporte 1: {data['SOPORTE_1']:,}€
-- Soporte 2: {data['SOPORTE_2']:,}€
-- Soporte 3: {data['SOPORTE_3']:,}€
-- Resistencia clave: {data['RESISTENCIA']:,}€
+- Precio actual: {formatear_numero(data['PRECIO_ACTUAL'])}
+- Volumen del último día completo: {data['VOLUMEN']}
+- Soporte 1: {formatear_numero(data['SOPORTE_1'])}
+- Soporte 2: {formatear_numero(data['SOPORTE_2'])}
+- Soporte 3: {formatear_numero(data['SOPORTE_3'])}
+- Resistencia clave: {formatear_numero(data['RESISTENCIA'])}
 - Recomendación general: {data['RECOMENDACION']}
 - SMI actual: {data['SMI']}
-- Precio objetivo de compra: {data['PRECIO_OBJETIVO_COMPRA']:,}€
+- Precio objetivo de compra: {formatear_numero(data['PRECIO_OBJETIVO_COMPRA'])}€
 - Tendencia del SMI: {data['tendencia_ibexia']}
 
 
@@ -863,8 +860,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <h1>{titulo_post}</h1>
 
 <h2>Análisis Inicial</h2>
-<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
-<p>{volumen_analisis_text}</p>
+<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{formatear_numero(data['PRECIO_ACTUAL'])}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
 
 <h2>Historial de Operaciones</h2>
 {ganancias_html}
@@ -886,7 +882,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <p>Más allá de la sobrecompra o sobreventa, la señal de compra más clara es cuando el Algoritmo <strong>gira hacia arriba</strong>. Si ves que sube, es un buen momento para comprar (siempre y cuando no esté en una zona extrema de sobrecompra). Si gira a la baja, es mejor esperar.</p>
 
 {tabla_resumen}
-""".replace(",", "X").replace(".", ",").replace("X", ".")
+"""
     return prompt, titulo_post
 
 
