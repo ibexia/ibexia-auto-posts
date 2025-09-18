@@ -713,7 +713,7 @@ def construir_prompt_formateado(data):
 
         # El gráfico en sí, que debe ir antes que el análisis
         chart_html = f"""
-        <div style="width: 100%; max-width: 800px; margin: auto;">
+        <div style="width: 100%; max-width: 800px; margin: auto; height: 500px;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
