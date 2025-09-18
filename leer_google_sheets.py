@@ -586,9 +586,9 @@ def construir_prompt_formateado(data):
     # Bloque de código a insertar en construir_prompt_formateado
     # Va después del 'Historial de Operaciones' y antes del 'Gráfico'
     anuncio_html = """
-    <div style="background-color: #000000; color: #FFFFFF; padding: 15px; margin: 20px 0; text-align: center; border-radius: 8px;">
-        <p style="font-size: 1.1em; margin: 0;">
-            Estamos desarrollando un nuevo sistema de **ALERTAS PREMIUM** actualmente gratuito. Con este servicio, no tendrás que esperar al análisis diario. En su lugar, verás un análisis detallado de todas las empresas que actualizamos tres veces al día. <a href="https://ibexia.es/contenido-premium/" style="color: #FFFFFF; font-weight: bold; text-decoration: underline;">**ENTRA.**</a>
+    <div style="background-color: #f0f8ff; color: #333333; padding: 15px; margin: 20px 0; text-align: center; border-radius: 8px; border: 1px solid #cceeff;">
+        <p style="font-size: 1.1em; margin: 0; font-weight: bold;">
+            Estamos desarrollando un nuevo sistema de **ALERTAS PREMIUM** actualmente gratuito. Con este servicio, no tendrás que esperar al análisis diario. En su lugar, verás un análisis detallado de todas las empresas que actualizamos tres veces al día. <a href="https://ibexia.es/contenido-premium/" style="color: #007bff; font-weight: bold; text-decoration: underline;">**ENTRA.**</a>
         </p>
     </div>
     """
@@ -610,15 +610,15 @@ def construir_prompt_formateado(data):
         
         # Reemplazo para la sección de análisis detallado del gráfico
         analisis_grafico_html = f"""
-        <h2 style="color: #FFFFFF; background-color: #333333; padding: 10px; border-radius: 5px; text-align: center;">Análisis Detallado del Gráfico</h2>
-        <div style="background-color: #1a1a1a; padding: 15px; border-radius: 8px;">
-            <table style="width: 100%; border-collapse: collapse; color: #f2f2f2; font-family: Arial, sans-serif;">
+        <h2 style="color: #333333; background-color: #e9e9e9; padding: 10px; border-radius: 5px; text-align: center;">Análisis Detallado del Gráfico</h2>
+        <div style="background-color: #fafafa; padding: 15px; border-radius: 8px; border: 1px solid #dddddd;">
+            <table style="width: 100%; border-collapse: collapse; color: #333333; font-family: Arial, sans-serif;">
                 <thead>
-                    <tr style="background-color: #000000; border-bottom: 2px solid #555555;">
-                        <th style="padding: 12px; text-align: left; font-size: 14px;">Período</th>
-                        <th style="padding: 12px; text-align: left; font-size: 14px;">Movimiento del Algoritmo</th>
-                        <th style="padding: 12px; text-align: left; font-size: 14px;">Evolución del Precio</th>
-                        <th style="padding: 12px; text-align: left; font-size: 14px;">Decisión / Estado</th>
+                    <tr style="background-color: #dcdcdc; border-bottom: 2px solid #aaaaaa;">
+                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Período</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Movimiento del Algoritmo</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Evolución del Precio</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Decisión / Estado</th>
                     </tr>
                 </thead>
                 <tbody>
