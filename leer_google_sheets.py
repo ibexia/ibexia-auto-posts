@@ -49,14 +49,18 @@ def formatear_numero(numero):
         return "N/A"
     try:
         num = float(numero)
+        # Formatear usando locale o reemplazando los separadores
+        s = f"{num:,.3f}"
+        s = s.replace(",", "X").replace(".", ",").replace("X", ".")
+        
         if abs(num) >= 1_000_000_000:
-            return f"{num / 1_000_000_000:,.3f}B"
+            return f"{num / 1_000_000_000:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".") + "B"
         elif abs(num) >= 1_000_000:
-            return f"{num / 1_000_000:,.3f}M"
+            return f"{num / 1_000_000:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".") + "M"
         elif abs(num) >= 1_000:
-            return f"{num / 1_000:,.3f}K"
+            return f"{num / 1_000:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".") + "K"
         else:
-            return f"{num:,.3f}"
+            return f"{num:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except (ValueError, TypeError):
         return "N/A"
 
@@ -118,7 +122,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                     posicion_abierta = True
                     precio_compra_actual = precios[i-1]
                     compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
-                    print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.3f}")
+                    print(f"✅ COMPRA: {fechas[i-1]} a {f'{precio_compra_actual:.3f}'.replace('.', ',')}")
                 else:
                     print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.3f})")
             else:
@@ -131,7 +135,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
                 num_acciones = capital_inicial / precio_compra_actual
                 ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
-                print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.3f}")
+                print(f"✅ VENTA: {fechas[i-1]} a {f'{precios[i-1]:.3f}'.replace('.', ',')}")
             else:
                 print(f"❌ No venta en {fechas[i-1]}: No hay posición abierta")
 
@@ -148,7 +152,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
         estado_ganancia = "Ganancia" if ganancia_operacion >= 0 else "Pérdida"
 
-        operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{compra['precio']:,.3f}€</strong>, Venta en {venta['fecha']} a <strong>{venta['precio']:,.3f}€</strong> - {estado_ganancia}: <strong>{ganancia_operacion:,.3f}€</strong></li>"
+        operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{f'{compra['precio']:,}'.replace(',', 'X').replace('.', ',').replace('X', '.')}€</strong>, Venta en {venta['fecha']} a <strong>{f'{venta['precio']:,}'.replace(',', 'X').replace('.', ',').replace('X', '.')}€</strong> - {estado_ganancia}: <strong>{f'{ganancia_operacion:,}'.replace(',', 'X').replace('.', ',').replace('X', '.')}€</strong></li>"
 
     html_resultados = ""
 
@@ -166,12 +170,12 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
             html_resultados = f"""
             <p>Se encontraron señales de compra en el período. La última posición abierta no se ha cerrado todavía.</p>
-            <p>Si hubieras invertido {capital_inicial:,.3f}€ en cada operación, tu ganancia simulada total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{ganancia_simulada_total_incl_abierta:,.3f}€</strong>.</p>
+            <p>Si hubieras invertido {f'{capital_inicial:,}'.replace(',', 'X').replace('.', ',').replace('X', '.')}€ en cada operación, tu ganancia simulada total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{f'{ganancia_simulada_total_incl_abierta:,}'.replace(',', 'X').replace('.', ',').replace('X', '.')}€</strong>.</p>
             """
             # Si hay operaciones completadas (ventas realizadas), las mostramos
             if compras and posicion_abierta: # NUEVA LÍNEA AÑADIDA
                 html_resultados += f"""
-                <p>La última posición comprada fue en {compras[-1]['fecha']} a <strong>{compras[-1]['precio']:,.3f}€</strong> y todavía no se ha vendido.</p>
+                <p>La última posición comprada fue en {compras[-1]['fecha']} a <strong>{f'{compras[-1]['precio']:,}'.replace(',', 'X').replace('.', ',').replace('X', '.')}€</strong> y todavía no se ha vendido.</p>
                 """
             if operaciones_html:
                 html_resultados += f"""
@@ -180,7 +184,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 """
         else:  # Todas las posiciones se cerraron
             html_resultados = f"""
-            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro Algoritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.3f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.3f}€</strong>.</p>
+            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro Algoritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {f'{capital_inicial:,}'.replace(',', 'X').replace('.', ',').replace('X', '.')}€ en cada operación, tu ganancia simulada total habría sido de <strong>{f'{ganancia_total:,}'.replace(',', 'X').replace('.', ',').replace('X', '.')}€</strong>.</p>
             """
             # Siempre mostramos las operaciones detalladas si hay alguna
             if operaciones_html:
@@ -539,7 +543,7 @@ def construir_prompt_formateado(data):
     else:
         volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
 
-    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.3f}€"
+    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {f'{data['PRECIO_PROYECTADO_5DIAS']:,}'.replace(',', 'X').replace('.', ',').replace('X', '.')}€"
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
