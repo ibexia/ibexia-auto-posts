@@ -582,6 +582,16 @@ def construir_prompt_formateado(data):
                           f"el segundo en <strong>{formatear_numero(soportes_unicos[1])}€</strong>, y el tercero en <strong>{formatear_numero(soportes_unicos[2])}€</strong>.")
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
+
+    # Bloque de código a insertar en construir_prompt_formateado
+    # Va después del 'Historial de Operaciones' y antes del 'Gráfico'
+    anuncio_html = """
+    <div style="background-color: #000000; color: #FFFFFF; padding: 15px; margin: 20px 0; text-align: center; border-radius: 8px;">
+        <p style="font-size: 1.1em; margin: 0;">
+            Estamos desarrollando un nuevo sistema de **ALERTAS PREMIUM** actualmente gratuito. Con este servicio, no tendrás que esperar al análisis diario. En su lugar, verás un análisis detallado de todas las empresas que actualizamos tres veces al día. <a href="https://ibexia.es/contenido-premium/" style="color: #FFFFFF; font-weight: bold; text-decoration: underline;">**ENTRA.**</a>
+        </p>
+    </div>
+    """
     
     # Nuevo HTML del gráfico (incluyendo el análisis detallado)
     analisis_grafico_html = ""
@@ -865,6 +875,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <h2>Historial de Operaciones</h2>
 {ganancias_html}
 
+{anuncio_html}
 
 {chart_html}
 {analisis_grafico_html}
