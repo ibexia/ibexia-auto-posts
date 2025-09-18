@@ -867,7 +867,7 @@ Genera un análisis técnico completo de aproximadamente 800 palabras sobre la e
 - Soporte 2: {data['SOPORTE_2']:,}€
 - Soporte 3: {data['SOPORTE_3']:,}€
 - Resistencia clave: {data['RESISTENCIA']:,}€
-- Recomendación general: {data['RECOMENDacion']}
+- Recomendación general: {data['RECOMENDACION']}
 - SMI actual: {data['SMI']}
 - Precio objetivo de compra: {data['PRECIO_OBJETIVO_COMPRA']:,}€
 - Tendencia del SMI: {data['tendencia_ibexia']}
@@ -984,7 +984,7 @@ def generar_contenido_con_gemini(tickers):
                 response = model.generate_content(prompt)
                 print(f"\n🧠 Contenido generado para {ticker}:\n")
                 print(response.text)
-                asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDacion']}"
+                asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
                 nombre_archivo = f"analisis_{ticker}_{datetime.today().strftime('%Y%m%d')}"
                 enviar_email(response.text, asunto_email, nombre_archivo)
 
