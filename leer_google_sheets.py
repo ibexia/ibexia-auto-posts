@@ -608,69 +608,64 @@ def construir_prompt_formateado(data):
         if len(smi_desplazados_para_grafico) < len(labels_total):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
         
-        # Generación del análisis dinámico del gráfico
-        analisis_grafico_html = "<h2>Análisis Detallado del Gráfico</h2>"
-        precios = data['PRECIOS_PARA_SIMULACION']
-        smis = data['SMI_PARA_SIMULACION']
-        fechas = data['FECHAS_PARA_SIMULACION']
+        # Reemplazo para la sección de análisis detallado del gráfico
+        analisis_grafico_html = f"""
+        <h2 style="color: #FFFFFF; background-color: #333333; padding: 10px; border-radius: 5px;">Análisis Detallado de Operaciones</h2>
+        <div style="background-color: #1a1a1a; padding: 15px; border-radius: 8px;">
+            <table style="width: 100%; border-collapse: collapse; color: #f2f2f2; font-family: Arial, sans-serif;">
+                <thead>
+                    <tr style="background-color: #000000; border-bottom: 2px solid #555555;">
+                        <th style="padding: 12px; text-align: left; font-size: 14px;">Fecha</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px;">Movimiento Detectado</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px;">Precio de la Acción</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px;">Decisión de Inversión</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
         
-        analisis_grafico_html += f"<p>A continuación, analizaremos los movimientos clave de nuestro Algoritmo y cómo se reflejaron en el precio de la acción:</p>"
+        # Recuperar los datos de compras y ventas simuladas
+        compras_simuladas = data.get('COMPRAS_SIMULADAS', [])
+        ventas_simuladas = data.get('VENTAS_SIMULADAS', [])
 
-        def get_trend(smi_val):
-            if smi_val > 40:
-                return "sobrecompra"
-            elif smi_val < -40:
-                return "sobreventa"
-            elif smi_val > 0.1:
-                return "alcista"
-            elif smi_val < -0.1:
-                return "bajista"
-            else:
-                return "consolidación"
+        # Unificar y ordenar los eventos de compra y venta por fecha
+        eventos = sorted(compras_simuladas + ventas_simuladas, key=lambda x: datetime.strptime(x['fecha'], "%d/%m/%Y"))
 
-        pendientes_smi = [0] * len(smis)
-        for i in range(1, len(smis)):
-            pendientes_smi[i] = smis[i] - smis[i-1]
-
-        i = 1
-        while i < len(smis):
-            tendencia_actual_smi = get_trend(pendientes_smi[i])
-            start_index = i - 1
-            
-            while i < len(smis) and get_trend(pendientes_smi[i]) == tendencia_actual_smi:
-                i += 1
-            
-            end_index = i - 1
-            
-            # Descripción narrativa del tramo
-            if tendencia_actual_smi == "alcista":
-                analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, nuestro Algoritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{formatear_numero(precios[end_index])}€</strong>.</p>"
-            elif tendencia_actual_smi == "bajista":
-                analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, nuestro Algoritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{formatear_numero(precios[end_index])}€</strong>.</p>"
-            elif tendencia_actual_smi == "consolidación":
-                analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. Nuestro Algoritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{formatear_numero(precios[end_index])}€</strong>.</p>"
-            
-            # Chequeo de compra o venta en el cambio de tramo
-            compra_en_giro = next((c for c in compras_simuladas if c['fecha'] == fechas[end_index]), None)
-            if compra_en_giro:
-                analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! Nuestro Algoritmo mostró un giro y se compró en <strong>{formatear_numero(compra_en_giro['precio'])}€</strong>.</p>"
-            
-            venta_en_giro = next((v for v in ventas_simuladas if v['fecha'] == fechas[end_index]), None)
-            if venta_en_giro:
-                analisis_grafico_html += f"<p>❌ ¡Se detectó una señal de venta! Se vendió en el giro a <strong>{formatear_numero(venta_en_giro['precio'])}€</strong>.</p>"
-    
-        # Conclusión basada en la última tendencia
-        ultima_tendencia = get_trend(pendientes_smi[-1])
-        if ultima_tendencia == "alcista":
-            analisis_grafico_html += f"<p>Actualmente, nuestro Algoritmo muestra una tendencia <strong>alcista</strong>. Nos mantendremos en posición y atentos a los próximos movimientos para futuras ventas.</p>"
-        elif ultima_tendencia == "bajista":
-            analisis_grafico_html += f"<p>En estos momentos, nuestro Algoritmo tiene una pendiente <strong>bajista</strong>. Esperaremos una señal de giro más adelante.</p>"
-        elif ultima_tendencia == "consolidación":
-            analisis_grafico_html += f"<p>Nuestro Algoritmo se encuentra en una fase de <strong>consolidación</strong>, moviéndose de forma lateral. Nos mantendremos atentos para entrar o salir del mercado cuando se detecte un giro claro.</p>"
-        elif ultima_tendencia == "sobrecompra":
-            analisis_grafico_html += f"<p>Nuestro Algoritmo ha entrado en una zona de <strong>sobrecompra</strong>. Esto indica que la tendencia alcista podría estar agotándose y podríamos ver una señal de venta o un giro en cualquier momento.</p>"
-        elif ultima_tendencia == "sobreventa":
-            analisis_grafico_html += f"<p>Nuestro Algoritmo se encuentra en una zona de <strong>sobreventa</strong>. Esto indica que la tendencia bajista está llegando a su fin y podríamos ver un giro y una señal de compra en breve.</p>"
+        if not eventos:
+            analisis_grafico_html += f"""
+                    <tr>
+                        <td colspan="4" style="padding: 12px; text-align: center; color: #aaaaaa;">
+                            No se registraron operaciones de compra o venta en el período analizado.
+                        </td>
+                    </tr>
+            """
+        else:
+            for evento in eventos:
+                fecha = evento['fecha']
+                precio = formatear_numero(evento['precio'])
+                if 'compra' in evento:
+                    movimiento = "Giro a la compra detectado"
+                    precio_accion = f"Subida a <strong>{precio}€</strong>"
+                    decision = "<strong>✅ Compra</strong>"
+                else:
+                    movimiento = "Giro a la venta detectado"
+                    precio_accion = f"Bajada a <strong>{precio}€</strong>"
+                    decision = "<strong>❌ Venta</strong>"
+                
+                analisis_grafico_html += f"""
+                    <tr style="border-bottom: 1px solid #333333;">
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{fecha}</td>
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{movimiento}</td>
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{precio_accion}</td>
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{decision}</td>
+                    </tr>
+                """
+        
+        analisis_grafico_html += f"""
+                </tbody>
+            </table>
+        </div>
+        """
 
         # El gráfico en sí, que debe ir antes que el análisis
         chart_html = f"""
