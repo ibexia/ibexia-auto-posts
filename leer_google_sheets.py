@@ -713,7 +713,7 @@ def construir_prompt_formateado(data):
 
         # El gráfico en sí, que debe ir antes que el análisis
         chart_html = f"""
-        <div style="width: 100%; max-width: 800px; margin: auto; height: 500px;">
+        <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -729,30 +729,33 @@ def construir_prompt_formateado(data):
                         {{
                             label: 'Nuestro Algoritmo',
                             data: {smi_desplazados_para_grafico},
-                            borderColor: 'rgb(255, 99, 132)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                            borderColor: '#00bfa5',
+                            backgroundColor: 'rgba(0, 191, 165, 0.2)',
                             yAxisID: 'y1',
                             pointRadius: 0,
-                            borderWidth: 2
+                            borderWidth: 2,
+                            tension: 0.1
                         }},
                         {{
                             label: 'Precio Real',
                             data: {precios_reales_grafico},
-                            borderColor: 'rgb(54, 162, 235)',
-                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            borderColor: '#2979ff',
+                            backgroundColor: 'rgba(41, 121, 255, 0.2)',
                             yAxisID: 'y',
                             pointRadius: 0,
-                            borderWidth: 2
+                            borderWidth: 2,
+                            tension: 0.1
                         }},
                         {{
                             label: 'Precio Proyectado',
                             data: {data_proyectada},
-                            borderColor: 'rgb(75, 192, 192)',
+                            borderColor: '#ffc107',
                             borderDash: [5, 5],
-                            backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                            backgroundColor: 'rgba(255, 193, 7, 0.2)',
                             yAxisID: 'y',
                             pointRadius: 0,
-                            borderWidth: 2
+                            borderWidth: 2,
+                            tension: 0.1
                         }}
                     ]
                 }},
@@ -763,14 +766,101 @@ def construir_prompt_formateado(data):
                         mode: 'index',
                         intersect: false,
                     }},
+                    plugins: {{
+                        legend: {{
+                            display: true,
+                            labels: {{
+                                color: '#e0e0e0'
+                            }}
+                        }},
+                        tooltip: {{
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(26, 26, 46, 0.8)',
+                            titleColor: '#e0e0e0',
+                            bodyColor: '#e0e0e0',
+                            borderColor: '#4a4a5e',
+                            borderWidth: 1,
+                            callbacks: {{
+                                label: function(context) {{
+                                    let label = context.dataset.label || '';
+                                    if (label) {{
+                                        label += ': ';
+                                    }}
+                                    if (context.parsed.y !== null) {{
+                                        label += context.parsed.y.toFixed(2) + '€';
+                                    }}
+                                    return label;
+                                }}
+                            }}
+                        }},
+                        annotation: {{
+                            annotations: {{
+                                sobrecompra: {{
+                                    type: 'line',
+                                    mode: 'horizontal',
+                                    scaleID: 'y1',
+                                    value: 40,
+                                    borderColor: '#d32f2f',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Sobrecompra (+40)',
+                                        enabled: true,
+                                        position: 'start',
+                                        color: '#e0e0e0',
+                                        backgroundColor: 'rgba(211, 47, 47, 0.6)',
+                                        font: {{
+                                            size: 10
+                                        }}
+                                    }}
+                                }},
+                                sobreventa: {{
+                                    type: 'line',
+                                    mode: 'horizontal',
+                                    scaleID: 'y1',
+                                    value: -40,
+                                    borderColor: '#388e3c',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Sobreventa (-40)',
+                                        enabled: true,
+                                        position: 'start',
+                                        color: '#e0e0e0',
+                                        backgroundColor: 'rgba(56, 142, 60, 0.6)',
+                                        font: {{
+                                            size: 10
+                                        }}
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }},
                     scales: {{
+                        x: {{
+                            ticks: {{
+                                color: '#e0e0e0'
+                            }},
+                            grid: {{
+                                color: 'rgba(128, 128, 128, 0.2)'
+                            }}
+                        }},
                         y: {{
                             type: 'linear',
                             display: true,
                             position: 'right',
                             title: {{
                                 display: true,
-                                text: 'Precio (EUR)'
+                                text: 'Precio (EUR)',
+                                color: '#e0e0e0'
+                            }},
+                            ticks: {{
+                                color: '#e0e0e0'
+                            }},
+                            grid: {{
+                                color: 'rgba(128, 128, 128, 0.2)',
+                                drawOnChartArea: false
                             }}
                         }},
                         y1: {{
@@ -779,7 +869,8 @@ def construir_prompt_formateado(data):
                             position: 'left',
                             title: {{
                                 display: true,
-                                text: 'Nuestro Algoritmo'
+                                text: 'Nuestro Algoritmo',
+                                color: '#e0e0e0'
                             }},
                             grid: {{
                                 drawOnChartArea: false,
@@ -787,58 +878,8 @@ def construir_prompt_formateado(data):
                             min: -100,
                             max: 100,
                             ticks: {{
-                                stepSize: 20
-                            }}
-                        }}
-                    }},
-                    plugins: {{
-                        legend: {{
-                            display: true
-                        }},
-                        tooltip: {{
-                            callbacks: {{
-                                label: function(context) {{
-                                    let label = context.dataset.label || '';
-                                    if (label) {{
-                                        label += ': ';
-                                    }}
-                                    if (context.parsed.y !== null) {{
-                                        label += context.parsed.y.toFixed(2);
-                                    }}
-                                    return label;
-                                }}
-                            }}
-                        }},
-                        annotation: {{
-                            annotations: {{
-                                compra: {{
-                                    type: 'line',
-                                    mode: 'horizontal',
-                                    scaleID: 'y1',
-                                    value: 40,
-                                    borderColor: 'rgba(0, 128, 0, 0.5)',
-                                    borderWidth: 2,
-                                    label: {{
-                                        content: 'Sobrecompra (+40)',
-                                        enabled: true,
-                                        position: 'start',
-                                        backgroundColor: 'rgba(0, 128, 0, 0.5)'
-                                    }}
-                                }},
-                                venta: {{
-                                    type: 'line',
-                                    mode: 'horizontal',
-                                    scaleID: 'y1',
-                                    value: -40,
-                                    borderColor: 'rgba(255, 0, 0, 0.5)',
-                                    borderWidth: 2,
-                                    label: {{
-                                        content: 'Sobreventa (-40)',
-                                        enabled: true,
-                                        position: 'start',
-                                        backgroundColor: 'rgba(255, 0, 0, 0.5)'
-                                    }}
-                                }}
+                                stepSize: 25,
+                                color: '#e0e0e0'
                             }}
                         }}
                     }}
