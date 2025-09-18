@@ -50,13 +50,13 @@ def formatear_numero(numero):
     try:
         num = float(numero)
         if abs(num) >= 1_000_000_000:
-            return f"{num / 1_000_000_000:,.3f}B"
+            return f"{num / 1_000_000_000:,.3f}B".replace(",", "X").replace(".", ",").replace("X", ".")
         elif abs(num) >= 1_000_000:
-            return f"{num / 1_000_000:,.3f}M"
+            return f"{num / 1_000_000:,.3f}M".replace(",", "X").replace(".", ",").replace("X", ".")
         elif abs(num) >= 1_000:
-            return f"{num / 1_000:,.3f}K"
+            return f"{num / 1_000:,.3f}K".replace(",", "X").replace(".", ",").replace("X", ".")
         else:
-            return f"{num:,.3f}"
+            return f"{num:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except (ValueError, TypeError):
         return "N/A"
 
@@ -148,7 +148,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
         estado_ganancia = "Ganancia" if ganancia_operacion >= 0 else "Pérdida"
 
-        operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{compra['precio']:,.3f}€</strong>, Venta en {venta['fecha']} a <strong>{venta['precio']:,.3f}€</strong> - {estado_ganancia}: <strong>{ganancia_operacion:,.3f}€</strong></li>"
+        operaciones_html += f"<li>Compra en {compra['fecha']} a <strong>{formatear_numero(compra['precio'])}€</strong>, Venta en {venta['fecha']} a <strong>{formatear_numero(venta['precio'])}€</strong> - {estado_ganancia}: <strong>{formatear_numero(ganancia_operacion)}€</strong></li>"
 
     html_resultados = ""
 
@@ -166,12 +166,12 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
             html_resultados = f"""
             <p>Se encontraron señales de compra en el período. La última posición abierta no se ha cerrado todavía.</p>
-            <p>Si hubieras invertido {capital_inicial:,.3f}€ en cada operación, tu ganancia simulada total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{ganancia_simulada_total_incl_abierta:,.3f}€</strong>.</p>
+            <p>Si hubieras invertido 10000€ en cada operación, tu ganancia simulada total (contando operaciones cerradas y la ganancia/pérdida actual de la posición abierta) sería de <strong>{formatear_numero(ganancia_simulada_total_incl_abierta)}€</strong>.</p>
             """
             # Si hay operaciones completadas (ventas realizadas), las mostramos
             if compras and posicion_abierta: # NUEVA LÍNEA AÑADIDA
                 html_resultados += f"""
-                <p>La última posición comprada fue en {compras[-1]['fecha']} a <strong>{compras[-1]['precio']:,.3f}€</strong> y todavía no se ha vendido.</p>
+                <p>La última posición comprada fue en {compras[-1]['fecha']} a <strong>{formatear_numero(compras[-1]['precio'])}€</strong> y todavía no se ha vendido.</p>
                 """
             if operaciones_html:
                 html_resultados += f"""
@@ -180,7 +180,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 """
         else:  # Todas las posiciones se cerraron
             html_resultados = f"""
-            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro Algoritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {capital_inicial:,.3f}€ en cada operación, tu ganancia simulada total habría sido de <strong>{ganancia_total:,.3f}€</strong>.</p>
+            <p>La fiabilidad de nuestro sistema se confirma en el histórico de operaciones. Nuestro Algoritmo ha completado un ciclo de compra y venta en el período. Si hubieras invertido {formatear_numero(capital_inicial)}€ en cada operación, tu ganancia simulada total habría sido de <strong>{formatear_numero(ganancia_total)}€</strong>.</p>
             """
             # Siempre mostramos las operaciones detalladas si hay alguna
             if operaciones_html:
@@ -436,11 +436,11 @@ def obtener_datos_yfinance(ticker):
             if slope > 0.1:
                 tendencia_ibexia = "mejorando (alcista)"
                 recomendacion = "Comprar"
-                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {resistencia_1:.3f}€."
+                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {formatear_numero(resistencia_1)}€."
             elif slope < -0.1:
                 tendencia_ibexia = "empeorando (bajista)"
                 recomendacion = "Vender"
-                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {soporte_1:.3f}€."
+                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {formatear_numero(soporte_1)}€."
             else:
                 tendencia_ibexia = "cambio de tendencia"
                 recomendacion = "Atención máxima"
@@ -485,16 +485,16 @@ def obtener_datos_yfinance(ticker):
         
         if diferencia_precio_porcentual > 3:
             recomendacion = "Comprar (Impulso Fuerte)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es significativamente superior al precio actual, indicando un fuerte impulso alcista."
+            motivo_analisis = f"El precio proyectado a 5 días de {formatear_numero(precio_proyectado_dia_5)}€ es significativamente superior al precio actual, indicando un fuerte impulso alcista."
         elif diferencia_precio_porcentual > 1:
             recomendacion = "Comprar (Impulso Moderado)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es superior al precio actual, sugiriendo un impulso alcista moderado."
+            motivo_analisis = f"El precio proyectado a 5 días de {formatear_numero(precio_proyectado_dia_5)}€ es superior al precio actual, sugiriendo un impulso alcista moderado."
         elif diferencia_precio_porcentual < -3:
             recomendacion = "Vender (Impulso Fuerte)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es significativamente inferior al precio actual, lo que indica una fuerte presión bajista."
+            motivo_analisis = f"El precio proyectado a 5 días de {formatear_numero(precio_proyectado_dia_5)}€ es significativamente inferior al precio actual, lo que indica una fuerte presión bajista."
         elif diferencia_precio_porcentual < -1:
             recomendacion = "Vender (Impulso Moderado)"
-            motivo_analisis = f"El precio proyectado a 5 días de {precio_proyectado_dia_5:,.3f}€ es inferior al precio actual, sugiriendo un impulso bajista moderado."
+            motivo_analisis = f"El precio proyectado a 5 días de {formatear_numero(precio_proyectado_dia_5)}€ es inferior al precio actual, sugiriendo un impulso bajista moderado."
         
         # Sobrescribir las variables recomendacion y motivo_analisis
         datos['RECOMENDACION'] = recomendacion
@@ -539,7 +539,7 @@ def construir_prompt_formateado(data):
     else:
         volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
 
-    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {data['PRECIO_PROYECTADO_5DIAS']:,.3f}€"
+    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {formatear_numero(data['PRECIO_PROYECTADO_5DIAS'])}€"
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
@@ -574,14 +574,24 @@ def construir_prompt_formateado(data):
 
     soportes_texto = ""
     if len(soportes_unicos) == 1:
-        soportes_texto = f"un soporte clave en <strong>{soportes_unicos[0]:,.3f}€</strong>."
+        soportes_texto = f"un soporte clave en <strong>{formatear_numero(soportes_unicos[0])}€</strong>."
     elif len(soportes_unicos) == 2:
-        soportes_texto = f"dos soportes importantes en <strong>{soportes_unicos[0]:,.3f}€</strong> y <strong>{soportes_unicos[1]:,.3f}€</strong>."
+        soportes_texto = f"dos soportes importantes en <strong>{formatear_numero(soportes_unicos[0])}€</strong> y <strong>{formatear_numero(soportes_unicos[1])}€</strong>."
     elif len(soportes_unicos) >= 3:
-        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{soportes_unicos[0]:,.3f}€</strong>, "
-                          f"el segundo en <strong>{soportes_unicos[1]:,.3f}€</strong>, y el tercero en <strong>{soportes_unicos[2]:,.3f}€</strong>.")
+        soportes_texto = (f"tres soportes relevantes: el primero en <strong>{formatear_numero(soportes_unicos[0])}€</strong>, "
+                          f"el segundo en <strong>{formatear_numero(soportes_unicos[1])}€</strong>, y el tercero en <strong>{formatear_numero(soportes_unicos[2])}€</strong>.")
     else:
         soportes_texto = "no presenta soportes claros en el análisis reciente, requiriendo un seguimiento cauteloso."
+
+    # Bloque de código a insertar en construir_prompt_formateado
+    # Va después del 'Historial de Operaciones' y antes del 'Gráfico'
+    anuncio_html = """
+    <div style="background-color: #f0f8ff; color: #333333; padding: 15px; margin: 20px 0; text-align: center; border-radius: 8px; border: 1px solid #cceeff;">
+        <p style="font-size: 1.1em; margin: 0; font-weight: bold;">
+            Estamos desarrollando un nuevo sistema de **ALERTAS PREMIUM** actualmente gratuito. Con este servicio, no tendrás que esperar al análisis diario. En su lugar, verás un análisis detallado de todas las empresas que actualizamos tres veces al día. <a href="https://ibexia.es/contenido-premium/" style="color: #007bff; font-weight: bold; text-decoration: underline;">**ENTRA.**</a>
+        </p>
+    </div>
+    """
     
     # Nuevo HTML del gráfico (incluyendo el análisis detallado)
     analisis_grafico_html = ""
@@ -598,73 +608,112 @@ def construir_prompt_formateado(data):
         if len(smi_desplazados_para_grafico) < len(labels_total):
             smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
         
-        # Generación del análisis dinámico del gráfico
-        analisis_grafico_html = "<h2>Análisis Detallado del Gráfico</h2>"
+        # Reemplazo para la sección de análisis detallado del gráfico
+        analisis_grafico_html = f"""
+        <h2 style="color: #333333; background-color: #e9e9e9; padding: 10px; border-radius: 5px; text-align: center;">Análisis Detallado del Gráfico</h2>
+        <div style="background-color: #fafafa; padding: 15px; border-radius: 8px; border: 1px solid #dddddd;">
+            <table style="width: 100%; border-collapse: collapse; color: #333333; font-family: Arial, sans-serif;">
+                <thead>
+                    <tr style="background-color: #dcdcdc; border-bottom: 2px solid #aaaaaa;">
+                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Período</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Movimiento del Algoritmo</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Evolución del Precio</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Decisión / Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        
         precios = data['PRECIOS_PARA_SIMULACION']
         smis = data['SMI_PARA_SIMULACION']
         fechas = data['FECHAS_PARA_SIMULACION']
         
-        analisis_grafico_html += f"<p>A continuación, analizaremos los movimientos clave de nuestro Algoritmo y cómo se reflejaron en el precio de la acción:</p>"
-
-        def get_trend(smi_val):
-            if smi_val > 40:
-                return "sobrecompra"
-            elif smi_val < -40:
-                return "sobreventa"
-            elif smi_val > 0.1:
+        def get_trend(smi_val, prev_smi_val):
+            # Analiza la pendiente
+            if smi_val - prev_smi_val > 0.1:
                 return "alcista"
-            elif smi_val < -0.1:
+            elif smi_val - prev_smi_val < -0.1:
                 return "bajista"
             else:
                 return "consolidación"
 
-        pendientes_smi = [0] * len(smis)
-        for i in range(1, len(smis)):
-            pendientes_smi[i] = smis[i] - smis[i-1]
-
+        def get_event_action(start_date, end_date):
+            compra = next((c for c in data.get('COMPRAS_SIMULADAS', []) if c['fecha'] >= start_date and c['fecha'] <= end_date), None)
+            venta = next((v for v in data.get('VENTAS_SIMULADAS', []) if v['fecha'] >= start_date and v['fecha'] <= end_date), None)
+            
+            if compra:
+                return f"<strong>✅ Compra</strong> en {formatear_numero(compra['precio'])}€"
+            elif venta:
+                return f"<strong>❌ Venta</strong> en {formatear_numero(venta['precio'])}€"
+            return "Sin operación"
+            
         i = 1
         while i < len(smis):
-            tendencia_actual_smi = get_trend(pendientes_smi[i])
             start_index = i - 1
+            tendencia_actual = get_trend(smis[i], smis[i-1])
             
-            while i < len(smis) and get_trend(pendientes_smi[i]) == tendencia_actual_smi:
+            while i < len(smis) and get_trend(smis[i], smis[i-1]) == tendencia_actual:
                 i += 1
             
             end_index = i - 1
             
-            # Descripción narrativa del tramo
-            if tendencia_actual_smi == "alcista":
-                analisis_grafico_html += f"<p>Desde el <strong>{fechas[start_index]}</strong>, nuestro Algoritmo comenzó a girar y mostró una clara tendencia <strong>alcista</strong>. Este impulso llevó al precio hasta <strong>{precios[end_index]:,.3f}€</strong>.</p>"
-            elif tendencia_actual_smi == "bajista":
-                analisis_grafico_html += f"<p>A partir del <strong>{fechas[start_index]}</strong>, nuestro Algoritmo giró a la baja. Durante esta tendencia <strong>bajista</strong>, el precio de la acción descendió hasta <strong>{precios[end_index]:,.3f}€</strong>.</p>"
-            elif tendencia_actual_smi == "consolidación":
-                analisis_grafico_html += f"<p>El período entre el <strong>{fechas[start_index]}</strong> y el <strong>{fechas[end_index]}</strong> fue de <strong>consolidación</strong>. Nuestro Algoritmo se mantuvo plano y el precio se movió lateralmente, finalizando en <strong>{precios[end_index]:,.3f}€</strong>.</p>"
+            fecha_inicio = fechas[start_index]
+            fecha_fin = fechas[end_index]
+            precio_inicio = formatear_numero(precios[start_index])
+            precio_final = formatear_numero(precios[end_index])
             
-            # Chequeo de compra o venta en el cambio de tramo
-            compra_en_giro = next((c for c in compras_simuladas if c['fecha'] == fechas[end_index]), None)
-            if compra_en_giro:
-                analisis_grafico_html += f"<p>✅ ¡Se detectó una señal de compra! Nuestro Algoritmo mostró un giro y se compró en <strong>{compra_en_giro['precio']:,.3f}€</strong>.</p>"
-            
-            venta_en_giro = next((v for v in ventas_simuladas if v['fecha'] == fechas[end_index]), None)
-            if venta_en_giro:
-                analisis_grafico_html += f"<p>❌ ¡Se detectó una señal de venta! Se vendió en el giro a <strong>{venta_en_giro['precio']:,.3f}€</strong>.</p>"
-    
-        # Conclusión basada en la última tendencia
-        ultima_tendencia = get_trend(pendientes_smi[-1])
+            movimiento_algoritmo = ""
+            evolucion_precio = f"De <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
+            decision_inversion = get_event_action(fecha_inicio, fecha_fin)
+
+            if tendencia_actual == "alcista":
+                movimiento_algoritmo = "Tendencia alcista"
+                evolucion_precio = f"<span style='color: #4CAF50;'>Subida</span> de <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
+            elif tendencia_actual == "bajista":
+                movimiento_algoritmo = "Tendencia bajista"
+                evolucion_precio = f"<span style='color: #F44336;'>Bajada</span> de <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
+            elif tendencia_actual == "consolidación":
+                movimiento_algoritmo = "Fase de consolidación"
+                evolucion_precio = f"<span style='color: #FFC107;'>Lateral</span> de <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
+
+            analisis_grafico_html += f"""
+                    <tr style="border-bottom: 1px solid #333333;">
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{fecha_inicio} a {fecha_fin}</td>
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{movimiento_algoritmo}</td>
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{evolucion_precio}</td>
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{decision_inversion}</td>
+                    </tr>
+            """
+        
+        # Última fila para el estado actual
+        ultima_tendencia = "bajista" # Asumir una tendencia por defecto si no hay suficientes datos
+        if len(smis) > 1:
+             ultima_tendencia_smi = get_trend(smis[-1], smis[-2])
+             if ultima_tendencia_smi == "alcista":
+                ultima_tendencia = "alcista"
+             elif ultima_tendencia_smi == "bajista":
+                ultima_tendencia = "bajista"
+             elif ultima_tendencia_smi == "consolidación":
+                 ultima_tendencia = "consolidación"
+
+        estado_actual = ""
         if ultima_tendencia == "alcista":
-            analisis_grafico_html += f"<p>Actualmente, nuestro Algoritmo muestra una tendencia <strong>alcista</strong>. Nos mantendremos en posición y atentos a los próximos movimientos para futuras ventas.</p>"
+            estado_actual = "Actualmente, el Algoritmo muestra una **tendencia alcista**."
         elif ultima_tendencia == "bajista":
-            analisis_grafico_html += f"<p>En estos momentos, nuestro Algoritmo tiene una pendiente <strong>bajista</strong>. Esperaremos una señal de giro más adelante.</p>"
+            estado_actual = "En estos momentos, el Algoritmo tiene una **tendencia bajista**."
         elif ultima_tendencia == "consolidación":
-            analisis_grafico_html += f"<p>Nuestro Algoritmo se encuentra en una fase de <strong>consolidación</strong>, moviéndose de forma lateral. Nos mantendremos atentos para entrar o salir del mercado cuando se detecte un giro claro.</p>"
-        elif ultima_tendencia == "sobrecompra":
-            analisis_grafico_html += f"<p>Nuestro Algoritmo ha entrado en una zona de <strong>sobrecompra</strong>. Esto indica que la tendencia alcista podría estar agotándose y podríamos ver una señal de venta o un giro en cualquier momento.</p>"
-        elif ultima_tendencia == "sobreventa":
-            analisis_grafico_html += f"<p>Nuestro Algoritmo se encuentra en una zona de <strong>sobreventa</strong>. Esto indica que la tendencia bajista está llegando a su fin y podríamos ver un giro y una señal de compra en breve.</p>"
+            estado_actual = "El Algoritmo se encuentra en una fase de **consolidación**, moviéndose de forma lateral."
+
+        analisis_grafico_html += f"""
+                </tbody>
+            </table>
+        </div>
+        <p style="text-align: center; color: #aaaaaa; margin-top: 15px;">{estado_actual}</p>
+        """
 
         # El gráfico en sí, que debe ir antes que el análisis
         chart_html = f"""
-        <div style="width: 100%; max-width: 800px; margin: auto;">
+        <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -680,30 +729,33 @@ def construir_prompt_formateado(data):
                         {{
                             label: 'Nuestro Algoritmo',
                             data: {smi_desplazados_para_grafico},
-                            borderColor: 'rgb(255, 99, 132)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                            borderColor: '#00bfa5',
+                            backgroundColor: 'rgba(0, 191, 165, 0.2)',
                             yAxisID: 'y1',
                             pointRadius: 0,
-                            borderWidth: 2
+                            borderWidth: 2,
+                            tension: 0.1
                         }},
                         {{
                             label: 'Precio Real',
                             data: {precios_reales_grafico},
-                            borderColor: 'rgb(54, 162, 235)',
-                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            borderColor: '#2979ff',
+                            backgroundColor: 'rgba(41, 121, 255, 0.2)',
                             yAxisID: 'y',
                             pointRadius: 0,
-                            borderWidth: 2
+                            borderWidth: 2,
+                            tension: 0.1
                         }},
                         {{
                             label: 'Precio Proyectado',
                             data: {data_proyectada},
-                            borderColor: 'rgb(75, 192, 192)',
+                            borderColor: '#ffc107',
                             borderDash: [5, 5],
-                            backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                            backgroundColor: 'rgba(255, 193, 7, 0.2)',
                             yAxisID: 'y',
                             pointRadius: 0,
-                            borderWidth: 2
+                            borderWidth: 2,
+                            tension: 0.1
                         }}
                     ]
                 }},
@@ -714,14 +766,101 @@ def construir_prompt_formateado(data):
                         mode: 'index',
                         intersect: false,
                     }},
+                    plugins: {{
+                        legend: {{
+                            display: true,
+                            labels: {{
+                                color: '#e0e0e0'
+                            }}
+                        }},
+                        tooltip: {{
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(26, 26, 46, 0.8)',
+                            titleColor: '#e0e0e0',
+                            bodyColor: '#e0e0e0',
+                            borderColor: '#4a4a5e',
+                            borderWidth: 1,
+                            callbacks: {{
+                                label: function(context) {{
+                                    let label = context.dataset.label || '';
+                                    if (label) {{
+                                        label += ': ';
+                                    }}
+                                    if (context.parsed.y !== null) {{
+                                        label += context.parsed.y.toFixed(2) + '€';
+                                    }}
+                                    return label;
+                                }}
+                            }}
+                        }},
+                        annotation: {{
+                            annotations: {{
+                                sobrecompra: {{
+                                    type: 'line',
+                                    mode: 'horizontal',
+                                    scaleID: 'y1',
+                                    value: 40,
+                                    borderColor: '#d32f2f',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Sobrecompra (+40)',
+                                        enabled: true,
+                                        position: 'start',
+                                        color: '#e0e0e0',
+                                        backgroundColor: 'rgba(211, 47, 47, 0.6)',
+                                        font: {{
+                                            size: 10
+                                        }}
+                                    }}
+                                }},
+                                sobreventa: {{
+                                    type: 'line',
+                                    mode: 'horizontal',
+                                    scaleID: 'y1',
+                                    value: -40,
+                                    borderColor: '#388e3c',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {{
+                                        content: 'Sobreventa (-40)',
+                                        enabled: true,
+                                        position: 'start',
+                                        color: '#e0e0e0',
+                                        backgroundColor: 'rgba(56, 142, 60, 0.6)',
+                                        font: {{
+                                            size: 10
+                                        }}
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }},
                     scales: {{
+                        x: {{
+                            ticks: {{
+                                color: '#e0e0e0'
+                            }},
+                            grid: {{
+                                color: 'rgba(128, 128, 128, 0.2)'
+                            }}
+                        }},
                         y: {{
                             type: 'linear',
                             display: true,
                             position: 'right',
                             title: {{
                                 display: true,
-                                text: 'Precio (EUR)'
+                                text: 'Precio (EUR)',
+                                color: '#e0e0e0'
+                            }},
+                            ticks: {{
+                                color: '#e0e0e0'
+                            }},
+                            grid: {{
+                                color: 'rgba(128, 128, 128, 0.2)',
+                                drawOnChartArea: false
                             }}
                         }},
                         y1: {{
@@ -730,7 +869,8 @@ def construir_prompt_formateado(data):
                             position: 'left',
                             title: {{
                                 display: true,
-                                text: 'Nuestro Algoritmo'
+                                text: 'Nuestro Algoritmo',
+                                color: '#e0e0e0'
                             }},
                             grid: {{
                                 drawOnChartArea: false,
@@ -738,58 +878,8 @@ def construir_prompt_formateado(data):
                             min: -100,
                             max: 100,
                             ticks: {{
-                                stepSize: 20
-                            }}
-                        }}
-                    }},
-                    plugins: {{
-                        legend: {{
-                            display: true
-                        }},
-                        tooltip: {{
-                            callbacks: {{
-                                label: function(context) {{
-                                    let label = context.dataset.label || '';
-                                    if (label) {{
-                                        label += ': ';
-                                    }}
-                                    if (context.parsed.y !== null) {{
-                                        label += context.parsed.y.toFixed(2);
-                                    }}
-                                    return label;
-                                }}
-                            }}
-                        }},
-                        annotation: {{
-                            annotations: {{
-                                compra: {{
-                                    type: 'line',
-                                    mode: 'horizontal',
-                                    scaleID: 'y1',
-                                    value: 40,
-                                    borderColor: 'rgba(0, 128, 0, 0.5)',
-                                    borderWidth: 2,
-                                    label: {{
-                                        content: 'Sobrecompra (+40)',
-                                        enabled: true,
-                                        position: 'start',
-                                        backgroundColor: 'rgba(0, 128, 0, 0.5)'
-                                    }}
-                                }},
-                                venta: {{
-                                    type: 'line',
-                                    mode: 'horizontal',
-                                    scaleID: 'y1',
-                                    value: -40,
-                                    borderColor: 'rgba(255, 0, 0, 0.5)',
-                                    borderWidth: 2,
-                                    label: {{
-                                        content: 'Sobreventa (-40)',
-                                        enabled: true,
-                                        position: 'start',
-                                        backgroundColor: 'rgba(255, 0, 0, 0.5)'
-                                    }}
-                                }}
+                                stepSize: 25,
+                                color: '#e0e0e0'
                             }}
                         }}
                     }}
@@ -809,7 +899,7 @@ def construir_prompt_formateado(data):
     </tr>
     <tr>
         <td style="padding: 8px;">Precio Actual</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_ACTUAL']:,}€</strong></td>
+        <td style="padding: 8px;"><strong>{formatear_numero(data['PRECIO_ACTUAL'])}€</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Volumen</td>
@@ -817,15 +907,15 @@ def construir_prompt_formateado(data):
     </tr>
     <tr>
         <td style="padding: 8px;">Soporte Clave</td>
-        <td style="padding: 8px;"><strong>{soportes_unicos[0]:,.3f}€</strong></td>
+        <td style="padding: 8px;"><strong>{formatear_numero(soportes_unicos[0])}€</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Resistencia Clave</td>
-        <td style="padding: 8px;"><strong>{data['RESISTENCIA']:,}€</strong></td>
+        <td style="padding: 8px;"><strong>{formatear_numero(data['RESISTENCIA'])}€</strong></td>
     </tr>
     <tr>
         <td style="padding: 8px;">Precio Objetivo de Compra</td>
-        <td style="padding: 8px;"><strong>{data['PRECIO_OBJETIVO_COMPRA']:,}€</strong></td>
+        <td style="padding: 8px;"><strong>{formatear_numero(data['PRECIO_OBJETIVO_COMPRA'])}€</strong></td>
     </tr>
 </table>
 <br/>
@@ -842,15 +932,15 @@ Genera un análisis técnico completo de aproximadamente 800 palabras sobre la e
 ¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y Único para TODOS sus gráficos solicitados. Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
 
 **Datos clave:**
-- Precio actual: {data['PRECIO_ACTUAL']}
+- Precio actual: {formatear_numero(data['PRECIO_ACTUAL'])}
 - Volumen del último día completo: {data['VOLUMEN']}
-- Soporte 1: {data['SOPORTE_1']}
-- Soporte 2: {data['SOPORTE_2']}
-- Soporte 3: {data['SOPORTE_3']}
-- Resistencia clave: {data['RESISTENCIA']}
+- Soporte 1: {formatear_numero(data['SOPORTE_1'])}
+- Soporte 2: {formatear_numero(data['SOPORTE_2'])}
+- Soporte 3: {formatear_numero(data['SOPORTE_3'])}
+- Resistencia clave: {formatear_numero(data['RESISTENCIA'])}
 - Recomendación general: {data['RECOMENDACION']}
 - SMI actual: {data['SMI']}
-- Precio objetivo de compra: {data['PRECIO_OBJETIVO_COMPRA']}€
+- Precio objetivo de compra: {formatear_numero(data['PRECIO_OBJETIVO_COMPRA'])}€
 - Tendencia del SMI: {data['tendencia_ibexia']}
 
 
@@ -860,12 +950,13 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <h1>{titulo_post}</h1>
 
 <h2>Análisis Inicial</h2>
-<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{data['PRECIO_ACTUAL']:,}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
+<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{formatear_numero(data['PRECIO_ACTUAL'])}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
 
 <h2>Historial de Operaciones</h2>
 {ganancias_html}
 
-<h2>Análisis Detallado del Gráfico</h2>
+{anuncio_html}
+
 {chart_html}
 {analisis_grafico_html}
 
@@ -993,6 +1084,8 @@ def generar_contenido_con_gemini(tickers):
             
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180)
+
+
 
 
 
