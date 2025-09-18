@@ -610,61 +610,105 @@ def construir_prompt_formateado(data):
         
         # Reemplazo para la sección de análisis detallado del gráfico
         analisis_grafico_html = f"""
-        <h2 style="color: #FFFFFF; background-color: #333333; padding: 10px; border-radius: 5px;">Análisis Detallado de Operaciones</h2>
+        <h2 style="color: #FFFFFF; background-color: #333333; padding: 10px; border-radius: 5px; text-align: center;">Análisis Detallado del Gráfico</h2>
         <div style="background-color: #1a1a1a; padding: 15px; border-radius: 8px;">
             <table style="width: 100%; border-collapse: collapse; color: #f2f2f2; font-family: Arial, sans-serif;">
                 <thead>
                     <tr style="background-color: #000000; border-bottom: 2px solid #555555;">
-                        <th style="padding: 12px; text-align: left; font-size: 14px;">Fecha</th>
-                        <th style="padding: 12px; text-align: left; font-size: 14px;">Movimiento Detectado</th>
-                        <th style="padding: 12px; text-align: left; font-size: 14px;">Precio de la Acción</th>
-                        <th style="padding: 12px; text-align: left; font-size: 14px;">Decisión de Inversión</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px;">Período</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px;">Movimiento del Algoritmo</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px;">Evolución del Precio</th>
+                        <th style="padding: 12px; text-align: left; font-size: 14px;">Decisión / Estado</th>
                     </tr>
                 </thead>
                 <tbody>
         """
         
-        # Recuperar los datos de compras y ventas simuladas
-        compras_simuladas = data.get('COMPRAS_SIMULADAS', [])
-        ventas_simuladas = data.get('VENTAS_SIMULADAS', [])
+        precios = data['PRECIOS_PARA_SIMULACION']
+        smis = data['SMI_PARA_SIMULACION']
+        fechas = data['FECHAS_PARA_SIMULACION']
+        
+        def get_trend(smi_val, prev_smi_val):
+            # Analiza la pendiente
+            if smi_val - prev_smi_val > 0.1:
+                return "alcista"
+            elif smi_val - prev_smi_val < -0.1:
+                return "bajista"
+            else:
+                return "consolidación"
 
-        # Unificar y ordenar los eventos de compra y venta por fecha
-        eventos = sorted(compras_simuladas + ventas_simuladas, key=lambda x: datetime.strptime(x['fecha'], "%d/%m/%Y"))
+        def get_event_action(start_date, end_date):
+            compra = next((c for c in data.get('COMPRAS_SIMULADAS', []) if c['fecha'] >= start_date and c['fecha'] <= end_date), None)
+            venta = next((v for v in data.get('VENTAS_SIMULADAS', []) if v['fecha'] >= start_date and v['fecha'] <= end_date), None)
+            
+            if compra:
+                return f"<strong>✅ Compra</strong> en {formatear_numero(compra['precio'])}€"
+            elif venta:
+                return f"<strong>❌ Venta</strong> en {formatear_numero(venta['precio'])}€"
+            return "Sin operación"
+            
+        i = 1
+        while i < len(smis):
+            start_index = i - 1
+            tendencia_actual = get_trend(smis[i], smis[i-1])
+            
+            while i < len(smis) and get_trend(smis[i], smis[i-1]) == tendencia_actual:
+                i += 1
+            
+            end_index = i - 1
+            
+            fecha_inicio = fechas[start_index]
+            fecha_fin = fechas[end_index]
+            precio_inicio = formatear_numero(precios[start_index])
+            precio_final = formatear_numero(precios[end_index])
+            
+            movimiento_algoritmo = ""
+            evolucion_precio = f"De <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
+            decision_inversion = get_event_action(fecha_inicio, fecha_fin)
 
-        if not eventos:
+            if tendencia_actual == "alcista":
+                movimiento_algoritmo = "Tendencia alcista"
+                evolucion_precio = f"<span style='color: #4CAF50;'>Subida</span> de <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
+            elif tendencia_actual == "bajista":
+                movimiento_algoritmo = "Tendencia bajista"
+                evolucion_precio = f"<span style='color: #F44336;'>Bajada</span> de <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
+            elif tendencia_actual == "consolidación":
+                movimiento_algoritmo = "Fase de consolidación"
+                evolucion_precio = f"<span style='color: #FFC107;'>Lateral</span> de <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
+
             analisis_grafico_html += f"""
-                    <tr>
-                        <td colspan="4" style="padding: 12px; text-align: center; color: #aaaaaa;">
-                            No se registraron operaciones de compra o venta en el período analizado.
-                        </td>
+                    <tr style="border-bottom: 1px solid #333333;">
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{fecha_inicio} a {fecha_fin}</td>
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{movimiento_algoritmo}</td>
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{evolucion_precio}</td>
+                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{decision_inversion}</td>
                     </tr>
             """
-        else:
-            for evento in eventos:
-                fecha = evento['fecha']
-                precio = formatear_numero(evento['precio'])
-                if 'compra' in evento:
-                    movimiento = "Giro a la compra detectado"
-                    precio_accion = f"Subida a <strong>{precio}€</strong>"
-                    decision = "<strong>✅ Compra</strong>"
-                else:
-                    movimiento = "Giro a la venta detectado"
-                    precio_accion = f"Bajada a <strong>{precio}€</strong>"
-                    decision = "<strong>❌ Venta</strong>"
-                
-                analisis_grafico_html += f"""
-                    <tr style="border-bottom: 1px solid #333333;">
-                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{fecha}</td>
-                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{movimiento}</td>
-                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{precio_accion}</td>
-                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{decision}</td>
-                    </tr>
-                """
         
+        # Última fila para el estado actual
+        ultima_tendencia = "bajista" # Asumir una tendencia por defecto si no hay suficientes datos
+        if len(smis) > 1:
+             ultima_tendencia_smi = get_trend(smis[-1], smis[-2])
+             if ultima_tendencia_smi == "alcista":
+                ultima_tendencia = "alcista"
+             elif ultima_tendencia_smi == "bajista":
+                ultima_tendencia = "bajista"
+             elif ultima_tendencia_smi == "consolidación":
+                 ultima_tendencia = "consolidación"
+
+        estado_actual = ""
+        if ultima_tendencia == "alcista":
+            estado_actual = "Actualmente, el Algoritmo muestra una **tendencia alcista**."
+        elif ultima_tendencia == "bajista":
+            estado_actual = "En estos momentos, el Algoritmo tiene una **tendencia bajista**."
+        elif ultima_tendencia == "consolidación":
+            estado_actual = "El Algoritmo se encuentra en una fase de **consolidación**, moviéndose de forma lateral."
+
         analisis_grafico_html += f"""
                 </tbody>
             </table>
         </div>
+        <p style="text-align: center; color: #aaaaaa; margin-top: 15px;">{estado_actual}</p>
         """
 
         # El gráfico en sí, que debe ir antes que el análisis
