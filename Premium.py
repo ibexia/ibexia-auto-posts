@@ -147,10 +147,10 @@ def calculate_smi_tv(df):
     epsilon = 1e-9
     smi_raw = np.where(
         (avgdiff / 2 + epsilon) != 0,
-        (avgrel / (avgdiff / 2 + epsilon)) * 100,
+        (avgrel / (avgdiff / 2 + epsilon)) * ,
         0.0
     )
-    smi_raw = np.clip(smi_raw, -100, 100)
+    smi_raw = np.clip(smi_raw, -, )
     smi_smoothed = pd.Series(smi_raw, index=df.index).rolling(window=smooth_period).mean()
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
     df['SMI'] = smi_smoothed
@@ -158,11 +158,11 @@ def calculate_smi_tv(df):
 
 def calculate_emas(df):
     """
-    Calcula las medias móviles exponenciales (EMA) para 14 y 100 periodos.
+    Calcula las medias móviles exponenciales (EMA) para 14 y  periodos.
     """
     try:
         df['EMA14'] = df['Close'].ewm(span=14, adjust=False).mean()
-        df['EMA100'] = df['Close'].ewm(span=100, adjust=False).mean()
+        df['EMA200'] = df['Close'].ewm(span=100, adjust=False).mean()
         return df
     except Exception as e:
         print(f"❌ Error al calcular EMAs: {e}")
@@ -330,7 +330,7 @@ def obtener_datos_yfinance(ticker):
             "RESISTENCIA_1": sr_levels['r1'],
             "RESISTENCIA_2": sr_levels['r2'],
             "EMA14": hist_extended['EMA14'].iloc[-1],  # <-- Añade esta línea
-            "EMA100": hist_extended['EMA100'].iloc[-1]   # <-- Añade esta línea
+            "EMA200": hist_extended['EMA200'].iloc[-1]   # <-- Añade esta línea
         
         }
 
@@ -673,7 +673,7 @@ def generar_reporte():
                                 <th>Resistencia 1</th>
                                 <th>Resistencia 2</th>
                                 <th>EMA 14</th>
-                                <th>EMA 100</th>
+                                <th>EMA 200</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -757,16 +757,16 @@ def generar_reporte():
 
                 # Nueva lógica para colorear las celdas de la EMA
                 clase_ema14 = ""
-                clase_ema100 = ""
+                clase_ema200 = ""
                 if data['PRECIO_ACTUAL'] is not None and data['EMA14'] is not None:
                     # Comprobamos si la diferencia porcentual es menor al 1%
                     if data['EMA14'] != 0 and abs(data['PRECIO_ACTUAL'] - data['EMA14']) / data['EMA14'] < 0.01:
                         clase_ema14 = "green-cell"
 
-                if data['PRECIO_ACTUAL'] is not None and data['EMA100'] is not None:
+                if data['PRECIO_ACTUAL'] is not None and data['EMA200'] is not None:
                     # Comprobamos si la diferencia porcentual es menor al 1%
-                    if data['EMA100'] != 0 and abs(data['PRECIO_ACTUAL'] - data['EMA100']) / data['EMA100'] < 0.01:
-                        clase_ema100 = "green-cell"
+                    if data['EMA200'] != 0 and abs(data['PRECIO_ACTUAL'] - data['EMA200']) / data['EMA200'] < 0.01:
+                        clase_ema200 = "green-cell"
                         
                 html_body += f"""
                             <tr>
@@ -777,7 +777,7 @@ def generar_reporte():
                                 <td>{data['VENDE_SI']}</td>
                                 {sr_html}
                                 <td class="{clase_ema14}">{formatear_numero(data['EMA14'])}€</td>
-                                <td class="{clase_ema100}">{formatear_numero(data['EMA100'])}€</td>
+                                <td class="{clase_ema200}">{formatear_numero(data['EMA200'])}€</td>
                             </tr>
                             <tr class="observaciones-row">
                                 <td colspan="11">{observaciones}</td>
