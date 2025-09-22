@@ -49,6 +49,7 @@ tickers = {
     'GAM': 'GAM.MC',
     'Gigas-Hosting': 'GIGA.MC',
     'Grifols': 'GRF.MC',
+    'Grupo San Jose': 'GSJ.MC',
     'Holaluz': 'HLZ.MC',
     'Neinor-homes': 'HOME.MC',
     'IAG': 'IAG.MC',
