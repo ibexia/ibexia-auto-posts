@@ -162,7 +162,7 @@ def calculate_emas(df):
     """
     try:
         df['EMA14'] = df['Close'].ewm(span=14, adjust=False).mean()
-        df['EMA200'] = df['Close'].ewm(span=100, adjust=False).mean()
+        df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
         return df
     except Exception as e:
         print(f"❌ Error al calcular EMAs: {e}")
