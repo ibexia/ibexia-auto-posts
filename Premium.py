@@ -156,18 +156,6 @@ def calculate_smi_tv(df):
     df['SMI'] = smi_smoothed
     return df
 
-def calculate_emas(df):
-    """
-    Calcula las medias móviles exponenciales (EMA) para 14 y  periodos.
-    """
-    try:
-        df['EMA14'] = df['Close'].ewm(span=14, adjust=False).mean()
-        df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
-        return df
-    except Exception as e:
-        print(f"❌ Error al calcular EMAs: {e}")
-        return df
-
 def calcular_precio_aplanamiento(df):
     try:
         if len(df) < 3:
@@ -203,7 +191,7 @@ def calcular_precio_aplanamiento(df):
         print(f"❌ Error en el cálculo de precio de aplanamiento: {e}")
         return "N/A"
 
-def calcular_soporte_cia(df, window=5):
+def calcular_soporte_resistencia(df, window=5):
     try:
         supports = []
         resistances = []
@@ -235,7 +223,7 @@ def calcular_soporte_cia(df, window=5):
         return {'s1': s1, 's2': s2, 'r1': r1, 'r2': r2}
         
     except Exception as e:
-        print(f"❌ Error al calcular soportes y cias: {e}")
+        print(f"❌ Error al calcular soportes y resistencias: {e}")
         return {'s1': 'N/A', 's2': 'N/A', 'r1': 'N/A', 'r2': 'N/A'}
         
 def calcular_beneficio_perdida(precio_compra, precio_actual, inversion=10000):
@@ -267,9 +255,8 @@ def obtener_datos_yfinance(ticker):
             print(f"⚠️ Advertencia: No se encontraron datos históricos para {ticker}. Saltando...")
             return None
         hist_extended = calculate_smi_tv(hist_extended)
-        hist_extended = calculate_emas(hist_extended)  
         
-        sr_levels = calcular_soporte_cia(hist_extended)
+        sr_levels = calcular_soporte_resistencia(hist_extended)
 
         smi_series = hist_extended['SMI'].dropna()
         if len(smi_series) < 2:
@@ -328,10 +315,7 @@ def obtener_datos_yfinance(ticker):
             "SOPORTE_1": sr_levels['s1'],
             "SOPORTE_2": sr_levels['s2'],
             "RESISTENCIA_1": sr_levels['r1'],
-            "RESISTENCIA_2": sr_levels['r2'],
-            "EMA14": hist_extended['EMA14'].iloc[-1],  # <-- Añade esta línea
-            "EMA200": hist_extended['EMA200'].iloc[-1]   # <-- Añade esta línea
-        
+            "RESISTENCIA_2": sr_levels['r2']
         }
 
     except Exception as e:
@@ -672,8 +656,6 @@ def generar_reporte():
                                 <th>Soporte 2</th>
                                 <th>Resistencia 1</th>
                                 <th>Resistencia 2</th>
-                                <th>EMA 14</th>
-                                <th>EMA 200</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -753,21 +735,7 @@ def generar_reporte():
                     sr_html += f'<td class="{r_clase}">{formatear_numero(r)}€</td>'
                 
                 observaciones = generar_observaciones(data)
-
-
-                # Nueva lógica para colorear las celdas de la EMA
-                clase_ema14 = ""
-                clase_ema200 = ""
-                if data['PRECIO_ACTUAL'] is not None and data['EMA14'] is not None:
-                    # Comprobamos si la diferencia porcentual es menor al 1%
-                    if data['EMA14'] != 0 and abs(data['PRECIO_ACTUAL'] - data['EMA14']) / data['EMA14'] < 0.01:
-                        clase_ema14 = "green-cell"
-
-                if data['PRECIO_ACTUAL'] is not None and data['EMA200'] is not None:
-                    # Comprobamos si la diferencia porcentual es menor al 1%
-                    if data['EMA200'] != 0 and abs(data['PRECIO_ACTUAL'] - data['EMA200']) / data['EMA200'] < 0.01:
-                        clase_ema200 = "green-cell"
-                        
+                
                 html_body += f"""
                             <tr>
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
@@ -776,11 +744,9 @@ def generar_reporte():
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
                                 {sr_html}
-                                <td class="{clase_ema14}">{formatear_numero(data['EMA14'])}€</td>
-                                <td class="{clase_ema200}">{formatear_numero(data['EMA200'])}€</td>
                             </tr>
                             <tr class="observaciones-row">
-                                <td colspan="11">{observaciones}</td>
+                                <td colspan="9">{observaciones}</td>
                             </tr>
                 """
                 previous_orden_grupo = current_orden_grupo
