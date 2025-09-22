@@ -766,7 +766,7 @@ def generar_reporte():
                 if data['PRECIO_ACTUAL'] is not None and data['EMA100'] is not None:
                     # Comprobamos si la diferencia porcentual es menor al 1%
                     if data['EMA100'] != 0 and abs(data['PRECIO_ACTUAL'] - data['EMA100']) / data['EMA100'] < 0.01:
-                        clase_EMA100 = "green-cell"
+                        clase_ema100 = "green-cell"
                         
                 html_body += f"""
                             <tr>
@@ -777,7 +777,7 @@ def generar_reporte():
                                 <td>{data['VENDE_SI']}</td>
                                 {sr_html}
                                 <td class="{clase_ema14}">{formatear_numero(data['EMA14'])}€</td>
-                                <td class="{clase_EMA100}">{formatear_numero(data['EMA100'])}€</td>
+                                <td class="{clase_ema100}">{formatear_numero(data['EMA100'])}€</td>
                             </tr>
                             <tr class="observaciones-row">
                                 <td colspan="11">{observaciones}</td>
