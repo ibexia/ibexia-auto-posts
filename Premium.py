@@ -144,7 +144,7 @@ def calculate_smi_tv(df):
     rdiff = close - (hh + ll) / 2
     avgrel = rdiff.ewm(span=length_d, adjust=False).mean()
     avgdiff = diff.ewm(span=length_d, adjust=False).mean()
-     = 1e-9
+    epsilon = 1e-9
     smi_raw = np.where(
         (avgdiff / 2 + ) != 0,
         (avgrel / (avgdiff / 2 + epsilon)) * 100,
