@@ -203,7 +203,7 @@ def calcular_precio_aplanamiento(df):
         print(f"❌ Error en el cálculo de precio de aplanamiento: {e}")
         return "N/A"
 
-def calcular_soporte_resistencia(df, window=5):
+def calcular_soporte_cia(df, window=5):
     try:
         supports = []
         resistances = []
@@ -235,7 +235,7 @@ def calcular_soporte_resistencia(df, window=5):
         return {'s1': s1, 's2': s2, 'r1': r1, 'r2': r2}
         
     except Exception as e:
-        print(f"❌ Error al calcular soportes y resistencias: {e}")
+        print(f"❌ Error al calcular soportes y cias: {e}")
         return {'s1': 'N/A', 's2': 'N/A', 'r1': 'N/A', 'r2': 'N/A'}
         
 def calcular_beneficio_perdida(precio_compra, precio_actual, inversion=10000):
@@ -269,7 +269,7 @@ def obtener_datos_yfinance(ticker):
         hist_extended = calculate_smi_tv(hist_extended)
         hist_extended = calculate_emas(hist_extended)  
         
-        sr_levels = calcular_soporte_resistencia(hist_extended)
+        sr_levels = calcular_soporte_cia(hist_extended)
 
         smi_series = hist_extended['SMI'].dropna()
         if len(smi_series) < 2:
@@ -328,7 +328,7 @@ def obtener_datos_yfinance(ticker):
             "SOPORTE_1": sr_levels['s1'],
             "SOPORTE_2": sr_levels['s2'],
             "RESISTENCIA_1": sr_levels['r1'],
-            "RESISTENCIA_2": sr_levels['r2']
+            "RESISTENCIA_2": sr_levels['r2'],
             "EMA14": hist_extended['EMA14'].iloc[-1],  # <-- Añade esta línea
             "EMA50": hist_extended['EMA50'].iloc[-1]   # <-- Añade esta línea
         
