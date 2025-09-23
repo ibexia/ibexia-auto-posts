@@ -22,7 +22,10 @@ jobs:
 
           pip install yfinance pandas
           pip install yfinance pandas feedparser
-
+          
+      - name: Install pandas-ta  # Nuevo paso
+        run: pip install pandas-ta # Comando para instalar la librería
+        
       - name: Ejecutar script para leer Google Sheets y generar contenido con Gemini
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
