@@ -252,7 +252,7 @@ def obtener_datos_yfinance(ticker):
             return None
 
         hist_extended = stock.history(period="150d", interval="1d")
-        hist_extended['SMA_100'] = ta.sma(hist_extended['Close'], length=150)
+        hist_extended['EMA_100'] = ta.ema(hist_extended['Close'], length=150)
         if hist_extended.empty:
             print(f"⚠️ Advertencia: No se encontraron datos históricos para {ticker}. Saltando...")
             return None
@@ -643,7 +643,7 @@ def generar_reporte():
                             <tr>
                                 <th>Empresa (Precio)</th>
                                 <th>Tendencia Actual</th>
-                                <th>SMA 100</th>
+                                <th>EMA 100</th>
                                 <th>Oportunidad</th>
                                 <th>Compra si...</th>
                                 <th>Vende si...</th>
@@ -735,7 +735,7 @@ def generar_reporte():
                             <tr>
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
-                                <td>{formatear_numero(data['HIST_DF']['SMA_100'].iloc[-1])}</td>
+                                <td>{formatear_numero(data['HIST_DF']['EMA_100'].iloc[-1])}</td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
