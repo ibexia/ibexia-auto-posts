@@ -15,6 +15,7 @@ import re
 import random
 from email.mime.base import MIMEBase
 from email import encoders
+import pandas_ta as ta
 
 tickers = {
     'Acciona': 'ANA.MC',
@@ -251,6 +252,7 @@ def obtener_datos_yfinance(ticker):
             return None
 
         hist_extended = stock.history(period="60d", interval="1d")
+        hist_extended['SMA_14'] = ta.sma(hist_extended['Close'], length=14)
         if hist_extended.empty:
             print(f"⚠️ Advertencia: No se encontraron datos históricos para {ticker}. Saltando...")
             return None
@@ -649,6 +651,7 @@ def generar_reporte():
                             <tr>
                                 <th>Empresa (Precio)</th>
                                 <th>Tendencia Actual</th>
+                                <th>SMA 14</th>
                                 <th>Oportunidad</th>
                                 <th>Compra si...</th>
                                 <th>Vende si...</th>
@@ -740,6 +743,7 @@ def generar_reporte():
                             <tr>
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
+                                <td>{formatear_numero(data['HIST_DF']['SMA_14'].iloc[-1])}</td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
