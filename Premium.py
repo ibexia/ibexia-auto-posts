@@ -750,7 +750,7 @@ def generar_reporte():
                             <tr>
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
-                                <td>{formatear_numero(data['VALOR_EMA'])}€<br><b>({data['TIPO_EMA']})</b></td>
+                                <td>{formatear_numero(data['VALOR_EMA'])}€<br><b>({data['TIPO_EMA']} EMA)</b></td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
