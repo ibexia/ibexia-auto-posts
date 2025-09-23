@@ -554,91 +554,105 @@ def generar_reporte():
         <head>
             <title>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
             <style>
-                body {{ 
-                    font-family: Arial, sans-serif; 
-                    background-color: #f4f4f4;
+                body {{
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    background-color: #f8f9fa;
                     margin: 0;
-                    padding: 20px;
+                    padding: 10px;
                 }}
                 .main-container {{
-                    max-width: 1300px;
+                    max-width: 1200px;
                     margin: 0 auto;
-                    background-color: #fff;
-                    padding: 20px;
+                    background-color: #ffffff;
+                    padding: 15px;
                     border-radius: 8px;
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
                 }}
-                h2 {{ color: #2c3e50; text-align: center; }}
-                p {{ color: #7f8c8d; text-align: center; }}
-                #search-container {{ margin-bottom: 20px; }}
+                h2 {{
+                    color: #343a40;
+                    text-align: center;
+                    font-size: 1.5em;
+                    margin-bottom: 10px;
+                }}
+                p {{
+                    color: #6c757d;
+                    text-align: center;
+                    font-size: 0.9em;
+                }}
+                #search-container {{
+                    margin-bottom: 15px;
+                }}
                 #searchInput {{
                     width: 100%;
-                    padding: 10px;
-                    font-size: 16px;
-                    border: 1px solid #ddd;
+                    padding: 8px;
+                    font-size: 0.9em;
+                    border: 1px solid #ced4da;
                     border-radius: 4px;
                     box-sizing: border-box;
                 }}
                 .table-container {{
                     overflow-x: auto;
                     overflow-y: auto;
-                    height: 80vh;
+                    height: 70vh; /* Altura un poco más baja para que no sea tan grande */
                     position: relative;
                 }}
-                table {{ 
-                    width: 90%;
+                table {{
+                    width: 100%;
                     table-layout: fixed;
-                    margin: 20px auto 0 auto;
+                    margin: 10px auto 0 auto;
                     border-collapse: collapse;
+                    font-size: 0.85em; /* Reducir el tamaño de la fuente de la tabla */
                 }}
-                th, td {{ 
-                    border: 1px solid #ddd; 
-                    padding: 8px; 
+                th, td {{
+                    border: 1px solid #e9ecef;
+                    padding: 6px; /* Reducir el padding para celdas más pequeñas */
                     text-align: center;
-                    vertical-align: top;
+                    vertical-align: middle;
                     white-space: normal;
-                    width: calc(140px * 0.80);
                     line-height: 1.2;
                 }}
-                th {{ 
-                    background-color: #f2f2f2;
+                th {{
+                    background-color: #e9ecef;
+                    color: #495057;
+                    font-weight: 600;
                     position: sticky;
                     top: 0;
                     z-index: 10;
+                    white-space: nowrap; /* Para que los títulos de las columnas no se rompan */
                 }}
-                .compra {{ color: #1abc9c; font-weight: bold; }}
-                .venta {{ color: #e74c3c; font-weight: bold; }}
-                .comprado-si {{ background-color: #2ecc71; color: white; font-weight: bold; }}
+                .compra {{ color: #28a745; font-weight: bold; }}
+                .venta {{ color: #dc3545; font-weight: bold; }}
+                .comprado-si {{ background-color: #28a745; color: white; font-weight: bold; }}
                 .bg-green {{ background-color: #d4edda; color: #155724; }}
                 .bg-red {{ background-color: #f8d7da; color: #721c24; }}
-                .bg-highlight {{ background-color: #2ecc71; color: white; font-weight: bold; }}
+                .bg-highlight {{ background-color: #28a745; color: white; font-weight: bold; }}
                 .text-center {{ text-align: center; }}
-                .disclaimer {{ font-size: 12px; text-align: center; color: #95a5a6; }}
-                .small-text {{ font-size: 10px; color: #555; }}
+                .disclaimer {{ font-size: 0.8em; text-align: center; color: #6c757d; margin-top: 15px; }}
+                .small-text {{ font-size: 0.7em; color: #6c757d; }}
                 .green-cell {{ background-color: #d4edda; }}
                 .red-cell {{ background-color: #f8d7da; }}
-                .separator-row td {{ background-color: black; height: 5px; padding: 0; border: none; }}
+                .separator-row td {{ background-color: #e9ecef; height: 3px; padding: 0; border: none; }}
                 .category-header td {{
-                    background-color: #34495e;
+                    background-color: #495057;
                     color: white;
-                    font-size: 1.5em;
+                    font-size: 1.1em;
                     font-weight: bold;
                     text-align: center;
-                    padding: 15px;
+                    padding: 10px;
                     border: none;
                 }}
                 .observaciones-row td {{
                     background-color: #f9f9f9;
                     text-align: left;
-                    font-size: 0.9em;
-                    border: 1px solid #ddd;
+                    font-size: 0.8em;
+                    border: 1px solid #e9ecef;
                 }}
-                .stacked-text {{ 
+                .stacked-text {{
                     line-height: 1.2;
-                    font-size: 10px;
+                    font-size: 0.8em;
                 }}
-                .vigilar {{ color: #f39c12; font-weight: bold; }}
-            </style>
+                .vigilar {{ color: #ffc107; font-weight: bold; }}
+            </style>                
         </head>
         <body>
             <div class="main-container">
