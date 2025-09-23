@@ -503,16 +503,8 @@ def generar_reporte():
             print(f"🔎 Analizando {ticker}...")
             
             try:
-                stock = yf.Ticker(ticker)
-                hist_df = stock.history(period="60d", interval="1d")
-                if hist_df.empty:
-                    print(f"⚠️ Advertencia: No se encontraron datos históricos para {ticker}. Saltando...")
-                    continue
-                hist_df = calculate_smi_tv(hist_df)
-                
                 data = obtener_datos_yfinance(ticker)
                 if data:
-                    data['HIST_DF'] = hist_df
                     datos_completos.append(clasificar_empresa(data))
             except Exception as e:
                 print(f"❌ Error al procesar {ticker}: {e}. Saltando a la siguiente empresa...")
