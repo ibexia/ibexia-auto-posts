@@ -251,8 +251,8 @@ def obtener_datos_yfinance(ticker):
             print(f"⚠️ Advertencia: No se encontró precio actual para {ticker}. Saltando...")
             return None
 
-        hist_extended = stock.history(period="120d", interval="1d")
-        hist_extended['SMA_100'] = ta.sma(hist_extended['Close'], length=100)
+        hist_extended = stock.history(period="150d", interval="1d")
+        hist_extended['SMA_100'] = ta.sma(hist_extended['Close'], length=150)
         if hist_extended.empty:
             print(f"⚠️ Advertencia: No se encontraron datos históricos para {ticker}. Saltando...")
             return None
