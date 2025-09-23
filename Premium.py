@@ -253,6 +253,17 @@ def obtener_datos_yfinance(ticker):
 
         hist_extended = stock.history(period="150d", interval="1d")
         hist_extended['EMA_100'] = ta.ema(hist_extended['Close'], length=100)
+                
+        precio_actual = hist_extended['Close'].iloc[-1]
+        ema_actual = hist_extended['EMA_100'].iloc[-1]
+        
+        if precio_actual > ema_actual:
+            tipo_ema = "Soporte"
+        elif precio_actual < ema_actual:
+            tipo_ema = "Resistencia"
+        else:
+            tipo_ema = "Igual"
+            
         if hist_extended.empty:
             print(f"⚠️ Advertencia: No se encontraron datos históricos para {ticker}. Saltando...")
             return None
@@ -317,6 +328,8 @@ def obtener_datos_yfinance(ticker):
             "SOPORTE_1": sr_levels['s1'],
             "SOPORTE_2": sr_levels['s2'],
             "RESISTENCIA_1": sr_levels['r1'],
+            "TIPO_EMA": tipo_ema,
+            "VALOR_EMA": ema_actual,
             "RESISTENCIA_2": sr_levels['r2']
         }
 
@@ -423,35 +436,37 @@ def generar_observaciones(data):
     resistencia1 = formatear_numero(data['RESISTENCIA_1'])
     compra_si = data['COMPRA_SI']
     vende_si = data['VENDE_SI']
+    tipo_ema = data['TIPO_EMA']
+    valor_ema = formatear_numero(data['VALOR_EMA'])
     
     texto_observacion = f"<strong>Observaciones de {nombre_empresa}:</strong><br>"
 
     if oportunidad == "Posibilidad de Compra Activada":
-        texto = f"El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda tener en cuenta los niveles de resistencia ({resistencia1}€) para determinar un objetivo de precio."
+        texto = f"El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda tener en cuenta los niveles de resistencia ({resistencia1}€) para determinar un objetivo de precio. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
     
     elif oportunidad == "Posibilidad de Compra":
         if "COMPRA YA" in compra_si:
-            texto = f"El algoritmo detecta que el valor está en una zona de sobreventa, lo que puede ser un indicador de reversión. El algoritmo ha detectado una oportunidad de compra inmediata para aprovechar un posible rebote."
+            texto = f"El algoritmo detecta que el valor está en una zona de sobreventa, lo que puede ser un indicador de reversión. El algoritmo ha detectado una oportunidad de compra inmediata para aprovechar un posible rebote.La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
         else:
-            texto = f"El algoritmo detecta que el valor está en una zona de sobreventa con una tendencia bajista. Se ha detectado una oportunidad de {compra_si} para un posible rebote."
+            texto = f"El algoritmo detecta que el valor está en una zona de sobreventa con una tendencia bajista. Se ha detectado una oportunidad de {compra_si} para un posible rebote. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
     
     elif oportunidad == "VIGILAR":
-        texto = f"El algoritmo se encuentra en una zona intermedia y muestra una tendencia alcista en sus últimos valores. Se sugiere vigilar de cerca, ya que una caída en el precio podría ser una señal de venta. {vende_si}. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio."
+        texto = f"El algoritmo se encuentra en una zona intermedia y muestra una tendencia alcista en sus últimos valores. Se sugiere vigilar de cerca, ya que una caída en el precio podría ser una señal de venta. {vende_si}. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
     
     elif oportunidad == "Riesgo de Venta":
-        texto = f"El algoritmo ha entrado en una zona de sobrecompra. Esto genera un riesgo de venta. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio."
+        texto = f"El algoritmo ha entrado en una zona de sobrecompra. Esto genera un riesgo de venta. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
     
     elif oportunidad == "Riesgo de Venta Activada":
-        texto = f"La combinación de una zona de sobrecompra y una tendencia bajista en el algoritmo ha activado una señal de riesgo de venta. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio."
+        texto = f"La combinación de una zona de sobrecompra y una tendencia bajista en el algoritmo ha activado una señal de riesgo de venta. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
 
     elif oportunidad == "Seguirá bajando":
-        texto = f"El algoritmo sugiere que es probable que el precio siga bajando en el corto plazo. No se aconseja ni comprar ni vender. Se recomienda observar los niveles de soporte ({soporte1}€)."
+        texto = f"El algoritmo sugiere que es probable que el precio siga bajando en el corto plazo. No se aconseja ni comprar ni vender. Se recomienda observar los niveles de soporte ({soporte1}€). La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
 
     elif oportunidad == "Intermedio":
-        texto = "El algoritmo no emite recomendaciones de compra o venta en este momento, por lo que lo más prudente es mantenerse al margen."
+        texto = "El algoritmo no emite recomendaciones de compra o venta en este momento, por lo que lo más prudente es mantenerse al margen. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
     
     else:
-        texto = "El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda comprar para aprovechar un posible rebote, con un objetivo de precio en la zona de resistencia."
+        texto = "El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda comprar para aprovechar un posible rebote, con un objetivo de precio en la zona de resistencia. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
     
     return f'<p style="text-align:left; color:#000;">{texto_observacion.strip()}{texto.strip()}</p>'
 
@@ -643,7 +658,7 @@ def generar_reporte():
                             <tr>
                                 <th>Empresa (Precio)</th>
                                 <th>Tendencia Actual</th>
-                                <th>EMA 100</th>
+                                <th>EMA</th>
                                 <th>Oportunidad</th>
                                 <th>Compra si...</th>
                                 <th>Vende si...</th>
@@ -735,7 +750,7 @@ def generar_reporte():
                             <tr>
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
-                                <td>{formatear_numero(data['HIST_DF']['EMA_100'].iloc[-1])}</td>
+                                <td>{formatear_numero(data['VALOR_EMA'])}€<br><b>({data['TIPO_EMA']})</b></td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
