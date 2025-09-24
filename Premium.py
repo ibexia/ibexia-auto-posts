@@ -507,48 +507,127 @@ def enviar_email_con_adjunto(html_body, asunto_email):
         print("❌ Error al enviar el correo:", e)
 
 def generar_reporte():
+    """Genera un reporte diario de oportunidades de trading y lo envía por correo."""
+
+    # Se agregan los tickers del IBEX 35 y los del MAB
+    tickers = {
+        'Acciona': 'ANA.MC',
+        'Accionarenovables': 'ANE.MC',
+        'Acerinox': 'ACX.MC',
+        'ACS': 'ACS.MC',
+        'Aedas-Homes': 'AEDAS.MC',
+        'Aena': 'AENA.MC',
+        'Almirall': 'ALM.MC',
+        'Airbus': 'AIR.MC',
+        'AirTificial': 'AI.MC',
+        'Amadeus': 'AMS.MC',
+        'Amper': 'AMP.MC',
+        'Audax-Renovables': 'ADX.MC',
+        'Bankinter': 'BKT.MC',
+        'BBVA': 'BBVA.MC',
+        'Berkeley': 'BKY.MC',
+        'Biotechnology': 'BST.MC',
+        'CaixaBank': 'CABK.MC',
+        'Cellnex': 'CLNX.MC',
+        'DIA': 'DIA.MC',
+        'Ercros': 'ECR.MC',
+        'Endesa': 'ELE.MC',
+        'Elecnor': 'ENO.MC',
+        'Ence': 'ENC.MC',
+        'Enagas': 'ENG.MC',
+        'Fluidra': 'FLUIDRA.MC',
+        'Ferrovial': 'FER.MC',
+        'GAM': 'GAM.MC',
+        'Gestamp': 'GEST.MC',
+        'Grifols': 'GRF.MC',
+        'GrifolsB': 'GRF.B.MC',
+        'Iberdrola': 'IBE.MC',
+        'Inditex': 'ITX.MC',
+        'Inmobiliaria-Colonial': 'COL.MC',
+        'Inmobiliaria del Sur': 'ISUR.MC',
+        'Indra': 'IDR.MC',
+        'Mapfre': 'MAP.MC',
+        'MasMovil': 'MAS.MC',
+        'Merlin Properties': 'MRL.MC',
+        'Naturgy': 'NTGY.MC',
+        'Pharma Mar': 'PHM.MC',
+        'Redeia': 'RED.MC',
+        'Repsol': 'REP.MC',
+        'Sabadell': 'SAB.MC',
+        'Santander': 'SAN.MC',
+        'Solaria': 'SLR.MC',
+        'Telefónica': 'TEF.MC',
+        'Unicaja-Banco': 'UNICA.MC',
+        'Vidrala': 'VID.MC',
+        'Siemens Gamesa': 'SGRE.MC',
+    }
+
+    def formatear_numero(n):
+        return f"{n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if isinstance(n, (int, float)) else ""
+
+    def generar_observaciones(data):
+        observaciones = []
+        if 'OBSERVACIONES_PERSONALIZADAS' in data and data['OBSERVACIONES_PERSONALIZADAS']:
+            observaciones.append(data['OBSERVACIONES_PERSONALIZADAS'])
+        if data.get('PUNTOS_IMPORTANTES'):
+            puntos = data['PUNTOS_IMPORTANTES'].split(';')
+            for punto in puntos:
+                if punto.strip():
+                    observaciones.append(punto.strip())
+        return "<ul>" + "".join([f"<li>{obs}</li>" for obs in observaciones]) + "</ul>" if observaciones else ""
+
+    def analizar_volumen(ticker, volumen_actual):
+        """Analiza el volumen de trading de un ticker y devuelve un comentario de trading profesional."""
+        try:
+            # Descargar los últimos 30 días de datos
+            fin_fecha = datetime.today()
+            inicio_fecha = fin_fecha - timedelta(days=45) # 45 días para asegurar al menos 30 días de trading
+            
+            data_historial = yf.download(ticker, start=inicio_fecha, end=fin_fecha, progress=False)
+
+            if data_historial.empty or 'Volume' not in data_historial.columns:
+                return "No hay datos de volumen disponibles para el análisis."
+
+            # Calcular el volumen promedio de los últimos 30 días
+            volumen_promedio_30d = data_historial['Volume'].tail(30).mean()
+
+            if volumen_promedio_30d == 0:
+                return f"Volumen actual: {volumen_actual:,.0f}. El volumen promedio es cero, por lo que no se puede analizar."
+
+            ratio_volumen = volumen_actual / volumen_promedio_30d
+
+            comentario = ""
+            if ratio_volumen > 2.0:
+                comentario = "Una subida de volumen **superior al 200%** del promedio es una señal de que el interés en este activo se está disparando. Esto podría indicar una **gran oportunidad de trading** y confirma la validez de los movimientos de precio actuales."
+            elif ratio_volumen > 1.5:
+                comentario = "El volumen de hoy es **más de un 50% superior al promedio**. Esta fuerte entrada de capital indica un interés significativo y podría estar **confirmando un movimiento de tendencia** o una ruptura."
+            elif ratio_volumen > 1.0:
+                comentario = f"El volumen de hoy es **superior al promedio** de los últimos 30 días. Esto sugiere que el movimiento de precio actual está respaldado por el mercado."
+            else:
+                comentario = "El volumen actual es **inferior al promedio**. Esto puede ser un indicio de falta de convicción en el movimiento de precio, sugiriendo que la tendencia no es tan fuerte como parece. Es una señal de **precaución**."
+
+            return f"Volumen actual: {volumen_actual:,.0f}<br>Promedio 30D: {volumen_promedio_30d:,.0f}<br><br><b>Análisis:</b> {comentario}"
+
+        except Exception as e:
+            return f"Error al analizar el volumen: {e}"
+
     try:
-        all_tickers = leer_google_sheets()[1:]
-        if not all_tickers:
-            print("No hay tickers para procesar.")
+        data_base_path = 'data_base.json'
+
+        if not os.path.exists(data_base_path) or os.path.getsize(data_base_path) == 0:
+            print("❌ El archivo 'data_base.json' no existe o está vacío. Saliendo del script.")
             return
 
-        datos_completos = []
-        for ticker in all_tickers:
-            print(f"🔎 Analizando {ticker}...")
-            
-            try:
-                data = obtener_datos_yfinance(ticker)
-                if data:
-                    datos_completos.append(clasificar_empresa(data))
-            except Exception as e:
-                print(f"❌ Error al procesar {ticker}: {e}. Saltando a la siguiente empresa...")
-                continue
-                
-            time.sleep(1)
+        with open(data_base_path, 'r', encoding='utf-8') as f:
+            datos_empresas = json.load(f)
 
-        # --- Lógica de ordenación integrada ---
-        def obtener_clave_ordenacion(empresa):
-            categoria = empresa['OPORTUNIDAD']
-            
-            orden_grupo = 99
-            orden_interna = float('inf')
-            
-            if categoria in ["Posibilidad de Compra Activada", "Posibilidad de Compra"]:
-                orden_grupo = 1
-            elif categoria in ["VIGILAR", "Riesgo de Venta", "Riesgo de Venta Activada", "Seguirá bajando"]:
-                orden_grupo = 2
-            elif categoria == "Intermedio":
-                orden_grupo = 3
-
-            return (empresa['ORDEN_PRIORIDAD'], empresa['NOMBRE_EMPRESA'])
-
-        datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
+        datos_ordenados = sorted(
+            [d for d in datos_empresas if d.get('ORDEN_PRIORIDAD') is not None],
+            key=lambda x: x['ORDEN_PRIORIDAD']
+        )
         
-        # --- Fin de la lógica de ordenación integrada ---
-        now_utc = datetime.utcnow()
-        hora_actual = (now_utc + timedelta(hours=2)).strftime('%H:%M')
-        
+        hora_actual = datetime.now().strftime('%H:%M')
+
         html_body = f"""
         <html>
         <head>
@@ -740,8 +819,10 @@ def generar_reporte():
                 else:
                     empresa_link = '#'
                 
+                # --- CAMBIO AÑADIDO: AHORA INCLUYE EL TICKER ---
                 nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
-
+                # ------------------------------------------------
+                
                 clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else ("vigilar" if "vigilar" in data['OPORTUNIDAD'].lower() else ""))
                 
                 celda_empresa_class = ""
@@ -752,6 +833,10 @@ def generar_reporte():
                 
                 observaciones = generar_observaciones(data)
                 
+                # --- NUEVA LÍNEA: ANÁLISIS DEL VOLUMEN ---
+                analisis_volumen = analizar_volumen(data['TICKER'], data.get('VOLUMEN', 0))
+                # ----------------------------------------
+
                 html_body += f"""
                             <tr class="main-row" data-index="{i}">
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
@@ -763,21 +848,28 @@ def generar_reporte():
                             </tr>
                             <tr class="collapsible-row detailed-row-{i}">
                                 <td colspan="6">
-                                    <div style="display:flex; justify-content:space-around; align-items:flex-start; padding: 10px;">
-                                        <div style="flex-basis: 20%; text-align:left;">
-                                            <b>EMA</b><br>
-                                            <span style="font-weight:bold;">{formatear_numero(data['VALOR_EMA'])}€</span><br>
-                                            ({data['TIPO_EMA']})
+                                    <div style="display:flex; justify-content:space-around; align-items:flex-start; padding: 10px; text-align: left; gap: 20px;">
+                                        <div style="flex-basis: 30%;">
+                                            <b>Análisis Técnico</b><br><br>
+                                            <div style="margin-bottom: 10px;">
+                                                <b>EMA</b><br>
+                                                <span style="font-weight:bold;">{formatear_numero(data['VALOR_EMA'])}€</span><br>
+                                                ({data['TIPO_EMA']})
+                                            </div>
+                                            <div>
+                                                <b>Soportes</b><br>
+                                                S1: {formatear_numero(data['SOPORTE_1'])}€<br>
+                                                S2: {formatear_numero(data['SOPORTE_2'])}€
+                                            </div>
+                                            <div>
+                                                <b>Resistencias</b><br>
+                                                R1: {formatear_numero(data['RESISTENCIA_1'])}€<br>
+                                                R2: {formatear_numero(data['RESISTENCIA_2'])}€
+                                            </div>
                                         </div>
-                                        <div style="flex-basis: 20%; text-align:left;">
-                                            <b>Soportes</b><br>
-                                            S1: {formatear_numero(data['SOPORTE_1'])}€<br>
-                                            S2: {formatear_numero(data['SOPORTE_2'])}€
-                                        </div>
-                                        <div style="flex-basis: 20%; text-align:left;">
-                                            <b>Resistencias</b><br>
-                                            R1: {formatear_numero(data['RESISTENCIA_1'])}€<br>
-                                            R2: {formatear_numero(data['RESISTENCIA_2'])}€
+                                        <div style="flex-basis: 70%; border-left: 1px solid #e9ecef; padding-left: 20px;">
+                                            <b>Análisis de Volumen</b><br><br>
+                                            {analisis_volumen}
                                         </div>
                                     </div>
                                 </td>
@@ -878,7 +970,6 @@ def generar_reporte():
         </body>
         </html>
         """
-
         
         asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} oportunidades detectadas hoy {datetime.today().strftime('%d/%m/%Y')}"
         enviar_email_con_adjunto(html_body, asunto)
