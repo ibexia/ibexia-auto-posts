@@ -652,16 +652,6 @@ def generar_reporte():
                     font-size: 0.8em;
                 }}
                 .vigilar {{ color: #ffc107; font-weight: bold; }}
-                /* Nuevas reglas para el acordeón */
-                .collapsed-columns {
-                    display: none;
-                }
-                .expand-button {
-                    cursor: pointer;
-                    text-align: center;
-                    font-weight: bold;
-                    color: #007bff;
-                }
             </style>                
         </head>
         <body>
@@ -682,15 +672,14 @@ def generar_reporte():
                             <tr>
                                 <th>Empresa (Precio)</th>
                                 <th>Tendencia Actual</th>
+                                <th>EMA</th>
                                 <th>Oportunidad</th>
                                 <th>Compra si...</th>
                                 <th>Vende si...</th>
-                                <th class="expand-button" onclick="toggleColumns()">+ Info</th>
-                                <th class="collapsed-columns">EMA</th>
-                                <th class="collapsed-columns">Soporte 1</th>
-                                <th class="collapsed-columns">Soporte 2</th>
-                                <th class="collapsed-columns">Resistencia 1</th>
-                                <th class="collapsed-columns">Resistencia 2</th>
+                                <th>Soporte 1</th>
+                                <th>Soporte 2</th>
+                                <th>Resistencia 1</th>
+                                <th>Resistencia 2</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -709,28 +698,28 @@ def generar_reporte():
                 if previous_orden_grupo is None:
                      if current_orden_grupo in [1, 2]:
                          html_body += """
-                            <tr class="category-header"><td colspan="11">OPORTUNIDADES DE COMPRA</td></tr>
+                            <tr class="category-header"><td colspan="9">OPORTUNIDADES DE COMPRA</td></tr>
                         """
                      elif current_orden_grupo in [3, 4, 5]:
                          html_body += """
-                            <tr class="category-header"><td colspan="11">ATENTOS A VENDER</td></tr>
+                            <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
                         """
                      elif current_orden_grupo in [6, 7]:
                          html_body += """
-                            <tr class="category-header"><td colspan="11">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
                 
                 elif current_orden_grupo != previous_orden_grupo:
                     if current_orden_grupo in [3, 4, 5] and previous_orden_grupo in [1, 2]:
                         html_body += """
-                            <tr class="category-header"><td colspan="11">ATENTOS A VENDER</td></tr>
+                            <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
                         """
                     elif current_orden_grupo in [6, 7] and previous_orden_grupo in [1, 2, 3, 4, 5]:
                          html_body += """
-                            <tr class="category-header"><td colspan="11">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
                     html_body += """
-                        <tr class="separator-row"><td colspan="11"></td></tr>
+                        <tr class="separator-row"><td colspan="9"></td></tr>
                     """
 
                 # Lógica de corrección para el enlace
@@ -759,14 +748,15 @@ def generar_reporte():
                 soportes = [data['SOPORTE_1'], data['SOPORTE_2']]
                 resistencias = [data['RESISTENCIA_1'], data['RESISTENCIA_2']]
                 
-                # Celdas que se van a ocultar/mostrar
-                hidden_cols_html = f"""
-                    <td class="collapsed-columns">{formatear_numero(data['VALOR_EMA'])}€<br><b>({data['TIPO_EMA']} EMA)</b></td>
-                    <td class="collapsed-columns">{formatear_numero(soportes[0])}€</td>
-                    <td class="collapsed-columns">{formatear_numero(soportes[1])}€</td>
-                    <td class="collapsed-columns">{formatear_numero(resistencias[0])}€</td>
-                    <td class="collapsed-columns">{formatear_numero(resistencias[1])}€</td>
-                """
+                sr_html = ""
+                
+                for s in soportes:
+                    s_clase = "red-cell" if s is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - s) / data['PRECIO_ACTUAL'] < 0.01 else ""
+                    sr_html += f'<td class="{s_clase}">{formatear_numero(s)}€</td>'
+
+                for r in resistencias:
+                    r_clase = "red-cell" if r is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - r) / data['PRECIO_ACTUAL'] < 0.01 else ""
+                    sr_html += f'<td class="{r_clase}">{formatear_numero(r)}€</td>'
                 
                 observaciones = generar_observaciones(data)
                 
@@ -774,14 +764,14 @@ def generar_reporte():
                             <tr>
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
+                                <td>{formatear_numero(data['VALOR_EMA'])}€<br><b>({data['TIPO_EMA']} EMA)</b></td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
-                                <td class="expand-button" onclick="toggleRowColumns(this)">+</td>
-                                {hidden_cols_html}
+                                {sr_html}
                             </tr>
                             <tr class="observaciones-row">
-                                <td colspan="11">{observaciones}</td>
+                                <td colspan="9">{observaciones}</td>
                             </tr>
                 """
                 previous_orden_grupo = current_orden_grupo
@@ -832,42 +822,6 @@ def generar_reporte():
                     }
                 }
                 
-                // Función para expandir/colapsar columnas por fila
-                function toggleRowColumns(element) {
-                    var parentRow = element.parentNode;
-                    var columns = parentRow.getElementsByClassName("collapsed-columns");
-                    var isHidden = columns[0].style.display === "none" || columns[0].style.display === "";
-                    
-                    for (var i = 0; i < columns.length; i++) {
-                        columns[i].style.display = isHidden ? "table-cell" : "none";
-                    }
-
-                    // Cambiar el texto del botón
-                    element.innerHTML = isHidden ? "-" : "+";
-                    
-                    // Asegurar que el encabezado también se expanda
-                    var headerRow = document.querySelector("#myTable thead tr");
-                    var headerCols = headerRow.getElementsByClassName("collapsed-columns");
-                    for (var i = 0; i < headerCols.length; i++) {
-                        headerCols[i].style.display = isHidden ? "table-cell" : "none";
-                    }
-                }
-
-                // Función para expandir/colapsar todas las columnas (desde el header)
-                function toggleColumns() {
-                    var columns = document.querySelectorAll(".collapsed-columns");
-                    var expandButtons = document.querySelectorAll(".expand-button");
-                    var isHidden = columns[0].style.display === "none" || columns[0].style.display === "";
-                    
-                    for (var i = 0; i < columns.length; i++) {
-                        columns[i].style.display = isHidden ? "table-cell" : "none";
-                    }
-                    
-                    for (var i = 0; i < expandButtons.length; i++) {
-                        expandButtons[i].innerHTML = isHidden ? "-" : "+";
-                    }
-                }
-                
                 // Asegurar que el script se ejecute cuando el DOM esté listo
                 document.addEventListener('DOMContentLoaded', function() {
                     const searchInput = document.getElementById("searchInput");
@@ -887,9 +841,6 @@ def generar_reporte():
                             scrollTop.scrollLeft = tableContainer.scrollLeft;
                         });
                     }
-                    
-                    // Colapsar las columnas al cargar la página
-                    toggleColumns();
                 });
             </script>
         </body>
