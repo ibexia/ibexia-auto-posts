@@ -652,26 +652,30 @@ def generar_reporte():
                     font-size: 0.8em;
                 }}
                 .vigilar {{ color: #ffc107; font-weight: bold; }}
-                .hidden-column {{
+                
+                .collapsible-row {{
                     display: none;
                 }}
-                .accordion-header {{
+                .expand-button {{
                     cursor: pointer;
+                    color: #007bff;
+                    font-weight: bold;
+                    text-decoration: underline;
                 }}
             </style>
         </head>
         <body>
             <div class="main-container">
                 <h2 class="text-center">Resumen Diario de Oportunidades ordenadas por prioridad - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</h2>
-
+                
                 <div id="search-container">
                     <input type="text" id="searchInput" placeholder="Buscar por nombre de empresa...">
                 </div>
-
+                
                 <div id="scroll-top" style="overflow-x: auto;">
                     <div style="min-width: 1400px;">&nbsp;</div>
                 </div>
-
+                
                 <div class="table-container">
                     <table id="myTable">
                         <thead>
@@ -681,49 +685,47 @@ def generar_reporte():
                                 <th>Oportunidad</th>
                                 <th>Compra si...</th>
                                 <th>Vende si...</th>
-                                <th class="accordion-header" colspan="5">EMA, Soportes y Resistencias (Haz clic para expandir)</th>
-                            </tr>
-                            <tr id="detailed-header" class="hidden-column">
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <th>EMA</th>
-                                <th>Soporte 1</th>
-                                <th>Soporte 2</th>
-                                <th>Resistencia 1</th>
-                                <th>Resistencia 2</th>
+                                <th>Análisis detallado</th>
                             </tr>
                         </thead>
                         <tbody>
         """
-
+        
         if not datos_ordenados:
             html_body += """
-                            <tr><td colspan="10">No se encontraron empresas con datos válidos hoy.</td></tr>
+                            <tr><td colspan="6">No se encontraron empresas con datos válidos hoy.</td></tr>
             """
         else:
             previous_orden_grupo = None
             for i, data in enumerate(datos_ordenados):
-
+                
                 current_orden_grupo = data['ORDEN_PRIORIDAD']
-
-                if previous_orden_grupo is None or current_orden_grupo != previous_orden_grupo:
-                    if current_orden_grupo in [1, 2]:
-                        html_body += """
-                            <tr class="category-header"><td colspan="10">OPORTUNIDADES DE COMPRA</td></tr>
+                
+                if previous_orden_grupo is None:
+                     if current_orden_grupo in [1, 2]:
+                         html_body += """
+                            <tr class="category-header"><td colspan="6">OPORTUNIDADES DE COMPRA</td></tr>
                         """
-                    elif current_orden_grupo in [3, 4, 5]:
-                        html_body += """
-                            <tr class="category-header"><td colspan="10">ATENTOS A VENDER</td></tr>
+                     elif current_orden_grupo in [3, 4, 5]:
+                         html_body += """
+                            <tr class="category-header"><td colspan="6">ATENTOS A VENDER</td></tr>
                         """
-                    elif current_orden_grupo in [6, 7]:
+                     elif current_orden_grupo in [6, 7]:
+                         html_body += """
+                            <tr class="category-header"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                        """
+                
+                elif current_orden_grupo != previous_orden_grupo:
+                    if current_orden_grupo in [3, 4, 5] and previous_orden_grupo in [1, 2]:
                         html_body += """
-                            <tr class="category-header"><td colspan="10">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                            <tr class="category-header"><td colspan="6">ATENTOS A VENDER</td></tr>
+                        """
+                    elif current_orden_grupo in [6, 7] and previous_orden_grupo in [1, 2, 3, 4, 5]:
+                         html_body += """
+                            <tr class="category-header"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
                     html_body += """
-                        <tr class="separator-row"><td colspan="10"></td></tr>
+                        <tr class="separator-row"><td colspan="6"></td></tr>
                     """
 
                 # Lógica de corrección para el enlace
@@ -732,58 +734,65 @@ def generar_reporte():
                     if ticker_val == data['TICKER']:
                         nombre_empresa_url = nombre
                         break
-
+                
                 if nombre_empresa_url:
                     empresa_link = f'https://ibexia.es/category/{nombre_empresa_url.lower()}/'
                 else:
                     empresa_link = '#'
-
+                
                 nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
 
                 clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else ("vigilar" if "vigilar" in data['OPORTUNIDAD'].lower() else ""))
-
+                
                 celda_empresa_class = ""
                 if "compra" in data['OPORTUNIDAD'].lower():
                     celda_empresa_class = "green-cell"
                 elif "venta" in data['OPORTUNIDAD'].lower():
                     celda_empresa_class = "red-cell"
-
-                soportes = [data['SOPORTE_1'], data['SOPORTE_2']]
-                resistencias = [data['RESISTENCIA_1'], data['RESISTENCIA_2']]
-
-                sr_html = ""
-
-                for s in soportes:
-                    s_clase = "red-cell" if s is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - s) / data['PRECIO_ACTUAL'] < 0.01 else ""
-                    sr_html += f'<td class="collapsible-cell {s_clase}">{formatear_numero(s)}€</td>'
-
-                for r in resistencias:
-                    r_clase = "red-cell" if r is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - r) / data['PRECIO_ACTUAL'] < 0.01 else ""
-                    sr_html += f'<td class="collapsible-cell {r_clase}">{formatear_numero(r)}€</td>'
-
+                
                 observaciones = generar_observaciones(data)
-
+                
                 html_body += f"""
-                            <tr>
+                            <tr class="main-row" data-index="{i}">
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
-                                <td class="collapsible-cell">{formatear_numero(data['VALOR_EMA'])}€<br><b>({data['TIPO_EMA']} EMA)</b></td>
-                                {sr_html}
+                                <td><span class="expand-button" onclick="toggleDetails({i})">Ver más...</span></td>
+                            </tr>
+                            <tr class="collapsible-row detailed-row-{i}">
+                                <td colspan="6">
+                                    <div style="display:flex; justify-content:space-around; align-items:flex-start; padding: 10px;">
+                                        <div style="flex-basis: 20%; text-align:left;">
+                                            <b>EMA</b><br>
+                                            <span style="font-weight:bold;">{formatear_numero(data['VALOR_EMA'])}€</span><br>
+                                            ({data['TIPO_EMA']})
+                                        </div>
+                                        <div style="flex-basis: 20%; text-align:left;">
+                                            <b>Soportes</b><br>
+                                            S1: {formatear_numero(data['SOPORTE_1'])}€<br>
+                                            S2: {formatear_numero(data['SOPORTE_2'])}€
+                                        </div>
+                                        <div style="flex-basis: 20%; text-align:left;">
+                                            <b>Resistencias</b><br>
+                                            R1: {formatear_numero(data['RESISTENCIA_1'])}€<br>
+                                            R2: {formatear_numero(data['RESISTENCIA_2'])}€
+                                        </div>
+                                    </div>
+                                </td>
                             </tr>
                             <tr class="observaciones-row">
-                                <td colspan="10">{observaciones}</td>
+                                <td colspan="6">{observaciones}</td>
                             </tr>
                 """
                 previous_orden_grupo = current_orden_grupo
-
+        
         html_body += """
                         </tbody>
                     </table>
                 </div>
-
+                
                 <br>
                 <p class="disclaimer"><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
             </div>
@@ -791,7 +800,7 @@ def generar_reporte():
             <script>
                 // Función de filtrado
                 function filterTable() {
-                    var input, filter, table, tr, td, i, txtValue;
+                    var input, filter, table, tr, i, txtValue;
                     input = document.getElementById("searchInput");
                     filter = input.value.toUpperCase();
                     table = document.getElementById("myTable");
@@ -799,47 +808,49 @@ def generar_reporte():
                     tr = tbody.getElementsByTagName("tr");
 
                     for (i = 0; i < tr.length; i++) {
-                        if (tr[i].classList.contains("separator-row") || tr[i].classList.contains("category-header") || tr[i].id === "detailed-header") {
+                        if (tr[i].classList.contains("separator-row") || tr[i].classList.contains("category-header")) {
                             continue;
                         }
-                        
-                        td = tr[i].getElementsByTagName("td")[0];
-                        if (td) {
-                            txtValue = td.textContent || td.innerText;
-                            var observationsRow = tr[i + 1];
 
-                            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                                tr[i].style.display = "";
-                                if (observationsRow && observationsRow.classList.contains("observaciones-row")) {
-                                    observationsRow.style.display = "";
-                                }
-                            } else {
-                                tr[i].style.display = "none";
-                                if (observationsRow && observationsRow.classList.contains("observaciones-row")) {
-                                    observationsRow.style.display = "none";
+                        // Get the company name cell from the main row
+                        if (tr[i].classList.contains("main-row")) {
+                            var companyCell = tr[i].getElementsByTagName("td")[0];
+                            var observationsRow = tr[i + 2];
+                            var detailedRow = tr[i + 1];
+
+                            if (companyCell) {
+                                txtValue = companyCell.textContent || companyCell.innerText;
+                                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                                    tr[i].style.display = "";
+                                    if (observationsRow) {
+                                        observationsRow.style.display = "";
+                                    }
+                                    if (detailedRow) {
+                                        // Ensure detailed row is hidden by default after filter
+                                        detailedRow.style.display = 'none';
+                                    }
+                                } else {
+                                    tr[i].style.display = "none";
+                                    if (observationsRow) {
+                                        observationsRow.style.display = "none";
+                                    }
+                                    if (detailedRow) {
+                                        detailedRow.style.display = "none";
+                                    }
                                 }
                             }
+                        } else if (tr[i].classList.contains("collapsible-row") || tr[i].classList.contains("observaciones-row")) {
+                            // Hide these rows by default until the parent is shown
+                            tr[i].style.display = "none";
                         }
                     }
                 }
                 
-                // Función de acordeón para las columnas
-                function setupAccordion() {
-                    const accordionHeader = document.querySelector('.accordion-header');
-                    const detailedHeader = document.getElementById('detailed-header');
-                    const collapsibleCells = document.querySelectorAll('.collapsible-cell');
-                    
-                    if (accordionHeader) {
-                        accordionHeader.addEventListener('click', () => {
-                            const isHidden = detailedHeader.classList.contains('hidden-column');
-                            
-                            detailedHeader.classList.toggle('hidden-column', !isHidden);
-                            collapsibleCells.forEach(cell => {
-                                cell.classList.toggle('hidden-column', !isHidden);
-                            });
-                            
-                            accordionHeader.textContent = isHidden ? "EMA, Soportes y Resistencias" : "EMA, Soportes y Resistencias (Haz clic para expandir)";
-                        });
+                // Función de acordeón para las filas individuales
+                function toggleDetails(index) {
+                    var detailedRow = document.querySelector('.detailed-row-' + index);
+                    if (detailedRow) {
+                        detailedRow.style.display = detailedRow.style.display === "table-row" ? "none" : "table-row";
                     }
                 }
                 
@@ -862,8 +873,6 @@ def generar_reporte():
                             scrollTop.scrollLeft = tableContainer.scrollLeft;
                         });
                     }
-                    
-                    setupAccordion();
                 });
             </script>
         </body>
