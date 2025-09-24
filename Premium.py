@@ -652,6 +652,22 @@ def generar_reporte():
                     font-size: 0.8em;
                 }}
                 .vigilar {{ color: #ffc107; font-weight: bold; }}
+                
+                /* Estilos para las filas colapsables */
+                .collapsible-row {
+                    display: none;
+                }
+                .toggle-input {
+                    display: none;
+                }
+                .toggle-label {
+                    cursor: pointer;
+                    display: block;
+                    width: 100%;
+                }
+                .toggle-input:checked ~ .collapsible-row {
+                    display: table-row;
+                }
             </style>                
         </head>
         <body>
@@ -676,10 +692,6 @@ def generar_reporte():
                                 <th>Oportunidad</th>
                                 <th>Compra si...</th>
                                 <th>Vende si...</th>
-                                <th>Soporte 1</th>
-                                <th>Soporte 2</th>
-                                <th>Resistencia 1</th>
-                                <th>Resistencia 2</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -687,7 +699,7 @@ def generar_reporte():
         
         if not datos_ordenados:
             html_body += """
-                            <tr><td colspan="9">No se encontraron empresas con datos válidos hoy.</td></tr>
+                            <tr><td colspan="6">No se encontraron empresas con datos válidos hoy.</td></tr>
             """
         else:
             previous_orden_grupo = None
@@ -698,32 +710,31 @@ def generar_reporte():
                 if previous_orden_grupo is None:
                      if current_orden_grupo in [1, 2]:
                          html_body += """
-                            <tr class="category-header"><td colspan="9">OPORTUNIDADES DE COMPRA</td></tr>
+                            <tr class="category-header"><td colspan="6">OPORTUNIDADES DE COMPRA</td></tr>
                         """
                      elif current_orden_grupo in [3, 4, 5]:
                          html_body += """
-                            <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
+                            <tr class="category-header"><td colspan="6">ATENTOS A VENDER</td></tr>
                         """
                      elif current_orden_grupo in [6, 7]:
                          html_body += """
-                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                            <tr class="category-header"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
                 
                 elif current_orden_grupo != previous_orden_grupo:
                     if current_orden_grupo in [3, 4, 5] and previous_orden_grupo in [1, 2]:
                         html_body += """
-                            <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
+                            <tr class="category-header"><td colspan="6">ATENTOS A VENDER</td></tr>
                         """
                     elif current_orden_grupo in [6, 7] and previous_orden_grupo in [1, 2, 3, 4, 5]:
                          html_body += """
-                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                            <tr class="category-header"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
                     html_body += """
-                        <tr class="separator-row"><td colspan="9"></td></tr>
+                        <tr class="separator-row"><td colspan="6"></td></tr>
                     """
 
                 # Lógica de corrección para el enlace
-                # Buscar el nombre de la empresa en el diccionario 'tickers'
                 nombre_empresa_url = None
                 for nombre, ticker_val in tickers.items():
                     if ticker_val == data['TICKER']:
@@ -733,7 +744,7 @@ def generar_reporte():
                 if nombre_empresa_url:
                     empresa_link = f'https://ibexia.es/category/{nombre_empresa_url.lower()}/'
                 else:
-                    empresa_link = '#' # Enlace por defecto si no se encuentra en el diccionario
+                    empresa_link = '#'
                 
                 nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
 
@@ -745,33 +756,30 @@ def generar_reporte():
                 elif "venta" in data['OPORTUNIDAD'].lower():
                     celda_empresa_class = "red-cell"
                 
-                soportes = [data['SOPORTE_1'], data['SOPORTE_2']]
-                resistencias = [data['RESISTENCIA_1'], data['RESISTENCIA_2']]
-                
-                sr_html = ""
-                
-                for s in soportes:
-                    s_clase = "red-cell" if s is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - s) / data['PRECIO_ACTUAL'] < 0.01 else ""
-                    sr_html += f'<td class="{s_clase}">{formatear_numero(s)}€</td>'
-
-                for r in resistencias:
-                    r_clase = "red-cell" if r is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - r) / data['PRECIO_ACTUAL'] < 0.01 else ""
-                    sr_html += f'<td class="{r_clase}">{formatear_numero(r)}€</td>'
-                
                 observaciones = generar_observaciones(data)
                 
                 html_body += f"""
                             <tr>
-                                <td class="{celda_empresa_class}">{nombre_con_precio}</td>
+                                <td class="{celda_empresa_class}">
+                                    <input type="checkbox" id="toggle_{data['TICKER']}" class="toggle-input">
+                                    <label for="toggle_{data['TICKER']}" class="toggle-label">
+                                        {nombre_con_precio}
+                                    </label>
+                                </td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
                                 <td>{formatear_numero(data['VALOR_EMA'])}€<br><b>({data['TIPO_EMA']} EMA)</b></td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
-                                {sr_html}
                             </tr>
-                            <tr class="observaciones-row">
-                                <td colspan="9">{observaciones}</td>
+                            <tr class="collapsible-row">
+                                <td colspan="6">
+                                    <div style="text-align: left; padding: 10px;">
+                                        <strong>Soportes:</strong> {formatear_numero(data['SOPORTE_1'])}€, {formatear_numero(data['SOPORTE_2'])}€<br>
+                                        <strong>Resistencias:</strong> {formatear_numero(data['RESISTENCIA_1'])}€, {formatear_numero(data['RESISTENCIA_2'])}€<br><br>
+                                        {observaciones}
+                                    </div>
+                                </td>
                             </tr>
                 """
                 previous_orden_grupo = current_orden_grupo
@@ -788,7 +796,7 @@ def generar_reporte():
             <script>
                 // Función de filtrado
                 function filterTable() {
-                    var input, filter, table, tr, td, i, txtValue;
+                    var input, filter, table, tr, i, txtValue;
                     input = document.getElementById("searchInput");
                     filter = input.value.toUpperCase();
                     table = document.getElementById("myTable");
@@ -797,25 +805,29 @@ def generar_reporte():
 
                     for (i = 0; i < tr.length; i++) {
                         // Skip separator and category rows
-                        if (tr[i].classList.contains("separator-row") || tr[i].classList.contains("category-header")) {
+                        if (tr[i].classList.contains("separator-row") || tr[i].classList.contains("category-header") || tr[i].classList.contains("collapsible-row")) {
                             continue;
                         }
 
                         // Check the company name row
-                        td = tr[i].getElementsByTagName("td")[0];
-                        if (td) {
-                            txtValue = td.textContent || td.innerText;
-                            var observationsRow = tr[i + 1];
+                        var label = tr[i].querySelector("label");
+                        if (label) {
+                            txtValue = label.textContent || label.innerText;
+                            var mainRow = tr[i];
+                            var collapsibleRow = tr[i + 1];
 
                             if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                                tr[i].style.display = "";
-                                if (observationsRow && observationsRow.classList.contains("observaciones-row")) {
-                                    observationsRow.style.display = "";
+                                mainRow.style.display = "";
+                                // Check if the next row is a collapsible row and hide it by default on filter
+                                if (collapsibleRow && collapsibleRow.classList.contains("collapsible-row")) {
+                                    collapsibleRow.style.display = "none";
+                                    var checkbox = mainRow.querySelector('.toggle-input');
+                                    if(checkbox) checkbox.checked = false; // Uncheck it
                                 }
                             } else {
-                                tr[i].style.display = "none";
-                                if (observationsRow && observationsRow.classList.contains("observaciones-row")) {
-                                    observationsRow.style.display = "none";
+                                mainRow.style.display = "none";
+                                if (collapsibleRow && collapsibleRow.classList.contains("collapsible-row")) {
+                                    collapsibleRow.style.display = "none";
                                 }
                             }
                         }
