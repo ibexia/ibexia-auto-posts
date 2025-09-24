@@ -593,7 +593,7 @@ def generar_reporte():
                 .table-container {{
                     overflow-x: auto;
                     overflow-y: auto;
-                    height: 70vh; /* Altura un poco más baja para que no sea tan grande */
+                    height: 70vh;
                     position: relative;
                 }}
                 table {{
@@ -601,11 +601,11 @@ def generar_reporte():
                     table-layout: fixed;
                     margin: 10px auto 0 auto;
                     border-collapse: collapse;
-                    font-size: 0.85em; /* Reducir el tamaño de la fuente de la tabla */
+                    font-size: 0.85em;
                 }}
                 th, td {{
                     border: 1px solid #e9ecef;
-                    padding: 6px; /* Reducir el padding para celdas más pequeñas */
+                    padding: 6px;
                     text-align: center;
                     vertical-align: middle;
                     white-space: normal;
@@ -618,7 +618,7 @@ def generar_reporte():
                     position: sticky;
                     top: 0;
                     z-index: 10;
-                    white-space: nowrap; /* Para que los títulos de las columnas no se rompan */
+                    white-space: nowrap;
                 }}
                 .compra {{ color: #28a745; font-weight: bold; }}
                 .venta {{ color: #dc3545; font-weight: bold; }}
@@ -652,30 +652,44 @@ def generar_reporte():
                     font-size: 0.8em;
                 }}
                 .vigilar {{ color: #ffc107; font-weight: bold; }}
-            </style>                
+                .hidden-column {{
+                    display: none;
+                }}
+                .accordion-header {{
+                    cursor: pointer;
+                }}
+            </style>
         </head>
         <body>
             <div class="main-container">
                 <h2 class="text-center">Resumen Diario de Oportunidades ordenadas por prioridad - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</h2>
-                
+
                 <div id="search-container">
                     <input type="text" id="searchInput" placeholder="Buscar por nombre de empresa...">
                 </div>
-                
+
                 <div id="scroll-top" style="overflow-x: auto;">
                     <div style="min-width: 1400px;">&nbsp;</div>
                 </div>
-                
+
                 <div class="table-container">
                     <table id="myTable">
                         <thead>
                             <tr>
                                 <th>Empresa (Precio)</th>
                                 <th>Tendencia Actual</th>
-                                <th>EMA</th>
                                 <th>Oportunidad</th>
                                 <th>Compra si...</th>
                                 <th>Vende si...</th>
+                                <th class="accordion-header" colspan="5">EMA, Soportes y Resistencias (Haz clic para expandir)</th>
+                            </tr>
+                            <tr id="detailed-header" class="hidden-column">
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                <th>EMA</th>
                                 <th>Soporte 1</th>
                                 <th>Soporte 2</th>
                                 <th>Resistencia 1</th>
@@ -684,103 +698,92 @@ def generar_reporte():
                         </thead>
                         <tbody>
         """
-        
+
         if not datos_ordenados:
             html_body += """
-                            <tr><td colspan="9">No se encontraron empresas con datos válidos hoy.</td></tr>
+                            <tr><td colspan="10">No se encontraron empresas con datos válidos hoy.</td></tr>
             """
         else:
             previous_orden_grupo = None
             for i, data in enumerate(datos_ordenados):
-                
+
                 current_orden_grupo = data['ORDEN_PRIORIDAD']
-                
-                if previous_orden_grupo is None:
-                     if current_orden_grupo in [1, 2]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="9">OPORTUNIDADES DE COMPRA</td></tr>
-                        """
-                     elif current_orden_grupo in [3, 4, 5]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
-                        """
-                     elif current_orden_grupo in [6, 7]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
-                        """
-                
-                elif current_orden_grupo != previous_orden_grupo:
-                    if current_orden_grupo in [3, 4, 5] and previous_orden_grupo in [1, 2]:
+
+                if previous_orden_grupo is None or current_orden_grupo != previous_orden_grupo:
+                    if current_orden_grupo in [1, 2]:
                         html_body += """
-                            <tr class="category-header"><td colspan="9">ATENTOS A VENDER</td></tr>
+                            <tr class="category-header"><td colspan="10">OPORTUNIDADES DE COMPRA</td></tr>
                         """
-                    elif current_orden_grupo in [6, 7] and previous_orden_grupo in [1, 2, 3, 4, 5]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="9">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                    elif current_orden_grupo in [3, 4, 5]:
+                        html_body += """
+                            <tr class="category-header"><td colspan="10">ATENTOS A VENDER</td></tr>
+                        """
+                    elif current_orden_grupo in [6, 7]:
+                        html_body += """
+                            <tr class="category-header"><td colspan="10">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
                     html_body += """
-                        <tr class="separator-row"><td colspan="9"></td></tr>
+                        <tr class="separator-row"><td colspan="10"></td></tr>
                     """
 
                 # Lógica de corrección para el enlace
-                # Buscar el nombre de la empresa en el diccionario 'tickers'
                 nombre_empresa_url = None
                 for nombre, ticker_val in tickers.items():
                     if ticker_val == data['TICKER']:
                         nombre_empresa_url = nombre
                         break
-                
+
                 if nombre_empresa_url:
                     empresa_link = f'https://ibexia.es/category/{nombre_empresa_url.lower()}/'
                 else:
-                    empresa_link = '#' # Enlace por defecto si no se encuentra en el diccionario
-                
+                    empresa_link = '#'
+
                 nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
 
                 clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else ("vigilar" if "vigilar" in data['OPORTUNIDAD'].lower() else ""))
-                
+
                 celda_empresa_class = ""
                 if "compra" in data['OPORTUNIDAD'].lower():
                     celda_empresa_class = "green-cell"
                 elif "venta" in data['OPORTUNIDAD'].lower():
                     celda_empresa_class = "red-cell"
-                
+
                 soportes = [data['SOPORTE_1'], data['SOPORTE_2']]
                 resistencias = [data['RESISTENCIA_1'], data['RESISTENCIA_2']]
-                
+
                 sr_html = ""
-                
+
                 for s in soportes:
                     s_clase = "red-cell" if s is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - s) / data['PRECIO_ACTUAL'] < 0.01 else ""
-                    sr_html += f'<td class="{s_clase}">{formatear_numero(s)}€</td>'
+                    sr_html += f'<td class="collapsible-cell {s_clase}">{formatear_numero(s)}€</td>'
 
                 for r in resistencias:
                     r_clase = "red-cell" if r is not None and data['PRECIO_ACTUAL'] is not None and abs(data['PRECIO_ACTUAL'] - r) / data['PRECIO_ACTUAL'] < 0.01 else ""
-                    sr_html += f'<td class="{r_clase}">{formatear_numero(r)}€</td>'
-                
+                    sr_html += f'<td class="collapsible-cell {r_clase}">{formatear_numero(r)}€</td>'
+
                 observaciones = generar_observaciones(data)
-                
+
                 html_body += f"""
                             <tr>
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
-                                <td>{formatear_numero(data['VALOR_EMA'])}€<br><b>({data['TIPO_EMA']} EMA)</b></td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
                                 <td>{data['COMPRA_SI']}</td>
                                 <td>{data['VENDE_SI']}</td>
+                                <td class="collapsible-cell">{formatear_numero(data['VALOR_EMA'])}€<br><b>({data['TIPO_EMA']} EMA)</b></td>
                                 {sr_html}
                             </tr>
                             <tr class="observaciones-row">
-                                <td colspan="9">{observaciones}</td>
+                                <td colspan="10">{observaciones}</td>
                             </tr>
                 """
                 previous_orden_grupo = current_orden_grupo
-        
+
         html_body += """
                         </tbody>
                     </table>
                 </div>
-                
+
                 <br>
                 <p class="disclaimer"><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
             </div>
@@ -796,12 +799,10 @@ def generar_reporte():
                     tr = tbody.getElementsByTagName("tr");
 
                     for (i = 0; i < tr.length; i++) {
-                        // Skip separator and category rows
-                        if (tr[i].classList.contains("separator-row") || tr[i].classList.contains("category-header")) {
+                        if (tr[i].classList.contains("separator-row") || tr[i].classList.contains("category-header") || tr[i].id === "detailed-header") {
                             continue;
                         }
-
-                        // Check the company name row
+                        
                         td = tr[i].getElementsByTagName("td")[0];
                         if (td) {
                             txtValue = td.textContent || td.innerText;
@@ -819,6 +820,26 @@ def generar_reporte():
                                 }
                             }
                         }
+                    }
+                }
+                
+                // Función de acordeón para las columnas
+                function setupAccordion() {
+                    const accordionHeader = document.querySelector('.accordion-header');
+                    const detailedHeader = document.getElementById('detailed-header');
+                    const collapsibleCells = document.querySelectorAll('.collapsible-cell');
+                    
+                    if (accordionHeader) {
+                        accordionHeader.addEventListener('click', () => {
+                            const isHidden = detailedHeader.classList.contains('hidden-column');
+                            
+                            detailedHeader.classList.toggle('hidden-column', !isHidden);
+                            collapsibleCells.forEach(cell => {
+                                cell.classList.toggle('hidden-column', !isHidden);
+                            });
+                            
+                            accordionHeader.textContent = isHidden ? "EMA, Soportes y Resistencias" : "EMA, Soportes y Resistencias (Haz clic para expandir)";
+                        });
                     }
                 }
                 
@@ -841,11 +862,14 @@ def generar_reporte():
                             scrollTop.scrollLeft = tableContainer.scrollLeft;
                         });
                     }
+                    
+                    setupAccordion();
                 });
             </script>
         </body>
         </html>
         """
+
         
         asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} oportunidades detectadas hoy {datetime.today().strftime('%d/%m/%Y')}"
         enviar_email_con_adjunto(html_body, asunto)
