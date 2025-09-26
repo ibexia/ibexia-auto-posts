@@ -317,6 +317,8 @@ def obtener_datos_yfinance(ticker):
         if hist_weekly.empty:
             smi_weekly = 'N/A'
             estado_smi_weekly = 'N/A'
+            # Nuevo campo para el texto de la observación semanal
+            observacion_semanal = "No hay datos semanales suficientes."
         else:
             hist_weekly = calculate_smi_tv(hist_weekly)
             smi_weekly_series = hist_weekly['SMI'].dropna()
@@ -324,8 +326,18 @@ def obtener_datos_yfinance(ticker):
             
             if isinstance(smi_weekly, (int, float)):
                 estado_smi_weekly = "Sobrecompra" if smi_weekly > 40 else ("Sobreventa" if smi_weekly < -40 else "Intermedio")
+                
+                # Generar el texto de la observación semanal
+                if estado_smi_weekly == "Sobrecompra":
+                    observacion_semanal = f"El **SMI Semanal** ({formatear_numero(smi_weekly)}) está en zona de **Sobrecompra**. Sugiere que el precio ya ha subido mucho a largo plazo."
+                elif estado_smi_weekly == "Sobreventa":
+                    observacion_semanal = f"El **SMI Semanal** ({formatear_numero(smi_weekly)}) está en zona de **Sobreventa**. Sugiere potencial de subida a largo plazo."
+                else:
+                    observacion_semanal = f"El **SMI Semanal** ({formatear_numero(smi_weekly)}) está en zona **Intermedia**."
+                    
             else:
                 estado_smi_weekly = 'N/A'
+                observacion_semanal = "No hay datos semanales suficientes."
 
 
         return {
@@ -348,10 +360,11 @@ def obtener_datos_yfinance(ticker):
             "TIPO_EMA": tipo_ema,
             "VALOR_EMA": ema_actual,
             "RESISTENCIA_2": sr_levels['r2'],
-            # --- Nuevo Campo Semanal ---
+            # --- Nuevos Campos Semanales ---
             "SMI_SEMANAL": smi_weekly,
             "ESTADO_SMI_SEMANAL": estado_smi_weekly,
-            "ADVERTENCIA_SEMANAL": "NO" # Se inicializa y se modifica en clasificar_empresa
+            "ADVERTENCIA_SEMANAL": "NO", # Se inicializa y se modifica en clasificar_empresa
+            "OBSERVACION_SEMANAL": observacion_semanal # Nuevo campo con el texto de la observación semanal
         }
 
     except Exception as e:
@@ -837,6 +850,7 @@ def generar_reporte():
                 
                 observaciones = generar_observaciones(data)
                 
+                # --- MODIFICACIÓN CLAVE AQUÍ ---
                 html_body += f"""
                             <tr class="main-row" data-index="{i}">
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
@@ -849,20 +863,24 @@ def generar_reporte():
                             <tr class="collapsible-row detailed-row-{i}">
                                 <td colspan="6">
                                     <div style="display:flex; justify-content:space-around; align-items:flex-start; padding: 10px;">
-                                        <div style="flex-basis: 20%; text-align:left;">
+                                        <div style="flex-basis: 25%; text-align:left;">
                                             <b>EMA</b><br>
                                             <span style="font-weight:bold;">{formatear_numero(data['VALOR_EMA'])}€</span><br>
                                             ({data['TIPO_EMA']})
                                         </div>
-                                        <div style="flex-basis: 20%; text-align:left;">
+                                        <div style="flex-basis: 25%; text-align:left;">
                                             <b>Soportes</b><br>
                                             S1: {formatear_numero(data['SOPORTE_1'])}€<br>
                                             S2: {formatear_numero(data['SOPORTE_2'])}€
                                         </div>
-                                        <div style="flex-basis: 20%; text-align:left;">
+                                        <div style="flex-basis: 25%; text-align:left;">
                                             <b>Resistencias</b><br>
                                             R1: {formatear_numero(data['RESISTENCIA_1'])}€<br>
                                             R2: {formatear_numero(data['RESISTENCIA_2'])}€
+                                        </div>
+                                        <div style="flex-basis: 25%; text-align:left; font-size:0.9em;">
+                                            <b>Análisis Semanal (SMI)</b><br>
+                                            {data['OBSERVACION_SEMANAL']}
                                         </div>
                                     </div>
                                 </td>
@@ -871,6 +889,7 @@ def generar_reporte():
                                 <td colspan="6">{observaciones}</td>
                             </tr>
                 """
+                # --- FIN DE MODIFICACIÓN CLAVE ---
                 previous_orden_grupo = obtener_clave_ordenacion(data)[0] # Se usa la clave de ordenación para el separador
         
         html_body += """
