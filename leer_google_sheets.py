@@ -22,7 +22,8 @@ def safe_json_dump(data_list):
     """
     # json.dumps convierte None a 'null' y los floats a formato JavaScript (con punto decimal)
     # Se asegura de que la lista solo contenga valores o None, para que json.dumps funcione.
-    return json.dumps([val if val if val is not None else None for val in data_list])
+    # CORRECCIÓN DE SYNTAX ERROR EN ESTA LÍNEA (LÍNEA 25)
+    return json.dumps([val if val is not None else None for val in data_list])
 
 
 def leer_google_sheets():
