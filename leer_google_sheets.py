@@ -1023,7 +1023,7 @@ def generar_contenido_con_gemini(tickers):
     if not api_key:
         raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
 
-    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash-latest")  
+    model = genai.GenerativeModel(model_name="gemini-1.5-flash")  
 
     for ticker in tickers:
         print(f"\n📊 Procesando ticker: {ticker}")
