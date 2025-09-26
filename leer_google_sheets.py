@@ -380,11 +380,12 @@ def obtener_datos_yfinance(ticker):
         smi_history_last_30 = hist['SMI'].dropna().tail(30).tolist()
         
 
-        # --- NUEVA Lógica: Proyección lineal SIN soportes/resistencias (solo SMI) ---
+        # --- NUEVA Lógica: Proyección lineal sin soportes/resistencias ---
         precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
         # Determinar la dirección de la tendencia y el movimiento diario constante
+        # Usamos la pendiente del SMI para determinar si la tendencia es alcista o bajista
         smi_history_full = hist_extended['SMI'].dropna()
         smi_ultimos_5 = smi_history_full.tail(5).dropna()
 
@@ -394,29 +395,13 @@ def obtener_datos_yfinance(ticker):
             y = smi_ultimos_5.values
             pendiente_smi, _ = np.polyfit(x, y, 1)
 
-        # Definir un movimiento diario constante (usaremos +/- 1% o +/- 0.5%)
-        movimiento_diario = 0.0
-
-        # Prioridad 1: Sobrecompra / Sobreventa Extrema (Fuerza de Reversión)
-        if smi_actual > 40:
-            # En sobrecompra: proyectamos caída (reversión)
-            movimiento_diario = -0.01 
-        elif smi_actual < -40:
-            # En sobreventa: proyectamos subida (reversión)
-            movimiento_diario = 0.01
-        
-        # Prioridad 2: Tendencia en Zona Media (SMI entre -40 y 40)
-        # Se evalúa SÓLO si no se cumplió ninguna de las condiciones de extremos anteriores.
-        elif -40 <= smi_actual <= 40:
-            if pendiente_smi > 0.1:
-                # Subiendo en zona media: proyectamos subida
-                movimiento_diario = 0.005 # Subida moderada
-            elif pendiente_smi < -0.1:
-                # Bajando en zona media: proyectamos caída
-                movimiento_diario = -0.005 # Caída moderada
-            else:
-                # Aplanado en zona media: proyectamos lateral
-                movimiento_diario = 0.0
+        # Definir un movimiento diario constante, lo suficientemente grande para no redondearse
+        # Usamos 1% como un valor base claro y visible
+        movimiento_diario = 0
+        if pendiente_smi > 0.1 or smi_actual < -40:  # Si SMI sube o está en sobreventa
+            movimiento_diario = 0.01  # +1% de subida diaria
+        elif pendiente_smi < -0.1 or smi_actual > 40: # Si SMI baja o está en sobrecompra
+            movimiento_diario = -0.01 # -1% de bajada diaria
 
         for _ in range(PROYECCION_FUTURA_DIAS):
             siguiente_precio = ultimo_precio_conocido * (1 + movimiento_diario)
