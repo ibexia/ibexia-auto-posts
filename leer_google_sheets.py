@@ -22,7 +22,7 @@ def safe_json_dump(data_list):
     """
     # json.dumps convierte None a 'null' y los floats a formato JavaScript (con punto decimal)
     # Se asegura de que la lista solo contenga valores o None, para que json.dumps funcione.
-    return json.dumps([val if val is not None else None for val in data_list])
+    return json.dumps([val if val if val is not None else None for val in data_list])
 
 
 def leer_google_sheets():
@@ -105,6 +105,28 @@ def calculate_smi_tv(df):
 
     df['SMI'] = smi_smoothed # Asignamos directamente la señal SMI suavizada al DataFrame
     return df
+
+# NUEVA FUNCIÓN: Obtener SMI Semanal
+def obtener_smi_semanal(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        # 1 año de datos semanales para asegurar suficientes velas
+        hist_weekly = stock.history(period="1y", interval="1wk")
+        if hist_weekly.empty:
+            print(f"⚠️ Advertencia: No hay datos semanales para {ticker}.")
+            return 0.0
+
+        hist_weekly = calculate_smi_tv(hist_weekly)
+        smi_weekly_series = hist_weekly['SMI'].dropna()
+
+        if not smi_weekly_series.empty:
+            return round(smi_weekly_series.iloc[-1], 3)
+        else:
+            print(f"⚠️ Advertencia: No hay datos de SMI semanal válidos para {ticker}.")
+            return 0.0
+    except Exception as e:
+        print(f"❌ Error al obtener SMI semanal para {ticker}: {e}")
+        return 0.0
     
 def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
     compras = []
@@ -235,6 +257,9 @@ def obtener_datos_yfinance(ticker):
         else:
             print(f"⚠️ Advertencia: No hay datos de SMI válidos para {ticker}. Asignando SMI neutral.")
             smi_actual = 0  # Un valor por defecto para smi_actual
+        
+        # NUEVA ADICIÓN: Obtener SMI Semanal
+        smi_semanal = obtener_smi_semanal(ticker)
 
 
         # Calcular soportes y resistencia
@@ -468,6 +493,7 @@ def obtener_datos_yfinance(ticker):
             "CONDICION_RSI": condicion_rsi,
             "RECOMENDACION": recomendacion,
             "SMI": smi_actual,
+            "SMI_SEMANAL": smi_semanal, # NUEVA ADICIÓN
             "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
             "tendencia_ibexia": tendencia_ibexia, # Renombrado de TENDENCIA_NOTA
             "CIERRES_30_DIAS": precios_reales_para_grafico, # Usar los 30 días ya limpios y completos
@@ -486,7 +512,8 @@ def obtener_datos_yfinance(ticker):
             'FECHAS_PARA_SIMULACION': fechas_para_simulacion,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
-        # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO ---
+        
+        # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO Y RIESGO SEMANAL ---
         diferencia_precio_porcentual = ((precio_proyectado_dia_5 - current_price) / current_price) * 100 if current_price != 0 else 0
 
         recomendacion = "sin dirección clara"
@@ -504,6 +531,11 @@ def obtener_datos_yfinance(ticker):
         elif diferencia_precio_porcentual < -1:
             recomendacion = "Vender (Impulso Moderado)"
             motivo_analisis = f"El precio proyectado a 5 días de {formatear_numero(precio_proyectado_dia_5)}€ es inferior al precio actual, sugiriendo un impulso bajista moderado."
+        
+        # Lógica de RIESGO: Si la recomendación es de compra y SMI semanal está en sobrecompra
+        if "Comprar" in recomendacion and smi_semanal > 40:
+            recomendacion = recomendacion.replace("Comprar", "Compra (ALTO RIESGO)")
+            motivo_analisis += f" **ADVERTENCIA DE RIESGO:** A pesar del impulso alcista diario/proyectado, el Algoritmo Semanal (SMI Semanal en {smi_semanal:.3f}) se encuentra en zona de sobrecompra (> 40), lo que aumenta el riesgo de una corrección a corto plazo. Se recomienda extrema cautela."
         
         # Sobrescribir las variables recomendacion y motivo_analisis
         datos['RECOMENDACION'] = recomendacion
@@ -603,6 +635,21 @@ def construir_prompt_formateado(data):
     </div>
     """
     
+    # NUEVA ADICIÓN: Alerta de riesgo si es "Compra (ALTO RIESGO)"
+    alerta_riesgo_html = ""
+    if "ALTO RIESGO" in data['RECOMENDACION']:
+         alerta_riesgo_html = f"""
+        <div style="background-color: #fce4e4; color: #c62828; padding: 15px; margin: 20px 0; text-align: center; border-radius: 8px; border: 2px solid #e57373;">
+            <p style="font-size: 1.2em; margin: 0; font-weight: bold;">
+                ⚠️ ALERTA DE ALTO RIESGO (SMI Semanal en Sobrecompra):
+            </p>
+            <p style="margin: 5px 0 0 0;">
+                El SMI semanal de <strong>{data['NOMBRE_EMPRESA']}</strong> está en <strong>{formatear_numero(data['SMI_SEMANAL'])}</strong>. A pesar de la señal de compra diaria, la sobrecompra en el marco temporal semanal sugiere que la subida podría ser débil o que una corrección está cerca. <br/> **Se recomienda actuar con extrema cautela y considerar la posibilidad de una caída a pesar de la proyección alcista.**
+            </p>
+        </div>
+        """
+
+
     # Nuevo HTML del gráfico (incluyendo el análisis detallado)
     analisis_grafico_html = ""
     chart_html = ""
@@ -942,6 +989,7 @@ def construir_prompt_formateado(data):
         </script>
         """
     
+    # MODIFICACIÓN: Incluir SMI Semanal en la tabla de resumen
     tabla_resumen = f"""
 <h2>Resumen de Puntos Clave</h2>
 <table border="1" style="width:100%; border-collapse: collapse;">
@@ -969,6 +1017,10 @@ def construir_prompt_formateado(data):
         <td style="padding: 8px;">Precio Objetivo de Compra</td>
         <td style="padding: 8px;"><strong>{formatear_numero(data['PRECIO_OBJETIVO_COMPRA'])}€</strong></td>
     </tr>
+    <tr>
+        <td style="padding: 8px;">SMI Semanal</td>
+        <td style="padding: 8px;"><strong>{formatear_numero(data['SMI_SEMANAL'])}</strong></td>
+    </tr>
 </table>
 <br/>
 """
@@ -979,7 +1031,7 @@ Actúa como un generador de contenido estricto. Tu única tarea es completar las
 
 Destaca los datos importantes como precios, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
 
-Genera un análisis técnico completo sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención (pero no lo menciones) al **valor actual del SMI ({data['SMI']})**.
+Genera un análisis técnico completo sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención (pero no lo menciones) al **valor actual del SMI ({data['SMI']})** y al **SMI Semanal ({data['SMI_SEMANAL']})**.
 
 ¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y Único para TODOS sus gráficos solicitados. Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
 
@@ -992,6 +1044,7 @@ Genera un análisis técnico completo sobre la empresa {data['NOMBRE_EMPRESA']},
 - Resistencia clave: {formatear_numero(data['RESISTENCIA'])}
 - Recomendación general: {data['RECOMENDACION']}
 - SMI actual: {data['SMI']}
+- SMI semanal: {data['SMI_SEMANAL']}
 - Precio objetivo de compra: {formatear_numero(data['PRECIO_OBJETIVO_COMPRA'])}€
 - Tendencia del SMI: {data['tendencia_ibexia']}
 
@@ -1006,6 +1059,8 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 <h2>Historial de Operaciones</h2>
 {ganancias_html}
+
+{alerta_riesgo_html}
 
 {anuncio_html}
 
