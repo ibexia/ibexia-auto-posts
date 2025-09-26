@@ -109,7 +109,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
     # Iterar sobre los datos históricos para encontrar señales
     for i in range(2, len(smis)):
-        print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:.3f}, SMI[i]={smis[i]:.3f}, pendiente[i]={pendientes_smi[i]:.3f}, pendiente[i-1]={pendientes_smi[i-1]:.3f}")
+        # print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:.3f}, SMI[i]={smis[i]:.3f}, pendiente[i]={pendientes_smi[i]:.3f}, pendiente[i-1]={pendientes_smi[i-1]:.3f}")
         # Señal de compra: la pendiente del SMI cambia de negativa a positiva y no está en sobrecompra
         # Se anticipa un día la compra y se añade la condición de sobrecompra
         if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0:
@@ -118,11 +118,11 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                     posicion_abierta = True
                     precio_compra_actual = precios[i-1]
                     compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
-                    print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.3f}")
-                else:
-                    print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.3f})")
-            else:
-                print(f"❌ No compra en {fechas[i-1]}: Ya hay posición abierta")
+                    # print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.3f}")
+                # else:
+                    # print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.3f})")
+            # else:
+                # print(f"❌ No compra en {fechas[i-1]}: Ya hay posición abierta")
 
         # Señal de venta: la pendiente del SMI cambia de positiva a negativa (anticipando un día)
         elif i >= 1 and pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0:
@@ -131,9 +131,9 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
                 num_acciones = capital_inicial / precio_compra_actual
                 ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
-                print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.3f}")
-            else:
-                print(f"❌ No venta en {fechas[i-1]}: No hay posición abierta")
+                # print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.3f}")
+            # else:
+                # print(f"❌ No venta en {fechas[i-1]}: No hay posición abierta")
 
     # --- Generación de la lista HTML de operaciones completadas (SIEMPRE) ---
     operaciones_html = ""
@@ -603,6 +603,10 @@ def construir_prompt_formateado(data):
     num_labels_hist = len(labels_historial)
     num_labels_total = len(labels_total)
 
+    # **CLAVE DE LA CORRECCIÓN: ID ÚNICO PARA CADA GRÁFICO**
+    ticker_sanitized = data['TICKER'].replace('^', '').replace('.', '_') # Limpiar ticker para usarlo como parte del ID
+    chart_id = f"smiPrecioChart_{ticker_sanitized}"
+    
     if not smi_historico_para_grafico or not cierres_para_grafico_total or num_labels_total == 0:
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico.</p>"
     else:
@@ -747,16 +751,17 @@ def construir_prompt_formateado(data):
 
         # El gráfico en sí, que debe ir antes que el análisis
         # Usamos los arrays de datos corregidos: smi_desplazados_para_grafico, precios_reales_grafico_completo, data_proyectada
+        # *** CORRECCIÓN CLAVE EN LA LÍNEA DEL CANVAS Y EL SCRIPT ***
         chart_html = f"""
         <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
-            <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
+            <canvas id="{chart_id}" style="height: 600px;"></canvas>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
         <script>
             // Configuración del gráfico
-            var ctx = document.getElementById('smiPrecioChart').getContext('2d');
-            var smiPrecioChart = new Chart(ctx, {{
+            var ctx = document.getElementById('{chart_id}').getContext('2d');
+            var {chart_id}_chart = new Chart(ctx, {{
                 type: 'line',
                 data: {{
                     labels: {labels_total},
@@ -1085,7 +1090,7 @@ def generar_contenido_con_gemini(tickers):
             try:
                 response = model.generate_content(prompt)
                 print(f"\n🧠 Contenido generado para {ticker}:\n")
-                print(response.text)
+                # print(response.text) # Descomentar si quieres ver el HTML en la consola
                 asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
                 nombre_archivo = f"analisis_{ticker}_{datetime.today().strftime('%Y%m%d')}"
                 enviar_email(response.text, asunto_email, nombre_archivo)
