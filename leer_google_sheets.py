@@ -196,59 +196,43 @@ def obtener_datos_yfinance(ticker):
         stock = yf.Ticker(ticker)
         info = stock.info
         
-        # Ampliar periodo si es necesario para el retraso y proyecciones
+        # Ampliar periodo para el SMI, soportes/resistencias y simulación
         hist_extended = stock.history(period="90d", interval="1d")
         hist_extended = calculate_smi_tv(hist_extended)
 
-        # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
-        hist = stock.history(period="30d", interval="1d")
-        hist = calculate_smi_tv(hist)
-
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        # Ampliar periodo si es necesario para el retraso y proyecciones
-        hist_extended = stock.history(period="90d", interval="1d")
-        hist_extended = calculate_smi_tv(hist_extended)
-
-        # Usar un historial más corto para obtener la tendencia de la nota actual (últimos 30 días)
-        hist = stock.history(period="30d", interval="1d")
-        hist = calculate_smi_tv(hist)
+        # Usar un historial más corto (30d) solo si es necesario, pero nos enfocaremos en hist_extended
+        # hist = stock.history(period="30d", interval="1d") # Ya no es necesario cargar dos veces
+        # hist = calculate_smi_tv(hist)
 
         # Obtener datos históricos para el volumen del día anterior completo
-        # Solicitamos un periodo más largo (por ejemplo, 5 días) para tener margen
-        # y asegurarnos de encontrar un día de trading completo anterior.
         hist_recent = stock.history(period="5d", interval="1d") 
         
         current_price = round(info["currentPrice"], 3) # Este sigue siendo el precio actual
 
         current_volume = "N/A" # Inicializamos a N/A
         if not hist_recent.empty:
-            # Intentamos obtener el volumen del penúltimo día. 
-            # Si el último día es el actual (incompleto), el penúltimo será el anterior completo.
-            # Si solo hay un día (por ejemplo, fin de semana y solo trae el último viernes), entonces es ese.
             if len(hist_recent) >= 2:
                 current_volume = hist_recent['Volume'].iloc[-2] # Penúltima fila
             else: # Solo hay un día de datos (ejecutándose un lunes temprano y solo trae el viernes anterior)
-                current_volume = hist_recent['Volume'].iloc[-1] # Última fila (que sería el día anterior completo)
+                current_volume = hist_recent['Volume'].iloc[-1] # Última fila
 
         # Get last valid SMI signal
-        smi_actual_series = hist['SMI'].dropna() # Obtener las señales SMI sin NaN
+        smi_actual_series = hist_extended['SMI'].dropna() # Usamos el historial extendido para asegurar datos
 
         if not smi_actual_series.empty:
             smi_actual = round(smi_actual_series.iloc[-1], 3)
         else:
-            # Si no hay datos SMI válidos, asignar un valor por defecto
             print(f"⚠️ Advertencia: No hay datos de SMI válidos para {ticker}. Asignando SMI neutral.")
             smi_actual = 0  # Un valor por defecto para smi_actual
 
 
         # Calcular soportes y resistencia
         # Asegurarse de tener al menos 30 días para un cálculo significativo
-        if len(hist) < 30:
-            highs_lows = hist[['High', 'Low', 'Close']].values.flatten()
+        hist_for_sr = hist_extended.tail(30) # Usar los últimos 30 días del historial extendido
+        if len(hist_for_sr) < 1: # Si no hay datos, usar el precio actual
+             highs_lows = np.array([current_price])
         else:
-            highs_lows = hist[['High', 'Low', 'Close']].iloc[-30:].values.flatten()
+             highs_lows = hist_for_sr[['High', 'Low', 'Close']].values.flatten()
         
 
         # Calculamos soportes y resistencias como listas ordenadas
@@ -294,18 +278,16 @@ def obtener_datos_yfinance(ticker):
             resistencia_1, resistencia_2, resistencia_3 = round(current_price * 1.05, 3), round(current_price * 1.1, 3), round(current_price * 1.15, 3) # Default si no hay datos
 
         # --- LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
-        # --- NUEVA LÓGICA DE PRECIO OBJETIVO BASADA EN PENDIENTE DEL SMI ---
         # Asegúrate de tener historial completo para calcular SMI reciente
         smi_history_full = hist_extended['SMI'].dropna()
 
         # Calcular pendiente de los últimos 5 días del SMI
         smi_ultimos_5 = smi_history_full.tail(5).dropna()
+        pendiente_smi = 0
         if len(smi_ultimos_5) >= 2:
             x = np.arange(len(smi_ultimos_5))
             y = smi_ultimos_5.values
             pendiente_smi, _ = np.polyfit(x, y, 1)
-        else:
-            pendiente_smi = 0
 
         # Precio objetivo basado en dirección del SMI
         if pendiente_smi > 0.1:
@@ -346,52 +328,60 @@ def obtener_datos_yfinance(ticker):
 
 
         # Fechas reales de cotización para los últimos 30 días
-        fechas_historial = hist_extended['Close'].dropna().tail(30).index.strftime("%d/%m").tolist()
-        ultima_fecha_historial = hist_extended['Close'].dropna().tail(1).index[0]
+        fechas_historial = cierres_history_full.tail(30).index.strftime("%d/%m").tolist()
+        ultima_fecha_historial = cierres_history_full.index[-1] if not cierres_history_full.empty else datetime.today()
         fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
         
-        # SMI para los 30 días del gráfico (serán los que se visualicen)
-        # Serán los 30 SMI más recientes disponibles
+        # --- MANEJO ROBUSTO DE LOS 30 DÍAS DE DATOS PARA EL GRÁFICO ---
+        # SMI para los 30 días del gráfico
         smi_historico_para_grafico = []
         if len(smi_history_full) >= 30:
             smi_historico_para_grafico = smi_history_full.tail(30).tolist()
-        elif smi_history_full.empty:
-            smi_historico_para_grafico = [0.0] * 30 # Default neutral if no data
         else:
-            # Fill with first available SMI if less than 30
-            first_smi_val = smi_history_full.iloc[0]
+            # Rellenar con el primer valor SMI disponible o 0.0 si no hay ninguno
+            first_smi_val = smi_history_full.iloc[0] if not smi_history_full.empty else 0.0
             smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
 
-
-        # Precios para el gráfico: 30 días DESPLAZADOS + PROYECCIÓN
-        # Necesitamos los últimos (30 + OFFSET_DIAS) precios reales para tener el rango completo
+        # Precios para el gráfico: 30 días DESPLAZADOS
         precios_reales_para_grafico = []
-        if len(cierres_history_full) >= (30 + OFFSET_DIAS):
-            # Tomamos los 30 precios que se alinearán con los 30 SMI (considerando el offset)
+        # Para un offset de 0 (el SMI de hoy se alinea con el precio de hoy), tomamos los últimos 30 precios
+        if len(cierres_history_full) >= 30:
             precios_reales_para_grafico = cierres_history_full.tail(30).tolist()
-        elif len(cierres_history_full) > OFFSET_DIAS: # Si tenemos menos de 30 pero más que el offset
-            # Tomamos lo que tengamos después del offset y rellenamos al principio
-            temp_prices = cierres_history_full.iloc[OFFSET_DIAS:].tolist()
-            first_price_val = temp_prices[0] if temp_prices else current_price
-            precios_reales_para_grafico = [first_price_val] * (30 - len(temp_prices)) + temp_prices
-        else: # Muy pocos datos históricos
-             precios_reales_para_grafico = [current_price] * 30 # Default to current price if no historical data
-            
-        smi_history_last_30 = hist['SMI'].dropna().tail(30).tolist()
+        else:
+            # Rellenar con el primer precio disponible o el precio actual
+            first_price_val = cierres_history_full.iloc[0] if not cierres_history_full.empty else current_price
+            precios_reales_para_grafico = [first_price_val] * (30 - len(cierres_history_full)) + cierres_history_full.tolist()
         
+        # Asegurarse de que las etiquetas de fecha coincidan con los 30 días de datos
+        if len(fechas_historial) < 30 and len(cierres_history_full.tail(30)) > 0:
+            # Crear etiquetas de relleno si los datos históricos son menos de 30
+            num_fill = 30 - len(fechas_historial)
+            fecha_temp = cierres_history_full.index[0] if not cierres_history_full.empty else datetime.today()
+            fechas_relleno = [(fecha_temp - timedelta(days=i)).strftime("%d/%m (ant.)") for i in range(num_fill, 0, -1)]
+            fechas_historial = fechas_relleno + fechas_historial
+
+        # Validar la longitud final para evitar problemas en Chart.js
+        if len(smi_historico_para_grafico) != 30 or len(precios_reales_para_grafico) != 30 or len(fechas_historial) != 30:
+             # Si después de todo no coinciden, es mejor abortar la generación del gráfico
+             print(f"❌ Error crítico de longitud de arrays. SMI: {len(smi_historico_para_grafico)}, Precios: {len(precios_reales_para_grafico)}, Fechas: {len(fechas_historial)}")
+             # Usaremos un historial vacío para forzar un mensaje de error en el HTML
+             smi_historico_para_grafico = []
+             precios_reales_para_grafico = []
+             fechas_historial = []
+
 
         # --- NUEVA Lógica: Proyección lineal SIN soportes/resistencias (solo SMI) ---
         precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
         # Determinar la dirección de la tendencia y el movimiento diario constante
-        smi_history_full = hist_extended['SMI'].dropna()
-        smi_ultimos_5 = smi_history_full.tail(5).dropna()
+        smi_history_full_for_slope = hist_extended['SMI'].dropna()
+        smi_ultimos_5_for_slope = smi_history_full_for_slope.tail(5).dropna()
 
         pendiente_smi = 0
-        if len(smi_ultimos_5) >= 2:
-            x = np.arange(len(smi_ultimos_5))
-            y = smi_ultimos_5.values
+        if len(smi_ultimos_5_for_slope) >= 2:
+            x = np.arange(len(smi_ultimos_5_for_slope))
+            y = smi_ultimos_5_for_slope.values
             pendiente_smi, _ = np.polyfit(x, y, 1)
 
         # Definir un movimiento diario constante (usaremos +/- 1% o +/- 0.5%)
@@ -426,23 +416,21 @@ def obtener_datos_yfinance(ticker):
 
         # --- Fin de la NUEVA lógica lineal ---
 
-
-
-      
-     
         # Unir precios reales y proyectados
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
-        precio_proyectado_dia_5 = cierres_para_grafico_total[-1]  # Último precio proyectado a 5 días
+        precio_proyectado_dia_5 = cierres_para_grafico_total[-1] if cierres_para_grafico_total else current_price # Último precio proyectado a 5 días
 
         # Guarda los datos para la simulación
-        smi_historico_para_simulacion = [round(s, 3) for s in hist_extended['SMI'].dropna().tail(30).tolist()]
+        smi_historico_para_simulacion = [round(s, 3) for s in smi_history_full.tail(30).tolist()]
         precios_para_simulacion = precios_reales_para_grafico
         fechas_para_simulacion = hist_extended.tail(30).index.strftime("%d/%m/%Y").tolist() # CORREGIDO: ahora se aplica .tail() al DataFrame
-        tendencia_ibexia = "No disponible"
         
-        if len(smi_history_last_30) >= 2:
-            x = np.arange(len(smi_history_last_30))
-            y = np.array(smi_history_last_30)
+        # Lógica de tendencia para la nota
+        tendencia_ibexia = "No disponible"
+        slope = 0.0
+        if len(smi_historico_para_simulacion) >= 2:
+            x = np.arange(len(smi_historico_para_simulacion))
+            y = np.array(smi_historico_para_simulacion)
             if np.std(y) > 0.01:
                 slope, intercept = np.polyfit(x, y, 1)
             else:
@@ -450,16 +438,11 @@ def obtener_datos_yfinance(ticker):
 
             if slope > 0.1:
                 tendencia_ibexia = "mejorando (alcista)"
-                recomendacion = "Comprar"
-                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia alcista, lo que sugiere que el precio podría dirigirse hacia la próxima resistencia en {formatear_numero(resistencia_1)}€."
             elif slope < -0.1:
                 tendencia_ibexia = "empeorando (bajista)"
-                recomendacion = "Vender"
-                motivo_recomendacion = f"Nuestro Algoritmo muestra una tendencia bajista, lo que indica que el precio podría caer hacia el próximo soporte en {formatear_numero(soporte_1)}€."
             else:
                 tendencia_ibexia = "cambio de tendencia"
-                recomendacion = "Atención máxima"
-                motivo_recomendacion = "El precio podría girar a a corto plazo."
+
 
         datos = {
             "TICKER": ticker,
@@ -476,7 +459,7 @@ def obtener_datos_yfinance(ticker):
             "SMI": smi_actual,
             "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
             "tendencia_ibexia": tendencia_ibexia, # Renombrado de TENDENCIA_NOTA
-            "CIERRES_30_DIAS": hist['Close'].dropna().tail(30).tolist(),
+            "CIERRES_30_DIAS": precios_reales_para_grafico, # Usar los 30 días ya limpios y completos
             "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico, # Renombrado
             "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total,
             "OFFSET_DIAS_GRAFICO": OFFSET_DIAS,
@@ -559,7 +542,7 @@ def construir_prompt_formateado(data):
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
     cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
-    OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 4)
+    OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 0) # Corregido a 0 para el nuevo manejo
     PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
 
 
@@ -581,7 +564,8 @@ def construir_prompt_formateado(data):
     if len(temp_soportes) > 0:
         soportes_unicos.append(temp_soportes[0])
         for i in range(1, len(temp_soportes)):
-            if abs(temp_soportes[i] - soportes_unicos[-1]) / soportes_unicos[-1] > 0.005:
+            # Usar una tolerancia para considerar que son diferentes
+            if abs(temp_soportes[i] - soportes_unicos[-1]) / (soportes_unicos[-1] or 1) > 0.005:
                 soportes_unicos.append(temp_soportes[i])
     
     if not soportes_unicos:
@@ -611,18 +595,53 @@ def construir_prompt_formateado(data):
     # Nuevo HTML del gráfico (incluyendo el análisis detallado)
     analisis_grafico_html = ""
     chart_html = ""
-    if smi_historico_para_grafico and cierres_para_grafico_total:
-        labels_historial = data.get("FECHAS_HISTORIAL", [])
-        labels_proyeccion = data.get("FECHAS_PROYECCION", [])
-        labels_total = labels_historial + labels_proyeccion
 
-        precios_reales_grafico = cierres_para_grafico_total[:30]
-        data_proyectada = [None] * (len(labels_historial) - 1) + [precios_reales_grafico[-1]] + cierres_para_grafico_total[len(labels_historial):]
+    # REVISIÓN CRÍTICA DE DATOS ANTES DE GENERAR EL GRÁFICO
+    labels_historial = data.get("FECHAS_HISTORIAL", [])
+    labels_proyeccion = data.get("FECHAS_PROYECCION", [])
+    labels_total = labels_historial + labels_proyeccion
+    num_labels_hist = len(labels_historial)
+    num_labels_total = len(labels_total)
 
-        smi_desplazados_para_grafico = smi_historico_para_grafico
-        if len(smi_desplazados_para_grafico) < len(labels_total):
-            smi_desplazados_para_grafico.extend([None] * (len(labels_total) - len(smi_desplazados_para_grafico)))
+    if not smi_historico_para_grafico or not cierres_para_grafico_total or num_labels_total == 0:
+        chart_html = "<p>No hay suficientes datos válidos para generar el gráfico.</p>"
+    else:
+        # Asegurar que SMI tenga el mismo número de puntos que las etiquetas totales (rellenando con null)
+        smi_desplazados_para_grafico = smi_historico_para_grafico + [None] * PROYECCION_FUTURA_DIAS
         
+        # El dataset de precio proyectado debe ser:
+        # [null] * (días_historial - 1) + [último precio real] + [precios_proyectados]
+        # Esto asegura que la línea proyectada comience exactamente en el último punto del precio real
+        precios_reales_grafico = data.get('CIERRES_30_DIAS', [])
+        precios_proyectados = cierres_para_grafico_total[num_labels_hist:]
+        
+        data_proyectada = []
+        if num_labels_hist > 0 and precios_reales_grafico:
+            # Rellenar con null antes del último punto de precio real
+            data_proyectada = [None] * (num_labels_hist - 1)
+            # Agregar el último precio real (el punto de conexión)
+            data_proyectada.append(precios_reales_grafico[-1])
+            # Agregar la proyección
+            data_proyectada.extend(precios_proyectados)
+        else:
+             data_proyectada = [None] * num_labels_total # Si no hay historial, no hay proyección
+        
+        # Si el precio real tiene menos de 30 puntos (por la lógica de rellenado en yfinance),
+        # también debemos asegurarnos de que el array de precios reales tenga la longitud de las etiquetas históricas.
+        if len(precios_reales_grafico) < num_labels_hist:
+             # Esto debería estar resuelto por el manejo en yfinance, pero lo forzamos a null si hay un desajuste
+             precios_reales_grafico.extend([None] * (num_labels_hist - len(precios_reales_grafico)))
+
+        # Aseguramos que todos los datasets tengan la misma longitud que labels_total
+        max_len = num_labels_total
+        smi_desplazados_para_grafico = smi_desplazados_para_grafico[:max_len]
+        data_proyectada = data_proyectada[:max_len]
+        
+        # Rellenar el array de precios reales con 'null' para el área de proyección
+        precios_reales_grafico_completo = precios_reales_grafico[:num_labels_hist] + [None] * PROYECCION_FUTURA_DIAS
+        precios_reales_grafico_completo = precios_reales_grafico_completo[:max_len]
+
+
         # Reemplazo para la sección de análisis detallado del gráfico
         analisis_grafico_html = f"""
         <h2 style="color: #333333; background-color: #e9e9e9; padding: 10px; border-radius: 5px; text-align: center;">Análisis Detallado del Gráfico</h2>
@@ -701,7 +720,7 @@ def construir_prompt_formateado(data):
             """
         
         # Última fila para el estado actual
-        ultima_tendencia = "bajista" # Asumir una tendencia por defecto si no hay suficientes datos
+        ultima_tendencia = "sin datos" 
         if len(smis) > 1:
              ultima_tendencia_smi = get_trend(smis[-1], smis[-2])
              if ultima_tendencia_smi == "alcista":
@@ -727,6 +746,7 @@ def construir_prompt_formateado(data):
         """
 
         # El gráfico en sí, que debe ir antes que el análisis
+        # Usamos los arrays de datos corregidos: smi_desplazados_para_grafico, precios_reales_grafico_completo, data_proyectada
         chart_html = f"""
         <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
@@ -753,7 +773,7 @@ def construir_prompt_formateado(data):
                         }},
                         {{
                             label: 'Precio Real',
-                            data: {precios_reales_grafico},
+                            data: {precios_reales_grafico_completo},
                             borderColor: '#2979ff',
                             backgroundColor: 'rgba(41, 121, 255, 0.2)',
                             yAxisID: 'y',
@@ -902,8 +922,6 @@ def construir_prompt_formateado(data):
             }});
         </script>
         """
-    else:
-        chart_html = "<p>No hay suficientes datos para generar el gráfico.</p>"
     
     tabla_resumen = f"""
 <h2>Resumen de Puntos Clave</h2>
@@ -1050,9 +1068,7 @@ def generar_contenido_con_gemini(tickers):
             continue
         
         # ACCESO A LAS VARIABLES DESDE EL DICCIONARIO 'data'
-        # ANTES ERAN INDEFINIDAS, AHORA SE OBTIENEN DE 'data'
         cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
-        # Cambio aquí para usar 'SMI_HISTORICO_PARA_GRAFICO'
         smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
 
 
