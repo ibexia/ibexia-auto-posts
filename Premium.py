@@ -399,7 +399,7 @@ def clasificar_empresa(data):
         "Riesgo de Venta Activada": 5,
         "Seguirá bajando": 6,
         "Intermedio": 7,
-        "Compra RIESGO": 8 # Nueva prioridad para compras filtradas
+        "Compra RIESGO": 8 # Esta prioridad se anula con la clave de ordenación en generar_reporte, pero se mantiene aquí por consistencia.
     }
 
     if estado_smi == "Sobreventa":
@@ -599,28 +599,31 @@ def generar_reporte():
                 
             time.sleep(1)
 
-        # --- Lógica de ordenación integrada ---
+        # --- Lógica de ordenación MODIFICADA para mover "Compra RIESGO" arriba ---
         def obtener_clave_ordenacion(empresa):
             categoria = empresa['OPORTUNIDAD']
             
-            orden_grupo = 99
-            orden_interna = float('inf')
+            # Se ajustan las prioridades para que "Compra RIESGO" esté en el grupo de compra (valores < 3)
+            # y darle una prioridad interna de 2.5, justo después de las compras fuertes (1 y 2).
             
-            # Se ajustan las prioridades para incluir el nuevo estado "Compra RIESGO"
-            if categoria in ["Posibilidad de Compra Activada", "Posibilidad de Compra"]:
-                orden_grupo = 1 # Oportunidades de compra prioritarias
-            elif categoria == "Compra RIESGO":
-                orden_grupo = 2 # Compras con advertencia
-            elif categoria in ["VIGILAR", "Riesgo de Venta", "Riesgo de Venta Activada", "Seguirá bajando"]:
-                orden_grupo = 3 # Alerta de venta/Vigilancia
-            elif categoria == "Intermedio":
-                orden_grupo = 4 # Sin movimientos
+            prioridad = {
+                "Posibilidad de Compra Activada": 1, # Máxima prioridad de compra
+                "Posibilidad de Compra": 2,         # Segunda prioridad de compra
+                "Compra RIESGO": 2.5,               # TERCERA prioridad, pero aún en el grupo de Compra.
+                "VIGILAR": 3,
+                "Riesgo de Venta": 4,
+                "Riesgo de Venta Activada": 5,
+                "Seguirá bajando": 6,
+                "Intermedio": 7,
+            }
 
-            return (empresa['ORDEN_PRIORIDAD'], empresa['NOMBRE_EMPRESA'])
+            orden_interna = prioridad.get(categoria, 99) # Si no está, al final
+
+            return (orden_interna, empresa['NOMBRE_EMPRESA']) # Se ordena por la clave y luego por nombre
 
         datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
         
-        # --- Fin de la lógica de ordenación integrada ---
+        # --- Fin de la lógica de ordenación MODIFICADA ---
         now_utc = datetime.utcnow()
         hora_actual = (now_utc + timedelta(hours=2)).strftime('%H:%M')
         
@@ -778,43 +781,36 @@ def generar_reporte():
             previous_orden_grupo = None
             for i, data in enumerate(datos_ordenados):
                 
-                current_orden_grupo = data['ORDEN_PRIORIDAD']
+                current_orden_grupo = obtener_clave_ordenacion(data)[0]
                 
-                # Modificación para los nuevos grupos de prioridad
-                if previous_orden_grupo is None or (current_orden_grupo in [8, 3, 4, 5, 6, 7] and previous_orden_grupo in [1, 2, 8] and current_orden_grupo != previous_orden_grupo):
-                     if current_orden_grupo in [1, 2]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="6">OPORTUNIDADES DE COMPRA FUERTE</td></tr>
-                        """
-                     elif current_orden_grupo == 8: # Nueva categoría de riesgo
-                          html_body += """
-                            <tr class="category-header"><td colspan="6">OPORTUNIDADES DE COMPRA CON RIESGO SEMANAL</td></tr>
-                        """
-                     elif current_orden_grupo in [3, 4, 5]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="6">ATENTOS A VENDER/VIGILANCIA</td></tr>
-                        """
-                     elif current_orden_grupo in [6, 7]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
-                        """
+                # Lógica para determinar el encabezado de categoría
+                es_primera_fila = previous_orden_grupo is None
+                es_cambio_grupo = current_orden_grupo != previous_orden_grupo
                 
-                elif current_orden_grupo != previous_orden_grupo:
-                    if current_orden_grupo == 8 and previous_orden_grupo in [1, 2]:
+                if es_primera_fila or es_cambio_grupo:
+                    
+                    # MODIFICACIÓN DE LA LÓGICA DE ENCABEZADO
+                    if current_orden_grupo in [1, 2, 2.5]: # Grupo de Compra (incluye Compra RIESGO con 2.5)
+                        if previous_orden_grupo is None or previous_orden_grupo not in [1, 2, 2.5]:
+                            html_body += """
+                                <tr class="category-header"><td colspan="6">OPORTUNIDADES DE COMPRA</td></tr>
+                            """
+                    elif current_orden_grupo in [3, 4, 5]: # Grupo de Venta/Vigilancia
+                        if previous_orden_grupo is None or previous_orden_grupo not in [3, 4, 5]:
+                            html_body += """
+                                <tr class="category-header"><td colspan="6">ATENTOS A VENDER/VIGILANCIA</td></tr>
+                            """
+                    elif current_orden_grupo in [6, 7]: # Grupo Intermedio
+                        if previous_orden_grupo is None or previous_orden_grupo not in [6, 7]:
+                            html_body += """
+                                <tr class="category-header"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                            """
+                            
+                    # Poner un separador si no es la primera fila y hay cambio de grupo
+                    if not es_primera_fila and es_cambio_grupo:
                         html_body += """
-                            <tr class="category-header"><td colspan="6">OPORTUNIDADES DE COMPRA CON RIESGO SEMANAL</td></tr>
+                            <tr class="separator-row"><td colspan="6"></td></tr>
                         """
-                    elif current_orden_grupo in [3, 4, 5] and previous_orden_grupo in [1, 2, 8]:
-                        html_body += """
-                            <tr class="category-header"><td colspan="6">ATENTOS A VENDER/VIGILANCIA</td></tr>
-                        """
-                    elif current_orden_grupo in [6, 7] and previous_orden_grupo in [1, 2, 8, 3, 4, 5]:
-                         html_body += """
-                            <tr class="category-header"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
-                        """
-                    html_body += """
-                        <tr class="separator-row"><td colspan="6"></td></tr>
-                    """
 
                 # Lógica de corrección para el enlace
                 nombre_empresa_url = None
@@ -830,7 +826,7 @@ def generar_reporte():
                 
                 nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
 
-                # Ajuste de clases para el nuevo estado 'Compra RIESGO'
+                # Ajuste de clases para el estado 'Compra RIESGO' (texto amarillo, celda amarilla)
                 if "compra" in data['OPORTUNIDAD'].lower() and "riesgo" not in data['OPORTUNIDAD'].lower():
                     clase_oportunidad = "compra"
                     celda_empresa_class = "green-cell"
@@ -840,7 +836,7 @@ def generar_reporte():
                 elif "vigilar" in data['OPORTUNIDAD'].lower():
                     clase_oportunidad = "vigilar"
                     celda_empresa_class = ""
-                elif "riesgo" in data['OPORTUNIDAD'].lower(): # Nuevo estado
+                elif "riesgo" in data['OPORTUNIDAD'].lower():
                     clase_oportunidad = "riesgo-compra"
                     celda_empresa_class = "yellow-cell"
                 else:
@@ -850,7 +846,7 @@ def generar_reporte():
                 
                 observaciones = generar_observaciones(data)
                 
-                # --- MODIFICACIÓN CLAVE AQUÍ ---
+                # --- FILAS DE REPORTE CON OBSERVACIÓN SEMANAL EN DETALLE ---
                 html_body += f"""
                             <tr class="main-row" data-index="{i}">
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
@@ -889,8 +885,7 @@ def generar_reporte():
                                 <td colspan="6">{observaciones}</td>
                             </tr>
                 """
-                # --- FIN DE MODIFICACIÓN CLAVE ---
-                previous_orden_grupo = obtener_clave_ordenacion(data)[0] # Se usa la clave de ordenación para el separador
+                previous_orden_grupo = current_orden_grupo
         
         html_body += """
                         </tbody>
