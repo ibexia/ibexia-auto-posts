@@ -14,6 +14,17 @@ import time
 import re
 import random
 
+# NUEVA FUNCIÓN AÑADIDA PARA GARANTIZAR LA SERIALIZACIÓN A JSON/NULL
+def safe_json_dump(data_list):
+    """
+    Serializa una lista de Python a una cadena JSON, asegurando que los valores None
+    se conviertan a la palabra clave 'null' de JavaScript.
+    """
+    # json.dumps convierte None a 'null' y los floats a formato JavaScript (con punto decimal)
+    # Se asegura de que la lista solo contenga valores o None, para que json.dumps funcione.
+    return json.dumps([val if val is not None else None for val in data_list])
+
+
 def leer_google_sheets():
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
     if not credentials_json:
@@ -641,7 +652,15 @@ def construir_prompt_formateado(data):
         precios_reales_grafico_completo = precios_reales_grafico[:num_labels_hist] + [None] * PROYECCION_FUTURA_DIAS
         precios_reales_grafico_completo = precios_reales_grafico_completo[:max_len]
 
-
+        
+        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON ----
+        # Serializar todos los arrays para garantizar que None se convierte a 'null'
+        labels_json = safe_json_dump(labels_total)
+        smi_json = safe_json_dump(smi_desplazados_para_grafico)
+        precios_reales_json = safe_json_dump(precios_reales_grafico_completo)
+        data_proyectada_json = safe_json_dump(data_proyectada)
+        # ---- FIN DE LA CORRECCIÓN ----
+        
         # Reemplazo para la sección de análisis detallado del gráfico
         analisis_grafico_html = f"""
         <h2 style="color: #333333; background-color: #e9e9e9; padding: 10px; border-radius: 5px; text-align: center;">Análisis Detallado del Gráfico</h2>
@@ -759,11 +778,11 @@ def construir_prompt_formateado(data):
             var smiPrecioChart = new Chart(ctx, {{
                 type: 'line',
                 data: {{
-                    labels: {labels_total},
+                    labels: {labels_json},
                     datasets: [
                         {{
                             label: 'Nuestro Algoritmo',
-                            data: {smi_desplazados_para_grafico},
+                            data: {smi_json},
                             borderColor: '#00bfa5',
                             backgroundColor: 'rgba(0, 191, 165, 0.2)',
                             yAxisID: 'y1',
@@ -773,7 +792,7 @@ def construir_prompt_formateado(data):
                         }},
                         {{
                             label: 'Precio Real',
-                            data: {precios_reales_grafico_completo},
+                            data: {precios_reales_json},
                             borderColor: '#2979ff',
                             backgroundColor: 'rgba(41, 121, 255, 0.2)',
                             yAxisID: 'y',
@@ -783,7 +802,7 @@ def construir_prompt_formateado(data):
                         }},
                         {{
                             label: 'Precio Proyectado',
-                            data: {data_proyectada},
+                            data: {data_proyectada_json},
                             borderColor: '#ffc107',
                             borderDash: [5, 5],
                             backgroundColor: 'rgba(255, 193, 7, 0.2)',
