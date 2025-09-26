@@ -725,8 +725,11 @@ def generar_reporte():
                 }}
 
                 /* --- NUEVOS ESTILOS SMI SEMANAL --- */
+                /* Fondo y texto rojo para NO COMPRAR */
                 .smi-rojo { color: #dc3545; font-weight: bold; background-color: #f8d7da; } 
+                /* Fondo y texto verde para Oportunidad */
                 .smi-verde { color: #155724; font-weight: bold; background-color: #d4edda; } 
+                /* Color negro para Intermedio */
                 .smi-negro { color: #343a40; } 
                 /* ---------------------------------- */
             </style>
@@ -767,9 +770,16 @@ def generar_reporte():
             previous_orden_grupo = None
             for i, data in enumerate(datos_ordenados):
                 
+                # Inicializamos las variables de clase y contenido al inicio de cada iteración.
+                # Esto previene errores como 'name 'color' is not defined'.
+                clase_oportunidad = ""
+                celda_empresa_class = ""
+                smi_semanal_clase = "smi-negro" 
+                smi_semanal_texto_extra = ""
+                
                 current_orden_grupo = data['ORDEN_PRIORIDAD']
                 
-                # Modificación para los nuevos grupos de prioridad
+                # Lógica de encabezados de categoría
                 if previous_orden_grupo is None or (current_orden_grupo in [8, 3, 4, 5, 6, 7] and previous_orden_grupo in [1, 2, 8] and current_orden_grupo != previous_orden_grupo):
                      if current_orden_grupo in [1, 2]:
                          html_body += """
@@ -819,7 +829,7 @@ def generar_reporte():
                 
                 nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
 
-                # Ajuste de clases para el nuevo estado 'Compra RIESGO'
+                # Ajuste de clases para el estado diario
                 if "compra" in data['OPORTUNIDAD'].lower() and "riesgo" not in data['OPORTUNIDAD'].lower():
                     clase_oportunidad = "compra"
                     celda_empresa_class = "green-cell"
@@ -829,25 +839,26 @@ def generar_reporte():
                 elif "vigilar" in data['OPORTUNIDAD'].lower():
                     clase_oportunidad = "vigilar"
                     celda_empresa_class = ""
-                elif "riesgo" in data['OPORTUNIDAD'].lower(): # Nuevo estado
+                elif "riesgo" in data['OPORTUNIDAD'].lower(): 
                     clase_oportunidad = "riesgo-compra"
                     celda_empresa_class = "yellow-cell"
                 else:
                     clase_oportunidad = ""
                     celda_empresa_class = ""
                 
-                # --- Lógica de la NUEVA columna SMI Semanal ---
+                # --- Lógica de la NUEVA columna SMI Semanal (con color) ---
                 smi_semanal_status = data['ESTADO_SMI_SEMANAL']
                 smi_semanal_value = formatear_numero(data['SMI_SEMANAL'])
-                smi_semanal_clase = "smi-negro"
-                smi_semanal_texto_extra = ""
-
+                
                 if smi_semanal_status == "Sobrecompra":
                     smi_semanal_clase = "smi-rojo"
-                    smi_semanal_texto_extra = "<br><b><span style='font-size:1.1em;'>🔴 NO COMPRAR</span></b>" # Aviso claro y grande
+                    smi_semanal_texto_extra = "<br><b><span style='font-size:1.1em;'>🔴 NO COMPRAR</span></b>" 
                 elif smi_semanal_status == "Sobreventa":
                     smi_semanal_clase = "smi-verde"
                     smi_semanal_texto_extra = "<br><span style='font-size:1.1em;'>🟢 Oportunidad</span>"
+                else:
+                    smi_semanal_clase = "smi-negro"
+                    smi_semanal_texto_extra = "" # Intermedio no tiene texto extra
                 
                 smi_semanal_html = f"<div class='stacked-text {smi_semanal_clase}'><b>{smi_semanal_status}</b> ({smi_semanal_value}){smi_semanal_texto_extra}</div>"
                 # -----------------------------------------------------
@@ -987,6 +998,7 @@ def generar_reporte():
         enviar_email_con_adjunto(html_body, asunto)
 
     except Exception as e:
+        # Se ha añadido esta línea para mostrar el error, si persiste, al usuario.
         print(f"❌ Error al ejecutar el script principal: {e}")
 
 if __name__ == '__main__':
