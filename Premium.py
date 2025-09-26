@@ -251,6 +251,7 @@ def obtener_datos_yfinance(ticker):
             print(f"⚠️ Advertencia: No se encontró precio actual para {ticker}. Saltando...")
             return None
 
+        # --- Datos Diarios (como estaban) ---
         hist_extended = stock.history(period="150d", interval="1d")
         hist_extended['EMA_100'] = ta.ema(hist_extended['Close'], length=100)
                 
@@ -311,6 +312,22 @@ def obtener_datos_yfinance(ticker):
                 fecha_compra = hist_extended.index[i].strftime('%d/%m/%Y')
                 break
 
+        # --- Modificación: Cálculo de SMI Semanal ---
+        hist_weekly = stock.history(period="3y", interval="1wk")
+        if hist_weekly.empty:
+            smi_weekly = 'N/A'
+            estado_smi_weekly = 'N/A'
+        else:
+            hist_weekly = calculate_smi_tv(hist_weekly)
+            smi_weekly_series = hist_weekly['SMI'].dropna()
+            smi_weekly = smi_weekly_series.iloc[-1] if not smi_weekly_series.empty else 'N/A'
+            
+            if isinstance(smi_weekly, (int, float)):
+                estado_smi_weekly = "Sobrecompra" if smi_weekly > 40 else ("Sobreventa" if smi_weekly < -40 else "Intermedio")
+            else:
+                estado_smi_weekly = 'N/A'
+
+
         return {
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
@@ -330,7 +347,11 @@ def obtener_datos_yfinance(ticker):
             "RESISTENCIA_1": sr_levels['r1'],
             "TIPO_EMA": tipo_ema,
             "VALOR_EMA": ema_actual,
-            "RESISTENCIA_2": sr_levels['r2']
+            "RESISTENCIA_2": sr_levels['r2'],
+            # --- Nuevo Campo Semanal ---
+            "SMI_SEMANAL": smi_weekly,
+            "ESTADO_SMI_SEMANAL": estado_smi_weekly,
+            "ADVERTENCIA_SEMANAL": "NO" # Se inicializa y se modifica en clasificar_empresa
         }
 
     except Exception as e:
@@ -353,6 +374,9 @@ def clasificar_empresa(data):
     
     pendiente_smi_hoy = data['PENDIENTE']
     pendiente_smi_ayer = hist_df['SMI'].diff().iloc[-2] if len(hist_df['SMI']) > 1 else 'N/A'
+    
+    # --- Nuevo: Variables Semanales ---
+    estado_smi_weekly = data['ESTADO_SMI_SEMANAL']
 
     prioridad = {
         "Posibilidad de Compra Activada": 1,
@@ -361,23 +385,42 @@ def clasificar_empresa(data):
         "Riesgo de Venta": 4,
         "Riesgo de Venta Activada": 5,
         "Seguirá bajando": 6,
-        "Intermedio": 7
+        "Intermedio": 7,
+        "Compra RIESGO": 8 # Nueva prioridad para compras filtradas
     }
 
     if estado_smi == "Sobreventa":
         if tendencia == "Subiendo":
-            data['OPORTUNIDAD'] = "Compra Activada"
-            data['COMPRA_SI'] = "COMPRA YA"
-            data['VENDE_SI'] = "NO VENDER"
-            data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
-        elif tendencia == "Bajando":
-            data['OPORTUNIDAD'] = "Posibilidad de Compra"
-            if current_price > close_yesterday:
-                data['COMPRA_SI'] = "COMPRA YA"
+            # --- Lógica de Filtro Semanal ---
+            if estado_smi_weekly == "Sobrecompra":
+                data['OPORTUNIDAD'] = "Compra RIESGO"
+                data['COMPRA_SI'] = "NO RECOMENDAMOS" # La subida puede ser corta
+                data['VENDE_SI'] = "NO VENDER"
+                data['ORDEN_PRIORIDAD'] = prioridad["Compra RIESGO"]
+                data['ADVERTENCIA_SEMANAL'] = "SI"
             else:
-                data['COMPRA_SI'] = f"COMPRAR SI SUPERA {formatear_numero(close_yesterday)}€"
-            data['VENDE_SI'] = "NO VENDER"
-            data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
+                data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
+                data['COMPRA_SI'] = "COMPRA YA"
+                data['VENDE_SI'] = "NO VENDER"
+                data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
+            # -----------------------------------
+        elif tendencia == "Bajando":
+            # --- Lógica de Filtro Semanal ---
+            if estado_smi_weekly == "Sobrecompra":
+                data['OPORTUNIDAD'] = "Compra RIESGO"
+                data['COMPRA_SI'] = "NO RECOMENDAMOS"
+                data['VENDE_SI'] = "NO VENDER"
+                data['ORDEN_PRIORIDAD'] = prioridad["Compra RIESGO"]
+                data['ADVERTENCIA_SEMANAL'] = "SI"
+            else:
+                data['OPORTUNIDAD'] = "Posibilidad de Compra"
+                if current_price > close_yesterday:
+                    data['COMPRA_SI'] = "COMPRA YA"
+                else:
+                    data['COMPRA_SI'] = f"COMPRAR SI SUPERA {formatear_numero(close_yesterday)}€"
+                data['VENDE_SI'] = "NO VENDER"
+                data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
+            # -----------------------------------
         else:
             data['OPORTUNIDAD'] = "Intermedio"
             data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
@@ -439,7 +482,16 @@ def generar_observaciones(data):
     tipo_ema = data['TIPO_EMA']
     valor_ema = formatear_numero(data['VALOR_EMA'])
     
+    # --- Nuevo: Advertencia Semanal ---
+    advertencia_semanal = data['ADVERTENCIA_SEMANAL']
+
     texto_observacion = f"<strong>Observaciones de {nombre_empresa}:</strong><br>"
+    
+    # Nuevo texto de advertencia para insertar al inicio
+    advertencia_texto = ""
+    if advertencia_semanal == "SI":
+        advertencia_texto = "<strong style='color:#ffc107;'>ADVERTENCIA SEMANAL: El SMI semanal está en zona de sobrecompra. No se recomienda comprar ya que la subida podría ser muy corta y con alto riesgo.</strong><br>"
+
 
     if oportunidad == "Posibilidad de Compra Activada":
         texto = f"El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda tener en cuenta los niveles de resistencia ({resistencia1}€) para determinar un objetivo de precio. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
@@ -450,6 +502,10 @@ def generar_observaciones(data):
         else:
             texto = f"El algoritmo detecta que el valor está en una zona de sobreventa con una tendencia bajista. Se ha detectado una oportunidad de {compra_si} para un posible rebote. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
     
+    # Nuevo bloque de Riesgo de Compra
+    elif oportunidad == "Compra RIESGO":
+        texto = f"El algoritmo detectó una señal de compra diaria, pero el **SMI Semanal** se encuentra en zona de **Sobrecompra** ({formatear_numero(data['SMI_SEMANAL'])}). Esto indica que el precio ya ha subido mucho a largo plazo, y la señal de rebote diaria podría ser muy breve. No se recomienda la compra en este momento. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+
     elif oportunidad == "VIGILAR":
         texto = f"El algoritmo se encuentra en una zona intermedia y muestra una tendencia alcista en sus últimos valores. Se sugiere vigilar de cerca, ya que una caída en el precio podría ser una señal de venta. {vende_si}. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
     
@@ -468,10 +524,13 @@ def generar_observaciones(data):
     else:
         texto = "El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda comprar para aprovechar un posible rebote, con un objetivo de precio en la zona de resistencia. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
     
-    return f'<p style="text-align:left; color:#000;">{texto_observacion.strip()}{texto.strip()}</p>'
+    # Se añade la advertencia al inicio del texto de la observación
+    return f'<p style="text-align:left; color:#000;">{texto_observacion.strip()}{advertencia_texto}{texto.strip()}</p>'
 
 
 def enviar_email_con_adjunto(html_body, asunto_email):
+    # ATENCIÓN: Estas variables de correo no se modifican según tu petición.
+    # Asegúrate de que los datos de acceso estén correctos.
     remitente = "xumkox@gmail.com"
     destinatario = "xumkox@gmail.com"
     password = "kdgz lvdo wqvt vfkt"
@@ -534,12 +593,15 @@ def generar_reporte():
             orden_grupo = 99
             orden_interna = float('inf')
             
+            # Se ajustan las prioridades para incluir el nuevo estado "Compra RIESGO"
             if categoria in ["Posibilidad de Compra Activada", "Posibilidad de Compra"]:
-                orden_grupo = 1
+                orden_grupo = 1 # Oportunidades de compra prioritarias
+            elif categoria == "Compra RIESGO":
+                orden_grupo = 2 # Compras con advertencia
             elif categoria in ["VIGILAR", "Riesgo de Venta", "Riesgo de Venta Activada", "Seguirá bajando"]:
-                orden_grupo = 2
+                orden_grupo = 3 # Alerta de venta/Vigilancia
             elif categoria == "Intermedio":
-                orden_grupo = 3
+                orden_grupo = 4 # Sin movimientos
 
             return (empresa['ORDEN_PRIORIDAD'], empresa['NOMBRE_EMPRESA'])
 
@@ -549,6 +611,8 @@ def generar_reporte():
         now_utc = datetime.utcnow()
         hora_actual = (now_utc + timedelta(hours=2)).strftime('%H:%M')
         
+        # ATENCIÓN: No se modifica la estructura de la tabla HTML para mantener el formato original.
+        # Las nuevas advertencias se integran en la columna 'Oportunidad' y en el detalle de 'Observaciones'.
         html_body = f"""
         <html>
         <head>
@@ -622,6 +686,7 @@ def generar_reporte():
                 }}
                 .compra {{ color: #28a745; font-weight: bold; }}
                 .venta {{ color: #dc3545; font-weight: bold; }}
+                .riesgo-compra {{ color: #ffc107; font-weight: bold; }} /* Nuevo estilo para Compra RIESGO */
                 .comprado-si {{ background-color: #28a745; color: white; font-weight: bold; }}
                 .bg-green {{ background-color: #d4edda; color: #155724; }}
                 .bg-red {{ background-color: #f8d7da; color: #721c24; }}
@@ -631,6 +696,7 @@ def generar_reporte():
                 .small-text {{ font-size: 0.7em; color: #6c757d; }}
                 .green-cell {{ background-color: #d4edda; }}
                 .red-cell {{ background-color: #f8d7da; }}
+                .yellow-cell {{ background-color: #fff3cd; }} /* Nuevo estilo para celda de riesgo */
                 .separator-row td {{ background-color: #e9ecef; height: 3px; padding: 0; border: none; }}
                 .category-header td {{
                     background-color: #495057;
@@ -701,14 +767,19 @@ def generar_reporte():
                 
                 current_orden_grupo = data['ORDEN_PRIORIDAD']
                 
-                if previous_orden_grupo is None:
+                # Modificación para los nuevos grupos de prioridad
+                if previous_orden_grupo is None or (current_orden_grupo in [8, 3, 4, 5, 6, 7] and previous_orden_grupo in [1, 2, 8] and current_orden_grupo != previous_orden_grupo):
                      if current_orden_grupo in [1, 2]:
                          html_body += """
-                            <tr class="category-header"><td colspan="6">OPORTUNIDADES DE COMPRA</td></tr>
+                            <tr class="category-header"><td colspan="6">OPORTUNIDADES DE COMPRA FUERTE</td></tr>
+                        """
+                     elif current_orden_grupo == 8: # Nueva categoría de riesgo
+                          html_body += """
+                            <tr class="category-header"><td colspan="6">OPORTUNIDADES DE COMPRA CON RIESGO SEMANAL</td></tr>
                         """
                      elif current_orden_grupo in [3, 4, 5]:
                          html_body += """
-                            <tr class="category-header"><td colspan="6">ATENTOS A VENDER</td></tr>
+                            <tr class="category-header"><td colspan="6">ATENTOS A VENDER/VIGILANCIA</td></tr>
                         """
                      elif current_orden_grupo in [6, 7]:
                          html_body += """
@@ -716,11 +787,15 @@ def generar_reporte():
                         """
                 
                 elif current_orden_grupo != previous_orden_grupo:
-                    if current_orden_grupo in [3, 4, 5] and previous_orden_grupo in [1, 2]:
+                    if current_orden_grupo == 8 and previous_orden_grupo in [1, 2]:
                         html_body += """
-                            <tr class="category-header"><td colspan="6">ATENTOS A VENDER</td></tr>
+                            <tr class="category-header"><td colspan="6">OPORTUNIDADES DE COMPRA CON RIESGO SEMANAL</td></tr>
                         """
-                    elif current_orden_grupo in [6, 7] and previous_orden_grupo in [1, 2, 3, 4, 5]:
+                    elif current_orden_grupo in [3, 4, 5] and previous_orden_grupo in [1, 2, 8]:
+                        html_body += """
+                            <tr class="category-header"><td colspan="6">ATENTOS A VENDER/VIGILANCIA</td></tr>
+                        """
+                    elif current_orden_grupo in [6, 7] and previous_orden_grupo in [1, 2, 8, 3, 4, 5]:
                          html_body += """
                             <tr class="category-header"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                         """
@@ -742,13 +817,23 @@ def generar_reporte():
                 
                 nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
 
-                clase_oportunidad = "compra" if "compra" in data['OPORTUNIDAD'].lower() else ("venta" if "venta" in data['OPORTUNIDAD'].lower() else ("vigilar" if "vigilar" in data['OPORTUNIDAD'].lower() else ""))
-                
-                celda_empresa_class = ""
-                if "compra" in data['OPORTUNIDAD'].lower():
+                # Ajuste de clases para el nuevo estado 'Compra RIESGO'
+                if "compra" in data['OPORTUNIDAD'].lower() and "riesgo" not in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "compra"
                     celda_empresa_class = "green-cell"
                 elif "venta" in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "venta"
                     celda_empresa_class = "red-cell"
+                elif "vigilar" in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "vigilar"
+                    celda_empresa_class = ""
+                elif "riesgo" in data['OPORTUNIDAD'].lower(): # Nuevo estado
+                    clase_oportunidad = "riesgo-compra"
+                    celda_empresa_class = "yellow-cell"
+                else:
+                    clase_oportunidad = ""
+                    celda_empresa_class = ""
+                
                 
                 observaciones = generar_observaciones(data)
                 
@@ -786,7 +871,7 @@ def generar_reporte():
                                 <td colspan="6">{observaciones}</td>
                             </tr>
                 """
-                previous_orden_grupo = current_orden_grupo
+                previous_orden_grupo = obtener_clave_ordenacion(data)[0] # Se usa la clave de ordenación para el separador
         
         html_body += """
                         </tbody>
