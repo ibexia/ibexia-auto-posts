@@ -770,8 +770,7 @@ def generar_reporte():
             previous_orden_grupo = None
             for i, data in enumerate(datos_ordenados):
                 
-                # Inicializamos las variables de clase y contenido al inicio de cada iteración.
-                # Esto previene errores como 'name 'color' is not defined'.
+                # Inicialización de variables de clase para prevenir errores de 'name not defined'
                 clase_oportunidad = ""
                 celda_empresa_class = ""
                 smi_semanal_clase = "smi-negro" 
@@ -858,7 +857,7 @@ def generar_reporte():
                     smi_semanal_texto_extra = "<br><span style='font-size:1.1em;'>🟢 Oportunidad</span>"
                 else:
                     smi_semanal_clase = "smi-negro"
-                    smi_semanal_texto_extra = "" # Intermedio no tiene texto extra
+                    smi_semanal_texto_extra = "" 
                 
                 smi_semanal_html = f"<div class='stacked-text {smi_semanal_clase}'><b>{smi_semanal_status}</b> ({smi_semanal_value}){smi_semanal_texto_extra}</div>"
                 # -----------------------------------------------------
@@ -998,7 +997,6 @@ def generar_reporte():
         enviar_email_con_adjunto(html_body, asunto)
 
     except Exception as e:
-        # Se ha añadido esta línea para mostrar el error, si persiste, al usuario.
         print(f"❌ Error al ejecutar el script principal: {e}")
 
 if __name__ == '__main__':
