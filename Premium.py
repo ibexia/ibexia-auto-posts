@@ -1030,7 +1030,10 @@ def generar_reporte():
 
         
         asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} oportunidades detectadas hoy {datetime.today().strftime('%d/%m/%Y')}"
-        enviar_email_con_adjunto(html_body, asunto)
+        # CÓDIGO CORREGIDO: Añade el nombre del archivo
+        nombre_archivo_base = f"reporte_ibexia_{datetime.today().strftime('%Y%m%d')}"
+
+        enviar_email(html_body, asunto, nombre_archivo_base)
 
     except Exception as e:
         print(f"❌ Error al ejecutar el script principal: {e}")
