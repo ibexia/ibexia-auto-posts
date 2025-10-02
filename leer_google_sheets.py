@@ -1093,20 +1093,14 @@ def enviar_email(texto_generado, asunto_email, nombre_archivo):
     Envía un correo electrónico a través de Brevo (Sendinblue) con un archivo HTML adjunto,
     utilizando la configuración SMTP hardcodeada.
     """
-    # 1. CONFIGURACIÓN HARDCODEADA DE BREVO (SOLICITADO)
+    # 1. CONFIGURACIÓN HARDCODEADA DE BREVO Y DESTINATARIO
     servidor_smtp = 'smtp-relay.brevo.com'
     puerto_smtp = 587
     remitente_header = "IBEXIA.es <info@ibexia.es>" # Usado en el campo 'From'
     remitente_login = "9853a2001@smtp-brevo.com"    # Usuario SMTP para login
     password = "PRHTU5GN1ygZ9XVC"                   # Contraseña SMTP para login
-
-    # El destinatario se sigue leyendo de la variable de entorno 'RECIPIENT_EMAIL'
-    destinatario = os.getenv('RECIPIENT_EMAIL') 
+    destinatario = "XUMKOX@GMAIL.COM"               # ¡DESTINATARIO HARCODEADO!
     
-    if not destinatario:
-        print("❌ ERROR: No se encontró la variable de entorno RECIPIENT_EMAIL. No se puede enviar el correo.")
-        return
-
     # Extraer la dirección de correo visible (info@ibexia.es) del header completo
     match_remitente_email = re.search(r'<(.*?)>', remitente_header)
     # Esta dirección se usará como remitente en la transacción SMTP
@@ -1171,7 +1165,7 @@ def enviar_email(texto_generado, asunto_email, nombre_archivo):
         print("✅ Correo enviado exitosamente a Brevo.")
 
     except smtplib.SMTPAuthenticationError:
-        print(f"❌ ERROR de Autenticación SMTP. Verifica el login y la clave SMTP de Brevo.")
+        print(f"❌ ERROR de Autenticación SMTP. Verifica el login y la clave SMTP de Brevo: {remitente_login}")
     except Exception as e:
         print(f"❌ Ocurrió un error al enviar el correo vía Brevo: {e}")
     finally:
