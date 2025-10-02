@@ -541,7 +541,7 @@ def generar_observaciones(data):
     return f'<p style="text-align:left; color:#000;">{texto_observacion.strip()}{advertencia_texto}{texto.strip()}</p>'
 
 
-def enviar_email(texto_generado, asunto_email, nombre_archivo):
+def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
     """
     Envía un correo electrónico a través de Brevo (Sendinblue) con un archivo HTML adjunto,
     utilizando la configuración SMTP hardcodeada.
