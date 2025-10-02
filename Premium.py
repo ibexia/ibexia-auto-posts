@@ -1033,7 +1033,7 @@ def generar_reporte():
         # CÓDIGO CORREGIDO: Añade el nombre del archivo
         nombre_archivo_base = f"reporte_ibexia_{datetime.today().strftime('%Y%m%d')}"
 
-        enviar_email(html_body, asunto, nombre_archivo_base)
+        enviar_email_con_adjunto(html_body, asunto, nombre_archivo_base)
 
     except Exception as e:
         print(f"❌ Error al ejecutar el script principal: {e}")
