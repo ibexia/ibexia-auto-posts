@@ -5,6 +5,8 @@ import yfinance as yf
 import google.generativeai as genai
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime, timedelta
@@ -1086,47 +1088,93 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 """
     return prompt, titulo_post
 
-
 def enviar_email(texto_generado, asunto_email, nombre_archivo):
-    import os
-    from email.mime.base import MIMEBase
-    from email import encoders
-
-    remitente = "xumkox@gmail.com"
-    destinatario = "xumkox@gmail.com"
-    password = "kdgz lvdo wqvt vfkt"  # RECOMENDADO: usar variable de entorno
-
-    # Guardar el HTML en un archivo temporal
+    """
+    Envía un correo electrónico a través de Brevo (Sendinblue) con un archivo HTML adjunto,
+    utilizando la configuración SMTP hardcodeada.
+    """
+    # 1. CONFIGURACIÓN HARDCODEADA DE BREVO Y DESTINATARIO
+    servidor_smtp = 'smtp-relay.brevo.com'
+    puerto_smtp = 587
+    remitente_header = "IBEXIA.es <info@ibexia.es>" # Usado en el campo 'From'
+    remitente_login = "9853a2001@smtp-brevo.com"    # Usuario SMTP para login
+    password = "PRHTU5GN1ygZ9XVC"                   # Contraseña SMTP para login
+    destinatario = "XUMKOX@GMAIL.COM"               # ¡DESTINATARIO HARCODEADO!
+    
+    # Extraer la dirección de correo visible (info@ibexia.es) del header completo
+    match_remitente_email = re.search(r'<(.*?)>', remitente_header)
+    # Esta dirección se usará como remitente en la transacción SMTP
+    remitente_visible_email = match_remitente_email.group(1) if match_remitente_email else remitente_login
+    
     ruta_archivo = f"{nombre_archivo}.html"
-    with open(ruta_archivo, "w", encoding="utf-8") as f:
-        f.write(texto_generado)
+    
+    # 2. Guardar el contenido generado en un archivo local temporal
+    try:
+        with open(ruta_archivo, "w", encoding="utf-8") as f:
+            f.write(texto_generado)
+    except Exception as e:
+        print(f"❌ Error al escribir el archivo {ruta_archivo}: {e}")
+        return
 
-    # Crear el email
+    # 3. Construcción del mensaje MIME
     msg = MIMEMultipart()
-    msg['From'] = remitente
+    msg['From'] = remitente_header # Ej: "IBEXIA.es <info@ibexia.es>"
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
+    
+    # Cuerpo del email
     msg.attach(MIMEText("Adjunto el análisis en formato HTML.", 'plain'))
 
     # Adjuntar el archivo HTML
-    with open(ruta_archivo, "rb") as attachment:
-        part = MIMEBase("application", "octet-stream")
-        part.set_payload(attachment.read())
-
-    encoders.encode_base64(part)
-    part.add_header("Content-Disposition", f"attachment; filename= {nombre_archivo}.html")
-    msg.attach(part)
-
-    # Enviar el correo
     try:
-        servidor = smtplib.SMTP('smtp.gmail.com', 587)
-        servidor.starttls()
-        servidor.login(remitente, password)
-        servidor.sendmail(remitente, destinatario, msg.as_string())
-        servidor.quit()
-        print(f"✅ Correo enviado con el adjunto: {ruta_archivo}")
+        with open(ruta_archivo, "rb") as attachment:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(attachment.read())
+        
+        # Codificación y cabeceras para el adjunto
+        encoders.encode_base64(part)
+        part.add_header(
+            "Content-Disposition",
+            f"attachment; filename= {ruta_archivo}",
+        )
+        msg.attach(part)
     except Exception as e:
-        print("❌ Error al enviar el correo:", e)
+        print(f"❌ Error al adjuntar el archivo {ruta_archivo}: {e}")
+        # Asegurarse de que el archivo temporal se borre incluso si falla el adjunto
+        try:
+            os.remove(ruta_archivo)
+        except OSError:
+            pass
+        return
+        
+    # 4. Conexión al servidor Brevo SMTP
+    try:
+        print(f"🌐 Intentando conectar a Brevo SMTP: {servidor_smtp}:{puerto_smtp}")
+        servidor = smtplib.SMTP(servidor_smtp, puerto_smtp)
+        servidor.starttls() 
+        
+        print(f"🔑 Intentando iniciar sesión con el usuario: {remitente_login}")
+        # Usa el login y la clave de Brevo para la autenticación
+        servidor.login(remitente_login, password)
+        
+        print(f"✉️ Enviando correo a: {destinatario} desde: {remitente_visible_email}")
+        # Usa el email visible como el remitente de la transacción
+        servidor.sendmail(remitente_visible_email, destinatario, msg.as_string())
+        
+        servidor.quit()
+        print("✅ Correo enviado exitosamente a Brevo.")
+
+    except smtplib.SMTPAuthenticationError:
+        print(f"❌ ERROR de Autenticación SMTP. Verifica el login y la clave SMTP de Brevo: {remitente_login}")
+    except Exception as e:
+        print(f"❌ Ocurrió un error al enviar el correo vía Brevo: {e}")
+    finally:
+        # 5. Limpieza (Borrar el archivo temporal)
+        try:
+            os.remove(ruta_archivo)
+        except OSError as e:
+            print(f"⚠️ Error al intentar borrar el archivo temporal {ruta_archivo}: {e}")
+
 
 def generar_contenido_con_gemini(tickers):
     api_key = os.getenv('GEMINI_API_KEY')
