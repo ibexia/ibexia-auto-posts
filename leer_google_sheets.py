@@ -1259,7 +1259,7 @@ def main():
 
     day_of_week = datetime.today().weekday()
     
-    num_tickers_per_day = 10  
+    num_tickers_per_day = 12  
     total_tickers_in_sheet = len(all_tickers)
     
     start_index = (day_of_week * num_tickers_per_day) % total_tickers_in_sheet
