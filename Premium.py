@@ -19,8 +19,8 @@ import pandas_ta as ta
 
 tickers = {
     'Acciona': 'ANA.MC',
-    'A3Media': 'A3M.MC'
-    'Adolfo Dominguez': 'ADZ.MC'
+    'A3Media': 'A3M.MC',
+    'Adolfo Dominguez': 'ADZ.MC',
     'Accionarenovables': 'ANE.MC',
     'Acerinox': 'ACX.MC',
     'ACS': 'ACS.MC',
@@ -32,14 +32,14 @@ tickers = {
     'Amadeus': 'AMS.MC',
     'Amper': 'AMP.MC',
     'Audax-Renovables': 'ADX.MC',
-    'Atrys Health': 'ATRY.MC'
+    'Atrys Health': 'ATRY.MC',
     'Bankinter': 'BKT.MC',
     'BBVA': 'BBVA.MC',
     'Berkeley': 'BKY.MC',
     'Biotechnology': 'BST.MC',
     'CaixaBank': 'CABK.MC',
     'Cellnex': 'CLNX.MC',
-    'Colonial': 'COL.MC'
+    'Colonial': 'COL.MC',
     'DIA': 'DIA.MC',
     'Ercros': 'ECR.MC',
     'Endesa': 'ELE.MC',
@@ -53,7 +53,7 @@ tickers = {
     'Fluidra': 'FDR.MC',
     'GAM': 'GAM.MC',
     'Gigas-Hosting': 'GIGA.MC',
-    'Grenergy': 'GRE.MC'
+    'Grenergy': 'GRE.MC',
     'Grifols': 'GRF.MC',
     'Grupo San Jose': 'GSJ.MC',
     'Holaluz': 'HLZ.MC',
@@ -80,7 +80,7 @@ tickers = {
     'Pharma-Mar': 'PHM.MC',
     'Prosegur': 'PSG.MC',
     'Puig-brands': 'PUIG.MC',
-    'Realia': 'RLIA.MC'
+    'Realia': 'RLIA.MC',
     'Red-Electrica': 'RED.MC',
     'Repsol': 'REP.MC',
     'Laboratorios-rovi': 'ROVI.MC',
