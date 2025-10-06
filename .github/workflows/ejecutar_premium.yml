@@ -4,7 +4,7 @@ on:
   workflow_dispatch: # Trigger manual
   schedule:
     # Horario de invierno (CET): 9:30, 12:30, 17:00
-    - cron: '30 6,9,14 * * *'
+    - cron: '30 5,9,14 * * *'
 
 
 jobs:
