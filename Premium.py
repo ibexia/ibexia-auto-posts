@@ -760,7 +760,7 @@ def generar_reporte():
         html_body = f"""
         <html>
         <head>
-            <title>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
+            <title>ibexiaES - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
             <style>
                 body {{
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -908,7 +908,7 @@ def generar_reporte():
         </head>
         <body>
             <div class="main-container">
-                <h2 class="text-center">Resumen Diario de Oportunidades</h2>
+                <h2 class="text-center">ibexiaES</h2>
                 
                 <div id="search-container">
                     <input type="text" id="searchInput" placeholder="Buscar empresa por nombre o ticker (Ej: Inditex, SAN.MC)...">
@@ -1095,7 +1095,7 @@ def generar_reporte():
                 </div>
                 
                 <br>
-                <p class="disclaimer"><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
+                <p class="disclaimer"><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión. ¡Feliz trading!</p>
             </div>
 
             <script>
