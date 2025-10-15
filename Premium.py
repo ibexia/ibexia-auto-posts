@@ -234,7 +234,7 @@ def calcular_soporte_resistencia(df, window=5):
         return {'s1': 'N/A', 's2': 'N/A', 'r1': 'N/A', 'r2': 'N/A'}
         
 def calcular_beneficio_perdida(precio_compra, precio_actual, inversion=10000):
-    # MODIFICACIÓN PARA SER MÁS ROBUSTO Y DEVOLVER EL BENEFICIO NUMÉRICO O STRING "N/A"
+    # Función auxiliar para calcular el beneficio monetario
     try:
         precio_compra = float(precio_compra)
         precio_actual = float(precio_actual)
@@ -249,7 +249,7 @@ def calcular_beneficio_perdida(precio_compra, precio_actual, inversion=10000):
         return "N/A"
 
 # ******************************************************************************
-# ************** LÓGICA CORREGIDA PARA ULTIMA COMPRA/VENTA *********************
+# ************** LÓGICA DE COMPRA/VENTA EXTRAÍDA DE LEER_GOOGLE_SHEETS *********************
 # ******************************************************************************
 def analizar_ultima_operacion(df_hist):
     """
@@ -298,7 +298,6 @@ def analizar_ultima_operacion(df_hist):
                 if all_compras:
                     ultima_venta = {'fecha': fechas[i], 'precio': precios[i], 'compra_asociada': all_compras[-1]}
                     all_ventas.append(ultima_venta)
-                    # La compra ya no está abierta, pero la dejamos en all_compras como histórico
 
     # 2. Determinar la última operación
     
@@ -342,7 +341,7 @@ def analizar_ultima_operacion(df_hist):
             'precio_venta_cierre': "N/A", 'fecha_venta_cierre': "N/A", 'beneficio_ultima_op': "N/A"
         }
 # ******************************************************************************
-# ************ FIN LÓGICA CORREGIDA PARA ULTIMA COMPRA/VENTA *******************
+# ************ FIN LÓGICA DE COMPRA/VENTA EXTRAÍDA DE LEER_GOOGLE_SHEETS *******************
 # ******************************************************************************
         
 def formatear_beneficio(beneficio):
@@ -405,28 +404,23 @@ def obtener_datos_yfinance(ticker):
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
         
         # ******************************************************************************
-        # *** REEMPLAZO DE LA LÓGICA DE DETECCIÓN DE ÚLTIMA OPERACIÓN (COMPRA/VENTA) ***
+        # *** LLAMADA A LA LÓGICA DE DETECCIÓN DE ÚLTIMA OPERACIÓN (COMPRA/VENTA) ***
         # ******************************************************************************
-        
-        # La función 'analizar_ultima_operacion' determina si hay posición abierta ('comprado_status'='SI')
-        # o si la última operación fue un cierre ('comprado_status'='NO').
         resultados_operacion = analizar_ultima_operacion(hist_extended)
 
         comprado_status = resultados_operacion['comprado_status']
         precio_compra = resultados_operacion['precio_compra']
         fecha_compra = resultados_operacion['fecha_compra']
         
-        # Campos de Venta/Cierre y Beneficio de la última operación (abierta o cerrada)
         precio_venta_cierre = resultados_operacion['precio_venta_cierre']
         fecha_venta_cierre = resultados_operacion['fecha_venta_cierre']
         beneficio_ultima_op = resultados_operacion['beneficio_ultima_op'] # Resultado de la última operación
 
-        # --- Cálculo de Beneficio Actual (SI está Comprado) ---
         # Si la posición está abierta ('SI'), el beneficio_ultima_op ya contiene el beneficio actual simulado.
         beneficio_actual = beneficio_ultima_op if comprado_status == "SI" else "N/A"
 
         # ******************************************************************************
-        # ************* FIN REEMPLAZO DE LÓGICA DE COMPRA/VENTA ************************
+        # ************* FIN LLAMADA A LÓGICA DE COMPRA/VENTA ************************
         # ******************************************************************************
 
 
@@ -575,9 +569,6 @@ def formatear_valor(valor):
     return str(valor)
 
 def generar_html(datos_analizados):
-    # ******************************************************************************
-    # *************** INICIO DE LA MODIFICACIÓN DE LA SECCIÓN HTML *******************
-    # ******************************************************************************
     
     # Convertimos a F-string para inyectar la fecha correctamente
     html_template_start = f"""
@@ -753,9 +744,8 @@ def generar_html(datos_analizados):
                         <td>{dato['OBSERVACION']}</td>
                     </tr>
                 """
-    
-    # IMPORTANTE: Se elimina la 'f' del inicio para que el código JavaScript dentro 
-    # de esta cadena no sea interpretado por Python como una expresión, lo que causaba el SyntaxError.
+
+    # Esta sección se mantiene como cadena simple para evitar el SyntaxError de Python con JavaScript/f-strings.
     html_template_end = """
                 </tbody>
             </table>
@@ -792,12 +782,12 @@ def generar_html(datos_analizados):
             });
 
             // Enfocar el campo de búsqueda al cargar (si es posible)
-            if (searchInput) { // Corregido: Llaves simples
+            if (searchInput) {
                 searchInput.focus(); // Enfocar el campo de búsqueda al cargar
             }
             
             // Sincronizar el scroll lateral
-            if (tableContainer && scrollTop) { // Corregido: Llaves simples
+            if (tableContainer && scrollTop) {
                 scrollTop.addEventListener('scroll', () => {
                     tableContainer.scrollLeft = scrollTop.scrollLeft;
                 });
@@ -811,25 +801,30 @@ def generar_html(datos_analizados):
 </body>
 </html>
         """
-    # ******************************************************************************
-    # *************** FIN DE LA MODIFICACIÓN DE LA SECCIÓN HTML ********************
-    # ******************************************************************************
     
     return html_template_start + html_rows + html_template_end
 
 
 def enviar_email_con_adjunto(html_body, asunto, nombre_archivo_base):
     # ******************************************************************
-    # ******* ESTA FUNCIÓN NO SE MODIFICA, SE MANTIENE EL ORIGINAL ******
+    # ******* CORRECCIÓN DEL ERROR DE 'NoneType' AQUÍ ******************
     # ******************************************************************
     smtp_server = os.getenv('SMTP_SERVER')
-    smtp_port = int(os.getenv('SMTP_PORT'))
+    smtp_port_str = os.getenv('SMTP_PORT') # Leemos el puerto como string primero
     email_user = os.getenv('EMAIL_USER')
     email_password = os.getenv('EMAIL_PASSWORD')
     email_recipient = os.getenv('EMAIL_RECIPIENT')
 
-    if not all([smtp_server, smtp_port, email_user, email_password, email_recipient]):
-        print("❌ Error: Faltan variables de entorno para el envío de correo. Saltando envío.")
+    # 1. Validar que todas las variables estén definidas como cadenas no vacías
+    if not all([smtp_server, smtp_port_str, email_user, email_password, email_recipient]):
+        print("❌ Error: Faltan variables de entorno para el envío de correo. Asegúrate de que SMTP_SERVER, SMTP_PORT, EMAIL_USER, EMAIL_PASSWORD y EMAIL_RECIPIENT están configuradas. Saltando envío.")
+        return
+        
+    # 2. Convertir el puerto a entero de forma segura
+    try:
+        smtp_port = int(smtp_port_str)
+    except ValueError:
+        print(f"❌ Error: La variable de entorno SMTP_PORT ('{smtp_port_str}') no es un número entero válido. Saltando envío.")
         return
 
     msg = MIMEMultipart()
