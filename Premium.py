@@ -763,28 +763,34 @@ def generar_reporte():
             <title>ibexiaES - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0"> <meta name="robots" content="noindex">
             <style>
-            /* 🛑 SOLUCIÓN DEFINITIVA: RESET UNIVERSAL para evitar que padding/border cause desbordamiento y encogimiento. */
+            /* 🛑 SOLUCIÓN DEFINITIVA 1/3: RESET UNIVERSAL DE BOX-SIZING. */
             * {{
-                box-sizing: border-box !important; /* El !important da prioridad total en caso de conflicto con WordPress */
+                /* Esto asegura que el padding y los borders no hagan que los elementos excedan su ancho. */
+                box-sizing: border-box !important; 
             }}
             
-            /* 🛑 ELIMINACIÓN FORZADA DEL SCROLL LATERAL EN EL ELEMENTO RAÍZ */
+            /* 🛑 SOLUCIÓN DEFINITIVA 2/3: USAR VIEWPORT (vw) y ELIMINACIÓN FORZADA DEL SCROLL. */
             html {{ 
-                width: 100%;
-                overflow-x: hidden !important; /* Oculta el scroll horizontal a nivel de toda la página, ignorando AdSense/Cookies */
+                /* 100vw es más potente que 100% y fuerza el ancho total del área visible. */
+                width: 100vw !important; 
+                margin: 0 !important;
+                padding: 0 !important;
+                /* Oculta el scroll horizontal a nivel de toda la página con máxima prioridad. */
+                overflow-x: hidden !important; 
             }}
             
             body {{
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                 background-color: #f8f9fa;
-                margin: 0;
-                padding: 0;
+                margin: 0 !important; /* Elimina cualquier margen externo que cause desplazamiento. */
+                padding: 0 !important;
                 display: flex;
                 justify-content: center;
                 align-items: flex-start;
                 min-height: 100vh;
-                width: 100%; 
-                overflow-x: hidden !important; /* Doble seguridad en body */
+                /* 100vw también en el body para prevenir el encogimiento. */
+                width: 100vw !important; 
+                /* Ya no es necesario aquí: overflow-x: hidden !important; */
             }}
             .main-container {{
                 max-width: 1200px;
@@ -998,6 +1004,7 @@ def generar_reporte():
                 background-color: #ffffff;
             }}
         </style>
+
 
         </head>
         <body>
