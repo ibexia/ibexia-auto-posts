@@ -1261,18 +1261,7 @@ def generar_reporte():
                     }, 200); // Pequeño retraso para evitar ejecuciones rápidas
                 }
                 
-                // Función de acordeón para las filas individuales
-                function toggleDetails(index) {
-                    // Seleccionar la fila detallada (collapsible) y la fila de observaciones. Ambas usan la clase 'detailed-row-{index}'
-                    var detailedRows = document.querySelectorAll('.detailed-row-' + index);
-                    
-                    detailedRows.forEach(row => {
-                        // El estilo inicial es 'display: none;', se usa 'table-row' para que se muestre correctamente en la tabla.
-                        if (row) {
-                            row.style.display = row.style.display === "table-row" ? "none" : "table-row";
-                        }
-                    });
-                }
+
                 
                 // Asegurar que el script se ejecute cuando el DOM esté listo
                 document.addEventListener('DOMContentLoaded', function() {
