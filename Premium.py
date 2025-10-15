@@ -665,6 +665,7 @@ def generar_reporte():
             </div>
 
             <script>
+                // Los datos se pasan de Python a JavaScript como una cadena JSON
                 const data = JSON.parse('{json.dumps(datos_ordenados).replace("'", r"\'").replace('\\', '\\\\')}');
                 let currentSortCol = -1;
                 let isAscending = true;
@@ -713,22 +714,21 @@ def generar_reporte():
                         const profitLossSimFormatted = formatNumber(profitLossSim);
                         const profitLossClass = profitLossSim !== 'N/A' ? (profitLossSim >= 0 ? 'success' : 'warning') : 'info';
 
-                        let rowHTML = `
-                            <tr>
-                                <td class="sticky-col"><strong class="info">${data.TICKER}</strong><br>${data.NOMBRE_EMPRESA}</td>
-                                <td>${getStatusLabel(data.OPORTUNIDAD)}</td>
-                                <td data-value="${data.PRECIO_ACTUAL}">${formatNumber(data.PRECIO_ACTUAL)}€</td>
-                                <td data-value="${data.SMI_HOY}">${formatNumber(data.SMI_HOY)}</td>
-                                <td>${data.ESTADO_SMI} (${data.TENDENCIA_ACTUAL})</td>
-                                <td>${getEmaStatus(data.TIPO_EMA, data.VALOR_EMA)}</td>
-                                <td data-value="${data.PRECIO_APLANAMIENTO}">${formatNumber(data.PRECIO_APLANAMIENTO)}€</td>
-                                <td data-value="${profitLossSim}">${data.COMPRADO === 'SI' ? '<span class="' + profitLossClass + '">' + profitLossSimFormatted + '€</span>' : 'N/A'}</td>
-                                <td><span class="${data.COMPRA_SI === 'NO COMPRAR' || data.VENDE_SI === 'VIGILAR' ? 'warning' : 'success'}">${data.COMPRA_SI === 'VIGILAR' ? data.VENDE_SI : data.COMPRA_SI}</span></td>
-                                <td style="text-align: center;">
-                                    <button onclick="toggleDetails('${data.TICKER}')">Ver más</button>
-                                </td>
-                            </tr>
-                        `;
+                        // CORRECCIÓN: Usar concatenación de cadenas en JS para evitar el error de f-string en Python
+                        let rowHTML = '<tr>' +
+                            '<td class="sticky-col"><strong class="info">' + data.TICKER + '</strong><br>' + data.NOMBRE_EMPRESA + '</td>' +
+                            '<td>' + getStatusLabel(data.OPORTUNIDAD) + '</td>' +
+                            '<td data-value="' + data.PRECIO_ACTUAL + '">' + formatNumber(data.PRECIO_ACTUAL) + '€</td>' +
+                            '<td data-value="' + data.SMI_HOY + '">' + formatNumber(data.SMI_HOY) + '</td>' +
+                            '<td>' + data.ESTADO_SMI + ' (' + data.TENDENCIA_ACTUAL + ')</td>' +
+                            '<td>' + getEmaStatus(data.TIPO_EMA, data.VALOR_EMA) + '</td>' +
+                            '<td data-value="' + data.PRECIO_APLANAMIENTO + '">' + formatNumber(data.PRECIO_APLANAMIENTO) + '€</td>' +
+                            '<td data-value="' + profitLossSim + '">' + (data.COMPRADO === 'SI' ? '<span class="' + profitLossClass + '">' + profitLossSimFormatted + '€</span>' : 'N/A') + '</td>' +
+                            '<td><span class="' + (data.COMPRA_SI === 'NO COMPRAR' || data.VENDE_SI === 'VIGILAR' ? 'warning' : 'success') + '">' + (data.COMPRA_SI === 'VIGILAR' ? data.VENDE_SI : data.COMPRA_SI) + '</span></td>' +
+                            '<td style="text-align: center;">' +
+                                '<button onclick="toggleDetails(\'' + data.TICKER + '\')">Ver más</button>' +
+                            '</td>' +
+                        '</tr>';
 
                         // ******************************************************************************
                         // *************** GENERACIÓN DE LA FILA DE DETALLES (VER MÁS) ********************
@@ -749,13 +749,12 @@ def generar_reporte():
                             let estadoGanancia = gananciaActual !== 'N/A' ? (gananciaActual >= 0 ? "Ganancia" : "Pérdida") : 'N/A';
                             let estiloGanancia = gananciaActual !== 'N/A' ? (gananciaActual >= 0 ? '#28a745' : '#dc3545') : '#007bff';
 
-                            operacionesDetalle += `
-                                <li style="color: #007bff; font-weight: bold; margin-bottom: 5px;">
-                                    POSICIÓN ABIERTA: Entrada en ${ultimaCompra.fecha} a 
-                                    <strong>${formatNumber(ultimaCompra.precio)}€</strong>. 
-                                    Ganancia/Pérdida actual: 
-                                    <strong style="color: ${estiloGanancia};">${formatNumber(gananciaActual)}€</strong> (${estadoGanancia}).
-                                </li>`;
+                            operacionesDetalle += '<li style="color: #007bff; font-weight: bold; margin-bottom: 5px;">' +
+                                'POSICIÓN ABIERTA: Entrada en ' + ultimaCompra.fecha + ' a ' + 
+                                '<strong>' + formatNumber(ultimaCompra.precio) + '€</strong>. ' + 
+                                'Ganancia/Pérdida actual: ' + 
+                                '<strong style="color: ' + estiloGanancia + ';">' + formatNumber(gananciaActual) + '€</strong> (' + estadoGanancia + ').' +
+                            '</li>';
                         }
 
                         // 2. Operaciones Cerradas (Mostrar las más recientes primero)
@@ -766,14 +765,13 @@ def generar_reporte():
                             let estadoGanancia = ganancia !== 'N/A' ? (ganancia >= 0 ? "Ganancia" : "Pérdida") : 'N/A';
                             let estiloGanancia = ganancia !== 'N/A' ? (ganancia >= 0 ? '#28a745' : '#dc3545') : '#555';
 
-                            operacionesDetalle += `
-                                <li style="margin-left: 15px; border-left: 2px solid #ccc; padding-left: 10px; margin-top: 5px;">
-                                    Operación CERRADA: <strong>Entrada</strong> en ${compra.fecha} a 
-                                    <strong>${formatNumber(compra.precio)}€</strong>. 
-                                    <strong>Salida</strong> en ${venta.fecha} a 
-                                    <strong>${formatNumber(venta.precio)}€</strong>. 
-                                    Beneficio: <strong style="color: ${estiloGanancia};">${formatNumber(ganancia)}€</strong> (${estadoGanancia}).
-                                </li>`;
+                            operacionesDetalle += '<li style="margin-left: 15px; border-left: 2px solid #ccc; padding-left: 10px; margin-top: 5px;">' +
+                                'Operación CERRADA: <strong>Entrada</strong> en ' + compra.fecha + ' a ' + 
+                                '<strong>' + formatNumber(compra.precio) + '€</strong>. ' + 
+                                '<strong>Salida</strong> en ' + venta.fecha + ' a ' + 
+                                '<strong>' + formatNumber(venta.precio) + '€</strong>. ' + 
+                                'Beneficio: <strong style="color: ' + estiloGanancia + ';">' + formatNumber(ganancia) + '€</strong> (' + estadoGanancia + ').' +
+                            '</li>';
                         }
 
                         let historialOpHtml = '<ul style="list-style-type: none; padding-left: 0;">';
@@ -784,30 +782,29 @@ def generar_reporte():
                         }
                         historialOpHtml += '</ul>';
 
-                        // Construir el contenido del desplegable
-                        let detailsContent = `
-                            <div style="display: flex; gap: 30px; justify-content: space-between;">
-                                <div style="flex: 1; min-width: 250px;">
-                                    <p style="margin-top: 0;"><strong>ESTADO DE COMPRA ALGORÍTMICO:</strong> 
-                                        <span style="font-weight: bold; font-size: 1.1em; color: ${data.COMPRADO === 'SI' ? '#28a745' : '#dc3545'};">${data.COMPRADO}</span>
-                                    </p>
-                                    ${data.COMPRADO === 'SI' ? `<p><strong>Última Entrada (Algoritmo):</strong> ${data.FECHA_COMPRA} a ${formatNumber(data.PRECIO_COMPRA)}€</p>` : '<p><strong>Última Entrada:</strong> N/A (Posición cerrada)</p>'}
-                                    
-                                    <p><strong>Soportes / Resistencias (Local):</strong></p>
-                                    <ul style="list-style-type: none; padding-left: 0;">
-                                        <li><strong>S1:</strong> ${data.SOPORTE_1 ? formatNumber(data.SOPORTE_1) + '€' : 'N/A'}</li>
-                                        <li><strong>S2:</strong> ${data.SOPORTE_2 ? formatNumber(data.SOPORTE_2) + '€' : 'N/A'}</li>
-                                        <li><strong>R1:</strong> ${data.RESISTENCIA_1 ? formatNumber(data.RESISTENCIA_1) + '€' : 'N/A'}</li>
-                                        <li><strong>R2:</strong> ${data.RESISTENCIA_2 ? formatNumber(data.RESISTENCIA_2) + '€' : 'N/A'}</li>
-                                    </ul>
-                                </div>
-                                <div style="flex: 2; min-width: 600px; border-left: 1px solid #eee; padding-left: 20px;">
-                                    <p style="margin-top: 0; font-weight: bold; border-bottom: 1px solid #eee;">Historial de Compras y Ventas (Simulación SMI - Capital por operación: ${formatNumber(CAPITAL_INICIAL)}€)</p>
-                                    ${historialOpHtml}
-                                </div>
-                            </div>
-                            ${data.ADVERTENCIA_SEMANAL === 'SI' ? '<div style="margin-top: 15px; padding: 10px; background-color: #fff3cd; border-radius: 5px; color: #856404; border: 1px solid #ffeeba;"><strong>ADVERTENCIA SEMANAL:</strong> ' + data.OBSERVACION_SEMANAL + '</div>' : (data.OBSERVACION_SEMANAL ? '<div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;"><strong>OBSERVACIÓN SEMANAL:</strong> ' + data.OBSERVACION_SEMANAL + '</div>' : '')}
-                        `;
+                        // Construir el contenido del desplegable usando concatenación
+                        let detailsContent = '<div style="display: flex; gap: 30px; justify-content: space-between;">' +
+                            '<div style="flex: 1; min-width: 250px;">' +
+                                '<p style="margin-top: 0;"><strong>ESTADO DE COMPRA ALGORÍTMICO:</strong> ' + 
+                                    '<span style="font-weight: bold; font-size: 1.1em; color: ' + (data.COMPRADO === 'SI' ? '#28a745' : '#dc3545') + ';">' + data.COMPRADO + '</span>' +
+                                '</p>' +
+                                (data.COMPRADO === 'SI' ? '<p><strong>Última Entrada (Algoritmo):</strong> ' + data.FECHA_COMPRA + ' a ' + formatNumber(data.PRECIO_COMPRA) + '€</p>' : '<p><strong>Última Entrada:</strong> N/A (Posición cerrada)</p>') +
+                                
+                                '<p><strong>Soportes / Resistencias (Local):</strong></p>' +
+                                '<ul style="list-style-type: none; padding-left: 0;">' +
+                                    '<li><strong>S1:</strong> ' + (data.SOPORTE_1 ? formatNumber(data.SOPORTE_1) + '€' : 'N/A') + '</li>' +
+                                    '<li><strong>S2:</strong> ' + (data.SOPORTE_2 ? formatNumber(data.SOPORTE_2) + '€' : 'N/A') + '</li>' +
+                                    '<li><strong>R1:</strong> ' + (data.RESISTENCIA_1 ? formatNumber(data.RESISTENCIA_1) + '€' : 'N/A') + '</li>' +
+                                    '<li><strong>R2:</strong> ' + (data.RESISTENCIA_2 ? formatNumber(data.RESISTENCIA_2) + '€' : 'N/A') + '</li>' +
+                                '</ul>' +
+                            '</div>' +
+                            '<div style="flex: 2; min-width: 600px; border-left: 1px solid #eee; padding-left: 20px;">' +
+                                '<p style="margin-top: 0; font-weight: bold; border-bottom: 1px solid #eee;">Historial de Compras y Ventas (Simulación SMI - Capital por operación: ' + formatNumber(CAPITAL_INICIAL) + '€)</p>' +
+                                historialOpHtml +
+                            '</div>' +
+                        '</div>' +
+                        // Advertencia Semanal
+                        (data.ADVERTENCIA_SEMANAL === 'SI' ? '<div style="margin-top: 15px; padding: 10px; background-color: #fff3cd; border-radius: 5px; color: #856404; border: 1px solid #ffeeba;"><strong>ADVERTENCIA SEMANAL:</strong> ' + data.OBSERVACION_SEMANAL + '</div>' : (data.OBSERVACION_SEMANAL ? '<div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;"><strong>OBSERVACIÓN SEMANAL:</strong> ' + data.OBSERVACION_SEMANAL + '</div>' : ''));
                         
                         rowHTML += '<tr class="details-row" id="details-' + data.TICKER + '" style="display: none;"><td colspan="10" style="padding: 15px; border-top: 2px solid #ddd; background-color: #fcfcfc;">' + detailsContent + '</td></tr>';
                         
