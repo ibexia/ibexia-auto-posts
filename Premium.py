@@ -757,73 +757,96 @@ def generar_reporte():
         # ******************************************************************************
         # ******************** MODIFICACIÓN DE LA SECCIÓN HTML *************************
         # ******************************************************************************
+        
+        # Fecha de la creación del archivo
+        fecha_actualizacion = datetime.today().strftime('%Y-%m-%d')
+
         html_body = f"""
         <html>
         <head>
-            <title>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
+            <title>ibexiaES - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
             <style>
                 body {{
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                     background-color: #f8f9fa;
                     margin: 0;
-                    padding: 0; /* Cambio: Eliminamos padding para centrar mejor */
+                    padding: 0;
                     display: flex;
-                    justify-content: center; /* Centrar horizontalmente */
-                    align-items: flex-start; /* Alinear arriba */
-                    min-height: 100vh; /* Ocupar toda la altura de la ventana */
+                    justify-content: center;
+                    align-items: flex-start;
+                    min-height: 100vh;
                 }}
                 .main-container {{
                     max-width: 1200px;
-                    width: 95%; /* Asegurar que ocupe espacio */
-                    margin: 20px auto; /* Cambio: Margen superior para el centrado */
+                    width: 95%;
+                    margin: 20px auto;
                     background-color: #ffffff;
                     padding: 15px;
                     border-radius: 8px;
                     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
                 }}
-                h2 {{
-                    color: #343a40;
+                
+                /* ESTILO DEL TÍTULO ibexiaES (TIPO GOOGLE) */
+                .google-logo {{
                     text-align: center;
-                    font-size: 1.5em;
-                    margin-bottom: 30px; /* Aumentar margen */
+                    margin: 50px 0 20px 0; /* Más margen arriba y debajo del logo */
+                    font-size: 5em; /* Tamaño grande */
+                    font-weight: normal;
                 }}
-                p {{
-                    color: #6c757d;
-                    text-align: center;
-                    font-size: 0.9em;
-                }}
+                .google-logo span:nth-child(1) {{ color: #4285F4; }} /* i */
+                .google-logo span:nth-child(2) {{ color: #EA4335; }} /* b */
+                .google-logo span:nth-child(3) {{ color: #FBBC05; }} /* e */
+                .google-logo span:nth-child(4) {{ color: #4285F4; }} /* x */
+                .google-logo span:nth-child(5) {{ color: #34A853; }} /* i */
+                .google-logo span:nth-child(6) {{ color: #EA4335; }} /* a */
+                .google-logo span:nth-child(7) {{ color: #707070; font-size: 0.5em; vertical-align: super; }} /* ES */
                 
                 /* ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
                 #search-container {{
-                    display: flex; /* Para centrar el input */
+                    display: flex;
                     flex-direction: column;
                     align-items: center;
-                    margin-bottom: 50px; /* Más espacio */
+                    margin-bottom: 10px; /* Reducir espacio */
                 }}
                 #searchInput {{
-                    width: 70%; /* Cambio: Más ancho */
+                    width: 90%; 
                     max-width: 600px;
-                    padding: 15px 20px; /* Cambio: Más padding, más grande */
-                    font-size: 1.2em; /* Cambio: Fuente más grande */
-                    border: 1px solid #ced4da;
-                    border-radius: 24px; /* Bordes redondeados */
-                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Sombra para efecto 3D */
+                    padding: 15px 20px;
+                    font-size: 1.1em;
+                    border: 1px solid #dfe1e5; /* Borde más sutil */
+                    border-radius: 24px;
+                    box-shadow: 0 1px 6px rgba(32,33,36,.28); /* Sombra tipo Google */
                     box-sizing: border-box;
                     transition: box-shadow 0.3s ease-in-out;
-                    text-align: center;
-                }}
+                    text-align: left; /* Alineación del texto de búsqueda */
+                    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="%239aa0a6" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>');
+                    background-repeat: no-repeat;
+                    background-position: 20px center; /* Posicionar el icono a la izquierda */
+                    padding-left: 50px; /* Espacio para el icono */
+                }
+                #searchInput::placeholder {
+                    color: #9aa0a6;
+                }
                 #searchInput:focus {{
-                    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Sombra al enfocar */
+                    box-shadow: 0 1px 6px rgba(32,33,36,.28), 0 4px 12px rgba(32,33,36,.12); /* Sombra al enfocar */
                     outline: none;
                 }}
                 /* FIN DEL ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
+                
+                #update-date {{
+                    font-size: 0.9em;
+                    color: #5f6368; /* Color de texto secundario de Google */
+                    text-align: center;
+                    margin-top: 10px;
+                    margin-bottom: 40px;
+                }}
 
                 .table-container {{
                     overflow-x: auto;
                     overflow-y: auto;
-                    height: 70vh;
+                    max-height: 70vh; /* Máximo alto para scroll */
                     position: relative;
-                    /* Cambio: Ocultar la tabla al inicio */
+                    /* OCULTAR INICIALMENTE */
                     display: none; 
                 }}
                 table {{
@@ -852,17 +875,27 @@ def generar_reporte():
                 }}
                 .compra {{ color: #28a745; font-weight: bold; }}
                 .venta {{ color: #dc3545; font-weight: bold; }}
-                .riesgo-compra {{ color: #ffc107; font-weight: bold; }} /* Nuevo estilo para Compra RIESGO */
+                .riesgo-compra {{ color: #ffc107; font-weight: bold; }}
                 .comprado-si {{ background-color: #28a745; color: white; font-weight: bold; }}
                 .bg-green {{ background-color: #d4edda; color: #155724; }}
                 .bg-red {{ background-color: #f8d7da; color: #721c24; }}
                 .bg-highlight {{ background-color: #28a745; color: white; font-weight: bold; }}
                 .text-center {{ text-align: center; }}
-                .disclaimer {{ font-size: 0.8em; text-align: center; color: #6c757d; margin-top: 15px; }}
+                /* ESTILO DEL DISCLAIMER MEJORADO */
+                .disclaimer-box {{ 
+                    font-size: 0.8em; 
+                    text-align: center; 
+                    color: #5f6368; 
+                    margin-top: 30px; 
+                    padding: 15px;
+                    border: 1px solid #e0e0e0;
+                    border-radius: 8px;
+                    background-color: #f1f3f4;
+                }}
                 .small-text {{ font-size: 0.7em; color: #6c757d; }}
                 .green-cell {{ background-color: #d4edda; }}
                 .red-cell {{ background-color: #f8d7da; }}
-                .yellow-cell {{ background-color: #fff3cd; }} /* Nuevo estilo para celda de riesgo */
+                .yellow-cell {{ background-color: #fff3cd; }}
                 .separator-row td {{ background-color: #e9ecef; height: 3px; padding: 0; border: none; }}
                 .category-header td {{
                     background-color: #495057;
@@ -872,7 +905,7 @@ def generar_reporte():
                     text-align: center;
                     padding: 10px;
                     border: none;
-                    /* Cambio: Ocultar al inicio */
+                    /* OCULTAR INICIALMENTE */
                     display: none;
                 }}
                 .observaciones-row td {{
@@ -908,11 +941,16 @@ def generar_reporte():
         </head>
         <body>
             <div class="main-container">
-                <h2 class="text-center">Resumen Diario de Oportunidades</h2>
+                
+                <h1 class="google-logo">
+                    <span>i</span><span>b</span><span>e</span><span>x</span><span>i</span><span>a</span><span>ES</span>
+                </h1>
                 
                 <div id="search-container">
                     <input type="text" id="searchInput" placeholder="Buscar empresa por nombre o ticker (Ej: Inditex, SAN.MC)...">
                 </div>
+                
+                <p id="update-date">Última actualización: {fecha_actualizacion}</p>
                 
                 <div id="scroll-top" style="overflow-x: auto; display: none;">
                     <div style="min-width: 1400px;">&nbsp;</div>
@@ -934,8 +972,9 @@ def generar_reporte():
         """
         
         if not datos_ordenados:
+            # Esta fila se mostrará solo si el filtro no encuentra nada, ya que la tabla se oculta por defecto.
             html_body += """
-                            <tr><td colspan="6">No se encontraron empresas con datos válidos hoy.</td></tr>
+                            <tr class="main-row"><td colspan="6">No se encontraron empresas con datos válidos hoy.</td></tr>
             """
         else:
             previous_orden_grupo = None
@@ -1095,7 +1134,10 @@ def generar_reporte():
                 </div>
                 
                 <br>
-                <p class="disclaimer"><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
+                <div class="disclaimer-box">
+                    <p style="margin: 0;"><strong>NOTA IMPORTANTE:</strong> El contenido de esta web es únicamente informativo y se basa en indicadores técnicos. No constituye, bajo ninguna circunstancia, una recomendación de inversión. Las decisiones de trading son responsabilidad exclusiva del usuario, quien debe realizar su propio análisis y criterio. <strong>¡Feliz trading!</strong></p>
+                </div>
+
             </div>
 
             <script>
@@ -1114,6 +1156,7 @@ def generar_reporte():
                     
                     filterTimeout = setTimeout(() => {
                         const filter = searchInput.value.toUpperCase().trim();
+                        // MOSTRAR LA TABLA SOLO SI HAY ALGO ESCRITO (COMPORTAMIENTO TIPO GOOGLE)
                         const showTable = filter.length > 0;
                         
                         // Mostrar u ocultar la tabla y el scroll superior
@@ -1124,7 +1167,7 @@ def generar_reporte():
                         
                         // Si no hay filtro, salimos
                         if (!showTable) {
-                            // Al no haber filtro, todos los elementos están ocultos por el CSS inicial.
+                            // Al no haber filtro, todos los elementos están ocultos.
                             return; 
                         }
 
@@ -1178,6 +1221,7 @@ def generar_reporte():
                         categoryHeaders.forEach(header => {
                             let nextSibling = header.nextElementSibling;
                             let hasVisibleRows = false;
+                            // Buscar la primera fila principal visible dentro de este grupo de categoría
                             while(nextSibling && !nextSibling.classList.contains('category-header')) {
                                 if (nextSibling.classList.contains('main-row') && nextSibling.style.display !== 'none') {
                                     hasVisibleRows = true;
@@ -1194,11 +1238,12 @@ def generar_reporte():
                             const prev = separator.previousElementSibling;
                             const next = separator.nextElementSibling;
                             
-                            const prevVisible = prev && prev.style.display === "table-row" && prev.classList.contains("category-header");
-                            const nextVisible = next && next.style.display === "table-row" && next.classList.contains("category-header");
+                            // Comprobar si las categorías de antes y después del separador son visibles
+                            const prevVisibleCategory = prev && prev.classList.contains("category-header") && prev.style.display === "table-row";
+                            const nextVisibleCategory = next && next.classList.contains("category-header") && next.style.display === "table-row";
 
                             // Si el separador está entre dos categorías *visibles* diferentes, lo mostramos.
-                            if (prevVisible && nextVisible) {
+                            if (prevVisibleCategory && nextVisibleCategory) {
                                 separator.style.display = "table-row";
                             } else {
                                 separator.style.display = "none";
