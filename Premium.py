@@ -858,7 +858,7 @@ def generar_reporte():
                 display: flex;
                 justify-content: center; /* Centrar el grupo de botones */
                 gap: 20px; /* Espacio entre los botones */
-                margin: 20px 0; /* Espacio superior e inferior */
+                margin: 40px 0 20px 0; /* AUMENTADO: 40px arriba, 0 a los lados, 20px abajo */
                 flex-wrap: wrap; /* Permitir que los botones se envuelvan en pantallas pequeñas */
             }}
             .action-button {{
