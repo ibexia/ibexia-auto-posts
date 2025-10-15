@@ -772,6 +772,7 @@ def generar_reporte():
                 justify-content: center;
                 align-items: flex-start;
                 min-height: 100vh;
+                /* LÍNEA BORRADA: Se quita para permitir que AdSense gestione su espacio: overflow-x: hidden; */
             }}
             .main-container {{
                 max-width: 1200px;
@@ -781,6 +782,7 @@ def generar_reporte():
                 padding: 15px;
                 border-radius: 8px;
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+                box-sizing: border-box; /* 👈 LÍNEA AÑADIDA: Asegura que el padding no desborde el 95% del ancho */
             }}
             /* Estilo del título IBEXIA.ES (Tipo Google - Ajustado a ibexiaES) */
             h2 {{
@@ -835,100 +837,7 @@ def generar_reporte():
                 border: 1px solid #dfe1e5; /* Borde más sutil */
                 border-radius: 24px;
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-                box-sizing: border-box;
-                transition: box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
-                text-align: center;
-            }}
-            #searchInput:focus {{
-                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-                border-color: #4285F4; /* Borde azul al enfocar */
-                outline: none;
-            }}
-            
-            /* Nuevo estilo para la fecha de actualización */
-            #update-date {{
-                font-size: 0.85em;
-                color: #707070;
-                margin-top: 5px; /* Espacio entre el campo de búsqueda y la fecha */
-                text-align: center;
-            }}
-            /* FIN DEL ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
-
-<style>
-            body {{
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background-color: #f8f9fa;
-                margin: 0;
-                padding: 0;
-                display: flex;
-                justify-content: center;
-                align-items: flex-start;
-                min-height: 100vh;
-                overflow-x: hidden; /* <--- AÑADIDO PARA SOLUCIONAR EL SCROLL LATERAL MÓVIL */
-            }}
-            .main-container {{
-                max-width: 1200px;
-                width: 95%;
-                margin: 20px auto;
-                background-color: #ffffff;
-                padding: 15px;
-                border-radius: 8px;
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-            }}
-            /* Estilo del título IBEXIA.ES (Tipo Google - Ajustado a ) */
-            h2 {{
-                text-align: center;
-                font-size: 4.0em; /* Tamaño grande */
-                font-weight: 300;
-                margin-top: 20px;
-                margin-bottom: 0px; 
-                letter-spacing: -0.05em; /* Juntar las letras */
-            }}
-            .google-style {{
-                font-family: 'Product Sans', 'Arial', sans-serif; 
-                line-height: 1; 
-            }}
-            .google-style span {{
-                font-weight: 700; /* Las letras de color son más gruesas */
-                border-radius: 5px; /* Sutil borde redondeado a cada letra para imitar la 'suavidad' de la opción 5 */
-                display: inline-block; /* Necesario para que border-radius funcione */
-                padding: 0 1px; /* Espaciado mínimo para que se note el redondeado */
-            }}
-            .google-style .i1 {{ color: #1A237E; }} /* Azul Índigo Muy Oscuro */
-            .google-style .b1 {{ color: #3F51B5; }} /* Azul Real Oscuro */
-            .google-style .e1 {{ color: #4CAF50; }} /* Verde Brillante */
-            .google-style .x1 {{ color: #00BCD4; }} /* Cian Brillante */
-            .google-style .i2 {{ color: #00ACC1; }} /* Cian Medio */
-            .google-style .a1 {{ color: #26A69A; }} /* Verde Azulado */
-            .google-style .es-final {{
-                font-size: 0.7em; 
-                font-weight: 700;
-                color: #00BCD4; /* Cian Brillante */
-                vertical-align: top; 
-                margin-left: -0.1em; 
-            }}
-            p {{
-                color: #6c757d;
-                text-align: center;
-                font-size: 0.9em;
-            }}
-            
-            /* ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
-            #search-container {{
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                margin-bottom: 20px; /* Reducir margen inferior */
-            }}
-            #searchInput {{
-                width: 80%; /* Más ancho */
-                max-width: 650px; /* Límite */
-                padding: 12px 20px; /* Ajustar padding */
-                font-size: 1.1em;
-                border: 1px solid #dfe1e5; /* Borde más sutil */
-                border-radius: 24px;
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-                box-sizing: border-box;
+                box-sizing: border-box; /* 👈 LÍNEA AÑADIDA: Para prevenir desbordamiento */
                 transition: box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
                 text-align: center;
             }}
@@ -999,6 +908,7 @@ def generar_reporte():
                 height: 70vh;
                 position: relative;
                 display: none; 
+                max-width: 100%; /* 👈 LÍNEA AÑADIDA: Asegura que el contenedor de scroll no exceda el espacio de su padre */
             }}
             table {{
                 width: 100%;
