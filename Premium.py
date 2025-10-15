@@ -763,10 +763,15 @@ def generar_reporte():
             <title>ibexiaES - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0"> <meta name="robots" content="noindex">
             <style>
-            /* 🛑 CORRECCIÓN 1/3: EVITA EL SCROLL EN EL ELEMENTO RAÍZ (HTML) */
+            /* 🛑 SOLUCIÓN DEFINITIVA: RESET UNIVERSAL para evitar que padding/border cause desbordamiento y encogimiento. */
+            * {{
+                box-sizing: border-box !important; /* El !important da prioridad total en caso de conflicto con WordPress */
+            }}
+            
+            /* 🛑 ELIMINACIÓN FORZADA DEL SCROLL LATERAL EN EL ELEMENTO RAÍZ */
             html {{ 
                 width: 100%;
-                overflow-x: hidden; /* 👈 AÑADIDO: Fuerza la eliminación del scroll horizontal causado por elementos externos (Google AdSense/Cookies) */
+                overflow-x: hidden !important; /* Oculta el scroll horizontal a nivel de toda la página, ignorando AdSense/Cookies */
             }}
             
             body {{
@@ -778,8 +783,8 @@ def generar_reporte():
                 justify-content: center;
                 align-items: flex-start;
                 min-height: 100vh;
-                width: 100%; /* 👈 CORRECCIÓN 2/3: Asegura el 100% de ancho para evitar el encogimiento */
-                /* LÍNEA BORRADA: Ya no se necesita aquí: overflow-x: hidden; */
+                width: 100%; 
+                overflow-x: hidden !important; /* Doble seguridad en body */
             }}
             .main-container {{
                 max-width: 1200px;
@@ -789,7 +794,6 @@ def generar_reporte():
                 padding: 15px;
                 border-radius: 8px;
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-                box-sizing: border-box; /* Mantenida: Asegura que el padding no desborde el 95% del ancho */
             }}
             /* Estilo del título IBEXIA.ES (Tipo Google - Ajustado a ibexiaES) */
             h2 {{
@@ -815,7 +819,7 @@ def generar_reporte():
             .google-style .e1 {{ color: #4CAF50; }} /* Verde Brillante */
             .google-style .x1 {{ color: #00BCD4; }} /* Cian Brillante */
             .google-style .i2 {{ color: #00ACC1; }} /* Cian Medio */
-            .google-style .a1 {{ color: #26A69A; }} /* Verde Azulado */
+            .google-style .a1 {{ color: #26A699; }} /* Verde Azulado */
             .google-style .es-final {{
                 font-size: 0.7em; 
                 font-weight: 700;
@@ -844,7 +848,6 @@ def generar_reporte():
                 border: 1px solid #dfe1e5; /* Borde más sutil */
                 border-radius: 24px;
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-                box-sizing: border-box; /* Mantenida: Para prevenir desbordamiento */
                 transition: box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
                 text-align: center;
             }}
@@ -915,7 +918,7 @@ def generar_reporte():
                 height: 70vh;
                 position: relative;
                 display: none; 
-                max-width: 100%; /* Mantenida: Asegura que el contenedor de scroll no exceda el espacio de su padre */
+                max-width: 100%; 
             }}
             table {{
                 width: 100%;
@@ -995,6 +998,7 @@ def generar_reporte():
                 background-color: #ffffff;
             }}
         </style>
+
         </head>
         <body>
             <div class="main-container">
