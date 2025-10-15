@@ -861,10 +861,10 @@ def generar_reporte():
                 margin-bottom: 20px; /* Reducir margen inferior */
             }}
             #searchInput {{
-                width: 80%; /* Más ancho */
-                max-width: 650px; /* Límite */
-                padding: 12px 20px; /* Ajustar padding */
-                font-size: 1.1em;
+                width: 90%; /* Más ancho */
+                max-width: 800px; /* Límite */
+                padding: 15px 25px; /* Ajustar padding */
+                font-size: 1.2em;
                 border: 1px solid #dfe1e5; /* Borde más sutil */
                 border-radius: 24px;
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
@@ -880,9 +880,19 @@ def generar_reporte():
             /* Nuevo estilo para la fecha de actualización */
             #update-date {{
                 font-size: 0.85em;
-                color: #707070;
-                margin-top: 5px; /* Espacio entre el campo de búsqueda y la fecha */
-                text-align: center;
+                /* 🚀 CAMBIO 2: Color rojo oscuro (Dark Red) y alineación a la izquierda para acomodar dos textos */
+                color: #8b0000; 
+                margin-top: 5px; 
+                text-align: left; /* Se cambia a left para usar flex/inline-block */
+                display: flex; /* Usamos Flexbox para alinear contenido */
+                justify-content: center; /* Centrar el bloque completo horizontalmente */
+                width: 100%;
+            }}
+            /* Nuevo estilo para el texto de actualización de 2 horas */
+            .update-info-2h {{
+                color: #1A237E; /* Ejemplo de color azul oscuro */
+                font-weight: bold;
+                margin-left: 15px; /* Separación entre la fecha y la info de 2h */
             }}
             /* FIN DEL ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
 
@@ -1036,7 +1046,12 @@ def generar_reporte():
                 <div id="search-container">
                     <input type="text" id="searchInput" placeholder="Buscar empresa por nombre o ticker (Ej: Inditex, SAN.MC)...">
                     <div id="update-date">
-                        fecha de actualización: {datetime.today().strftime('%d de %B %Y').replace(datetime.today().strftime('%B'), ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][datetime.today().month-1])} hora {hora_actual}
+                        <span>
+                            fecha de actualización: {datetime.today().strftime('%d de %B %Y').replace(datetime.today().strftime('%B'), ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][datetime.today().month-1])} hora {hora_actual}
+                        </span>
+                        <span class="update-info-2h">
+                            (Los resultados de búsqueda están actualizados cada dos horas)
+                        </span>
                     </div>
                 </div>
                 
