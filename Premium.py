@@ -936,14 +936,14 @@ def generar_reporte():
         </head>
         <body>
             <div class="main-container">
-                <h2 class="google-style">
+                <h2 class="google-style" style="margin-top: 20px; margin-bottom: 0px;">
                     <span class="i1">i</span>
                     <span class="b1">b</span>
                     <span class="e1">e</span>
                     <span class="x1">x</span>
                     <span class="i2">i</span>
                     <span class="a1">a</span>
-                    <span class="dot-es">.ES</span>
+                    <span class="es-final">ES</span>
                 </h2>
                 
                 <div id="search-container">
