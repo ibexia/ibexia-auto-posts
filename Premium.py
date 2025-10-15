@@ -234,7 +234,7 @@ def calcular_soporte_resistencia(df, window=5):
         return {'s1': 'N/A', 's2': 'N/A', 'r1': 'N/A', 'r2': 'N/A'}
         
 def calcular_beneficio_perdida(precio_compra, precio_actual, inversion=10000):
-    # Función auxiliar para calcular el beneficio monetario
+    # MODIFICACIÓN PARA SER MÁS ROBUSTO Y DEVOLVER EL BENEFICIO NUMÉRICO O STRING "N/A"
     try:
         precio_compra = float(precio_compra)
         precio_actual = float(precio_actual)
@@ -247,102 +247,6 @@ def calcular_beneficio_perdida(precio_compra, precio_actual, inversion=10000):
         return beneficio_perdida # Devolver el número para la comprobación interna
     except (ValueError, TypeError):
         return "N/A"
-
-# ******************************************************************************
-# ************** LÓGICA DE COMPRA/VENTA EXTRAÍDA DE LEER_GOOGLE_SHEETS *********************
-# ******************************************************************************
-def analizar_ultima_operacion(df_hist):
-    """
-    Simula la operativa basada en el SMI (como en leer_google_sheets.py) 
-    para encontrar el estado de la última posición (abierta o cerrada).
-    """
-    df = df_hist.dropna(subset=['SMI']).copy()
-    if len(df) < 3:
-        return {
-            'comprado_status': "NO", 'precio_compra': "N/A", 'fecha_compra': "N/A",
-            'precio_venta_cierre': "N/A", 'fecha_venta_cierre': "N/A", 'beneficio_ultima_op': "N/A"
-        }
-
-    smis = df['SMI'].values
-    precios = df['Close'].values
-    fechas = df.index.strftime('%d/%m/%Y').tolist()
-    current_price = precios[-1]
-    
-    # Calcular la pendiente del SMI
-    pendientes_smi = np.diff(smis)
-    pendientes_smi = np.insert(pendientes_smi, 0, 0) # Rellenar el primer elemento
-
-    all_compras = []
-    all_ventas = []
-    posicion_abierta = False
-    
-    # Iterar hacia adelante para simular la operativa y detectar señales
-    for i in range(1, len(df)):
-        
-        pendiente_actual = pendientes_smi[i]
-        pendiente_anterior = pendientes_smi[i-1]
-        smi_anterior = smis[i-1]
-        
-        # Señal de Compra: SMI gira al alza (cruza de <=0 a >0) Y no está en sobrecompra
-        if pendiente_actual > 0 and pendiente_anterior <= 0 and smi_anterior < 40:
-            if not posicion_abierta:
-                posicion_abierta = True
-                ultima_compra = {'fecha': fechas[i], 'precio': precios[i]}
-                all_compras.append(ultima_compra)
-        
-        # Señal de Venta: SMI gira a la baja (cruza de >=0 a <0)
-        elif pendiente_actual < 0 and pendiente_anterior >= 0:
-            if posicion_abierta:
-                posicion_abierta = False
-                # Se asocia a la última compra abierta
-                if all_compras:
-                    ultima_venta = {'fecha': fechas[i], 'precio': precios[i], 'compra_asociada': all_compras[-1]}
-                    all_ventas.append(ultima_venta)
-
-    # 2. Determinar la última operación
-    
-    if posicion_abierta and all_compras:
-        # La última señal fue de COMPRA y la posición sigue abierta
-        compra_actual = all_compras[-1]
-        
-        # Cálculo del beneficio simulado actual
-        beneficio_simulado = calcular_beneficio_perdida(compra_actual['precio'], current_price)
-
-        return {
-            'comprado_status': "SI",
-            'precio_compra': compra_actual['precio'],
-            'fecha_compra': compra_actual['fecha'],
-            'precio_venta_cierre': "N/A",
-            'fecha_venta_cierre': "N/A",
-            'beneficio_ultima_op': beneficio_simulado # Beneficio actual
-        }
-    
-    elif all_ventas:
-        # La última señal fue de VENTA y la posición está cerrada
-        venta_cerrada = all_ventas[-1]
-        compra_asociada = venta_cerrada['compra_asociada']
-        
-        # Cálculo del beneficio de la última operación cerrada
-        beneficio_cerrado = calcular_beneficio_perdida(compra_asociada['precio'], venta_cerrada['precio'])
-        
-        return {
-            'comprado_status': "NO",
-            'precio_compra': compra_asociada['precio'], # Muestra la compra asociada a la última venta
-            'fecha_compra': compra_asociada['fecha'],
-            'precio_venta_cierre': venta_cerrada['precio'],
-            'fecha_venta_cierre': venta_cerrada['fecha'],
-            'beneficio_ultima_op': beneficio_cerrado
-        }
-    
-    else:
-        # No se encontraron señales de compra/venta en el historial
-        return {
-            'comprado_status': "NO", 'precio_compra': "N/A", 'fecha_compra': "N/A",
-            'precio_venta_cierre': "N/A", 'fecha_venta_cierre': "N/A", 'beneficio_ultima_op': "N/A"
-        }
-# ******************************************************************************
-# ************ FIN LÓGICA DE COMPRA/VENTA EXTRAÍDA DE LEER_GOOGLE_SHEETS *******************
-# ******************************************************************************
         
 def formatear_beneficio(beneficio):
     if beneficio == "N/A":
@@ -403,25 +307,67 @@ def obtener_datos_yfinance(ticker):
         
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
         
-        # ******************************************************************************
-        # *** LLAMADA A LA LÓGICA DE DETECCIÓN DE ÚLTIMA OPERACIÓN (COMPRA/VENTA) ***
-        # ******************************************************************************
-        resultados_operacion = analizar_ultima_operacion(hist_extended)
-
-        comprado_status = resultados_operacion['comprado_status']
-        precio_compra = resultados_operacion['precio_compra']
-        fecha_compra = resultados_operacion['fecha_compra']
+        # --- Lógica de Detección de Última Operación (Compra o Venta) ---
+        comprado_status = "NO"
+        precio_compra = "N/A"
+        fecha_compra = "N/A"
         
-        precio_venta_cierre = resultados_operacion['precio_venta_cierre']
-        fecha_venta_cierre = resultados_operacion['fecha_venta_cierre']
-        beneficio_ultima_op = resultados_operacion['beneficio_ultima_op'] # Resultado de la última operación
+        # NUEVOS CAMPOS: Para la última venta/cierre
+        precio_venta_cierre = "N/A"
+        fecha_venta_cierre = "N/A"
+        beneficio_ultima_op = "N/A"
+        
+        smi_series_copy = hist_extended['SMI'].copy()
+        pendientes_smi = smi_series_copy.diff()
+        
+        # Recorrer hacia atrás buscando el último cruce
+        for i in range(len(hist_extended) - 1, 0, -1):
+            smi_prev = hist_extended['SMI'].iloc[i - 1]
+            pendiente_prev = pendientes_smi.iloc[i - 1]
+            pendiente_curr = pendientes_smi.iloc[i]
+            
+            # Condición de VENTA (Bajando después de subir, sugiere cierre)
+            if pendiente_curr < 0 and pendiente_prev >= 0:
+                # Si se detecta una señal de venta, significa que la posición anterior (COMPRA) se cierra
+                
+                # Buscamos la señal de COMPRA inmediatamente anterior
+                precio_venta_cierre = hist_extended['Close'].iloc[i]
+                fecha_venta_cierre = hist_extended.index[i].strftime('%d/%m/%Y')
 
-        # Si la posición está abierta ('SI'), el beneficio_ultima_op ya contiene el beneficio actual simulado.
-        beneficio_actual = beneficio_ultima_op if comprado_status == "SI" else "N/A"
-
-        # ******************************************************************************
-        # ************* FIN LLAMADA A LÓGICA DE COMPRA/VENTA ************************
-        # ******************************************************************************
+                # Buscamos la última señal de COMPRA antes de esta VENTA
+                for j in range(i - 1, 0, -1):
+                    p_curr_compra = pendientes_smi.iloc[j]
+                    p_prev_compra = pendientes_smi.iloc[j - 1]
+                    smi_prev_compra = hist_extended['SMI'].iloc[j - 1]
+                    
+                    if p_curr_compra > 0 and p_prev_compra <= 0 and smi_prev_compra < 40:
+                        precio_compra_op_cerrada = hist_extended['Close'].iloc[j]
+                        
+                        # Cálculo de Beneficio de la operación CERRADA
+                        beneficio_ultima_op = calcular_beneficio_perdida(precio_compra_op_cerrada, precio_venta_cierre)
+                        break
+                        
+                comprado_status = "NO"
+                precio_compra = "N/A" # No estamos en posición de compra
+                fecha_compra = "N/A" 
+                break
+            
+            # Condición de COMPRA (Subiendo después de bajar, sugiere apertura)
+            elif pendiente_curr > 0 and pendiente_prev <= 0 and smi_prev < 40:
+                comprado_status = "SI"
+                precio_compra = hist_extended['Close'].iloc[i]
+                fecha_compra = hist_extended.index[i].strftime('%d/%m/%Y')
+                
+                # Al estar COMPRADO, no hay datos de venta/cierre aún, solo el beneficio simulado
+                precio_venta_cierre = "N/A"
+                fecha_venta_cierre = "N/A"
+                beneficio_ultima_op = "N/A"
+                break
+                
+        # --- Cálculo de Beneficio Actual (SI está Comprado) ---
+        beneficio_actual = "N/A"
+        if comprado_status == "SI" and isinstance(precio_compra, (int, float)):
+            beneficio_actual = calcular_beneficio_perdida(precio_compra, current_price)
 
 
         # --- Modificación: Cálculo de SMI Semanal ---
@@ -435,8 +381,10 @@ def obtener_datos_yfinance(ticker):
             hist_weekly = calculate_smi_tv(hist_weekly)
             smi_weekly_series = hist_weekly['SMI'].dropna()
             smi_weekly = smi_weekly_series.iloc[-1] if not smi_weekly_series.empty else 'N/A'
+            
             if isinstance(smi_weekly, (int, float)):
                 estado_smi_weekly = "Sobrecompra" if smi_weekly > 40 else ("Sobreventa" if smi_weekly < -40 else "Intermedio")
+                
                 # Generar el texto de la observación semanal
                 if estado_smi_weekly == "Sobrecompra":
                     observacion_semanal = f"El **SMI Semanal** ({formatear_numero(smi_weekly)}) está en zona de **Sobrecompra**. Sugiere que el precio ya ha subido mucho a largo plazo."
@@ -444,9 +392,11 @@ def obtener_datos_yfinance(ticker):
                     observacion_semanal = f"El **SMI Semanal** ({formatear_numero(smi_weekly)}) está en zona de **Sobreventa**. Sugiere potencial de subida a largo plazo."
                 else:
                     observacion_semanal = f"El **SMI Semanal** ({formatear_numero(smi_weekly)}) está en zona **Intermedia**."
+                    
             else:
                 estado_smi_weekly = 'N/A'
                 observacion_semanal = "No hay datos semanales suficientes."
+
 
         return {
             "TICKER": ticker,
@@ -479,414 +429,821 @@ def obtener_datos_yfinance(ticker):
             "BENEFICIO_ULTIMA_OP": beneficio_ultima_op, # Beneficio numérico o "N/A"
             "BENEFICIO_ACTUAL": beneficio_actual, # Beneficio numérico o "N/A" (si COMPRADO=SI)
         }
+
     except Exception as e:
-        print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a...")
+        print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
-def clasificar_empresa(datos):
-    # ******************************************************************
-    # ******* ESTA FUNCIÓN NO SE MODIFICA, SE MANTIENE EL ORIGINAL ******
-    # ******************************************************************
-    recomendacion = ""
-    nivel_confianza = 0
-    observacion = ""
-    estado_diario = ""
+def clasificar_empresa(data):
+    estado_smi = data['ESTADO_SMI']
+    tendencia = data['TENDENCIA_ACTUAL']
+    precio_aplanamiento = data['PRECIO_APLANAMIENTO']
+    smi_actual = data['SMI_HOY']
+    smi_ayer = data['SMI_AYER']
+    hist_df = data['HIST_DF']
     
-    # 1. Recomendación Basada en SMI Diario
-    if datos["ESTADO_SMI"] == "Sobreventa" and datos["TENDENCIA_ACTUAL"] == "Subiendo" and datos["PENDIENTE"] > 0.1:
-        recomendacion = "COMPRA"
-        nivel_confianza += 5
-        estado_diario = "Fuerte señal de compra (SMI en sobreventa girando al alza)."
-    elif datos["ESTADO_SMI"] == "Sobreventa" and datos["TENDENCIA_ACTUAL"] == "Plano" and datos["PENDIENTE"] >= -0.1:
-        recomendacion = "COMPRA (Cautelosa)"
-        nivel_confianza += 3
-        estado_diario = "Señal de posible compra (SMI en sobreventa, pero sin giro fuerte)."
-    elif datos["ESTADO_SMI"] == "Sobrecompra" and datos["TENDENCIA_ACTUAL"] == "Bajando" and datos["PENDIENTE"] < -0.1:
-        recomendacion = "VENTA/CIERRE"
-        nivel_confianza += 5
-        estado_diario = "Fuerte señal de venta o cierre (SMI en sobrecompra girando a la baja)."
-    elif datos["ESTADO_SMI"] == "Sobrecompra" and datos["TENDENCIA_ACTUAL"] == "Plano" and datos["PENDIENTE"] <= 0.1:
-        recomendacion = "VENTA/CIERRE (Cautelosa)"
-        nivel_confianza += 3
-        estado_diario = "Señal de posible venta o cierre (SMI en sobrecompra, pero sin caída fuerte)."
-    elif datos["ESTADO_SMI"] == "Intermedio":
-        if datos["TENDENCIA_ACTUAL"] == "Subiendo" and datos["PENDIENTE"] > 0.1:
-            recomendacion = "MANTENER"
-            nivel_confianza += 2
-            estado_diario = "Tendencia alcista en zona intermedia. Mantener."
-        elif datos["TENDENCIA_ACTUAL"] == "Bajando" and datos["PENDIENTE"] < -0.1:
-            recomendacion = "MANTENER (Espera)"
-            nivel_confianza += 1
-            estado_diario = "Tendencia bajista en zona intermedia. Esperar."
-        else:
-            recomendacion = "NEUTRO"
-            nivel_confianza += 0
-            estado_diario = "Movimiento plano en zona intermedia. No operar."
-    else:
-        recomendacion = "NEUTRO"
-        nivel_confianza += 0
-        estado_diario = "Condiciones no claras para operar."
-        
-    # 2. Modificación por SMI Semanal (Advertencia)
-    if datos["ESTADO_SMI_SEMANAL"] == "Sobrecompra" and recomendacion.startswith("COMPRA"):
-        recomendacion = recomendacion.replace("COMPRA", "COMPRA (ALTO RIESGO)")
-        nivel_confianza -= 2
-        datos["ADVERTENCIA_SEMANAL"] = "SMI Semanal en Sobrecompra"
-        
-    if datos["ESTADO_SMI_SEMANAL"] == "Sobreventa" and recomendacion.startswith("VENTA"):
-        recomendacion = recomendacion.replace("VENTA/CIERRE", "VENTA/CIERRE (BAJO RIESGO)")
-        nivel_confianza -= 1
-        datos["ADVERTENCIA_SEMANAL"] = "SMI Semanal en Sobreventa" # Esto es menos una advertencia y más una confirmación de soporte
+    current_price = data['PRECIO_ACTUAL']
+    close_yesterday = hist_df['Close'].iloc[-2] if len(hist_df) > 1 else 'N/A'
 
-    # 3. Consideración de Posición Abierta
-    if datos["COMPRADO"] == "SI":
-        # Si ya está comprado, la recomendación se orienta a la gestión de la posición
-        if datos["ESTADO_SMI"] == "Sobrecompra" and datos["TENDENCIA_ACTUAL"] == "Bajando":
-             recomendacion = "ALERTA CIERRE"
-             observacion = f"Posición abierta desde {datos['FECHA_COMPRA']}. SMI indica posible corrección (sobrecompra + bajando)."
-        elif recomendacion.startswith("VENTA"):
-             recomendacion = "ALERTA CIERRE"
-             observacion = f"Posición abierta desde {datos['FECHA_COMPRA']}. SMI diario indica giro de venta."
-        else:
-             recomendacion = "MANTENER POSICIÓN"
-             observacion = f"Posición abierta desde {datos['FECHA_COMPRA']} con beneficio actual: {formatear_beneficio(datos['BENEFICIO_ACTUAL'])}."
-             
-    # 4. Observaciones Finales
-    observacion_final = f"{estado_diario} {datos['OBSERVACION_SEMANAL']}"
+    high_today = hist_df['High'].iloc[-1]
+    low_today = hist_df['Low'].iloc[-1]
+    
+    pendiente_smi_hoy = data['PENDIENTE']
+    pendiente_smi_ayer = hist_df['SMI'].diff().iloc[-2] if len(hist_df['SMI']) > 1 else 'N/A'
+    
+    # --- Nuevo: Variables Semanales ---
+    estado_smi_weekly = data['ESTADO_SMI_SEMANAL']
 
-    return {
-        "RECOMENDACION": recomendacion,
-        "NIVEL_CONFIANZA": max(0, nivel_confianza),
-        "OBSERVACION": observacion or observacion_final.strip()
+    prioridad = {
+        "Posibilidad de Compra Activada": 1,
+        "Posibilidad de Compra": 2,
+        "VIGILAR": 3,
+        "Riesgo de Venta": 4,
+        "Riesgo de Venta Activada": 5,
+        "Seguirá bajando": 6,
+        "Intermedio": 7,
+        "Compra RIESGO": 8 # Esta prioridad se anula con la clave de ordenación en generar_reporte, pero se mantiene aquí por consistencia.
     }
 
-
-def formatear_valor(valor):
-    if valor is None:
-        return "N/A"
-    if isinstance(valor, (int, float)):
-        return formatear_numero(valor) + "€"
-    return str(valor)
-
-def generar_html(datos_analizados):
+    if estado_smi == "Sobreventa":
+        if tendencia == "Subiendo":
+            # --- Lógica de Filtro Semanal ---
+            if estado_smi_weekly == "Sobrecompra":
+                data['OPORTUNIDAD'] = "Compra RIESGO"
+                data['COMPRA_SI'] = "NO RECOMENDAMOS" # La subida puede ser corta
+                data['VENDE_SI'] = "NO VENDER"
+                data['ORDEN_PRIORIDAD'] = prioridad["Compra RIESGO"]
+                data['ADVERTENCIA_SEMANAL'] = "SI"
+            else:
+                data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
+                data['COMPRA_SI'] = "COMPRA YA"
+                data['VENDE_SI'] = "NO VENDER"
+                data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
+            # -----------------------------------
+        elif tendencia == "Bajando":
+            # --- Lógica de Filtro Semanal ---
+            if estado_smi_weekly == "Sobrecompra":
+                data['OPORTUNIDAD'] = "Compra RIESGO"
+                data['COMPRA_SI'] = "NO RECOMENDAMOS"
+                data['VENDE_SI'] = "NO VENDER"
+                data['ORDEN_PRIORIDAD'] = prioridad["Compra RIESGO"]
+                data['ADVERTENCIA_SEMANAL'] = "SI"
+            else:
+                data['OPORTUNIDAD'] = "Posibilidad de Compra"
+                if current_price > close_yesterday:
+                    data['COMPRA_SI'] = "COMPRA YA"
+                else:
+                    data['COMPRA_SI'] = f"COMPRAR SI SUPERA {formatear_numero(close_yesterday)}€"
+                data['VENDE_SI'] = "NO VENDER"
+                data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
+            # -----------------------------------
+        else:
+            data['OPORTUNIDAD'] = "Intermedio"
+            data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
+            data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
+            data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
     
-    # Convertimos a F-string para inyectar la fecha correctamente
-    html_template_start = f"""
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reporte de Análisis Bursátil IBEXIA</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
-    <style>
-        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }}
-        .container {{ max-width: 1200px; margin: auto; background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }}
-        h1 {{ color: #007bff; text-align: center; margin-bottom: 20px; }}
-        .header-info {{ text-align: center; margin-bottom: 30px; font-size: 1.1em; color: #555; }}
-        .company-card {{ background-color: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 20px; padding: 20px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }}
-        .company-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }}
-        .company-header h2 {{ margin: 0; color: #333; }}
-        .recommendation {{ font-weight: bold; padding: 5px 10px; border-radius: 5px; color: white; }}
-        .COMPRA {{ background-color: #28a745; }}
-        .VENTA-CIERRE {{ background-color: #dc3545; }}
-        .MANTENER, .NEUTRO {{ background-color: #ffc107; color: #333; }}
-        .ALERTA-CIERRE {{ background-color: #ff5722; }}
-        .COMPRA-ALTO-RIESGO {{ background-color: #ff9800; color: #333; }}
-        .VENTA-CIERRE-BAJO-RIESGO {{ background-color: #4CAF50; }}
-        
-        .grid-3 {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-top: 15px; }}
-        .stat-box {{ background-color: #f0f8ff; padding: 10px; border-radius: 5px; border-left: 4px solid #007bff; }}
-        .stat-box strong {{ display: block; font-size: 0.9em; color: #555; }}
-        .stat-box span {{ font-size: 1.2em; font-weight: bold; color: #333; }}
-        
-        .data-table-container {{ 
-            overflow-x: auto; 
-            margin-top: 20px; 
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }}
-        .data-table {{ width: 100%; border-collapse: collapse; white-space: nowrap; }}
-        .data-table th, .data-table td {{ border: 1px solid #e9ecef; padding: 12px 15px; text-align: left; }}
-        .data-table th {{ background-color: #007bff; color: white; font-weight: bold; text-transform: uppercase; font-size: 0.9em; }}
-        .data-table tr:nth-child(even) {{ background-color: #f7f7f7; }}
-        .data-table tr:hover {{ background-color: #e9ecef; }}
-        .scroll-top {{ overflow-x: scroll; height: 18px; opacity: 0; }}
-        
-        .filter-container {{ margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }}
-        .filter-container input[type="text"] {{ padding: 8px; border: 1px solid #ccc; border-radius: 5px; width: 250px; }}
-
-        .operacion-historica {{
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #e9f7ef; /* Light green background */
-            border-left: 5px solid #28a745;
-            border-radius: 4px;
-        }}
-
-        .operacion-historica strong {{
-            color: #333;
-        }}
-
-        .alerta-semanal {{
-            color: #dc3545;
-            font-weight: bold;
-            margin-left: 10px;
-        }}
-        
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🔔 Reporte Diario de Análisis Bursátil IBEXIA</h1>
-        <div class="header-info">
-            Reporte generado el <strong>{datetime.today().strftime('%d/%m/%Y')}</strong>
-        </div>
-
-        <div class="filter-container">
-            <input type="text" id="searchInput" placeholder="Filtrar por nombre o ticker...">
-            <div>Mostrando {len(datos_analizados)} oportunidades</div>
-        </div>
-        
-        <div id="scrollTop" class="scroll-top">
-            <div style="width: 3000px; height: 1px;"></div>
-        </div>
-        
-        <div class="data-table-container" id="tableContainer">
-            <table class="data-table" id="data-table">
-                <thead>
-                    <tr>
-                        <th>Empresa</th>
-                        <th>Precio Actual</th>
-                        <th>Recomendación</th>
-                        <th>Confianza (0-5)</th>
-                        <th>Estado SMI</th>
-                        <th>SMI Hoy</th>
-                        <th>SMI Ayer</th>
-                        <th>Pendiente</th>
-                        <th>Soporte 1</th>
-                        <th>Resistencia 1</th>
-                        <th>Tipo EMA (100)</th>
-                        <th>Valor EMA (100)</th>
-                        <th>P. Aplanamiento</th>
-                        <th>Estado SMI Semanal</th>
-                        <th>Última Compra (Precio)</th>
-                        <th>Última Compra (Fecha)</th>
-                        <th>Última Venta (Precio)</th>
-                        <th>Última Venta (Fecha)</th>
-                        <th>Beneficio Operación</th>
-                        <th>Observación</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody">
-    """
-    
-    html_rows = ""
-    
-    for dato in datos_analizados:
-        
-        recomendacion_class = dato['RECOMENDACION'].split(' ')[0].replace("/", "-")
-        if recomendacion_class == "VENTA":
-            recomendacion_class = "VENTA-CIERRE"
-        
-        # Determine the color and text for the benefit column
-        beneficio_op_formateado = formatear_beneficio(dato["BENEFICIO_ULTIMA_OP"])
-        
-        # Formatting for display
-        precio_compra_display = formatear_valor(dato["PRECIO_COMPRA"]) if dato["COMPRADO"] == "SI" else "N/A"
-        fecha_compra_display = dato["FECHA_COMPRA"] if dato["COMPRADO"] == "SI" else "N/A"
-        precio_venta_display = formatear_valor(dato["PRECIO_VENTA_CIERRE"]) if dato["COMPRADO"] == "NO" else "N/A"
-        fecha_venta_display = dato["FECHA_VENTA_CIERRE"] if dato["COMPRADO"] == "NO" else "N/A"
-
-        # If Comprado=SI, the last operation benefit is the current simulated profit
-        if dato["COMPRADO"] == "SI":
-             # Use the current benefit for the Operación column, as it's the only one
-             beneficio_op_formateado = formatear_beneficio(dato["BENEFICIO_ACTUAL"])
-             precio_compra_display = formatear_valor(dato["PRECIO_COMPRA"])
-             fecha_compra_display = dato["FECHA_COMPRA"]
-             precio_venta_display = "N/A"
-             fecha_venta_display = "N/A"
-             
-        # If Comprado=NO, the last operation benefit is the closed profit (BENEFICIO_ULTIMA_OP)
-        elif dato["COMPRADO"] == "NO" and dato["FECHA_VENTA_CIERRE"] != "N/A":
-             # Last operation was a close, show the purchase associated with that sale
-             precio_compra_display = formatear_valor(dato["PRECIO_COMPRA"])
-             fecha_compra_display = dato["FECHA_COMPRA"]
-             precio_venta_display = formatear_valor(dato["PRECIO_VENTA_CIERRE"])
-             fecha_venta_display = dato["FECHA_VENTA_CIERRE"]
-
-
-        # Check if the SMI is "N/A" to avoid trying to format it
-        smi_hoy_formateado = formatear_numero(dato["SMI_HOY"])
-        smi_ayer_formateado = formatear_numero(dato["SMI_AYER"])
-        
-        html_rows += f"""
-                    <tr class="{'comprado' if dato['COMPRADO'] == 'SI' else 'no-comprado'}" data-name="{dato['NOMBRE_EMPRESA']}" data-ticker="{dato['TICKER']}">
-                        <td><strong>{dato['NOMBRE_EMPRESA']}</strong> ({dato['TICKER']})</td>
-                        <td>{formatear_numero(dato['PRECIO_ACTUAL'])}€</td>
-                        <td><span class="recommendation {recomendacion_class}">{dato['RECOMENDACION']}</span></td>
-                        <td>{dato['NIVEL_CONFIANZA']}/5</td>
-                        <td>{dato['ESTADO_SMI']}</td>
-                        <td>{smi_hoy_formateado}</td>
-                        <td>{smi_ayer_formateado}</td>
-                        <td>{formatear_numero(dato['PENDIENTE'])}</td>
-                        <td>{formatear_valor(dato['SOPORTE_1'])}</td>
-                        <td>{formatear_valor(dato['RESISTENCIA_1'])}</td>
-                        <td>{dato['TIPO_EMA']}</td>
-                        <td>{formatear_numero(dato['VALOR_EMA'])}€</td>
-                        <td>{formatear_valor(dato['PRECIO_APLANAMIENTO'])}</td>
-                        <td>{dato['ESTADO_SMI_SEMANAL']} <span class="alerta-semanal">{'!ALERTA' if dato['ADVERTENCIA_SEMANAL'] != 'NO' else ''}</span></td>
-                        <td>{precio_compra_display}</td>
-                        <td>{fecha_compra_display}</td>
-                        <td>{precio_venta_display}</td>
-                        <td>{fecha_venta_display}</td>
-                        <td>{beneficio_op_formateado}</td>
-                        <td>{dato['OBSERVACION']}</td>
-                    </tr>
-                """
-
-    # Esta sección se mantiene como cadena simple para evitar el SyntaxError de Python con JavaScript/f-strings.
-    html_template_end = """
-                </tbody>
-            </table>
-        </div>
-        
-        <div style="margin-top: 30px;">
-            <p><strong>Nota sobre Beneficio Operación:</strong></p>
-            <ul>
-                <li>Si <strong>Compra</strong> es 'SI', este es el beneficio/pérdida actual de la posición abierta.</li>
-                <li>Si <strong>Compra</strong> es 'NO', este es el beneficio/pérdida de la última operación cerrada (Buy & Sell).</li>
-            </ul>
-        </div>
-    </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const searchInput = document.getElementById('searchInput');
-            const tableBody = document.getElementById('tableBody');
-            const rows = tableBody.getElementsByTagName('tr');
-            const tableContainer = document.getElementById('tableContainer');
-            const scrollTop = document.getElementById('scrollTop');
-
-            searchInput.addEventListener('keyup', function() {
-                const filter = searchInput.value.toUpperCase();
-                for (let i = 0; i < rows.length; i++) {
-                    const row = rows[i];
-                    const name = row.getAttribute('data-name').toUpperCase();
-                    const ticker = row.getAttribute('data-ticker').toUpperCase();
-                    if (name.includes(filter) || ticker.includes(filter)) {
-                        row.style.display = "";
-                    } else {
-                        row.style.display = "none";
-                    }
-                }
-            });
-
-            // Enfocar el campo de búsqueda al cargar (si es posible)
-            if (searchInput) {
-                searchInput.focus(); // Enfocar el campo de búsqueda al cargar
-            }
+    elif estado_smi == "Intermedio":
+        if tendencia == "Bajando":
+            data['OPORTUNIDAD'] = "Seguirá bajando"
+            data['COMPRA_SI'] = "NO COMPRAR"
+            data['VENDE_SI'] = "YA ES TARDE PARA VENDER"
+            data['ORDEN_PRIORIDAD'] = prioridad["Seguirá bajando"]
+        elif tendencia == "Subiendo":
+            data['OPORTUNIDAD'] = "VIGILAR"
+            data['COMPRA_SI'] = "NO COMPRAR"
             
-            // Sincronizar el scroll lateral
-            if (tableContainer && scrollTop) {
-                scrollTop.addEventListener('scroll', () => {
-                    tableContainer.scrollLeft = scrollTop.scrollLeft;
-                });
-                
-                tableContainer.addEventListener('scroll', () => {
-                    scrollTop.scrollLeft = tableContainer.scrollLeft;
-                });
-            }
-        });
-    </script>
-</body>
-</html>
-        """
+            trigger_price = close_yesterday * 0.99
+            
+            if current_price < trigger_price:
+                 data['VENDE_SI'] = "VENDE YA"
+            else:
+                 data['VENDE_SI'] = f"VENDER SI PIERDE {formatear_numero(trigger_price)}€"
+            data['ORDEN_PRIORIDAD'] = prioridad["VIGILAR"]
+        else:
+            data['OPORTUNIDAD'] = "Intermedio"
+            data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
+            data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
+            data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
+            
+    elif estado_smi == "Sobrecompra":
+        if tendencia == "Subiendo":
+            data['OPORTUNIDAD'] = "Riesgo de Venta"
+            data['COMPRA_SI'] = "NO COMPRAR"
+            data['VENDE_SI'] = f"ZONA DE VENTA<br><span class='small-text'>PRECIO IDEAL VENTA HOY: {high_today:,.2f}€</span>"
+            data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta"]
+        elif tendencia == "Bajando":
+            data['OPORTUNIDAD'] = "Riesgo de Venta Activada"
+            data['COMPRA_SI'] = "NO COMPRAR"
+            data['VENDE_SI'] = "VENDE AHORA"
+            data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta Activada"]
+        else:
+            data['OPORTUNIDAD'] = "Intermedio"
+            data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
+            data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
+            data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
     
-    return html_template_start + html_rows + html_template_end
-
-
-def enviar_email_con_adjunto(html_body, asunto, nombre_archivo_base):
+    return data
     
-    smtp_server = os.getenv('SMTP_SERVER')
-    smtp_port_str = os.getenv('SMTP_PORT') 
-    email_user = os.getenv('EMAIL_USER')
-    email_password = os.getenv('EMAIL_PASSWORD')
-    email_recipient = os.getenv('EMAIL_RECIPIENT')
+def generar_observaciones(data):
+    nombre_empresa = data['NOMBRE_EMPRESA']
+    precio_actual = formatear_numero(data['PRECIO_ACTUAL'])
+    estado_smi = data['ESTADO_SMI']
+    tendencia = data['TENDENCIA_ACTUAL']
+    oportunidad = data['OPORTUNIDAD']
+    soporte1 = formatear_numero(data['SOPORTE_1'])
+    resistencia1 = formatear_numero(data['RESISTENCIA_1'])
+    compra_si = data['COMPRA_SI']
+    vende_si = data['VENDE_SI']
+    tipo_ema = data['TIPO_EMA']
+    valor_ema = formatear_numero(data['VALOR_EMA'])
+    
+    # --- Nuevo: Advertencia Semanal ---
+    advertencia_semanal = data['ADVERTENCIA_SEMANAL']
 
-    # CORRECCIÓN DE ROBUSTEZ: Verifica que todas las variables existan antes de intentar usarlas
-    if not all([smtp_server, smtp_port_str, email_user, email_password, email_recipient]):
-        print("❌ Error: Faltan variables de entorno para el envío de correo. Asegúrate de que SMTP_SERVER, SMTP_PORT, EMAIL_USER, EMAIL_PASSWORD y EMAIL_RECIPIENT están configuradas. Saltando envío.")
+    texto_observacion = f"<strong>Observaciones de {nombre_empresa}:</strong><br>"
+    
+    # Nuevo texto de advertencia para insertar al inicio
+    advertencia_texto = ""
+    if advertencia_semanal == "SI":
+        advertencia_texto = "<strong style='color:#ffc107;'>ADVERTENCIA SEMANAL: El SMI semanal está en zona de sobrecompra. No se recomienda comprar ya que la subida podría ser muy corta y con alto riesgo.</strong><br>"
+
+
+    if oportunidad == "Posibilidad de Compra Activada":
+        texto = f"El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda tener en cuenta los niveles de resistencia ({resistencia1}€) para determinar un objetivo de precio. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+    
+    elif oportunidad == "Posibilidad de Compra":
+        if "COMPRA YA" in compra_si:
+            texto = f"El algoritmo detecta que el valor está en una zona de sobreventa, lo que puede ser un indicador de reversión. El algoritmo ha detectado una oportunidad de compra inmediata para aprovechar un posible rebote.La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+        else:
+            texto = f"El algoritmo detecta que el valor está en una zona de sobreventa con una tendencia bajista. Se ha detectado una oportunidad de {compra_si} para un posible rebote. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+    
+    # Nuevo bloque de Riesgo de Compra
+    elif oportunidad == "Compra RIESGO":
+        texto = f"El algoritmo detectó una señal de compra diaria, pero el **SMI Semanal** se encuentra en zona de **Sobrecompra** ({formatear_numero(data['SMI_SEMANAL'])}). Esto indica que el precio ya ha subido mucho a largo plazo, y la señal de rebote diaria podría ser muy breve. No se recomienda la compra en este momento. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+
+    elif oportunidad == "VIGILAR":
+        texto = f"El algoritmo se encuentra en una zona intermedia y muestra una tendencia alcista en sus últimos valores. Se sugiere vigilar de cerca, ya que una caída en el precio podría ser una señal de venta. {vende_si}. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+    
+    elif oportunidad == "Riesgo de Venta":
+        texto = f"El algoritmo ha entrado en una zona de sobrecompra. Esto genera un riesgo de venta. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+    
+    elif oportunidad == "Riesgo de Venta Activada":
+        texto = f"La combinación de una zona de sobrecompra y una tendencia bajista en el algoritmo ha activado una señal de riesgo de venta. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+
+    elif oportunidad == "Seguirá bajando":
+        texto = f"El algoritmo sugiere que es probable que el precio siga bajando en el corto plazo. No se aconseja ni comprar ni vender. Se recomienda observar los niveles de soporte ({soporte1}€). La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+
+    elif oportunidad == "Intermedio":
+        texto = "El algoritmo no emite recomendaciones de compra o venta en este momento, por lo que lo más prudente es mantenerse al margen. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+    
+    else:
+        texto = "El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda comprar para aprovechar un posible rebote, con un objetivo de precio en la zona de resistencia. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+    
+    # Se añade la advertencia al inicio del texto de la observación
+    return f'<p style="text-align:left; color:#000;">{texto_observacion.strip()}{advertencia_texto}{texto.strip()}</p>'
+
+
+def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
+    """
+    Envía un correo electrónico a través de Brevo (Sendinblue) con un archivo HTML adjunto,
+    utilizando la configuración SMTP hardcodeada.
+    """
+    # 1. CONFIGURACIÓN HARDCODEADA DE BREVO Y DESTINATARIO
+    servidor_smtp = 'smtp-relay.brevo.com'
+    puerto_smtp = 587
+    remitente_header = "IBEXIA.es <info@ibexia.es>" # Usado en el campo 'From'
+    remitente_login = "9853a2001@smtp-brevo.com"    # Usuario SMTP para login
+    password = "PRHTU5GN1ygZ9XVC"                   # Contraseña SMTP para login
+    destinatario = "XUMKOX@GMAIL.COM"               # ¡DESTINATARIO HARCODEADO!
+    
+    # Extraer la dirección de correo visible (info@ibexia.es) del header completo
+    match_remitente_email = re.search(r'<(.*?)>', remitente_header)
+    # Esta dirección se usará como remitente en la transacción SMTP
+    remitente_visible_email = match_remitente_email.group(1) if match_remitente_email else remitente_login
+    
+    ruta_archivo = f"{nombre_archivo}.html"
+    
+    # 2. Guardar el contenido generado en un archivo local temporal
+    try:
+        with open(ruta_archivo, "w", encoding="utf-8") as f:
+            f.write(texto_generado)
+    except Exception as e:
+        print(f"❌ Error al escribir el archivo {ruta_archivo}: {e}")
+        return
+
+    # 3. Construcción del mensaje MIME
+    msg = MIMEMultipart()
+    msg['From'] = remitente_header # Ej: "IBEXIA.es <info@ibexia.es>"
+    msg['To'] = destinatario
+    msg['Subject'] = asunto_email
+    
+    # Cuerpo del email
+    msg.attach(MIMEText("Adjunto el análisis en formato HTML.", 'plain'))
+
+    # Adjuntar el archivo HTML
+    try:
+        with open(ruta_archivo, "rb") as attachment:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(attachment.read())
+        
+        # Codificación y cabeceras para el adjunto
+        encoders.encode_base64(part)
+        part.add_header(
+            "Content-Disposition",
+            f"attachment; filename= {ruta_archivo}",
+        )
+        msg.attach(part)
+    except Exception as e:
+        print(f"❌ Error al adjuntar el archivo {ruta_archivo}: {e}")
+        # Asegurarse de que el archivo temporal se borre incluso si falla el adjunto
+        try:
+            os.remove(ruta_archivo)
+        except OSError:
+            pass
         return
         
-    # CORRECCIÓN DE ROBUSTEZ: Conversión segura del puerto a entero
+    # 4. Conexión al servidor Brevo SMTP
     try:
-        smtp_port = int(smtp_port_str)
-    except ValueError:
-        print(f"❌ Error: La variable de entorno SMTP_PORT ('{smtp_port_str}') no es un número entero válido. Saltando envío.")
-        return
+        print(f"🌐 Intentando conectar a Brevo SMTP: {servidor_smtp}:{puerto_smtp}")
+        servidor = smtplib.SMTP(servidor_smtp, puerto_smtp)
+        servidor.starttls() 
+        
+        print(f"🔑 Intentando iniciar sesión con el usuario: {remitente_login}")
+        # Usa el login y la clave de Brevo para la autenticación
+        servidor.login(remitente_login, password)
+        
+        print(f"✉️ Enviando correo a: {destinatario} desde: {remitente_visible_email}")
+        # Usa el email visible como el remitente de la transacción
+        servidor.sendmail(remitente_visible_email, destinatario, msg.as_string())
+        
+        servidor.quit()
+        print("✅ Correo enviado exitosamente a Brevo.")
 
-    msg = MIMEMultipart()
-    msg['From'] = email_user
-    msg['To'] = email_recipient
-    msg['Subject'] = asunto
-
-    # Adjuntar el HTML como parte del cuerpo y como archivo
-    html_part = MIMEText(html_body, 'html')
-    msg.attach(html_part)
-    
-    archivo_html = MIMEBase('application', 'octet-stream')
-    archivo_html.set_payload(html_body.encode('utf-8'))
-    encoders.encode_base64(archivo_html)
-    archivo_html.add_header('Content-Disposition', f'attachment; filename="{nombre_archivo_base}.html"')
-    msg.attach(archivo_html)
-
-    try:
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()  # Para seguridad
-        server.login(email_user, email_password)
-        server.sendmail(email_user, email_recipient, msg.as_string())
-        server.quit()
-        print(f"✅ Correo enviado con éxito a {email_recipient}")
+    except smtplib.SMTPAuthenticationError:
+        print(f"❌ ERROR de Autenticación SMTP. Verifica el login y la clave SMTP de Brevo: {remitente_login}")
     except Exception as e:
-        print(f"❌ Error al enviar el correo: {e}")
+        print(f"❌ Ocurrió un error al enviar el correo vía Brevo: {e}")
+    finally:
+        # 5. Limpieza (Borrar el archivo temporal)
+        try:
+            os.remove(ruta_archivo)
+        except OSError as e:
+            print(f"⚠️ Error al intentar borrar el archivo temporal {ruta_archivo}: {e}")
 
 def generar_reporte():
-    
     try:
-        # Se asume que leer_google_sheets y obtener_datos_yfinance existen
-        all_tickers = list(tickers.values())
-        datos_analizados = []
-        
-        for ticker in all_tickers:
-            datos = obtener_datos_yfinance(ticker)
-            if datos:
-                # Realizar el análisis avanzado
-                analisis = clasificar_empresa(datos)
-                datos.update(analisis)
-                datos_analizados.append(datos)
-                print(f"✅ Análisis completado para {datos['NOMBRE_EMPRESA']}.")
-            # time.sleep(random.randint(2, 5)) # Espera aleatoria para evitar saturar la API
-
-        if not datos_analizados:
-            print("No se generaron datos de análisis para ninguna empresa. Abortando reporte.")
+        all_tickers = leer_google_sheets()[1:]
+        if not all_tickers:
+            print("No hay tickers para procesar.")
             return
 
-        # Ordenar por Recomendación (COMPRA, VENTA/CIERRE, MANTENER, NEUTRO)
-        orden_recomendacion = {"COMPRA": 4, "COMPRA (Cautelosa)": 3, "MANTENER": 2, "MANTENER (Espera)": 1, "NEUTRO": 0, "VENTA/CIERRE": -4, "VENTA/CIERRE (Cautelosa)": -3, "ALERTA CIERRE": -2, "COMPRA (ALTO RIESGO)": -1, "VENTA/CIERRE (BAJO RIESGO)": -5, "MANTENER POSICIÓN": 10}
+        datos_completos = []
+        for ticker in all_tickers:
+            print(f"🔎 Analizando {ticker}...")
+            
+            try:
+                data = obtener_datos_yfinance(ticker)
+                if data:
+                    datos_completos.append(clasificar_empresa(data))
+            except Exception as e:
+                print(f"❌ Error al procesar {ticker}: {e}. Saltando a la siguiente empresa...")
+                continue
+                
+            time.sleep(1)
+
+        # --- Lógica de ordenación MODIFICADA para mover "Compra RIESGO" arriba ---
+        def obtener_clave_ordenacion(empresa):
+            categoria = empresa['OPORTUNIDAD']
+            
+            # Se ajustan las prioridades para que "Compra RIESGO" esté en el grupo de compra (valores < 3)
+            # y darle una prioridad interna de 2.5, justo después de las compras fuertes (1 y 2).
+            
+            prioridad = {
+                "Posibilidad de Compra Activada": 1, # Máxima prioridad de compra
+                "Posibilidad de Compra": 2,         # Segunda prioridad de compra
+                "Compra RIESGO": 2.5,               # TERCERA prioridad, pero aún en el grupo de Compra.
+                "VIGILAR": 3,
+                "Riesgo de Venta": 4,
+                "Riesgo de Venta Activada": 5,
+                "Seguirá bajando": 6,
+                "Intermedio": 7,
+            }
+
+            orden_interna = prioridad.get(categoria, 99) # Si no está, al final
+
+            return (orden_interna, empresa['NOMBRE_EMPRESA']) # Se ordena por la clave y luego por nombre
+
+        datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
         
-        # Uso de .get con un valor por defecto bajo (-10) para manejar cualquier nueva recomendación
-        datos_ordenados = sorted(datos_analizados, key=lambda x: orden_recomendacion.get(x["RECOMENDACION"].split('(')[0].strip(), -10), reverse=True)
+        # --- Fin de la lógica de ordenación MODIFICADA ---
+        now_utc = datetime.utcnow()
+        hora_actual = (now_utc + timedelta(hours=2)).strftime('%H:%M')
+        
+        # ******************************************************************************
+        # ******************** MODIFICACIÓN DE LA SECCIÓN HTML *************************
+        # ******************************************************************************
+        html_body = f"""
+        <html>
+        <head>
+            <title>Resumen Diario de Oportunidades - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
+            <style>
+                body {{
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    background-color: #f8f9fa;
+                    margin: 0;
+                    padding: 0; /* Cambio: Eliminamos padding para centrar mejor */
+                    display: flex;
+                    justify-content: center; /* Centrar horizontalmente */
+                    align-items: flex-start; /* Alinear arriba */
+                    min-height: 100vh; /* Ocupar toda la altura de la ventana */
+                }}
+                .main-container {{
+                    max-width: 1200px;
+                    width: 95%; /* Asegurar que ocupe espacio */
+                    margin: 20px auto; /* Cambio: Margen superior para el centrado */
+                    background-color: #ffffff;
+                    padding: 15px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+                }}
+                h2 {{
+                    color: #343a40;
+                    text-align: center;
+                    font-size: 1.5em;
+                    margin-bottom: 30px; /* Aumentar margen */
+                }}
+                p {{
+                    color: #6c757d;
+                    text-align: center;
+                    font-size: 0.9em;
+                }}
+                
+                /* ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
+                #search-container {{
+                    display: flex; /* Para centrar el input */
+                    flex-direction: column;
+                    align-items: center;
+                    margin-bottom: 50px; /* Más espacio */
+                }}
+                #searchInput {{
+                    width: 70%; /* Cambio: Más ancho */
+                    max-width: 600px;
+                    padding: 15px 20px; /* Cambio: Más padding, más grande */
+                    font-size: 1.2em; /* Cambio: Fuente más grande */
+                    border: 1px solid #ced4da;
+                    border-radius: 24px; /* Bordes redondeados */
+                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Sombra para efecto 3D */
+                    box-sizing: border-box;
+                    transition: box-shadow 0.3s ease-in-out;
+                    text-align: center;
+                }}
+                #searchInput:focus {{
+                    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Sombra al enfocar */
+                    outline: none;
+                }}
+                /* FIN DEL ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
+
+                .table-container {{
+                    overflow-x: auto;
+                    overflow-y: auto;
+                    height: 70vh;
+                    position: relative;
+                    /* Cambio: Ocultar la tabla al inicio */
+                    display: none; 
+                }}
+                table {{
+                    width: 100%;
+                    table-layout: fixed;
+                    margin: 10px auto 0 auto;
+                    border-collapse: collapse;
+                    font-size: 0.85em;
+                }}
+                th, td {{
+                    border: 1px solid #e9ecef;
+                    padding: 6px;
+                    text-align: center;
+                    vertical-align: middle;
+                    white-space: normal;
+                    line-height: 1.2;
+                }}
+                th {{
+                    background-color: #e9ecef;
+                    color: #495057;
+                    font-weight: 600;
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                    white-space: nowrap;
+                }}
+                .compra {{ color: #28a745; font-weight: bold; }}
+                .venta {{ color: #dc3545; font-weight: bold; }}
+                .riesgo-compra {{ color: #ffc107; font-weight: bold; }} /* Nuevo estilo para Compra RIESGO */
+                .comprado-si {{ background-color: #28a745; color: white; font-weight: bold; }}
+                .bg-green {{ background-color: #d4edda; color: #155724; }}
+                .bg-red {{ background-color: #f8d7da; color: #721c24; }}
+                .bg-highlight {{ background-color: #28a745; color: white; font-weight: bold; }}
+                .text-center {{ text-align: center; }}
+                .disclaimer {{ font-size: 0.8em; text-align: center; color: #6c757d; margin-top: 15px; }}
+                .small-text {{ font-size: 0.7em; color: #6c757d; }}
+                .green-cell {{ background-color: #d4edda; }}
+                .red-cell {{ background-color: #f8d7da; }}
+                .yellow-cell {{ background-color: #fff3cd; }} /* Nuevo estilo para celda de riesgo */
+                .separator-row td {{ background-color: #e9ecef; height: 3px; padding: 0; border: none; }}
+                .category-header td {{
+                    background-color: #495057;
+                    color: white;
+                    font-size: 1.1em;
+                    font-weight: bold;
+                    text-align: center;
+                    padding: 10px;
+                    border: none;
+                    /* Cambio: Ocultar al inicio */
+                    display: none;
+                }}
+                .observaciones-row td {{
+                    background-color: #f9f9f9;
+                    text-align: left;
+                    font-size: 0.8em;
+                    border: 1px solid #e9ecef;
+                }}
+                .stacked-text {{
+                    line-height: 1.2;
+                    font-size: 0.8em;
+                }}
+                .vigilar {{ color: #ffc107; font-weight: bold; }}
+                
+                .collapsible-row {{
+                    display: none;
+                }}
+                .expand-button {{
+                    cursor: pointer;
+                    color: #007bff;
+                    font-weight: bold;
+                    text-decoration: underline;
+                }}
+                .position-box {{
+                    border: 1px solid #dee2e6;
+                    border-radius: 6px;
+                    padding: 10px;
+                    margin: 5px 0;
+                    text-align: left;
+                    background-color: #ffffff;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="main-container">
+                <h2 class="text-center">Resumen Diario de Oportunidades</h2>
+                
+                <div id="search-container">
+                    <input type="text" id="searchInput" placeholder="Buscar empresa por nombre o ticker (Ej: Inditex, SAN.MC)...">
+                </div>
+                
+                <div id="scroll-top" style="overflow-x: auto; display: none;">
+                    <div style="min-width: 1400px;">&nbsp;</div>
+                </div>
+                
+                <div class="table-container" id="tableContainer">
+                    <table id="myTable">
+                        <thead>
+                            <tr>
+                                <th>Empresa (Precio)</th>
+                                <th>Tendencia Actual</th>
+                                <th>Oportunidad</th>
+                                <th>Compra si...</th>
+                                <th>Vende si...</th>
+                                <th>Análisis detallado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        """
+        
+        if not datos_ordenados:
+            html_body += """
+                            <tr><td colspan="6">No se encontraron empresas con datos válidos hoy.</td></tr>
+            """
+        else:
+            previous_orden_grupo = None
+            for i, data in enumerate(datos_ordenados):
+                
+                current_orden_grupo = obtener_clave_ordenacion(data)[0]
+                
+                # Lógica para determinar el encabezado de categoría
+                es_primera_fila = previous_orden_grupo is None
+                es_cambio_grupo = current_orden_grupo != previous_orden_grupo
+                
+                if es_primera_fila or es_cambio_grupo:
+                    
+                    # MODIFICACIÓN DE LA LÓGICA DE ENCABEZADO
+                    if current_orden_grupo in [1, 2, 2.5]: # Grupo de Compra (incluye Compra RIESGO con 2.5)
+                        if previous_orden_grupo is None or previous_orden_grupo not in [1, 2, 2.5]:
+                            # Se añade la clase 'category-header-compra' para un control más fino en JS
+                            html_body += """
+                                <tr class="category-header category-header-compra"><td colspan="6">OPORTUNIDADES DE COMPRA</td></tr>
+                            """
+                    elif current_orden_grupo in [3, 4, 5]: # Grupo de Venta/Vigilancia
+                        if previous_orden_grupo is None or previous_orden_grupo not in [3, 4, 5]:
+                            # Se añade la clase 'category-header-vigilar'
+                            html_body += """
+                                <tr class="category-header category-header-vigilar"><td colspan="6">ATENTOS A VENDER/VIGILANCIA</td></tr>
+                            """
+                    elif current_orden_grupo in [6, 7]: # Grupo Intermedio
+                        if previous_orden_grupo is None or previous_orden_grupo not in [6, 7]:
+                            # Se añade la clase 'category-header-intermedio'
+                            html_body += """
+                                <tr class="category-header category-header-intermedio"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                            """
+                            
+                    # Poner un separador si no es la primera fila y hay cambio de grupo
+                    if not es_primera_fila and es_cambio_grupo:
+                        html_body += """
+                            <tr class="separator-row"><td colspan="6"></td></tr>
+                        """
+
+                # Lógica de corrección para el enlace
+                nombre_empresa_url = None
+                for nombre, ticker_val in tickers.items():
+                    if ticker_val == data['TICKER']:
+                        nombre_empresa_url = nombre
+                        break
+                
+                if nombre_empresa_url:
+                    empresa_link = f'https://ibexia.es/category/{nombre_empresa_url.lower()}/'
+                else:
+                    empresa_link = '#'
+                
+                nombre_con_precio = f"<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'><div class='stacked-text'><b>{data['NOMBRE_EMPRESA']}</b><br>({formatear_numero(data['PRECIO_ACTUAL'])}€)</div></a>"
+
+                # Ajuste de clases para el estado 'Compra RIESGO' (texto amarillo, celda amarilla)
+                if "compra" in data['OPORTUNIDAD'].lower() and "riesgo" not in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "compra"
+                    celda_empresa_class = "green-cell"
+                elif "venta" in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "venta"
+                    celda_empresa_class = "red-cell"
+                elif "vigilar" in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "vigilar"
+                    celda_empresa_class = ""
+                elif "riesgo" in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "riesgo-compra"
+                    celda_empresa_class = "yellow-cell"
+                else:
+                    clase_oportunidad = ""
+                    celda_empresa_class = ""
+                
+                
+                observaciones = generar_observaciones(data)
+                
+                # --- NUEVA SECCIÓN DE DATOS DE OPERATIVA (DENTRO DEL COLLAPSIBLE) ---
+                
+                # Bloque de la última operación CERRADA (Venta)
+                if data['BENEFICIO_ULTIMA_OP'] != "N/A":
+                    ultima_op_html = f"""
+                        <div class='position-box' style='background-color: #e9ecef;'>
+                            <b>ÚLTIMA OPERACIÓN CERRADA:</b>
+                            <ul>
+                                <li><strong>Compra:</strong> {formatear_numero(data['PRECIO_COMPRA'])}€ ({data['FECHA_COMPRA']})</li>
+                                <li><strong>Venta/Cierre:</strong> {formatear_numero(data['PRECIO_VENTA_CIERRE'])}€ ({data['FECHA_VENTA_CIERRE']})</li>
+                                <li><strong>Beneficio Cerrado:</strong> {formatear_beneficio(data['BENEFICIO_ULTIMA_OP'])} (Base 10.000€)</li>
+                            </ul>
+                        </div>
+                    """
+                else:
+                    ultima_op_html = "<p style='font-size:0.9em; margin-top:5px;'>No se detectó un ciclo completo (Compra->Venta) reciente.</p>"
+
+                # Bloque de Posición ABIERTA (Compra Actual)
+                if data['COMPRADO'] == "SI":
+                    posicion_actual_html = f"""
+                        <div class='position-box' style='border: 2px solid #28a745; background-color: #d4edda;'>
+                            <b>POSICIÓN ACTUAL: COMPRADO (✅)</b>
+                            <ul>
+                                <li><strong>Precio de Entrada:</strong> {formatear_numero(data['PRECIO_COMPRA'])}€ ({data['FECHA_COMPRA']})</li>
+                                <li><strong>Precio Actual:</strong> {formatear_numero(data['PRECIO_ACTUAL'])}€</li>
+                                <li><strong>Beneficio Actual (Simulado):</strong> {formatear_beneficio(data['BENEFICIO_ACTUAL'])} (Base 10.000€)</li>
+                            </ul>
+                        </div>
+                    """
+                else:
+                    posicion_actual_html = """
+                        <div class='position-box' style='border: 2px solid #dc3545; background-color: #f8d7da;'>
+                            <b>POSICIÓN ACTUAL: NO COMPRADO (❌)</b>
+                        </div>
+                    """
+                
+                
+                # --- FILAS DE REPORTE CON OBSERVACIÓN SEMANAL EN DETALLE ---
+                html_body += f"""
+                            <tr class="main-row" data-index="{i}" data-name="{data['NOMBRE_EMPRESA'].upper()}" data-ticker="{data['TICKER'].upper()}">
+                                <td class="{celda_empresa_class}">{nombre_con_precio}</td>
+                                <td>{data['TENDENCIA_ACTUAL']}</td>
+                                <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
+                                <td>{data['COMPRA_SI']}</td>
+                                <td>{data['VENDE_SI']}</td>
+                                <td><span class="expand-button" onclick="toggleDetails({i})">Ver más...</span></td>
+                            </tr>
+                            <tr class="collapsible-row detailed-row-{i}">
+                                <td colspan="6">
+                                    <div style="display:flex; justify-content:space-between; align-items:flex-start; padding: 10px; flex-wrap: wrap;">
+                                        
+                                        <div style="flex-basis: 30%; text-align:left; padding-right: 10px;">
+                                            {posicion_actual_html}
+                                        </div>
+
+                                        <div style="flex-basis: 30%; text-align:left; padding-right: 10px;">
+                                            {ultima_op_html}
+                                        </div>
+                                        
+                                        <div style="flex-basis: 30%; text-align:left; font-size:0.9em;">
+                                            <div class='position-box'>
+                                                <b>EMA/SR</b><br>
+                                                EMA ({data['TIPO_EMA']}): <span style="font-weight:bold;">{formatear_numero(data['VALOR_EMA'])}€</span><br>
+                                                S1/R1: {formatear_numero(data['SOPORTE_1'])}€ / {formatear_numero(data['RESISTENCIA_1'])}€
+                                            </div>
+                                            <div class='position-box' style="margin-top:10px;">
+                                                <b>Análisis Semanal (SMI)</b><br>
+                                                {data['OBSERVACION_SEMANAL']}
+                                            </div>
+                                        </div>
+                                        
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="observaciones-row detailed-row-{i}">
+                                <td colspan="6">{observaciones}</td>
+                            </tr>
+                """
+                previous_orden_grupo = current_orden_grupo
+        
+        html_body += """
+                        </tbody>
+                    </table>
+                </div>
+                
+                <br>
+                <p class="disclaimer"><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. ¡Feliz trading!</p>
+            </div>
+
+            <script>
+                // Se utiliza una variable global o una referencia de cierre para el temporizador
+                let filterTimeout;
+                const tableContainer = document.getElementById("tableContainer");
+                const scrollTop = document.getElementById('scroll-top');
+                const searchInput = document.getElementById("searchInput");
+                const table = document.getElementById("myTable");
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.getElementsByTagName("tr"));
+
+                // Función de filtrado
+                function filterTable() {
+                    clearTimeout(filterTimeout); // Limpiar el temporizador anterior
+                    
+                    filterTimeout = setTimeout(() => {
+                        const filter = searchInput.value.toUpperCase().trim();
+                        const showTable = filter.length > 0;
+                        
+                        // Mostrar u ocultar la tabla y el scroll superior
+                        tableContainer.style.display = showTable ? "block" : "none";
+                        if (scrollTop) {
+                            scrollTop.style.display = showTable ? "block" : "none";
+                        }
+                        
+                        // Si no hay filtro, salimos
+                        if (!showTable) {
+                            // Al no haber filtro, todos los elementos están ocultos por el CSS inicial.
+                            return; 
+                        }
+
+                        let lastCategoryDisplayed = null;
+
+                        for (let i = 0; i < rows.length; i++) {
+                            const row = rows[i];
+                            
+                            // 1. Manejar Separadores
+                            if (row.classList.contains("separator-row")) {
+                                row.style.display = "none";
+                                continue;
+                            }
+
+                            // 2. Manejar Filas de Categoría: inicialmente se ocultan por CSS y se muestran si su grupo tiene filas visibles
+                            if (row.classList.contains("category-header")) {
+                                row.style.display = "none";
+                                continue;
+                            }
+
+                            // 3. Manejar Filas Detalle/Observaciones: se mantienen ocultas
+                            if (row.classList.contains("collapsible-row") || row.classList.contains("observaciones-row")) {
+                                row.style.display = "none";
+                                continue;
+                            }
+                            
+                            // 4. Procesar Filas Principales
+                            if (row.classList.contains("main-row")) {
+                                const name = row.getAttribute('data-name');
+                                const ticker = row.getAttribute('data-ticker');
+                                
+                                const isMatch = (name.indexOf(filter) > -1) || (ticker.indexOf(filter) > -1);
+
+                                if (isMatch) {
+                                    row.style.display = "table-row";
+                                    // Marcar que esta categoría debe mostrarse (se procesará después del loop)
+                                    const currentCategory = row.previousElementSibling;
+                                    
+                                    if (currentCategory && currentCategory.classList.contains("category-header")) {
+                                        lastCategoryDisplayed = currentCategory;
+                                    }
+
+                                } else {
+                                    row.style.display = "none";
+                                }
+                            }
+                        }
+                        
+                        // 5. Segunda pasada para mostrar las cabeceras de categoría si tienen al menos una fila visible
+                        const categoryHeaders = document.querySelectorAll('.category-header');
+                        categoryHeaders.forEach(header => {
+                            let nextSibling = header.nextElementSibling;
+                            let hasVisibleRows = false;
+                            while(nextSibling && !nextSibling.classList.contains('category-header')) {
+                                if (nextSibling.classList.contains('main-row') && nextSibling.style.display !== 'none') {
+                                    hasVisibleRows = true;
+                                    break;
+                                }
+                                nextSibling = nextSibling.nextElementSibling;
+                            }
+                            header.style.display = hasVisibleRows ? "table-row" : "none";
+                        });
+
+                        // 6. Tercera pasada para mostrar los separadores si hay un cambio de categoría visible
+                        const separatorRows = document.querySelectorAll('.separator-row');
+                        separatorRows.forEach(separator => {
+                            const prev = separator.previousElementSibling;
+                            const next = separator.nextElementSibling;
+                            
+                            const prevVisible = prev && prev.style.display === "table-row" && prev.classList.contains("category-header");
+                            const nextVisible = next && next.style.display === "table-row" && next.classList.contains("category-header");
+
+                            // Si el separador está entre dos categorías *visibles* diferentes, lo mostramos.
+                            if (prevVisible && nextVisible) {
+                                separator.style.display = "table-row";
+                            } else {
+                                separator.style.display = "none";
+                            }
+                        });
 
 
-        # Generar el HTML
-        html_body = generar_html(datos_ordenados)
+                    }, 200); // Pequeño retraso para evitar ejecuciones rápidas
+                }
+                
+                // Función de acordeón para las filas individuales
+                function toggleDetails(index) {
+                    // Seleccionar la fila detallada (collapsible) y la fila de observaciones. Ambas usan la clase 'detailed-row-{index}'
+                    var detailedRows = document.querySelectorAll('.detailed-row-' + index);
+                    
+                    detailedRows.forEach(row => {
+                        // El estilo inicial es 'display: none;', se usa 'table-row' para que se muestre correctamente en la tabla.
+                        if (row) {
+                            row.style.display = row.style.display === "table-row" ? "none" : "table-row";
+                        }
+                    });
+                }
+                
+                // Asegurar que el script se ejecute cuando el DOM esté listo
+                document.addEventListener('DOMContentLoaded', function() {
+                    if (searchInput) {
+                        searchInput.addEventListener("keyup", filterTable);
+                        searchInput.focus(); // Enfocar el campo de búsqueda al cargar
+                    }
+                    
+                    // Sincronizar el scroll lateral
+                    if (tableContainer && scrollTop) {
+                        scrollTop.addEventListener('scroll', () => {
+                            tableContainer.scrollLeft = scrollTop.scrollLeft;
+                        });
+                        
+                        tableContainer.addEventListener('scroll', () => {
+                            scrollTop.scrollLeft = tableContainer.scrollLeft;
+                        });
+                    }
+                });
+            </script>
+        </body>
+        </html>
+        """
+        # ******************************************************************************
+        # *************** FIN DE LA MODIFICACIÓN DE LA SECCIÓN HTML ********************
+        # ******************************************************************************
+
         
         asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} oportunidades detectadas hoy {datetime.today().strftime('%d/%m/%Y')}"
+        # CÓDIGO CORREGIDO: Añade el nombre del archivo
         nombre_archivo_base = f"reporte_ibexia_{datetime.today().strftime('%Y%m%d')}"
 
         enviar_email_con_adjunto(html_body, asunto, nombre_archivo_base)
 
     except Exception as e:
+        # Nota: La excepción de Google Sheets por falta de variables de entorno (GOOGLE_APPLICATION_CREDENTIALS) 
+        # sigue activa en leer_google_sheets().
         print(f"❌ Error al ejecutar el script principal: {e}")
 
 if __name__ == '__main__':
