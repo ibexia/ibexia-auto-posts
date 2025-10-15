@@ -856,10 +856,11 @@ def generar_reporte():
             /* NUEVOS ESTILOS PARA LOS BOTONES */
             #button-group {{
                 display: flex;
-                justify-content: center; /* Centrar el grupo de botones */
-                gap: 20px; /* Espacio entre los botones */
-                margin: 90px 0 20px 0; /* AUMENTADO: 40px arriba, 0 a los lados, 20px abajo */
-                flex-wrap: wrap; /* Permitir que los botones se envuelvan en pantallas pequeñas */
+                justify-content: space-around; /* CAMBIO: Aumenta la separación al máximo */
+                gap: 20px;
+                margin: 40px 0 20px 0; /* CAMBIO: Ajuste de margen superior e inferior */
+                flex-wrap: wrap; 
+                padding: 0 20px; /* Añadir padding horizontal para evitar que se peguen a los bordes */
             }}
             .action-button {{
                 text-decoration: none;
@@ -872,13 +873,13 @@ def generar_reporte():
                 background-color: #007bff; /* Azul primario */
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
                 transition: background-color 0.3s ease, box-shadow 0.3s ease;
-                min-width: 150px; /* Asegurar un ancho mínimo para adaptabilidad */
+                min-width: 150px; 
                 text-align: center;
                 cursor: pointer;
                 display: block;
             }}
             .action-button:hover {{
-                background-color: #0056b3; /* Tono más oscuro al pasar el ratón */
+                background-color: #0056b3; 
                 box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
             }}
             .button-item {{
@@ -886,8 +887,8 @@ def generar_reporte():
                 max-width: 250px; /* Limitar el ancho de la columna de botón/descripción */
                 flex-grow: 1;
                 flex-shrink: 1;
-                flex-basis: 30%; /* Para que en desktop quepan 3 por fila */
-                margin-bottom: 10px; /* Espacio debajo de cada grupo botón/descripción */
+                flex-basis: 40%; /* CAMBIO: Asegura que solo quepan dos en una fila y estén más separados */
+                margin-bottom: 10px; 
             }}
             .button-description {{
                 font-size: 0.8em;
@@ -1003,20 +1004,6 @@ def generar_reporte():
                     </div>
                 </div>
                 
-                <div id="button-group">
-                    <div class="button-item">
-                        <a href="https://ibexia.es/operaciones-compraventa-octubre/" class="action-button">MIS INVERSIONES</a>
-                        <div class="button-description">Acceso a todas nuestras operaciones actualizadas a día de hoy</div>
-                    </div>
-                    <div class="button-item">
-                        <a href="https://ibexia.es/category/analisis-acciones/" class="action-button">ANÁLISIS DETALLADOS</a>
-                        <div class="button-description">Los valores que hemos analizado en detalle por fecha</div>
-                    </div>
-                    <div class="button-item">
-                        <a href="enlace 3" class="action-button"> </a>
-                        <div class="button-description"> </div>
-                    </div>
-                </div>
                 <div id="scroll-top" style="overflow-x: auto; display: none;">
                     <div style="min-width: 1400px;">&nbsp;</div>
                 </div>
@@ -1195,6 +1182,16 @@ def generar_reporte():
         html_body += """
                         </tbody>
                     </table>
+                </div>
+                <div id="button-group">
+                    <div class="button-item">
+                        <a href="https://ibexia.es/operaciones-compraventa-octubre/" class="action-button">MIS INVERSIONES</a>
+                        <div class="button-description">Acceso a todas nuestras operaciones actualizadas a día de hoy</div>
+                    </div>
+                    <div class="button-item">
+                        <a href="https://ibexia.es/category/analisis-acciones/" class="action-button">ANÁLISIS DETALLADOS</a>
+                        <div class="button-description">Los valores que hemos analizado en detalle por fecha</div>
+                    </div>
                 </div>
                 
                 <br>
