@@ -604,22 +604,32 @@ def generar_reporte():
         all_tickers = leer_google_sheets()
         
         # Filtra la primera fila que se asume es la cabecera
+        # CORRECCIÓN: El error sugiere que all_tickers contiene los Ticker Symbols (e.g., 'A3M.MC')
         tickers_a_procesar = all_tickers[1:] if all_tickers and len(all_tickers) > 1 else []
         
-        if not tickers_a_procesar:
-            print("No se encontraron tickers en la hoja de Google Sheets. Saliendo.")
-            return
+        # Mapa inverso para obtener el nombre amigable a partir del ticker (para la tabla)
+        reverse_tickers = {v: k for k, v in tickers.items()}
 
         datos_empresas = []
-        for nombre_empresa in tickers_a_procesar:
-            ticker = tickers.get(nombre_empresa)
-            if ticker:
-                datos = obtener_datos_yfinance(ticker)
+        # Cambiamos la variable de 'nombre_empresa' a 'ticker_symbol' ya que la hoja devuelve símbolos
+        for ticker_symbol in tickers_a_procesar: 
+            
+            ticker_yfinance = ticker_symbol
+            
+            # Determinamos el nombre amigable de la empresa a partir del ticker
+            nombre_display = reverse_tickers.get(ticker_symbol, ticker_symbol) # Usa el símbolo si no encuentra el nombre
+
+            if ticker_yfinance:
+                datos = obtener_datos_yfinance(ticker_yfinance)
                 if datos:
+                    # Sobreescribimos el nombre de la empresa si YFinance devuelve el ticker en lugar del longName
+                    if datos.get('NOMBRE_EMPRESA') == datos.get('TICKER') and nombre_display != datos.get('TICKER'):
+                        datos['NOMBRE_EMPRESA'] = nombre_display
+                        
                     datos = clasificar_empresa(datos)
                     datos_empresas.append(datos)
             else:
-                print(f"⚠️ Advertencia: No se encontró el ticker para {nombre_empresa}. Saltando...")
+                print(f"⚠️ Advertencia: El ticker {ticker_symbol} es inválido. Saltando...")
 
         # Ordenar por prioridad
         datos_ordenados = sorted(datos_empresas, key=lambda x: x['ORDEN_PRIORIDAD'])
