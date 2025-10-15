@@ -683,8 +683,9 @@ def generar_reporte():
         now_utc = datetime.utcnow()
         hora_actual = (now_utc + timedelta(hours=2)).strftime('%H:%M')
         
-        # ATENCIÓN: No se modifica la estructura de la tabla HTML para mantener el formato original.
-        # Las nuevas advertencias se integran en la columna 'Oportunidad' y en el detalle de 'Observaciones'.
+        # ******************************************************************************
+        # ******************** MODIFICACIÓN DE LA SECCIÓN HTML *************************
+        # ******************************************************************************
         html_body = f"""
         <html>
         <head>
@@ -694,11 +695,16 @@ def generar_reporte():
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                     background-color: #f8f9fa;
                     margin: 0;
-                    padding: 10px;
+                    padding: 0; /* Cambio: Eliminamos padding para centrar mejor */
+                    display: flex;
+                    justify-content: center; /* Centrar horizontalmente */
+                    align-items: flex-start; /* Alinear arriba */
+                    min-height: 100vh; /* Ocupar toda la altura de la ventana */
                 }}
                 .main-container {{
                     max-width: 1200px;
-                    margin: 0 auto;
+                    width: 95%; /* Asegurar que ocupe espacio */
+                    margin: 20px auto; /* Cambio: Margen superior para el centrado */
                     background-color: #ffffff;
                     padding: 15px;
                     border-radius: 8px;
@@ -708,29 +714,46 @@ def generar_reporte():
                     color: #343a40;
                     text-align: center;
                     font-size: 1.5em;
-                    margin-bottom: 10px;
+                    margin-bottom: 30px; /* Aumentar margen */
                 }}
                 p {{
                     color: #6c757d;
                     text-align: center;
                     font-size: 0.9em;
                 }}
+                
+                /* ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
                 #search-container {{
-                    margin-bottom: 15px;
+                    display: flex; /* Para centrar el input */
+                    flex-direction: column;
+                    align-items: center;
+                    margin-bottom: 50px; /* Más espacio */
                 }}
                 #searchInput {{
-                    width: 100%;
-                    padding: 8px;
-                    font-size: 0.9em;
+                    width: 70%; /* Cambio: Más ancho */
+                    max-width: 600px;
+                    padding: 15px 20px; /* Cambio: Más padding, más grande */
+                    font-size: 1.2em; /* Cambio: Fuente más grande */
                     border: 1px solid #ced4da;
-                    border-radius: 4px;
+                    border-radius: 24px; /* Bordes redondeados */
+                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Sombra para efecto 3D */
                     box-sizing: border-box;
+                    transition: box-shadow 0.3s ease-in-out;
+                    text-align: center;
                 }}
+                #searchInput:focus {{
+                    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Sombra al enfocar */
+                    outline: none;
+                }}
+                /* FIN DEL ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
+
                 .table-container {{
                     overflow-x: auto;
                     overflow-y: auto;
                     height: 70vh;
                     position: relative;
+                    /* Cambio: Ocultar la tabla al inicio */
+                    display: none; 
                 }}
                 table {{
                     width: 100%;
@@ -778,6 +801,8 @@ def generar_reporte():
                     text-align: center;
                     padding: 10px;
                     border: none;
+                    /* Cambio: Ocultar al inicio */
+                    display: none;
                 }}
                 .observaciones-row td {{
                     background-color: #f9f9f9;
@@ -804,17 +829,17 @@ def generar_reporte():
         </head>
         <body>
             <div class="main-container">
-                <h2 class="text-center">Resumen Diario de Oportunidades ordenadas por prioridad - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</h2>
+                <h2 class="text-center">Resumen Diario de Oportunidades</h2>
                 
                 <div id="search-container">
-                    <input type="text" id="searchInput" placeholder="Buscar por nombre de empresa...">
+                    <input type="text" id="searchInput" placeholder="Buscar empresa por nombre o ticker (Ej: Inditex, SAN.MC)...">
                 </div>
                 
-                <div id="scroll-top" style="overflow-x: auto;">
+                <div id="scroll-top" style="overflow-x: auto; display: none;">
                     <div style="min-width: 1400px;">&nbsp;</div>
                 </div>
                 
-                <div class="table-container">
+                <div class="table-container" id="tableContainer">
                     <table id="myTable">
                         <thead>
                             <tr>
@@ -848,18 +873,21 @@ def generar_reporte():
                     # MODIFICACIÓN DE LA LÓGICA DE ENCABEZADO
                     if current_orden_grupo in [1, 2, 2.5]: # Grupo de Compra (incluye Compra RIESGO con 2.5)
                         if previous_orden_grupo is None or previous_orden_grupo not in [1, 2, 2.5]:
+                            # Se añade la clase 'category-header-compra' para un control más fino en JS
                             html_body += """
-                                <tr class="category-header"><td colspan="6">OPORTUNIDADES DE COMPRA</td></tr>
+                                <tr class="category-header category-header-compra"><td colspan="6">OPORTUNIDADES DE COMPRA</td></tr>
                             """
                     elif current_orden_grupo in [3, 4, 5]: # Grupo de Venta/Vigilancia
                         if previous_orden_grupo is None or previous_orden_grupo not in [3, 4, 5]:
+                            # Se añade la clase 'category-header-vigilar'
                             html_body += """
-                                <tr class="category-header"><td colspan="6">ATENTOS A VENDER/VIGILANCIA</td></tr>
+                                <tr class="category-header category-header-vigilar"><td colspan="6">ATENTOS A VENDER/VIGILANCIA</td></tr>
                             """
                     elif current_orden_grupo in [6, 7]: # Grupo Intermedio
                         if previous_orden_grupo is None or previous_orden_grupo not in [6, 7]:
+                            # Se añade la clase 'category-header-intermedio'
                             html_body += """
-                                <tr class="category-header"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
+                                <tr class="category-header category-header-intermedio"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                             """
                             
                     # Poner un separador si no es la primera fila y hay cambio de grupo
@@ -904,7 +932,7 @@ def generar_reporte():
                 
                 # --- FILAS DE REPORTE CON OBSERVACIÓN SEMANAL EN DETALLE ---
                 html_body += f"""
-                            <tr class="main-row" data-index="{i}">
+                            <tr class="main-row" data-index="{i}" data-name="{data['NOMBRE_EMPRESA'].upper()}" data-ticker="{data['TICKER'].upper()}">
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
                                 <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
@@ -937,7 +965,7 @@ def generar_reporte():
                                     </div>
                                 </td>
                             </tr>
-                            <tr class="observaciones-row">
+                            <tr class="observaciones-row detailed-row-{i}">
                                 <td colspan="6">{observaciones}</td>
                             </tr>
                 """
@@ -953,72 +981,136 @@ def generar_reporte():
             </div>
 
             <script>
+                // Se utiliza una variable global o una referencia de cierre para el temporizador
+                let filterTimeout;
+                const tableContainer = document.getElementById("tableContainer");
+                const scrollTop = document.getElementById('scroll-top');
+                const searchInput = document.getElementById("searchInput");
+                const table = document.getElementById("myTable");
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.getElementsByTagName("tr"));
+
                 // Función de filtrado
                 function filterTable() {
-                    var input, filter, table, tr, i, txtValue;
-                    input = document.getElementById("searchInput");
-                    filter = input.value.toUpperCase();
-                    table = document.getElementById("myTable");
-                    var tbody = table.querySelector('tbody');
-                    tr = tbody.getElementsByTagName("tr");
-
-                    for (i = 0; i < tr.length; i++) {
-                        if (tr[i].classList.contains("separator-row") || tr[i].classList.contains("category-header")) {
-                            continue;
+                    clearTimeout(filterTimeout); // Limpiar el temporizador anterior
+                    
+                    filterTimeout = setTimeout(() => {
+                        const filter = searchInput.value.toUpperCase().trim();
+                        const showTable = filter.length > 0;
+                        
+                        // Mostrar u ocultar la tabla y el scroll superior
+                        tableContainer.style.display = showTable ? "block" : "none";
+                        if (scrollTop) {
+                            scrollTop.style.display = showTable ? "block" : "none";
+                        }
+                        
+                        // Si no hay filtro, salimos
+                        if (!showTable) {
+                            // Al no haber filtro, todos los elementos están ocultos por el CSS inicial.
+                            return; 
                         }
 
-                        // Get the company name cell from the main row
-                        if (tr[i].classList.contains("main-row")) {
-                            var companyCell = tr[i].getElementsByTagName("td")[0];
-                            var observationsRow = tr[i + 2];
-                            var detailedRow = tr[i + 1];
+                        let lastCategoryDisplayed = null;
 
-                            if (companyCell) {
-                                txtValue = companyCell.textContent || companyCell.innerText;
-                                if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                                    tr[i].style.display = "";
-                                    if (observationsRow) {
-                                        observationsRow.style.display = "";
+                        for (let i = 0; i < rows.length; i++) {
+                            const row = rows[i];
+                            
+                            // 1. Manejar Separadores
+                            if (row.classList.contains("separator-row")) {
+                                row.style.display = "none";
+                                continue;
+                            }
+
+                            // 2. Manejar Filas de Categoría: inicialmente se ocultan por CSS y se muestran si su grupo tiene filas visibles
+                            if (row.classList.contains("category-header")) {
+                                row.style.display = "none";
+                                continue;
+                            }
+
+                            // 3. Manejar Filas Detalle/Observaciones: se mantienen ocultas
+                            if (row.classList.contains("collapsible-row") || row.classList.contains("observaciones-row")) {
+                                row.style.display = "none";
+                                continue;
+                            }
+                            
+                            // 4. Procesar Filas Principales
+                            if (row.classList.contains("main-row")) {
+                                const name = row.getAttribute('data-name');
+                                const ticker = row.getAttribute('data-ticker');
+                                
+                                const isMatch = (name.indexOf(filter) > -1) || (ticker.indexOf(filter) > -1);
+
+                                if (isMatch) {
+                                    row.style.display = "table-row";
+                                    // Marcar que esta categoría debe mostrarse (se procesará después del loop)
+                                    const currentCategory = row.previousElementSibling;
+                                    
+                                    if (currentCategory && currentCategory.classList.contains("category-header")) {
+                                        lastCategoryDisplayed = currentCategory;
                                     }
-                                    if (detailedRow) {
-                                        // Ensure detailed row is hidden by default after filter
-                                        detailedRow.style.display = 'none';
-                                    }
+
                                 } else {
-                                    tr[i].style.display = "none";
-                                    if (observationsRow) {
-                                        observationsRow.style.display = "none";
-                                    }
-                                    if (detailedRow) {
-                                        detailedRow.style.display = "none";
-                                    }
+                                    row.style.display = "none";
                                 }
                             }
-                        } else if (tr[i].classList.contains("collapsible-row") || tr[i].classList.contains("observaciones-row")) {
-                            // Hide these rows by default until the parent is shown
-                            tr[i].style.display = "none";
                         }
-                    }
+                        
+                        // 5. Segunda pasada para mostrar las cabeceras de categoría si tienen al menos una fila visible
+                        const categoryHeaders = document.querySelectorAll('.category-header');
+                        categoryHeaders.forEach(header => {
+                            let nextSibling = header.nextElementSibling;
+                            let hasVisibleRows = false;
+                            while(nextSibling && !nextSibling.classList.contains('category-header')) {
+                                if (nextSibling.classList.contains('main-row') && nextSibling.style.display !== 'none') {
+                                    hasVisibleRows = true;
+                                    break;
+                                }
+                                nextSibling = nextSibling.nextElementSibling;
+                            }
+                            header.style.display = hasVisibleRows ? "table-row" : "none";
+                        });
+
+                        // 6. Tercera pasada para mostrar los separadores si hay un cambio de categoría visible
+                        const separatorRows = document.querySelectorAll('.separator-row');
+                        separatorRows.forEach(separator => {
+                            const prev = separator.previousElementSibling;
+                            const next = separator.nextElementSibling;
+                            
+                            const prevVisible = prev && prev.style.display === "table-row" && prev.classList.contains("category-header");
+                            const nextVisible = next && next.style.display === "table-row" && next.classList.contains("category-header");
+
+                            // Si el separador está entre dos categorías *visibles* diferentes, lo mostramos.
+                            if (prevVisible && nextVisible) {
+                                separator.style.display = "table-row";
+                            } else {
+                                separator.style.display = "none";
+                            }
+                        });
+
+
+                    }, 200); // Pequeño retraso para evitar ejecuciones rápidas
                 }
                 
                 // Función de acordeón para las filas individuales
                 function toggleDetails(index) {
-                    var detailedRow = document.querySelector('.detailed-row-' + index);
-                    if (detailedRow) {
-                        detailedRow.style.display = detailedRow.style.display === "table-row" ? "none" : "table-row";
-                    }
+                    // Seleccionar la fila detallada (collapsible) y la fila de observaciones. Ambas usan la clase 'detailed-row-{index}'
+                    var detailedRows = document.querySelectorAll('.detailed-row-' + index);
+                    
+                    detailedRows.forEach(row => {
+                        if (row) {
+                            row.style.display = row.style.display === "table-row" ? "none" : "table-row";
+                        }
+                    });
                 }
                 
                 // Asegurar que el script se ejecute cuando el DOM esté listo
                 document.addEventListener('DOMContentLoaded', function() {
-                    const searchInput = document.getElementById("searchInput");
                     if (searchInput) {
                         searchInput.addEventListener("keyup", filterTable);
+                        searchInput.focus(); // Enfocar el campo de búsqueda al cargar
                     }
-
-                    const tableContainer = document.querySelector('.table-container');
-                    const scrollTop = document.getElementById('scroll-top');
                     
+                    // Sincronizar el scroll lateral
                     if (tableContainer && scrollTop) {
                         scrollTop.addEventListener('scroll', () => {
                             tableContainer.scrollLeft = scrollTop.scrollLeft;
@@ -1033,6 +1125,9 @@ def generar_reporte():
         </body>
         </html>
         """
+        # ******************************************************************************
+        # *************** FIN DE LA MODIFICACIÓN DE LA SECCIÓN HTML ********************
+        # ******************************************************************************
 
         
         asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} oportunidades detectadas hoy {datetime.today().strftime('%d/%m/%Y')}"
