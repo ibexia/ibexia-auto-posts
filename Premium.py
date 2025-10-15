@@ -17,19 +17,6 @@ from email.mime.base import MIMEBase
 from email import encoders
 import pandas_ta as ta
 
-# ******************************************************************************
-# *************** FUNCIONES DE LECTURA Y UTILIDADES (MODIFICADAS) **************
-# ******************************************************************************
-
-# NUEVA FUNCIÓN AÑADIDA PARA GARANTIZAR LA SERIALIZACIÓN A JSON/NULL
-def safe_json_dump(data_list):
-    """
-    Serializa una lista de Python a una cadena JSON, asegurando que los valores None
-    se conviertan a la palabra clave 'null' de JavaScript.
-    """
-    return json.dumps([val if val is not None else None for val in data_list])
-
-
 tickers = {
     'Acciona': 'ANA.MC',
     'A3Media': 'A3M.MC',
@@ -127,8 +114,7 @@ def leer_google_sheets():
     if not spreadsheet_id:
         raise Exception("No se encontró la variable de entorno SPREADSHEET_ID")
 
-    # Se mantiene la lectura solo de la columna A, como estaba en Premium.py y se asume es para obtener los tickers
-    range_name = 'A:A' 
+    range_name = 'A:A'
     service = build('sheets', 'v4', credentials=creds)
     sheet = service.spreadsheets()
     result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
@@ -142,21 +128,12 @@ def leer_google_sheets():
             print(row)
     return [row[0] for row in values if row]
 
-# FUNCIÓN MODIFICADA: Ahora maneja formato español y notación de miles (K, M, B)
 def formatear_numero(numero):
-    if pd.isna(numero) or numero == "N/A" or numero is None:
+    if pd.isna(numero) or numero is None:
         return "N/A"
     try:
         num = float(numero)
-        # Formato español (reemplazando . por , y , por . para miles)
-        if abs(num) >= 1_000_000_000:
-            return f"{num / 1_000_000_000:,.3f}B".replace(",", "X").replace(".", ",").replace("X", ".")
-        elif abs(num) >= 1_000_000:
-            return f"{num / 1_000_000:,.3f}M".replace(",", "X").replace(".", ",").replace("X", ".")
-        elif abs(num) >= 1_000:
-            return f"{num / 1_000:,.3f}K".replace(",", "X").replace(".", ",").replace("X", ".")
-        else:
-            return f"{num:,.3f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"{num:,.3f}"
     except (ValueError, TypeError):
         return "N/A"
         
@@ -185,6 +162,44 @@ def calculate_smi_tv(df):
     smi_signal = smi_smoothed.ewm(span=ema_signal_len, adjust=False).mean()
     df['SMI'] = smi_smoothed
     return df
+
+# ******************************************************************************
+# ************** INICIO DE LA LÓGICA DE SIMULACIÓN (DE leer_google_sheets.py) **
+# ******************************************************************************
+def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
+    compras = []
+    ventas = []
+    posicion_abierta = False
+    
+    # Calcular la pendiente del SMI para cada punto
+    pendientes_smi = [0] * len(smis)
+    for i in range(1, len(smis)):
+        pendientes_smi[i] = smis[i] - smis[i-1]
+
+    # Iterar sobre los datos históricos para encontrar señales
+    for i in range(2, len(smis)):
+        # Señal de compra: la pendiente del SMI cambia de negativa a positiva y no está en sobrecompra
+        if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0:
+            if not posicion_abierta:
+                # Condición de sobrecompra (SMI < 40)
+                if smis[i-1] < 40: 
+                    posicion_abierta = True
+                    # El precio de la compra se registra al cierre del día anterior (i-1)
+                    precio_compra_actual = precios[i-1] 
+                    compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
+                
+        # Señal de venta: la pendiente del SMI cambia de positiva a negativa
+        elif i >= 1 and pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0:
+            if posicion_abierta:
+                posicion_abierta = False
+                # La venta se registra al cierre del día anterior (i-1)
+                precio_venta_actual = precios[i-1]
+                ventas.append({'fecha': fechas[i-1], 'precio': precio_venta_actual}) 
+                
+    return compras, ventas
+# ******************************************************************************
+# *************** FIN DE LA LÓGICA DE SIMULACIÓN *******************************
+# ******************************************************************************
 
 def calcular_precio_aplanamiento(df):
     try:
@@ -254,49 +269,22 @@ def calcular_soporte_resistencia(df, window=5):
         
     except Exception as e:
         print(f"❌ Error al calcular soportes y resistencias: {e}")
-        return {'s1': 'N/A', 's2': 'N/A', 'r1': 'N/A', 'r2': 'N/A'}
+        return {'s1': 'N/A', 's2': 'N/A', 'r1': 'N/A', 'r2': 'r2'}
         
-# FUNCIÓN AÑADIDA: Lógica de simulación para calcular operaciones y beneficio
-def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
-    """
-    Simula las operaciones de compra y venta basadas en señales SMI y calcula el beneficio.
-    Retorna los resultados para generar el HTML de detalle.
-    """
-    compras = []
-    ventas = []
-    posicion_abierta = False
-    precio_compra_actual = 0
-    
-    pendientes_smi = [0] * len(smis)
-    for i in range(1, len(smis)):
-        pendientes_smi[i] = smis[i] - smis[i-1]
+def calcular_beneficio_perdida(precio_compra, precio_actual, inversion=10000):
+    # Función existente, se mantiene para la columna principal si es necesaria
+    try:
+        precio_compra = float(precio_compra)
+        precio_actual = float(precio_actual)
+        
+        if precio_compra <= 0 or precio_actual <= 0:
+            return "N/A"
 
-    # Iterar sobre los datos históricos para encontrar señales
-    for i in range(2, len(smis)):
-        # Señal de compra: la pendiente del SMI cambia de negativa a positiva y no está en sobrecompra
-        if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0:
-            if not posicion_abierta:
-                # Condición de sobrecompra (SMI < 40) para evitar compras tardías
-                if smis[i-1] < 40: 
-                    posicion_abierta = True
-                    # Se compra al precio de CIERRE del día anterior a la señal
-                    precio_compra_actual = precios[i-1]
-                    compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
-            # else: Ya hay posición abierta, no hace nada
-
-        # Señal de venta: la pendiente del SMI cambia de positiva a negativa
-        elif i >= 1 and pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0:
-            if posicion_abierta:
-                posicion_abierta = False
-                # Se vende al precio de CIERRE del día anterior a la señal
-                ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
-            # else: No hay posición abierta, no hace nada
-
-    return compras, ventas # Retornamos las listas de operaciones
-
-# ******************************************************************************
-# *************** FUNCIÓN PRINCIPAL DE OBTENCIÓN DE DATOS (MODIFICADA) *********
-# ******************************************************************************
+        acciones = inversion / precio_compra
+        beneficio_perdida = (precio_actual - precio_compra) * acciones
+        return f"{beneficio_perdida:,.2f}"
+    except (ValueError, TypeError):
+        return "N/A"
 
 def obtener_datos_yfinance(ticker):
     try:
@@ -308,9 +296,8 @@ def obtener_datos_yfinance(ticker):
             print(f"⚠️ Advertencia: No se encontró precio actual para {ticker}. Saltando...")
             return None
 
-        # --- Datos Diarios ---
-        # 150d de historia para la simulación
-        hist_extended = stock.history(period="150d", interval="1d") 
+        # --- Datos Diarios: Periodo extendido para una mejor simulación ---
+        hist_extended = stock.history(period="1y", interval="1d") # Cambiado de 150d a 1y
         hist_extended['EMA_100'] = ta.ema(hist_extended['Close'], length=100)
                 
         precio_actual = hist_extended['Close'].iloc[-1]
@@ -326,7 +313,34 @@ def obtener_datos_yfinance(ticker):
         if hist_extended.empty:
             print(f"⚠️ Advertencia: No se encontraron datos históricos para {ticker}. Saltando...")
             return None
-        hist_extended = calculate_smi_tv(hist_extended)
+            
+        hist_extended = calculate_smi_tv(hist_extended) # Calcula SMI
+
+        # ******************************************************************************
+        # ************** CÁLCULO DE OPERACIONES SIMULADAS Y ESTADO ACTUAL **************
+        # ******************************************************************************
+        # Limpiar NaNs para la simulación
+        combined_df = hist_extended[['Close', 'SMI']].dropna()
+        precios_sim = combined_df['Close'].tolist()
+        smis_sim = combined_df['SMI'].tolist()
+        fechas_sim = combined_df.index.strftime('%d/%m/%Y').tolist()
+        
+        compras_sim, ventas_sim = calcular_ganancias_simuladas(precios_sim, smis_sim, fechas_sim)
+        
+        comprado_status = "NO"
+        precio_compra = "N/A"
+        fecha_compra = "N/A"
+        
+        # Determinar el estado actual (SI/NO COMPRADO)
+        if len(compras_sim) > len(ventas_sim):
+            comprado_status = "SI"
+            # La última compra es la posición abierta
+            ultima_compra = compras_sim[-1]
+            precio_compra = ultima_compra['precio']
+            fecha_compra = ultima_compra['fecha']
+        # ******************************************************************************
+        # ************ FIN CÁLCULO DE OPERACIONES SIMULADAS Y ESTADO ACTUAL ************
+        # ******************************************************************************
         
         sr_levels = calcular_soporte_resistencia(hist_extended)
 
@@ -345,81 +359,13 @@ def obtener_datos_yfinance(ticker):
         estado_smi = "Sobrecompra" if smi_today > 40 else ("Sobreventa" if smi_today < -40 else "Intermedio")
         
         precio_aplanamiento = calcular_precio_aplanamiento(hist_extended)
-
-        # ******************************************************************
-        # *********** NUEVA LÓGICA DE SIMULACIÓN Y ESTATUS *****************
-        # ******************************************************************
-        CAPITAL_INVERSION = 10000
         
-        # Preparamos los datos para la simulación
-        # Aseguramos que los arrays estén limpios de NaN antes de pasar a la simulación
-        df_simulacion = hist_extended[['Close', 'SMI']].dropna()
-        
-        precios = df_simulacion['Close'].values.tolist()
-        smis = df_simulacion['SMI'].values.tolist()
-        fechas = df_simulacion.index.strftime('%d/%m/%Y').tolist()
-        
-        compras, ventas = calcular_ganancias_simuladas(precios, smis, fechas, CAPITAL_INVERSION)
-
-        # 1. Determinar el estado 'COMPRADO' actual
-        posicion_abierta = len(compras) > len(ventas)
-        comprado_status = "SI" if posicion_abierta else "NO"
-        
-        # 2. Obtener los datos de la última compra
-        if compras:
-            precio_compra = compras[-1]['precio']
-            fecha_compra = compras[-1]['fecha']
-        else:
-            precio_compra = "N/A"
-            fecha_compra = "N/A"
-
-        # 3. Crear la lista de operaciones detalladas (para el HTML de "ver más")
-        operaciones_detalladas = []
-        num_operaciones_completadas = min(len(compras), len(ventas))
-        
-        # Operaciones cerradas
-        for i in range(num_operaciones_completadas):
-            compra = compras[i]
-            venta = ventas[i]
-            num_acciones_op = CAPITAL_INVERSION / compra['precio']
-            beneficio = (venta['precio'] - compra['precio']) * num_acciones_op
-            
-            operaciones_detalladas.append({
-                'TIPO': 'CERRADA',
-                'FECHA_ENTRADA': compra['fecha'],
-                'PRECIO_ENTRADA': compra['precio'],
-                'FECHA_SALIDA': venta['fecha'],
-                'PRECIO_SALIDA': venta['precio'],
-                'BENEFICIO': beneficio,
-                'GANANCIA': "SI" if beneficio >= 0 else "NO"
-            })
-
-        # Operación abierta
-        if posicion_abierta:
-            compra_abierta = compras[-1]
-            # Usamos el precio actual para calcular el beneficio de la operación abierta
-            num_acciones_op = CAPITAL_INVERSION / compra_abierta['precio']
-            beneficio_actual = (current_price - compra_abierta['precio']) * num_acciones_op
-            
-            operaciones_detalladas.append({
-                'TIPO': 'ABIERTA',
-                'FECHA_ENTRADA': compra_abierta['fecha'],
-                'PRECIO_ENTRADA': compra_abierta['precio'],
-                'FECHA_SALIDA': 'N/A', # Operación no cerrada
-                'PRECIO_SALIDA': current_price, # Precio actual para cálculo de beneficio
-                'BENEFICIO': beneficio_actual,
-                'GANANCIA': "SI" if beneficio_actual >= 0 else "NO"
-            })
-        
-        # ******************************************************************
-        # *********** FIN NUEVA LÓGICA DE SIMULACIÓN Y ESTATUS *************
-        # ******************************************************************
-
-        # --- Cálculo de SMI Semanal (Mantenido) ---
+        # --- Modificación: Cálculo de SMI Semanal ---
         hist_weekly = stock.history(period="3y", interval="1wk")
         if hist_weekly.empty:
             smi_weekly = 'N/A'
             estado_smi_weekly = 'N/A'
+            # Nuevo campo para el texto de la observación semanal
             observacion_semanal = "No hay datos semanales suficientes."
         else:
             hist_weekly = calculate_smi_tv(hist_weekly)
@@ -429,6 +375,7 @@ def obtener_datos_yfinance(ticker):
             if isinstance(smi_weekly, (int, float)):
                 estado_smi_weekly = "Sobrecompra" if smi_weekly > 40 else ("Sobreventa" if smi_weekly < -40 else "Intermedio")
                 
+                # Generar el texto de la observación semanal
                 if estado_smi_weekly == "Sobrecompra":
                     observacion_semanal = f"El **SMI Semanal** ({formatear_numero(smi_weekly)}) está en zona de **Sobrecompra**. Sugiere que el precio ya ha subido mucho a largo plazo."
                 elif estado_smi_weekly == "Sobreventa":
@@ -451,9 +398,9 @@ def obtener_datos_yfinance(ticker):
             "ESTADO_SMI": estado_smi,
             "PRECIO_APLANAMIENTO": precio_aplanamiento,
             "PENDIENTE": pendiente_hoy,
-            "COMPRADO": comprado_status, # MODIFICADO: Ahora de la simulación
-            "PRECIO_COMPRA": precio_compra, # MODIFICADO: Ahora de la simulación
-            "FECHA_COMPRA": fecha_compra, # MODIFICADO: Ahora de la simulación
+            "COMPRADO": comprado_status, # Valor actualizado
+            "PRECIO_COMPRA": precio_compra, # Valor actualizado
+            "FECHA_COMPRA": fecha_compra, # Valor actualizado
             "HIST_DF": hist_extended,
             "SOPORTE_1": sr_levels['s1'],
             "SOPORTE_2": sr_levels['s2'],
@@ -461,18 +408,20 @@ def obtener_datos_yfinance(ticker):
             "TIPO_EMA": tipo_ema,
             "VALOR_EMA": ema_actual,
             "RESISTENCIA_2": sr_levels['r2'],
+            # --- Nuevos Campos Semanales ---
             "SMI_SEMANAL": smi_weekly,
             "ESTADO_SMI_SEMANAL": estado_smi_weekly,
-            "ADVERTENCIA_SEMANAL": "NO",
-            "OBSERVACION_SEMANAL": observacion_semanal,
-            "DETALLE_OPERACIONES": operaciones_detalladas, # NUEVO CAMPO
+            "ADVERTENCIA_SEMANAL": "NO", # Se inicializa y se modifica en clasificar_empresa
+            "OBSERVACION_SEMANAL": observacion_semanal, # Nuevo campo con el texto de la observación semanal
+            # --- Nuevos Campos para el Desplegable de Operaciones ---
+            "SIM_COMPRAS": compras_sim,
+            "SIM_VENTAS": ventas_sim,
         }
     except Exception as e:
         print(f"❌ Error al obtener datos de {ticker}: {e}. Saltando a la siguiente empresa...")
         return None
 
 def clasificar_empresa(data):
-    # ... (Se mantiene la lógica original de clasificación sin cambios) ...
     estado_smi = data['ESTADO_SMI']
     tendencia = data['TENDENCIA_ACTUAL']
     precio_aplanamiento = data['PRECIO_APLANAMIENTO']
@@ -485,10 +434,10 @@ def clasificar_empresa(data):
     low_today = hist_df['Low'].iloc[-1]
     pendiente_smi_hoy = data['PENDIENTE']
     pendiente_smi_ayer = hist_df['SMI'].diff().iloc[-2] if len(hist_df['SMI']) > 1 else 'N/A'
-
+    
     # --- Nuevo: Variables Semanales ---
     estado_smi_weekly = data['ESTADO_SMI_SEMANAL']
-
+    
     prioridad = {
         "Posibilidad de Compra Activada": 1,
         "Posibilidad de Compra": 2,
@@ -499,7 +448,7 @@ def clasificar_empresa(data):
         "Intermedio": 7,
         "Compra RIESGO": 8 # Esta prioridad se anula con la clave de ordenación en generar_reporte, pero se mantiene aquí por consistencia.
     }
-
+    
     if estado_smi == "Sobreventa":
         if tendencia == "Subiendo":
             # --- Lógica de Filtro Semanal ---
@@ -509,510 +458,362 @@ def clasificar_empresa(data):
                 data['VENDE_SI'] = "NO VENDER"
                 data['ORDEN_PRIORIDAD'] = prioridad["Compra RIESGO"]
                 data['ADVERTENCIA_SEMANAL'] = "SI"
-            else:
+
+            elif estado_smi_weekly == "Sobreventa" or estado_smi_weekly == "Intermedio":
                 data['OPORTUNIDAD'] = "Posibilidad de Compra Activada"
-                data['COMPRA_SI'] = "SI COMPRAR"
+                data['COMPRA_SI'] = f"COMPRAR A PRECIO DE {formatear_numero(precio_aplanamiento)}€"
                 data['VENDE_SI'] = "NO VENDER"
                 data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra Activada"]
-
-        elif tendencia == "Plano":
+                
+            else: # N/A
+                data['OPORTUNIDAD'] = "Posibilidad de Compra"
+                data['COMPRA_SI'] = f"COMPRAR A PRECIO DE {formatear_numero(precio_aplanamiento)}€"
+                data['VENDE_SI'] = "NO VENDER"
+                data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
+                
+        else: # Bajando o Plano
             data['OPORTUNIDAD'] = "Posibilidad de Compra"
-            data['COMPRA_SI'] = "NO RECOMENDAMOS" # Esperar confirmación
+            data['COMPRA_SI'] = f"COMPRAR A PRECIO DE {formatear_numero(precio_aplanamiento)}€"
             data['VENDE_SI'] = "NO VENDER"
             data['ORDEN_PRIORIDAD'] = prioridad["Posibilidad de Compra"]
-
-        elif tendencia == "Bajando":
-            data['OPORTUNIDAD'] = "Seguirá bajando"
-            data['COMPRA_SI'] = "NO COMPRAR"
-            data['VENDE_SI'] = "NO VENDER"
-            data['ORDEN_PRIORIDAD'] = prioridad["Seguirá bajando"]
-
+            
     elif estado_smi == "Sobrecompra":
         if tendencia == "Bajando":
             data['OPORTUNIDAD'] = "Riesgo de Venta Activada"
+            # Nuevo criterio de Venta: si el precio de aplanamiento es menor al de ayer
+            if isinstance(precio_aplanamiento, (int, float)) and precio_aplanamiento < current_price:
+                data['VENDE_SI'] = f"VENDER A PRECIO DE {formatear_numero(precio_aplanamiento)}€"
+            else:
+                data['VENDE_SI'] = f"VENDER INMEDIATAMENTE"
             data['COMPRA_SI'] = "NO COMPRAR"
-            data['VENDE_SI'] = "SI VENDER"
             data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta Activada"]
-
-        elif tendencia == "Plano":
+        else: # Subiendo o Plano
             data['OPORTUNIDAD'] = "Riesgo de Venta"
+            if isinstance(precio_aplanamiento, (int, float)) and precio_aplanamiento < current_price:
+                data['VENDE_SI'] = f"VENDER A PRECIO DE {formatear_numero(precio_aplanamiento)}€"
+            else:
+                data['VENDE_SI'] = "VIGILAR"
             data['COMPRA_SI'] = "NO COMPRAR"
-            data['VENDE_SI'] = "NO RECOMENDAMOS" # Esperar confirmación
             data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta"]
-
+            
+    else: # Intermedio
+        if tendencia == "Bajando":
+            data['OPORTUNIDAD'] = "Seguirá bajando"
+            data['COMPRA_SI'] = "NO COMPRAR"
+            data['VENDE_SI'] = "VIGILAR"
+            data['ORDEN_PRIORIDAD'] = prioridad["Seguirá bajando"]
         elif tendencia == "Subiendo":
             data['OPORTUNIDAD'] = "VIGILAR"
-            data['COMPRA_SI'] = "NO COMPRAR"
-            data['VENDE_SI'] = "NO VENDER"
+            data['COMPRA_SI'] = "VIGILAR"
+            data['VENDE_SI'] = "VIGILAR"
             data['ORDEN_PRIORIDAD'] = prioridad["VIGILAR"]
-
-    else: # Intermedio
-        if tendencia == "Subiendo":
-            data['OPORTUNIDAD'] = "VIGILAR"
-            data['COMPRA_SI'] = "NO COMPRAR"
-            data['VENDE_SI'] = "NO VENDER"
-            data['ORDEN_PRIORIDAD'] = prioridad["VIGILAR"]
-        elif tendencia == "Bajando":
-            data['OPORTUNIDAD'] = "VIGILAR"
-            data['COMPRA_SI'] = "NO COMPRAR"
-            data['VENDE_SI'] = "NO VENDER"
-            data['ORDEN_PRIORIDAD'] = prioridad["VIGILAR"]
-        else:
+        else: # Plano
             data['OPORTUNIDAD'] = "Intermedio"
-            data['COMPRA_SI'] = "NO COMPRAR"
-            data['VENDE_SI'] = "NO VENDER"
+            data['COMPRA_SI'] = "VIGILAR"
+            data['VENDE_SI'] = "VIGILAR"
             data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
-
-
-    # Comprobación de precio de aplanamiento
-    if data['PRECIO_APLANAMIENTO'] != 'N/A':
-        if isinstance(data['PRECIO_APLANAMIENTO'], (int, float)):
-            precio_aplanamiento_num = float(data['PRECIO_APLANAMIENTO'])
-            
-            # Si el precio actual está un 1% por debajo del aplanamiento y estamos en sobreventa subiendo
-            if data['OPORTUNIDAD'] == "Posibilidad de Compra Activada":
-                if current_price < precio_aplanamiento_num * 0.99:
-                    data['COMPRA_SI'] = "COMPRA FUERTE"
-            
-            # Si el precio actual está un 1% por encima del aplanamiento y estamos en sobrecompra bajando
-            elif data['OPORTUNIDAD'] == "Riesgo de Venta Activada":
-                if current_price > precio_aplanamiento_num * 1.01:
-                    data['VENDE_SI'] = "VENTA FUERTE"
-
-
-    # Si el estado semanal es de Sobreventa y el diario es de Compra Fuerte, dar prioridad.
-    if data['ESTADO_SMI_SEMANAL'] == 'Sobreventa' and data['COMPRA_SI'] in ["SI COMPRAR", "COMPRA FUERTE"]:
-        data['ORDEN_PRIORIDAD'] = 0 # Máxima Prioridad
-    elif data['ESTADO_SMI_SEMANAL'] == 'Sobrecompra' and data['VENDE_SI'] in ["SI VENDER", "VENTA FUERTE"]:
-        data['ORDEN_PRIORIDAD'] = 9 # Mínima Prioridad (Vigilancia de venta)
-
 
     return data
 
 
-# ******************************************************************************
-# *************** FUNCIONES DE CORREO Y REPORTE (MODIFICADAS) ******************
-# ******************************************************************************
+def enviar_email_con_adjunto(cuerpo_html, asunto, nombre_archivo_base):
+    # --- CONFIGURACIÓN PERSONAL (NO MODIFICADA) ---
+    sender_email = os.getenv('SENDER_EMAIL')
+    receiver_email = os.getenv('RECEIVER_EMAIL')
+    smtp_server = os.getenv('SMTP_SERVER')
+    smtp_port = int(os.getenv('SMTP_PORT', 587))
+    smtp_user = os.getenv('SMTP_USER')
+    smtp_password = os.getenv('SMTP_PASSWORD')
 
-def enviar_email_con_adjunto(cuerpo_html, asunto, nombre_archivo_base, to_email=os.getenv('DESTINATARIO_CORREO_PERSONAL')):
-    # ... (Mantiene la función original) ...
-    # Datos personales y de envío (Se mantienen sin cambios)
-    pass # Asumiendo que la función es grande y no la modifico, solo el contenido del correo
+    if not all([sender_email, receiver_email, smtp_server, smtp_user, smtp_password]):
+        print("❌ Error: Faltan variables de entorno para el envío de correo.")
+        return
 
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = asunto
+    msg["From"] = sender_email
+    msg["To"] = receiver_email
+    
+    # Parte HTML
+    msg.attach(MIMEText(cuerpo_html, "html"))
+    
+    # Parte del archivo adjunto (con extensión .html)
+    archivo_adjunto_nombre = f"{nombre_archivo_base}.html"
+    
+    part = MIMEBase("application", "octet-stream")
+    part.set_payload(cuerpo_html.encode('utf-8'))
+    
+    encoders.encode_base64(part)
+    
+    part.add_header(
+        "Content-Disposition",
+        f"attachment; filename= {archivo_adjunto_nombre}",
+    )
+    
+    msg.attach(part)
+
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(sender_email, receiver_email, msg.as_string())
+        print(f"✅ Correo enviado con éxito a {receiver_email}. Archivo adjunto: {archivo_adjunto_nombre}")
+    except Exception as e:
+        print(f"❌ Error al enviar el correo: {e}")
+
+# ******************************************************************************
+# *************** FUNCION PRINCIPAL DE GENERACIÓN DE REPORTE *******************
+# ******************************************************************************
 def generar_reporte():
     try:
-        all_tickers = leer_google_sheets()
+        # Obtener datos de Google Sheets (la lista de tickers)
+        # Se asume que leer_google_sheets() devuelve la lista de tickers
+        # Si se usa un diccionario predefinido, se usa ese.
+        # Aquí se usa el diccionario 'tickers' como base.
+        tickers_list = list(tickers.values())
         
-        # Filtra la primera fila que se asume es la cabecera
-        # CORRECCIÓN: El error sugiere que all_tickers contiene los Ticker Symbols (e.g., 'A3M.MC')
-        tickers_a_procesar = all_tickers[1:] if all_tickers and len(all_tickers) > 1 else []
+        datos_completos = []
+        for nombre, ticker in tickers.items():
+            datos = obtener_datos_yfinance(ticker)
+            if datos:
+                datos = clasificar_empresa(datos)
+                datos_completos.append(datos)
         
-        # Mapa inverso para obtener el nombre amigable a partir del ticker (para la tabla)
-        reverse_tickers = {v: k for k, v in tickers.items()}
+        if not datos_completos:
+            print("No se pudo obtener datos para ningún ticker. Abortando.")
+            return
 
-        datos_empresas = []
-        # Cambiamos la variable de 'nombre_empresa' a 'ticker_symbol' ya que la hoja devuelve símbolos
-        for ticker_symbol in tickers_a_procesar: 
-            
-            ticker_yfinance = ticker_symbol
-            
-            # Determinamos el nombre amigable de la empresa a partir del ticker
-            nombre_display = reverse_tickers.get(ticker_symbol, ticker_symbol) # Usa el símbolo si no encuentra el nombre
+        # Ordenar los datos por prioridad
+        # Se excluyen los de "Compra RIESGO" de la ordenación principal
+        datos_ordenados = sorted(
+            [d for d in datos_completos if d.get('ORDEN_PRIORIDAD', 999) != 8],
+            key=lambda x: x.get('ORDEN_PRIORIDAD', 999)
+        )
+        
+        # Se añaden al final los de "Compra RIESGO" sin ordenación
+        datos_ordenados.extend([d for d in datos_completos if d.get('ORDEN_PRIORIDAD', 999) == 8])
 
-            if ticker_yfinance:
-                datos = obtener_datos_yfinance(ticker_yfinance)
-                if datos:
-                    # Sobreescribimos el nombre de la empresa si YFinance devuelve el ticker en lugar del longName
-                    if datos.get('NOMBRE_EMPRESA') == datos.get('TICKER') and nombre_display != datos.get('TICKER'):
-                        datos['NOMBRE_EMPRESA'] = nombre_display
-                        
-                    datos = clasificar_empresa(datos)
-                    datos_empresas.append(datos)
-            else:
-                print(f"⚠️ Advertencia: El ticker {ticker_symbol} es inválido. Saltando...")
-
-        # Ordenar por prioridad
-        datos_ordenados = sorted(datos_empresas, key=lambda x: x['ORDEN_PRIORIDAD'])
-
-        reporte_rows = ""
-        for datos in datos_ordenados:
-            # Colores
-            color_fondo = ""
-            color_smi = ""
-            if datos['OPORTUNIDAD'] == "Posibilidad de Compra Activada":
-                color_fondo = "#d4edda" # Verde claro
-            elif datos['OPORTUNIDAD'] == "Riesgo de Venta Activada":
-                color_fondo = "#f8d7da" # Rojo claro
-            elif datos['OPORTUNIDAD'] == "Posibilidad de Compra" or datos['OPORTUNIDAD'] == "Compra RIESGO":
-                color_fondo = "#fff3cd" # Amarillo claro
-            
-            if datos['ESTADO_SMI'] == "Sobrecompra":
-                color_smi = "#dc3545" # Rojo
-            elif datos['ESTADO_SMI'] == "Sobreventa":
-                color_smi = "#28a745" # Verde
-            else:
-                color_smi = "#ffc107" # Amarillo
-
-            # Formateo
-            precio_actual_str = formatear_numero(datos['PRECIO_ACTUAL'])
-            smi_hoy_str = formatear_numero(datos['SMI_HOY'])
-            smi_ayer_str = formatear_numero(datos['SMI_AYER'])
-            pendiente_str = formatear_numero(datos['PENDIENTE'])
-            precio_aplanamiento_str = formatear_numero(datos['PRECIO_APLANAMIENTO'])
-            
-            # Icono para el estado de compra
-            icono_compra = "🟢" if datos['COMPRADO'] == "SI" else "🔴"
-            
-            # Fila principal
-            reporte_rows += f"""
-            <tr style="background-color: {color_fondo}; cursor: pointer;" onclick="toggleDetails('{datos['TICKER']}')">
-                <td>{datos['NOMBRE_EMPRESA']} ({datos['TICKER']})</td>
-                <td><span style="font-weight: bold; color: {color_smi};">{datos['ESTADO_SMI']}</span></td>
-                <td>{datos['TENDENCIA_ACTUAL']}</td>
-                <td>{precio_actual_str}€</td>
-                <td>{smi_hoy_str}</td>
-                <td>{pendiente_str}</td>
-                <td>{datos['OPORTUNIDAD']}</td>
-                <td><strong class="pill pill-compra-{datos['COMPRA_SI'].replace(' ', '-').lower()}">{datos['COMPRA_SI']}</strong></td>
-                <td><strong class="pill pill-venta-{datos['VENDE_SI'].replace(' ', '-').lower()}">{datos['VENDE_SI']}</strong></td>
-                <td>{icono_compra}</td>
-                <td>{precio_aplanamiento_str}€</td>
-                <td><button onclick="event.stopPropagation(); toggleDetails('{datos['TICKER']}')">Ver más</button></td>
-            </tr>
-            """
-            
-            # ******************************************************************
-            # *********** INICIO: CÓDIGO HTML DETALLADO (MODIFICADO) ***********
-            # ******************************************************************
-
-            # 1. Generar la tabla de operaciones (el nuevo requerimiento)
-            operaciones_html_table = ""
-            if datos.get('DETALLE_OPERACIONES'):
-                # Invertir el orden para mostrar la más reciente primero
-                operaciones_html_table += """
-                <h4 style="margin-top: 15px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">Historial de Operaciones (Simulación 10000€/Op)</h4>
-                <div style="max-height: 250px; overflow-y: auto;">
-                    <table class="operaciones-table">
-                        <thead>
-                            <tr>
-                                <th>Estado</th>
-                                <th>Entrada (Fecha)</th>
-                                <th>Entrada (Precio)</th>
-                                <th>Salida (Fecha)</th>
-                                <th>Salida (Precio)</th>
-                                <th>Beneficio (€)</th>
-                                <th>Ganancia (%)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                """
-                for op in reversed(datos['DETALLE_OPERACIONES']):
-                    # Clase de color para el beneficio/pérdida
-                    clase_beneficio = 'ganancia' if op['BENEFICIO'] >= 0 else 'perdida'
-                    
-                    # Calcular el porcentaje de beneficio/pérdida
-                    porcentaje_str = 'N/A'
-                    try:
-                        precio_entrada = op['PRECIO_ENTRADA']
-                        precio_salida = op.get('PRECIO_SALIDA')
-                        if precio_entrada is not None and precio_entrada != 0 and isinstance(precio_salida, (int, float)):
-                            porcentaje = ((precio_salida - precio_entrada) / precio_entrada) * 100
-                            porcentaje_str = f"{formatear_numero(porcentaje)}%"
-                    except Exception:
-                        pass # Mantiene N/A si hay un error de cálculo
-
-                    # Determinar el estado de salida para el HTML
-                    salida_fecha_html = op['FECHA_SALIDA'] if op['FECHA_SALIDA'] != 'N/A' else '<span class="status-pill status-abierta">ABIERTA</span>'
-                    salida_precio_html = formatear_numero(op['PRECIO_SALIDA']) if op['PRECIO_SALIDA'] != 'N/A' else formatear_numero(datos['PRECIO_ACTUAL'])
-                    
-                    operaciones_html_table += f"""
-                    <tr class="{clase_beneficio}">
-                        <td data-label="Estado" class="status-cell">
-                            <span class="status-pill status-{op['TIPO'].lower()}">{op['TIPO']}</span>
-                        </td>
-                        <td data-label="Entrada (Fecha)">{op['FECHA_ENTRADA']}</td>
-                        <td data-label="Entrada (Precio)">{formatear_numero(op['PRECIO_ENTRADA'])}€</td>
-                        <td data-label="Salida (Fecha)">{salida_fecha_html}</td>
-                        <td data-label="Salida (Precio)">{salida_precio_html}€</td>
-                        <td data-label="Beneficio (€)" class="{clase_beneficio}">
-                            {formatear_numero(op['BENEFICIO'])}€
-                        </td>
-                        <td data-label="Ganancia (%)" class="{clase_beneficio}">
-                            {porcentaje_str}
-                        </td>
-                    </tr>
-                    """
-                operaciones_html_table += """
-                        </tbody>
-                    </table>
-                </div>
-                """
-            else:
-                operaciones_html_table = "<p>No hay historial de operaciones simuladas para este período.</p>"
-            
-            # Fila de detalles: Incluye el nuevo contenido
-            reporte_rows += f"""
-            <tr class="details-row" id="details-{datos['TICKER']}">
-                <td colspan="15">
-                    <div class="details-content">
-                        <div class="details-grid">
-                            <div class="details-item">
-                                <strong>¿Estamos Comprados?</strong>
-                                <span class="status-pill status-{datos['COMPRADO'].lower()}">{datos['COMPRADO']}</span>
-                            </div>
-                            <div class="details-item">
-                                <strong>Fecha Última Compra:</strong>
-                                {datos['FECHA_COMPRA']}
-                            </div>
-                            <div class="details-item">
-                                <strong>Precio Última Compra:</strong>
-                                {formatear_numero(datos['PRECIO_COMPRA'])}€
-                            </div>
-                        </div>
-                        
-                        {operaciones_html_table}
-
-                        <div class="observacion-semanal">
-                            <p><strong>Observación SMI Semanal ({datos['ESTADO_SMI_SEMANAL']}):</strong> {datos['OBSERVACION_SEMANAL']}</p>
-                        </div>
-                        
-                        {datos.get('CONTENIDO_GEMINI_HTML', '')}
-                        {datos.get('GRAFICO_HTML', '')}
-
-                        <div class="footer-details">
-                            <p><strong>Soporte 1:</strong> {formatear_numero(datos['SOPORTE_1'])} | <strong>Resistencia 1:</strong> {formatear_numero(datos['RESISTENCIA_1'])}</p>
-                            <p><strong>EMA 100:</strong> {formatear_numero(datos['VALOR_EMA'])} ({datos['TIPO_EMA']})</p>
-                        </div>
-                    </div>
-                </td>
-            </tr>
-            """
-            # ******************************************************************
-            # *********** FIN: CÓDIGO HTML DETALLADO (MODIFICADO) **************
-            # ******************************************************************
-
-
-        # El resto del HTML se mantiene, solo añadimos el CSS para los nuevos elementos
+        # ******************************************************************************
+        # *************** INICIO DE LA MODIFICACIÓN DE LA SECCIÓN HTML *****************
+        # ******************************************************************************
         html_body = f"""
         <!DOCTYPE html>
         <html lang="es">
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>IBEXIA - Reporte Premium de Oportunidades</title>
+            <title>Reporte de Oportunidades IBEXIA - {datetime.today().strftime('%d/%m/%Y')}</title>
             <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    margin: 0;
-                    padding: 0;
-                    background-color: #f4f7f9;
-                }}
-                .container {{
-                    padding: 20px;
-                    max-width: 1400px;
-                    margin: 0 auto;
-                }}
-                h1 {{
-                    color: #0d47a1;
-                    border-bottom: 3px solid #0d47a1;
-                    padding-bottom: 10px;
-                    margin-bottom: 20px;
-                }}
-                /* Estilos de la tabla principal */
-                .data-table-container {{
-                    overflow-x: auto;
-                    margin-top: 20px;
-                    border: 1px solid #ccc;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                }}
-                .data-table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    min-width: 1000px; /* Asegura el scroll en pantallas pequeñas */
-                }}
-                .data-table th, .data-table td {{
-                    padding: 12px 15px;
-                    text-align: left;
-                    border-bottom: 1px solid #ddd;
-                    white-space: nowrap;
-                }}
-                .data-table th {{
-                    background-color: #0d47a1;
-                    color: white;
-                    cursor: pointer;
-                    position: sticky;
-                    top: 0;
-                }}
-                .data-table tr:hover {{
-                    background-color: #f1f1f1 !important;
-                }}
-                
-                /* Pill styles */
-                .pill {{
-                    display: inline-block;
-                    padding: 5px 10px;
-                    border-radius: 15px;
-                    font-size: 0.8em;
-                    font-weight: bold;
-                    text-transform: uppercase;
-                }}
-                .pill-si-comprar, .pill-compra-fuerte {{ background-color: #28a745; color: white; }}
-                .pill-no-comprar, .pill-si-vender, .pill-venta-fuerte {{ background-color: #dc3545; color: white; }}
-                .pill-no-recomendamos, .pill-no-vender {{ background-color: #ffc107; color: #333; }}
-                
-                /* Estilos del detalle (Nuevo) */
-                .details-row {{
-                    display: none; /* Oculto por defecto */
-                    background-color: #e9ecef;
-                }}
-                .details-content {{
-                    padding: 20px;
-                    border-left: 5px solid #0d47a1;
-                    background-color: #f8f9fa;
-                    border-radius: 0 0 8px 8px;
-                }}
-                .details-grid {{
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                    gap: 20px;
-                    margin-bottom: 20px;
-                    padding: 10px;
-                    border: 1px solid #ddd;
-                    border-radius: 5px;
-                    background-color: #fff;
-                }}
-                .details-item {{
-                    line-height: 1.5;
-                }}
-                .status-pill {{
-                    padding: 3px 8px;
-                    border-radius: 10px;
-                    font-size: 0.75em;
-                    font-weight: bold;
-                    text-transform: uppercase;
-                    margin-left: 5px;
-                }}
-                .status-si, .status-abierta {{ background-color: #28a745; color: white; }}
-                .status-no, .status-cerrada {{ background-color: #6c757d; color: white; }}
-
-                /* Estilos de la tabla de Operaciones (Nuevo) */
-                .operaciones-table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-top: 10px;
-                }}
-                .operaciones-table th, .operaciones-table td {{
-                    padding: 8px 10px;
-                    border: 1px solid #e9ecef;
-                    text-align: center;
-                }}
-                .operaciones-table thead th {{
-                    background-color: #343a40;
-                    color: white;
-                    font-size: 0.85em;
-                    position: sticky;
-                    top: 0;
-                    z-index: 10;
-                }}
-                .operaciones-table tbody tr:nth-child(even) {{
-                    background-color: #f2f2f2;
-                }}
-                .operaciones-table .ganancia {{ color: #28a745; font-weight: bold; }}
-                .operaciones-table .perdida {{ color: #dc3545; font-weight: bold; }}
-
-                /* Búsqueda y Filtro */
-                .controls {{
-                    display: flex;
-                    gap: 20px;
-                    margin-bottom: 20px;
-                    align-items: center;
-                    flex-wrap: wrap;
-                }}
-                .controls input[type="text"], .controls select {{
-                    padding: 10px;
-                    border: 1px solid #ccc;
-                    border-radius: 5px;
-                    font-size: 1em;
-                }}
-                
-                /* Estilos Responsive para la tabla de Operaciones */
-                @media screen and (max-width: 768px) {{
-                    .operaciones-table thead {{
-                        display: none; 
-                    }}
-                    .operaciones-table, .operaciones-table tbody, .operaciones-table tr, .operaciones-table td {{
-                        display: block;
-                        width: 100%;
-                    }}
-                    .operaciones-table tr {{
-                        margin-bottom: 10px;
-                        border: 1px solid #ccc;
-                        border-radius: 5px;
-                        background-color: #fff;
-                    }}
-                    .operaciones-table td {{
-                        text-align: right;
-                        padding-left: 50%;
-                        position: relative;
-                    }}
-                    .operaciones-table td::before {{
-                        content: attr(data-label);
-                        position: absolute;
-                        left: 10px;
-                        width: calc(50% - 20px);
-                        padding-right: 10px;
-                        white-space: nowrap;
-                        text-align: left;
-                        font-weight: bold;
-                        color: #333;
-                    }}
-                }}
+                body {{ font-family: 'Arial', sans-serif; background-color: #f4f7f9; color: #333; margin: 0; padding: 20px; }}
+                .container {{ max-width: 1400px; margin: 0 auto; background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }}
+                h1 {{ color: #007bff; border-bottom: 3px solid #007bff; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }}
+                h2 {{ color: #555; margin-top: 25px; border-left: 5px solid #ffc107; padding-left: 10px; }}
+                .search-box {{ margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }}
+                .search-box input {{ padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; flex-grow: 1; }}
+                .table-scroll-top {{ overflow-x: auto; height: 10px; margin-bottom: -10px; }}
+                .table-container {{ overflow-x: auto; max-height: 70vh; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }}
+                thead th {{ background-color: #007bff; color: white; padding: 12px 8px; text-align: left; cursor: pointer; position: sticky; top: 0; z-index: 10; }}
+                tbody tr:nth-child(even) {{ background-color: #f9f9f9; }}
+                tbody tr:hover {{ background-color: #e9ecef; }}
+                td {{ padding: 10px 8px; border-bottom: 1px solid #ddd; word-wrap: break-word; }}
+                .clickable {{ cursor: pointer; user-select: none; }}
+                .details-row td {{ background-color: #fcfcfc; border-top: 2px solid #ddd; padding: 15px; }}
+                .label-compra {{ background-color: #28a745; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; }}
+                .label-venta {{ background-color: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; }}
+                .label-vigilar {{ background-color: #ffc107; color: #333; padding: 4px 8px; border-radius: 4px; font-weight: bold; }}
+                .warning {{ color: #dc3545; font-weight: bold; }}
+                .info {{ color: #007bff; font-weight: bold; }}
+                .success {{ color: #28a745; font-weight: bold; }}
+                .sort-arrow {{ margin-left: 5px; }}
+                .sticky-col {{ position: sticky; left: 0; background-color: #fff; z-index: 20; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }}
+                .details-row .sticky-col {{ background-color: #fcfcfc; }}
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>Reporte IBEXIA Premium - Oportunidades ({datetime.today().strftime('%d/%m/%Y')})</h1>
-
-                <div class="controls">
-                    <input type="text" id="searchInput" placeholder="Buscar empresa...">
-                    <select id="filterSelect">
-                        <option value="">Mostrar todo</option>
-                        <option value="Posibilidad de Compra Activada">🟢 Compra Activada</option>
-                        <option value="Posibilidad de Compra">🟡 Posibilidad de Compra</option>
-                        <option value="Riesgo de Venta Activada">🔴 Venta Activada</option>
-                        <option value="VIGILAR">🟠 VIGILAR</option>
-                        <option value="Intermedio">⚪ Intermedio</option>
-                    </select>
+                <h1>Reporte de Oportunidades Algorítmicas IBEXIA</h1>
+                <p>Generado el: <strong>{datetime.today().strftime('%d/%m/%Y %H:%M:%S')}</strong></p>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Buscar por Nombre, Ticker u Oportunidad...">
+                    <button onclick="clearSearch()">Limpiar Filtros</button>
                 </div>
                 
-                <div class="data-table-container" id="tableContainer">
-                    <table class="data-table" id="dataTable">
+                <div class="table-scroll-top" id="scroll-top">
+                    <div style="width: 150%; height: 1px;"></div>
+                </div>
+
+                <div class="table-container" id="table-container">
+                    <table id="data-table">
                         <thead>
                             <tr>
-                                <th data-sort="text">Empresa (Ticker)</th>
-                                <th data-sort="text">Estado SMI</th>
-                                <th data-sort="text">Tendencia</th>
-                                <th data-sort="number">Precio Actual (€)</th>
-                                <th data-sort="number">SMI Hoy</th>
-                                <th data-sort="number">Pendiente</th>
-                                <th data-sort="text">Oportunidad</th>
-                                <th data-sort="text">Comprar</th>
-                                <th data-sort="text">Vender</th>
-                                <th data-sort="text">Comprado</th>
-                                <th data-sort="number">P. Aplanamiento (€)</th>
-                                <th>Detalle</th>
+                                <th class="sticky-col" onclick="sortTable(0, 'string')">Ticker <span class="sort-arrow"></span></th>
+                                <th onclick="sortTable(1, 'string')">Oportunidad <span class="sort-arrow"></span></th>
+                                <th onclick="sortTable(2, 'number')">Precio Act. <span class="sort-arrow"></span></th>
+                                <th onclick="sortTable(3, 'number')">SMI Hoy <span class="sort-arrow"></span></th>
+                                <th onclick="sortTable(4, 'string')">Estado SMI <span class="sort-arrow"></span></th>
+                                <th onclick="sortTable(5, 'string')">EMA (100) <span class="sort-arrow"></span></th>
+                                <th onclick="sortTable(6, 'number')">Precio Aplan. <span class="sort-arrow"></span></th>
+                                <th onclick="sortTable(7, 'number')">B/P (Sim.) <span class="sort-arrow"></span></th>
+                                <th onclick="sortTable(8, 'string')">Comprar si... <span class="sort-arrow"></span></th>
+                                <th style="width: 50px;">Detalles</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {reporte_rows}
-                        </tbody>
+                        <tbody id="table-body">
+                            </tbody>
                     </table>
                 </div>
             </div>
 
             <script>
-                // ... (Se mantiene la lógica original de JavaScript para ordenar, buscar y desplegar) ...
+                const data = JSON.parse('{json.dumps(datos_ordenados).replace("'", r"\'").replace('\\', '\\\\')}');
+                let currentSortCol = -1;
+                let isAscending = true;
+                const CAPITAL_INICIAL = 10000;
+
+                // Función para dar formato de número con separador de miles y decimales
+                function formatNumber(num) {{
+                    if (num === null || num === undefined || isNaN(num) || num === 'N/A') return 'N/A';
+                    let floatNum = parseFloat(num);
+                    return floatNum.toLocaleString('es-ES', {{ minimumFractionDigits: 3, maximumFractionDigits: 3 }});
+                }}
+
+                function getProfitLoss(precioCompra, precioActual) {{
+                    if (precioCompra === 'N/A' || precioActual === 'N/A') return 'N/A';
+                    let pc = parseFloat(precioCompra);
+                    let pa = parseFloat(precioActual);
+                    if (pc <= 0 || pa <= 0) return 'N/A';
+
+                    let acciones = CAPITAL_INICIAL / pc;
+                    let beneficio = (pa - pc) * acciones;
+                    return beneficio;
+                }}
+                
+                function getStatusLabel(oportunidad) {{
+                    if (oportunidad.includes("Compra Activada")) return '<span class="label-compra">¡COMPRA ACTIVA!</span>';
+                    if (oportunidad.includes("Compra RIESGO")) return '<span class="label-compra">COMPRA RIESGO</span>';
+                    if (oportunidad.includes("Posibilidad de Compra")) return '<span class="label-vigilar">POSIBLE COMPRA</span>';
+                    if (oportunidad.includes("Riesgo de Venta Activada")) return '<span class="label-venta">¡VENTA ACTIVA!</span>';
+                    if (oportunidad.includes("Riesgo de Venta")) return '<span class="label-vigilar">RIESGO VENTA</span>';
+                    if (oportunidad.includes("Seguirá bajando")) return '<span class="label-venta">BAJISTA</span>';
+                    return '<span class="label-vigilar">VIGILAR</span>';
+                }}
+
+                function getEmaStatus(tipoEma, valorEma) {{
+                    if (tipoEma === 'Soporte') return '<span class="success">Soporte</span> (' + formatNumber(valorEma) + '€)';
+                    if (tipoEma === 'Resistencia') return '<span class="warning">Resistencia</span> (' + formatNumber(valorEma) + '€)';
+                    return formatNumber(valorEma);
+                }}
+
+                function generateTable(dataArray) {{
+                    const tbody = document.getElementById('table-body');
+                    tbody.innerHTML = ''; // Limpiar la tabla
+                    
+                    dataArray.forEach(data => {{
+                        const profitLossSim = getProfitLoss(data.PRECIO_COMPRA, data.PRECIO_ACTUAL);
+                        const profitLossSimFormatted = formatNumber(profitLossSim);
+                        const profitLossClass = profitLossSim !== 'N/A' ? (profitLossSim >= 0 ? 'success' : 'warning') : 'info';
+
+                        let rowHTML = `
+                            <tr>
+                                <td class="sticky-col"><strong class="info">${data.TICKER}</strong><br>${data.NOMBRE_EMPRESA}</td>
+                                <td>${getStatusLabel(data.OPORTUNIDAD)}</td>
+                                <td data-value="${data.PRECIO_ACTUAL}">${formatNumber(data.PRECIO_ACTUAL)}€</td>
+                                <td data-value="${data.SMI_HOY}">${formatNumber(data.SMI_HOY)}</td>
+                                <td>${data.ESTADO_SMI} (${data.TENDENCIA_ACTUAL})</td>
+                                <td>${getEmaStatus(data.TIPO_EMA, data.VALOR_EMA)}</td>
+                                <td data-value="${data.PRECIO_APLANAMIENTO}">${formatNumber(data.PRECIO_APLANAMIENTO)}€</td>
+                                <td data-value="${profitLossSim}">${data.COMPRADO === 'SI' ? '<span class="' + profitLossClass + '">' + profitLossSimFormatted + '€</span>' : 'N/A'}</td>
+                                <td><span class="${data.COMPRA_SI === 'NO COMPRAR' || data.VENDE_SI === 'VIGILAR' ? 'warning' : 'success'}">${data.COMPRA_SI === 'VIGILAR' ? data.VENDE_SI : data.COMPRA_SI}</span></td>
+                                <td style="text-align: center;">
+                                    <button onclick="toggleDetails('${data.TICKER}')">Ver más</button>
+                                </td>
+                            </tr>
+                        `;
+
+                        // ******************************************************************************
+                        // *************** GENERACIÓN DE LA FILA DE DETALLES (VER MÁS) ********************
+                        // ******************************************************************************
+
+                        // --- Generar Historial de Operaciones ---
+                        let operacionesDetalle = '';
+                        let numOperacionesCompletadas = Math.min(data.SIM_COMPRAS.length, data.SIM_VENTAS.length);
+                        let compras = data.SIM_COMPRAS;
+                        let ventas = data.SIM_VENTAS;
+
+                        // 1. Posición Abierta (Si la hay)
+                        if (data.COMPRADO === "SI") {
+                            let ultimaCompra = compras[compras.length - 1];
+                            let precioActual = parseFloat(data.PRECIO_ACTUAL);
+                            let precioCompra = parseFloat(ultimaCompra.precio);
+                            let gananciaActual = getProfitLoss(precioCompra, precioActual);
+                            let estadoGanancia = gananciaActual !== 'N/A' ? (gananciaActual >= 0 ? "Ganancia" : "Pérdida") : 'N/A';
+                            let estiloGanancia = gananciaActual !== 'N/A' ? (gananciaActual >= 0 ? '#28a745' : '#dc3545') : '#007bff';
+
+                            operacionesDetalle += `
+                                <li style="color: #007bff; font-weight: bold; margin-bottom: 5px;">
+                                    POSICIÓN ABIERTA: Entrada en ${ultimaCompra.fecha} a 
+                                    <strong>${formatNumber(ultimaCompra.precio)}€</strong>. 
+                                    Ganancia/Pérdida actual: 
+                                    <strong style="color: ${estiloGanancia};">${formatNumber(gananciaActual)}€</strong> (${estadoGanancia}).
+                                </li>`;
+                        }
+
+                        // 2. Operaciones Cerradas (Mostrar las más recientes primero)
+                        for (let i = numOperacionesCompletadas - 1; i >= 0; i--) { 
+                            let compra = compras[i];
+                            let venta = ventas[i];
+                            let ganancia = getProfitLoss(compra.precio, venta.precio);
+                            let estadoGanancia = ganancia !== 'N/A' ? (ganancia >= 0 ? "Ganancia" : "Pérdida") : 'N/A';
+                            let estiloGanancia = ganancia !== 'N/A' ? (ganancia >= 0 ? '#28a745' : '#dc3545') : '#555';
+
+                            operacionesDetalle += `
+                                <li style="margin-left: 15px; border-left: 2px solid #ccc; padding-left: 10px; margin-top: 5px;">
+                                    Operación CERRADA: <strong>Entrada</strong> en ${compra.fecha} a 
+                                    <strong>${formatNumber(compra.precio)}€</strong>. 
+                                    <strong>Salida</strong> en ${venta.fecha} a 
+                                    <strong>${formatNumber(venta.precio)}€</strong>. 
+                                    Beneficio: <strong style="color: ${estiloGanancia};">${formatNumber(ganancia)}€</strong> (${estadoGanancia}).
+                                </li>`;
+                        }
+
+                        let historialOpHtml = '<ul style="list-style-type: none; padding-left: 0;">';
+                        if (operacionesDetalle) {
+                            historialOpHtml += operacionesDetalle;
+                        } else {
+                            historialOpHtml += '<li>No se encontraron operaciones de Compra/Venta en el período de simulación (1 año) según el Algoritmo SMI.</li>';
+                        }
+                        historialOpHtml += '</ul>';
+
+                        // Construir el contenido del desplegable
+                        let detailsContent = `
+                            <div style="display: flex; gap: 30px; justify-content: space-between;">
+                                <div style="flex: 1; min-width: 250px;">
+                                    <p style="margin-top: 0;"><strong>ESTADO DE COMPRA ALGORÍTMICO:</strong> 
+                                        <span style="font-weight: bold; font-size: 1.1em; color: ${data.COMPRADO === 'SI' ? '#28a745' : '#dc3545'};">${data.COMPRADO}</span>
+                                    </p>
+                                    ${data.COMPRADO === 'SI' ? `<p><strong>Última Entrada (Algoritmo):</strong> ${data.FECHA_COMPRA} a ${formatNumber(data.PRECIO_COMPRA)}€</p>` : '<p><strong>Última Entrada:</strong> N/A (Posición cerrada)</p>'}
+                                    
+                                    <p><strong>Soportes / Resistencias (Local):</strong></p>
+                                    <ul style="list-style-type: none; padding-left: 0;">
+                                        <li><strong>S1:</strong> ${data.SOPORTE_1 ? formatNumber(data.SOPORTE_1) + '€' : 'N/A'}</li>
+                                        <li><strong>S2:</strong> ${data.SOPORTE_2 ? formatNumber(data.SOPORTE_2) + '€' : 'N/A'}</li>
+                                        <li><strong>R1:</strong> ${data.RESISTENCIA_1 ? formatNumber(data.RESISTENCIA_1) + '€' : 'N/A'}</li>
+                                        <li><strong>R2:</strong> ${data.RESISTENCIA_2 ? formatNumber(data.RESISTENCIA_2) + '€' : 'N/A'}</li>
+                                    </ul>
+                                </div>
+                                <div style="flex: 2; min-width: 600px; border-left: 1px solid #eee; padding-left: 20px;">
+                                    <p style="margin-top: 0; font-weight: bold; border-bottom: 1px solid #eee;">Historial de Compras y Ventas (Simulación SMI - Capital por operación: ${formatNumber(CAPITAL_INICIAL)}€)</p>
+                                    ${historialOpHtml}
+                                </div>
+                            </div>
+                            ${data.ADVERTENCIA_SEMANAL === 'SI' ? '<div style="margin-top: 15px; padding: 10px; background-color: #fff3cd; border-radius: 5px; color: #856404; border: 1px solid #ffeeba;"><strong>ADVERTENCIA SEMANAL:</strong> ' + data.OBSERVACION_SEMANAL + '</div>' : (data.OBSERVACION_SEMANAL ? '<div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;"><strong>OBSERVACIÓN SEMANAL:</strong> ' + data.OBSERVACION_SEMANAL + '</div>' : '')}
+                        `;
+                        
+                        rowHTML += '<tr class="details-row" id="details-' + data.TICKER + '" style="display: none;"><td colspan="10" style="padding: 15px; border-top: 2px solid #ddd; background-color: #fcfcfc;">' + detailsContent + '</td></tr>';
+                        
+                        tbody.insertAdjacentHTML('beforeend', rowHTML);
+                    }});
+                }
                 
                 function toggleDetails(ticker) {{
                     const detailsRow = document.getElementById('details-' + ticker);
@@ -1020,119 +821,127 @@ def generar_reporte():
                         detailsRow.style.display = detailsRow.style.display === 'none' ? 'table-row' : 'none';
                     }}
                 }}
-                
-                function filterTable() {{
-                    const filter = document.getElementById('filterSelect').value.toLowerCase();
-                    const search = document.getElementById('searchInput').value.toLowerCase();
-                    const table = document.getElementById('dataTable');
-                    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-                    
-                    for (let i = 0; i < rows.length; i++) {{
-                        let row = rows[i];
-                        if (row.classList.contains('details-row')) {{
-                            continue; // Saltar filas de detalle
-                        }}
-                        
-                        let shouldDisplay = true;
-                        
-                        // Busca por nombre/ticker (primera columna)
-                        const nameCell = row.cells[0];
-                        if (search && nameCell) {{
-                            const nameText = nameCell.textContent.toLowerCase();
-                            if (!nameText.includes(search)) {{
-                                shouldDisplay = false;
-                            }}
-                        }}
-                        
-                        // Filtra por oportunidad (séptima columna)
-                        const opportunityCell = row.cells[6];
-                        if (filter && opportunityCell) {{
-                            const opportunityText = opportunityCell.textContent.toLowerCase();
-                            if (opportunityText !== filter) {{
-                                shouldDisplay = false;
-                            }}
-                        }}
 
-                        if (shouldDisplay) {{
-                            row.style.display = "";
-                        }} else {{
-                            row.style.display = "none";
-                            // También oculta la fila de detalles asociada
-                            const detailRow = document.getElementById('details-' + row.cells[0].textContent.match(/\((.*?)\)/)[1]);
-                            if (detailRow) {{
-                                detailRow.style.display = "none";
-                            }}
+                // --- Funciones de Búsqueda y Ordenación (Se mantienen) ---
+
+                function filterTable() {{
+                    const input = document.getElementById('searchInput');
+                    const filter = input.value.toUpperCase();
+                    const tbody = document.getElementById('table-body');
+                    const tr = tbody.getElementsByTagName('tr');
+                    
+                    for (let i = 0; i < tr.length; i++) {{
+                        let row = tr[i];
+                        if (row.classList.contains('details-row')) continue; // Saltar filas de detalle
+
+                        let display = 'none';
+                        // Buscar en Ticker (col 0), Oportunidad (col 1), y Nombre de Empresa
+                        const tickerCell = row.cells[0];
+                        const oportunidadCell = row.cells[1];
+                        
+                        // Obtener texto de la celda de oportunidad (sin las etiquetas HTML)
+                        const oportunidadText = oportunidadCell.textContent || oportunidadCell.innerText;
+
+                        if (tickerCell.innerHTML.toUpperCase().indexOf(filter) > -1 || oportunidadText.toUpperCase().indexOf(filter) > -1) {{
+                            display = '';
+                        }}
+                        
+                        // Aplicar la visibilidad a la fila principal y a su fila de detalles
+                        row.style.display = display;
+                        const detailsRow = document.getElementById('details-' + tickerCell.querySelector('strong').textContent);
+                        if (detailsRow) {{
+                            detailsRow.style.display = 'none'; // Siempre ocultar el detalle al filtrar
                         }}
                     }}
                 }}
 
-                document.getElementById('searchInput').addEventListener('keyup', filterTable);
-                document.getElementById('filterSelect').addEventListener('change', filterTable);
+                function clearSearch() {{
+                    document.getElementById('searchInput').value = '';
+                    filterTable();
+                }}
 
-                // Función de ordenación (se mantiene la lógica original, asegurando que ignore las filas de detalle)
-                function sortTable(columnIndex, type) {{
-                    const table = document.getElementById('dataTable');
-                    const tbody = table.querySelector('tbody');
-                    const rows = Array.from(tbody.querySelectorAll('tr:not(.details-row)'));
+                function sortTable(n, type) {{
+                    const table = document.getElementById("data-table");
+                    const tbody = table.querySelector("tbody");
+                    const rows = Array.from(tbody.querySelectorAll("tr:not(.details-row)"));
                     
-                    // Almacenar las filas de detalle temporalmente
-                    const detailRows = Array.from(tbody.querySelectorAll('.details-row'));
-                    const rowMap = new Map();
-                    rows.forEach(row => {{
-                        const tickerMatch = row.cells[0].textContent.match(/\((.*?)\)/);
-                        const ticker = tickerMatch ? tickerMatch[1] : null;
-                        if (ticker) {{
-                            const detailRow = document.getElementById('details-' + ticker);
-                            rowMap.set(row, detailRow);
-                        }}
-                    }});
+                    if (currentSortCol === n) {{
+                        isAscending = !isAscending;
+                    }} else {{
+                        isAscending = true;
+                        currentSortCol = n;
+                    }}
 
-                    const sortedRows = rows.sort((a, b) => {{
-                        let aVal = a.cells[columnIndex].textContent.trim();
-                        let bVal = b.cells[columnIndex].textContent.trim();
+                    // Remover flechas de ordenación antiguas
+                    table.querySelectorAll('.sort-arrow').forEach(span => span.textContent = '');
+
+                    // Establecer nueva flecha de ordenación
+                    const header = table.querySelectorAll('th')[n];
+                    const arrowSpan = header.querySelector('.sort-arrow');
+                    arrowSpan.textContent = isAscending ? ' ▲' : ' ▼';
+
+
+                    rows.sort((rowA, rowB) => {{
+                        let cellA = rowA.cells[n];
+                        let cellB = rowB.cells[n];
+                        let valA, valB;
 
                         if (type === 'number') {{
-                            // Limpiar y parsear para números
-                            aVal = parseFloat(aVal.replace(/[^0-9,-]/g, '').replace(',', '.'));
-                            bVal = parseFloat(bVal.replace(/[^0-9,-]/g, '').replace(',', '.'));
-                            // Si el valor es N/A o NaN, se coloca al final
-                            if (isNaN(aVal)) return 1;
-                            if (isNaN(bVal)) return -1;
-                            return aVal - bVal;
-                        }} else {{
-                            return aVal.localeCompare(bVal);
+                            valA = parseFloat(cellA.getAttribute('data-value') || 0);
+                            valB = parseFloat(cellB.getAttribute('data-value') || 0);
+                        }} else if (type === 'string') {{
+                            valA = (cellA.textContent || cellA.innerText).toUpperCase();
+                            valB = (cellB.textContent || cellB.innerText).toUpperCase();
                         }}
+                        
+                        let comparison = 0;
+                        if (valA > valB) {{
+                            comparison = 1;
+                        }} else if (valA < valB) {{
+                            comparison = -1;
+                        }}
+                        
+                        return isAscending ? comparison : comparison * -1;
                     }});
 
-                    // Invertir si ya estaba ordenado (Toggle Asc/Desc)
-                    const currentDir = table.getAttribute('data-sort-direction') === 'asc' ? 'desc' : 'asc';
-                    if (table.getAttribute('data-sort-column') === String(columnIndex) && currentDir === 'desc') {{
-                        sortedRows.reverse();
-                        table.setAttribute('data-sort-direction', 'desc');
-                    }} else {{
-                        table.setAttribute('data-sort-direction', 'asc');
-                    }}
-                    table.setAttribute('data-sort-column', columnIndex);
-
-                    // Reconstruir el tbody
+                    // Reconstruir el tbody con las filas ordenadas y sus filas de detalle
                     tbody.innerHTML = '';
-                    sortedRows.forEach(row => {{
+                    rows.forEach(row => {{
+                        const ticker = row.cells[0].querySelector('strong').textContent;
+                        const detailsRow = document.getElementById('details-' + ticker);
                         tbody.appendChild(row);
-                        const detail = rowMap.get(row);
-                        if (detail) {{
-                            tbody.appendChild(detail);
+                        if (detailsRow) {{
+                            tbody.appendChild(detailsRow);
                         }}
                     }});
                 }}
 
-                document.querySelectorAll('.data-table th').forEach((header, index) => {{
-                    if (header.dataset.sort) {{
-                        header.addEventListener('click', () => {{
-                            sortTable(index, header.dataset.sort);
+                // --- Inicialización ---
+                document.addEventListener('DOMContentLoaded', () => {{
+                    generateTable(data);
+                    
+                    const searchInput = document.getElementById('searchInput');
+                    searchInput.addEventListener('keyup', filterTable);
+                    
+                    // Configurar el enfoque de la búsqueda
+                    if (searchInput) {{
+                        searchInput.focus(); // Enfocar el campo de búsqueda al cargar
+                    }}
+                    
+                    // Sincronizar el scroll lateral
+                    const tableContainer = document.getElementById('table-container');
+                    const scrollTop = document.getElementById('scroll-top');
+                    
+                    if (tableContainer && scrollTop) {{
+                        scrollTop.addEventListener('scroll', () => {{
+                            tableContainer.scrollLeft = scrollTop.scrollLeft;
+                        }});
+                        
+                        tableContainer.addEventListener('scroll', () => {{
+                            scrollTop.scrollLeft = tableContainer.scrollLeft;
                         }});
                     }}
-                }});
-
+                });
             </script>
         </body>
         </html>
