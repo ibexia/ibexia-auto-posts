@@ -763,6 +763,12 @@ def generar_reporte():
             <title>ibexiaES - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0"> <meta name="robots" content="noindex">
             <style>
+            /* 🛑 CORRECCIÓN 1/3: EVITA EL SCROLL EN EL ELEMENTO RAÍZ (HTML) */
+            html {{ 
+                width: 100%;
+                overflow-x: hidden; /* 👈 AÑADIDO: Fuerza la eliminación del scroll horizontal causado por elementos externos (Google AdSense/Cookies) */
+            }}
+            
             body {{
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                 background-color: #f8f9fa;
@@ -772,7 +778,8 @@ def generar_reporte():
                 justify-content: center;
                 align-items: flex-start;
                 min-height: 100vh;
-                /* LÍNEA BORRADA: Se quita para permitir que AdSense gestione su espacio: overflow-x: hidden; */
+                width: 100%; /* 👈 CORRECCIÓN 2/3: Asegura el 100% de ancho para evitar el encogimiento */
+                /* LÍNEA BORRADA: Ya no se necesita aquí: overflow-x: hidden; */
             }}
             .main-container {{
                 max-width: 1200px;
@@ -782,7 +789,7 @@ def generar_reporte():
                 padding: 15px;
                 border-radius: 8px;
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-                box-sizing: border-box; /* 👈 LÍNEA AÑADIDA: Asegura que el padding no desborde el 95% del ancho */
+                box-sizing: border-box; /* Mantenida: Asegura que el padding no desborde el 95% del ancho */
             }}
             /* Estilo del título IBEXIA.ES (Tipo Google - Ajustado a ibexiaES) */
             h2 {{
@@ -837,7 +844,7 @@ def generar_reporte():
                 border: 1px solid #dfe1e5; /* Borde más sutil */
                 border-radius: 24px;
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-                box-sizing: border-box; /* 👈 LÍNEA AÑADIDA: Para prevenir desbordamiento */
+                box-sizing: border-box; /* Mantenida: Para prevenir desbordamiento */
                 transition: box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
                 text-align: center;
             }}
@@ -908,7 +915,7 @@ def generar_reporte():
                 height: 70vh;
                 position: relative;
                 display: none; 
-                max-width: 100%; /* 👈 LÍNEA AÑADIDA: Asegura que el contenedor de scroll no exceda el espacio de su padre */
+                max-width: 100%; /* Mantenida: Asegura que el contenedor de scroll no exceda el espacio de su padre */
             }}
             table {{
                 width: 100%;
