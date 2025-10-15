@@ -853,6 +853,51 @@ def generar_reporte():
             }}
             /* FIN DEL ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
 
+            /* NUEVOS ESTILOS PARA LOS BOTONES */
+            #button-group {{
+                display: flex;
+                justify-content: center; /* Centrar el grupo de botones */
+                gap: 20px; /* Espacio entre los botones */
+                margin: 20px 0; /* Espacio superior e inferior */
+                flex-wrap: wrap; /* Permitir que los botones se envuelvan en pantallas pequeñas */
+            }}
+            .action-button {{
+                text-decoration: none;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 8px;
+                font-size: 1.0em;
+                font-weight: 600;
+                color: #ffffff;
+                background-color: #007bff; /* Azul primario */
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                transition: background-color 0.3s ease, box-shadow 0.3s ease;
+                min-width: 150px; /* Asegurar un ancho mínimo para adaptabilidad */
+                text-align: center;
+                cursor: pointer;
+                display: block;
+            }}
+            .action-button:hover {{
+                background-color: #0056b3; /* Tono más oscuro al pasar el ratón */
+                box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+            }}
+            .button-item {{
+                text-align: center;
+                max-width: 250px; /* Limitar el ancho de la columna de botón/descripción */
+                flex-grow: 1;
+                flex-shrink: 1;
+                flex-basis: 30%; /* Para que en desktop quepan 3 por fila */
+                margin-bottom: 10px; /* Espacio debajo de cada grupo botón/descripción */
+            }}
+            .button-description {{
+                font-size: 0.8em;
+                color: #6c757d;
+                margin-top: 5px;
+            }}
+            /* FIN DE NUEVOS ESTILOS PARA LOS BOTONES */
+
+
+
             .table-container {{
                 overflow-x: auto;
                 overflow-y: auto;
@@ -958,6 +1003,20 @@ def generar_reporte():
                     </div>
                 </div>
                 
+                <div id="button-group">
+                    <div class="button-item">
+                        <a href="enlace 1" class="action-button">BOTÓN 1</a>
+                        <div class="button-description">Descripción 1</div>
+                    </div>
+                    <div class="button-item">
+                        <a href="enlace 2" class="action-button">BOTÓN 2</a>
+                        <div class="button-description">Descripción 2</div>
+                    </div>
+                    <div class="button-item">
+                        <a href="enlace 3" class="action-button">BOTÓN 3</a>
+                        <div class="button-description">Descripción 3</div>
+                    </div>
+                </div>
                 <div id="scroll-top" style="overflow-x: auto; display: none;">
                     <div style="min-width: 1400px;">&nbsp;</div>
                 </div>
