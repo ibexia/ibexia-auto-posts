@@ -309,13 +309,12 @@ def obtener_datos_yfinance(ticker):
         
         # --- Lógica de Detección de Última Operación (Compra o Venta) ---
         comprado_status = "NO"
-        precio_compra = "N/A"
-        fecha_compra = "N/A"
+        precio_compra = "N/A" # Precio de compra de la posición ABIERTA (SI COMPRADO="SI") o CERRADA (SI COMPRADO="NO")
+        fecha_compra = "N/A"   # Fecha de compra de la posición ABIERTA (SI COMPRADO="SI") o CERRADA (SI COMPRADO="NO")
         
-        # NUEVOS CAMPOS: Para la última venta/cierre
         precio_venta_cierre = "N/A"
         fecha_venta_cierre = "N/A"
-        beneficio_ultima_op = "N/A"
+        beneficio_ultima_op = "N/A" # Beneficio de la operación CERRADA
         
         smi_series_copy = hist_extended['SMI'].copy()
         pendientes_smi = smi_series_copy.diff()
@@ -330,10 +329,12 @@ def obtener_datos_yfinance(ticker):
             if pendiente_curr < 0 and pendiente_prev >= 0:
                 # Si se detecta una señal de venta, significa que la posición anterior (COMPRA) se cierra
                 
-                # Buscamos la señal de COMPRA inmediatamente anterior
                 precio_venta_cierre = hist_extended['Close'].iloc[i]
                 fecha_venta_cierre = hist_extended.index[i].strftime('%d/%m/%Y')
 
+                precio_compra_op_cerrada = "N/A"
+                fecha_compra_op_cerrada = "N/A"
+                
                 # Buscamos la última señal de COMPRA antes de esta VENTA
                 for j in range(i - 1, 0, -1):
                     p_curr_compra = pendientes_smi.iloc[j]
@@ -342,14 +343,21 @@ def obtener_datos_yfinance(ticker):
                     
                     if p_curr_compra > 0 and p_prev_compra <= 0 and smi_prev_compra < 40:
                         precio_compra_op_cerrada = hist_extended['Close'].iloc[j]
+                        fecha_compra_op_cerrada = hist_extended.index[j].strftime('%d/%m/%Y')
                         
                         # Cálculo de Beneficio de la operación CERRADA
                         beneficio_ultima_op = calcular_beneficio_perdida(precio_compra_op_cerrada, precio_venta_cierre)
+                        
+                        # **CORRECCIÓN DE LÓGICA:**
+                        # Se asigna el precio y fecha de la compra de la operación CERRADA
+                        # a las variables que el HTML usa para mostrarlas.
+                        precio_compra = precio_compra_op_cerrada
+                        fecha_compra = fecha_compra_op_cerrada
+                        # **FIN DE LA CORRECCIÓN**
+                        
                         break
                         
                 comprado_status = "NO"
-                precio_compra = "N/A" # No estamos en posición de compra
-                fecha_compra = "N/A" 
                 break
             
             # Condición de COMPRA (Subiendo después de bajar, sugiere apertura)
@@ -366,6 +374,7 @@ def obtener_datos_yfinance(ticker):
                 
         # --- Cálculo de Beneficio Actual (SI está Comprado) ---
         beneficio_actual = "N/A"
+        # Si el estado más reciente es una compra (COMPRADO == "SI"), calculamos el beneficio actual.
         if comprado_status == "SI" and isinstance(precio_compra, (int, float)):
             beneficio_actual = calcular_beneficio_perdida(precio_compra, current_price)
 
