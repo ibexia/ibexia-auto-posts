@@ -762,7 +762,7 @@ def generar_reporte():
         <head>
             <title>ibexiaES - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
             <style>
-            body {
+            body {{
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                 background-color: #f8f9fa;
                 margin: 0;
@@ -771,8 +771,8 @@ def generar_reporte():
                 justify-content: center;
                 align-items: flex-start;
                 min-height: 100vh;
-            }
-            .main-container {
+            }}
+            .main-container {{
                 max-width: 1200px;
                 width: 95%;
                 margin: 20px auto;
@@ -780,48 +780,48 @@ def generar_reporte():
                 padding: 15px;
                 border-radius: 8px;
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-            }
+            }}
             /* Estilo del título IBEXIA.ES (Tipo Google) */
-            h2 {
+            h2 {{
                 text-align: center;
                 font-size: 3.5em; /* Más grande */
                 font-weight: 300; /* Más delgado */
                 margin-top: 20px;
                 margin-bottom: 10px; /* Menos margen inferior para acercar al cuadro */
-            }
-            .google-style {
+            }}
+            .google-style {{
                 /* Fuente más "amistosa" y cercana a Google. Puedes incrustar la fuente Product Sans para un match perfecto */
                 font-family: 'Product Sans', 'Arial', sans-serif; 
-            }
-            .google-style span {
+            }}
+            .google-style span {{
                 font-weight: 700; /* Las letras de color son más gruesas */
-            }
-            .google-style .i1 { color: #4285F4; } /* Azul */
-            .google-style .b1 { color: #DB4437; } /* Rojo */
-            .google-style .e1 { color: #F4B400; } /* Amarillo */
-            .google-style .x1 { color: #4285F4; } /* Azul */
-            .google-style .i2 { color: #0F9D58; } /* Verde */
-            .google-style .a1 { color: #DB4437; } /* Rojo */
-            .google-style .dot-es {
+            }}
+            .google-style .i1 {{ color: #4285F4; }} /* Azul */
+            .google-style .b1 {{ color: #DB4437; }} /* Rojo */
+            .google-style .e1 {{ color: #F4B400; }} /* Amarillo */
+            .google-style .x1 {{ color: #4285F4; }} /* Azul */
+            .google-style .i2 {{ color: #0F9D58; }} /* Verde */
+            .google-style .a1 {{ color: #DB4437; }} /* Rojo */
+            .google-style .dot-es {{
                 font-size: 0.6em; /* ".ES" más pequeño */
                 font-weight: 400;
                 color: #707070;
                 vertical-align: top; /* Alinear arriba */
-            }
-            p {
+            }}
+            p {{
                 color: #6c757d;
                 text-align: center;
                 font-size: 0.9em;
-            }
+            }}
             
             /* ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
-            #search-container {
+            #search-container {{
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 margin-bottom: 20px; /* Reducir margen inferior */
-            }
-            #searchInput {
+            }}
+            #searchInput {{
                 width: 80%; /* Más ancho */
                 max-width: 650px; /* Límite */
                 padding: 12px 20px; /* Ajustar padding */
@@ -832,45 +832,45 @@ def generar_reporte():
                 box-sizing: border-box;
                 transition: box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
                 text-align: center;
-            }
-            #searchInput:focus {
+            }}
+            #searchInput:focus {{
                 box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
                 border-color: #4285F4; /* Borde azul al enfocar */
                 outline: none;
-            }
+            }}
             
             /* Nuevo estilo para la fecha de actualización */
-            #update-date {
+            #update-date {{
                 font-size: 0.85em;
                 color: #707070;
                 margin-top: 5px; /* Espacio entre el campo de búsqueda y la fecha */
                 text-align: center;
-            }
+            }}
             /* FIN DEL ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
 
-            .table-container {
+            .table-container {{
                 overflow-x: auto;
                 overflow-y: auto;
                 height: 70vh;
                 position: relative;
                 display: none; 
-            }
-            table {
+            }}
+            table {{
                 width: 100%;
                 table-layout: fixed;
                 margin: 10px auto 0 auto;
                 border-collapse: collapse;
                 font-size: 0.85em;
-            }
-            th, td {
+            }}
+            th, td {{
                 border: 1px solid #e9ecef;
                 padding: 6px;
                 text-align: center;
                 vertical-align: middle;
                 white-space: normal;
                 line-height: 1.2;
-            }
-            th {
+            }}
+            th {{
                 background-color: #e9ecef;
                 color: #495057;
                 font-weight: 600;
@@ -878,22 +878,22 @@ def generar_reporte():
                 top: 0;
                 z-index: 10;
                 white-space: nowrap;
-            }
-            .compra { color: #28a745; font-weight: bold; }
-            .venta { color: #dc3545; font-weight: bold; }
-            .riesgo-compra { color: #ffc107; font-weight: bold; }
-            .comprado-si { background-color: #28a745; color: white; font-weight: bold; }
-            .bg-green { background-color: #d4edda; color: #155724; }
-            .bg-red { background-color: #f8d7da; color: #721c24; }
-            .bg-highlight { background-color: #28a745; color: white; font-weight: bold; }
-            .text-center { text-align: center; }
-            .disclaimer { font-size: 0.8em; text-align: center; color: #6c757d; margin-top: 15px; }
-            .small-text { font-size: 0.7em; color: #6c757d; }
-            .green-cell { background-color: #d4edda; }
-            .red-cell { background-color: #f8d7da; }
-            .yellow-cell { background-color: #fff3cd; }
-            .separator-row td { background-color: #e9ecef; height: 3px; padding: 0; border: none; }
-            .category-header td {
+            }}
+            .compra {{ color: #28a745; font-weight: bold; }}
+            .venta {{ color: #dc3545; font-weight: bold; }}
+            .riesgo-compra {{ color: #ffc107; font-weight: bold; }}
+            .comprado-si {{ background-color: #28a745; color: white; font-weight: bold; }}
+            .bg-green {{ background-color: #d4edda; color: #155724; }}
+            .bg-red {{ background-color: #f8d7da; color: #721c24; }}
+            .bg-highlight {{ background-color: #28a745; color: white; font-weight: bold; }}
+            .text-center {{ text-align: center; }}
+            .disclaimer {{ font-size: 0.8em; text-align: center; color: #6c757d; margin-top: 15px; }}
+            .small-text {{ font-size: 0.7em; color: #6c757d; }}
+            .green-cell {{ background-color: #d4edda; }}
+            .red-cell {{ background-color: #f8d7da; }}
+            .yellow-cell {{ background-color: #fff3cd; }}
+            .separator-row td {{ background-color: #e9ecef; height: 3px; padding: 0; border: none; }}
+            .category-header td {{
                 background-color: #495057;
                 color: white;
                 font-size: 1.1em;
@@ -902,36 +902,36 @@ def generar_reporte():
                 padding: 10px;
                 border: none;
                 display: none;
-            }
-            .observaciones-row td {
+            }}
+            .observaciones-row td {{
                 background-color: #f9f9f9;
                 text-align: left;
                 font-size: 0.8em;
                 border: 1px solid #e9ecef;
-            }
-            .stacked-text {
+            }}
+            .stacked-text {{
                 line-height: 1.2;
                 font-size: 0.8em;
-            }
-            .vigilar { color: #ffc107; font-weight: bold; }
+            }}
+            .vigilar {{ color: #ffc107; font-weight: bold; }}
             
-            .collapsible-row {
+            .collapsible-row {{
                 display: none;
-            }
-            .expand-button {
+            }}
+            .expand-button {{
                 cursor: pointer;
                 color: #007bff;
                 font-weight: bold;
                 text-decoration: underline;
-            }
-            .position-box {
+            }}
+            .position-box {{
                 border: 1px solid #dee2e6;
                 border-radius: 6px;
                 padding: 10px;
                 margin: 5px 0;
                 text-align: left;
                 background-color: #ffffff;
-            }
+            }}
         </style>
         </head>
         <body>
