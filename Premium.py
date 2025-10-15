@@ -781,20 +781,22 @@ def generar_reporte():
                 border-radius: 8px;
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
             }}
-            /* Estilo del título IBEXIA.ES (Tipo Google) */
+            /* Estilo del título IBEXIA.ES (Tipo Google - Ajustado a ibexiaES) */
             h2 {{
                 text-align: center;
-                font-size: 3.5em; /* Más grande */
-                font-weight: 300; /* Más delgado */
+                font-size: 4.0em; /* Aún más grande */
+                font-weight: 300;
                 margin-top: 20px;
-                margin-bottom: 10px; /* Menos margen inferior para acercar al cuadro */
+                margin-bottom: 0px; /* Reducir aún más el margen */
+                letter-spacing: -0.05em; /* Juntar las letras */
             }}
             .google-style {{
-                /* Fuente más "amistosa" y cercana a Google. Puedes incrustar la fuente Product Sans para un match perfecto */
-                font-family: 'Product Sans', 'Arial', sans-serif; 
+                font-family: 'Product Sans', 'Arial', sans-serif; /* Usar Product Sans si está disponible, si no, Arial */
+                line-height: 1; /* Asegurar que no haya espacio extra */
             }}
             .google-style span {{
                 font-weight: 700; /* Las letras de color son más gruesas */
+                border-radius: 50%; /* Intenta hacer los bordes más redondos (no aplica perfectamente a fuentes, pero ayuda a la percepción) */
             }}
             .google-style .i1 {{ color: #4285F4; }} /* Azul */
             .google-style .b1 {{ color: #DB4437; }} /* Rojo */
@@ -802,11 +804,12 @@ def generar_reporte():
             .google-style .x1 {{ color: #4285F4; }} /* Azul */
             .google-style .i2 {{ color: #0F9D58; }} /* Verde */
             .google-style .a1 {{ color: #DB4437; }} /* Rojo */
-            .google-style .dot-es {{
-                font-size: 0.6em; /* ".ES" más pequeño */
-                font-weight: 400;
-                color: #707070;
+            .google-style .es-final {{
+                font-size: 0.7em; /* Mantener ES un poco más pequeño */
+                font-weight: 700;
+                color: #DB4437; /* Usar el rojo de google para el ES */
                 vertical-align: top; /* Alinear arriba */
+                margin-left: -0.1em; /* Juntar un poco más al 'a' */
             }}
             p {{
                 color: #6c757d;
