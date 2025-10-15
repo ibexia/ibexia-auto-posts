@@ -640,8 +640,22 @@ def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
     
     # 2. Guardar el contenido generado en un archivo local temporal
     try:
+        # Se guarda el HTML COMPLETO, incluyendo head y body, para el envío por email
+        html_completo = f"""
+        <html>
+        <head>
+            <title>{asunto_email}</title>
+            </head>
+        <body>
+            {texto_generado}
+        </body>
+        </html>
+        """
         with open(ruta_archivo, "w", encoding="utf-8") as f:
-            f.write(texto_generado)
+            # Ahora guardamos el HTML completo que se generó y se pasó como argumento
+            # NOTA: La variable 'texto_generado' en esta función ahora SOLO contiene el cuerpo HTML.
+            # Se ha reajustado 'html_completo' arriba para envolverlo.
+            f.write(html_completo)
     except Exception as e:
         print(f"❌ Error al escribir el archivo {ruta_archivo}: {e}")
         return
@@ -757,11 +771,11 @@ def generar_reporte():
         # ******************************************************************************
         # ******************** MODIFICACIÓN DE LA SECCIÓN HTML *************************
         # ******************************************************************************
-        html_body = f"""
-        <html>
-        <head>
-            <title>ibexiaES - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0"> <meta name="robots" content="noindex">
+        # Se define la variable 'html_body' para contener *SOLO* el contenido insertable.
+        # Se conservan los estilos y scripts que son necesarios para el funcionamiento de la tabla.
+        
+        # 1. ESTILOS CSS INLINE (NECESARIOS)
+        html_styles = f"""
             <style>
             /* 🛑 SOLUCIÓN DEFINITIVA 1/3: RESET UNIVERSAL DE BOX-SIZING. */
             * {{
@@ -770,30 +784,19 @@ def generar_reporte():
             }}
             
             /* 🛑 SOLUCIÓN DEFINITIVA 2/3: USAR VIEWPORT (vw) y ELIMINACIÓN FORZADA DEL SCROLL. */
-            html {{ 
-                /* 100vw es más potente que 100% y fuerza el ancho total del área visible. */
+            /* ESTAS REGLAS DEBEN ESTAR EN LA HOJA DE ESTILOS DEL SITIO O EN UN <style> EN EL <head> */
+            /* SE ELIMINAN PORQUE PUEDEN ENTRAR EN CONFLICTO CON EL CSS GENERAL DE WORDPRESS */
+            /* html {{ 
                 width: 100vw !important; 
                 margin: 0 !important;
                 padding: 0 !important;
-                /* Oculta el scroll horizontal a nivel de toda la página con máxima prioridad. */
                 overflow-x: hidden !important; 
             }}
-            
             body {{
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background-color: #f8f9fa;
-                margin: 0 !important; /* Elimina cualquier margen externo que cause desplazamiento. */
-                padding: 0 !important;
-                display: flex;
-                justify-content: center;
-                align-items: flex-start;
-                min-height: 100vh;
-                /* 100vw también en el body para prevenir el encogimiento. */
                 width: 100vw !important; 
-            }}
+            }} */
             
-            /* 🛑 SOLUCIÓN DEFINITIVA 3/3: ATAQUE DIRECTO AL ELEMENTO DE COOKIES QUE PUEDE ESTAR CAUSANDO EL SCROLL LATERAL */
-            /* Esta regla está diseñada para prevenir que cualquier elemento fijo o flotante de Google exceda el ancho, forzándolo a desaparecer si lo hace. */
+            /* REGLA DE COOKIES FLOTANTES */
             div[style*="position: fixed"], div[style*="z-index"] {{
                 max-width: 100vw !important; /* Limita el ancho al 100% del viewport */
                 overflow-x: hidden !important; /* Asegura que no se desborde */
@@ -809,6 +812,8 @@ def generar_reporte():
                 padding: 15px;
                 border-radius: 8px;
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Se mueve la fuente aquí */
+                background-color: #f8f9fa; /* Se mueve el color de fondo aquí */
             }}
             /* Estilo del título IBEXIA.ES (Tipo Google - Ajustado a ibexiaES) */
             h2 {{
@@ -1013,11 +1018,10 @@ def generar_reporte():
                 background-color: #ffffff;
             }}
         </style>
-
-
-
-        </head>
-        <body>
+        """
+        
+        # 2. CUERPO HTML (Contenido insertable en WordPress)
+        html_content = f"""
             <div class="main-container">
                 <h2 class="google-style" style="margin-top: 20px; margin-bottom: 0px;">
                     <span class="i1">i</span>
@@ -1032,7 +1036,7 @@ def generar_reporte():
                 <div id="search-container">
                     <input type="text" id="searchInput" placeholder="Buscar empresa por nombre o ticker (Ej: Inditex, SAN.MC)...">
                     <div id="update-date">
-                        fecha de actualización: 15 de Octubre 2025 hora 11:41
+                        fecha de actualización: {datetime.today().strftime('%d de %B %Y').replace(datetime.today().strftime('%B'), ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][datetime.today().month-1])} hora {hora_actual}
                     </div>
                 </div>
                 
@@ -1056,7 +1060,7 @@ def generar_reporte():
         """
         
         if not datos_ordenados:
-            html_body += """
+            html_content += """
                             <tr><td colspan="6">No se encontraron empresas con datos válidos hoy.</td></tr>
             """
         else:
@@ -1075,25 +1079,25 @@ def generar_reporte():
                     if current_orden_grupo in [1, 2, 2.5]: # Grupo de Compra (incluye Compra RIESGO con 2.5)
                         if previous_orden_grupo is None or previous_orden_grupo not in [1, 2, 2.5]:
                             # Se añade la clase 'category-header-compra' para un control más fino en JS
-                            html_body += """
+                            html_content += """
                                 <tr class="category-header category-header-compra"><td colspan="6">OPORTUNIDADES DE COMPRA</td></tr>
                             """
                     elif current_orden_grupo in [3, 4, 5]: # Grupo de Venta/Vigilancia
                         if previous_orden_grupo is None or previous_orden_grupo not in [3, 4, 5]:
                             # Se añade la clase 'category-header-vigilar'
-                            html_body += """
+                            html_content += """
                                 <tr class="category-header category-header-vigilar"><td colspan="6">ATENTOS A VENDER/VIGILANCIA</td></tr>
                             """
                     elif current_orden_grupo in [6, 7]: # Grupo Intermedio
                         if previous_orden_grupo is None or previous_orden_grupo not in [6, 7]:
                             # Se añade la clase 'category-header-intermedio'
-                            html_body += """
+                            html_content += """
                                 <tr class="category-header category-header-intermedio"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                             """
                             
                     # Poner un separador si no es la primera fila y hay cambio de grupo
                     if not es_primera_fila and es_cambio_grupo:
-                        html_body += """
+                        html_content += """
                             <tr class="separator-row"><td colspan="6"></td></tr>
                         """
 
@@ -1169,7 +1173,7 @@ def generar_reporte():
                 
                 
                 # --- FILAS DE REPORTE CON OBSERVACIÓN SEMANAL EN DETALLE ---
-                html_body += f"""
+                html_content += f"""
                             <tr class="main-row" data-index="{i}" data-name="{data['NOMBRE_EMPRESA'].upper()}" data-ticker="{data['TICKER'].upper()}">
                                 <td class="{celda_empresa_class}">{nombre_con_precio}</td>
                                 <td>{data['TENDENCIA_ACTUAL']}</td>
@@ -1211,7 +1215,7 @@ def generar_reporte():
                 """
                 previous_orden_grupo = current_orden_grupo
         
-        html_body += """
+        html_content += """
                         </tbody>
                     </table>
                 </div>
@@ -1229,7 +1233,10 @@ def generar_reporte():
                 <br>
                 <p class="disclaimer"><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión. ¡Feliz trading!</p>
             </div>
-
+        """
+        
+        # 3. SCRIPT JAVASCRIPT (NECESARIO)
+        html_script = """
             <script>
                 // Función de acordeón para las filas individuales (Debe ser global para el onclick en el HTML)
                 function toggleDetails(index) {
@@ -1250,108 +1257,111 @@ def generar_reporte():
                 const scrollTop = document.getElementById('scroll-top');
                 const searchInput = document.getElementById("searchInput");
                 const table = document.getElementById("myTable");
-                const tbody = table.querySelector('tbody');
-                const rows = Array.from(tbody.getElementsByTagName("tr"));
-
-                // Función de filtrado
-                function filterTable() {
-                    clearTimeout(filterTimeout); // Limpiar el temporizador anterior
-                    
-                    filterTimeout = setTimeout(() => {
-                        const filter = searchInput.value.toUpperCase().trim();
-                        const showTable = filter.length > 0;
+                // Verificar si la tabla existe antes de intentar obtener tbody y rows
+                if (table) {
+                    const tbody = table.querySelector('tbody');
+                    const rows = Array.from(tbody.getElementsByTagName("tr"));
+                
+                    // Función de filtrado
+                    function filterTable() {
+                        clearTimeout(filterTimeout); // Limpiar el temporizador anterior
                         
-                        // Mostrar u ocultar la tabla y el scroll superior
-                        tableContainer.style.display = showTable ? "block" : "none";
-                        if (scrollTop) {
-                            scrollTop.style.display = showTable ? "block" : "none";
-                        }
-                        
-                        // Si no hay filtro, salimos
-                        if (!showTable) {
-                            // Al no haber filtro, todos los elementos están ocultos por el CSS inicial.
-                            return; 
-                        }
-
-                        let lastCategoryDisplayed = null;
-
-                        for (let i = 0; i < rows.length; i++) {
-                            const row = rows[i];
+                        filterTimeout = setTimeout(() => {
+                            const filter = searchInput.value.toUpperCase().trim();
+                            const showTable = filter.length > 0;
                             
-                            // 1. Manejar Separadores
-                            if (row.classList.contains("separator-row")) {
-                                row.style.display = "none";
-                                continue;
-                            }
-
-                            // 2. Manejar Filas de Categoría: inicialmente se ocultan por CSS y se muestran si su grupo tiene filas visibles
-                            if (row.classList.contains("category-header")) {
-                                row.style.display = "none";
-                                continue;
-                            }
-
-                            // 3. Manejar Filas Detalle/Observaciones: se mantienen ocultas
-                            if (row.classList.contains("collapsible-row") || row.classList.contains("observaciones-row")) {
-                                row.style.display = "none";
-                                continue;
+                            // Mostrar u ocultar la tabla y el scroll superior
+                            tableContainer.style.display = showTable ? "block" : "none";
+                            if (scrollTop) {
+                                scrollTop.style.display = showTable ? "block" : "none";
                             }
                             
-                            // 4. Procesar Filas Principales
-                            if (row.classList.contains("main-row")) {
-                                const name = row.getAttribute('data-name');
-                                const ticker = row.getAttribute('data-ticker');
+                            // Si no hay filtro, salimos
+                            if (!showTable) {
+                                // Al no haber filtro, todos los elementos están ocultos por el CSS inicial.
+                                return; 
+                            }
+
+                            let lastCategoryDisplayed = null;
+
+                            for (let i = 0; i < rows.length; i++) {
+                                const row = rows[i];
                                 
-                                const isMatch = (name.indexOf(filter) > -1) || (ticker.indexOf(filter) > -1);
-
-                                if (isMatch) {
-                                    row.style.display = "table-row";
-                                    // Marcar que esta categoría debe mostrarse (se procesará después del loop)
-                                    const currentCategory = row.previousElementSibling;
-                                    
-                                    if (currentCategory && currentCategory.classList.contains("category-header")) {
-                                        lastCategoryDisplayed = currentCategory;
-                                    }
-
-                                } else {
+                                // 1. Manejar Separadores
+                                if (row.classList.contains("separator-row")) {
                                     row.style.display = "none";
+                                    continue;
                                 }
-                            }
-                        }
-                        
-                        // 5. Segunda pasada para mostrar las cabeceras de categoría si tienen al menos una fila visible
-                        const categoryHeaders = document.querySelectorAll('.category-header');
-                        categoryHeaders.forEach(header => {
-                            let nextSibling = header.nextElementSibling;
-                            let hasVisibleRows = false;
-                            while(nextSibling && !nextSibling.classList.contains('category-header')) {
-                                if (nextSibling.classList.contains('main-row') && nextSibling.style.display !== 'none') {
-                                    hasVisibleRows = true;
-                                    break;
-                                }
-                                nextSibling = nextSibling.nextElementSibling;
-                            }
-                            header.style.display = hasVisibleRows ? "table-row" : "none";
-                        });
 
-                        // 6. Tercera pasada para mostrar los separadores si hay un cambio de categoría visible
-                        const separatorRows = document.querySelectorAll('.separator-row');
-                        separatorRows.forEach(separator => {
-                            const prev = separator.previousElementSibling;
-                            const next = separator.nextElementSibling;
+                                // 2. Manejar Filas de Categoría: inicialmente se ocultan por CSS y se muestran si su grupo tiene filas visibles
+                                if (row.classList.contains("category-header")) {
+                                    row.style.display = "none";
+                                    continue;
+                                }
+
+                                // 3. Manejar Filas Detalle/Observaciones: se mantienen ocultas
+                                if (row.classList.contains("collapsible-row") || row.classList.contains("observaciones-row")) {
+                                    row.style.display = "none";
+                                    continue;
+                                }
+                                
+                                // 4. Procesar Filas Principales
+                                if (row.classList.contains("main-row")) {
+                                    const name = row.getAttribute('data-name');
+                                    const ticker = row.getAttribute('data-ticker');
+                                    
+                                    const isMatch = (name.indexOf(filter) > -1) || (ticker.indexOf(filter) > -1);
+
+                                    if (isMatch) {
+                                        row.style.display = "table-row";
+                                        // Marcar que esta categoría debe mostrarse (se procesará después del loop)
+                                        const currentCategory = row.previousElementSibling;
+                                        
+                                        if (currentCategory && currentCategory.classList.contains("category-header")) {
+                                            lastCategoryDisplayed = currentCategory;
+                                        }
+
+                                    } else {
+                                        row.style.display = "none";
+                                    }
+                                }
+                            }
                             
-                            const prevVisible = prev && prev.style.display === "table-row" && prev.classList.contains("category-header");
-                            const nextVisible = next && next.style.display === "table-row" && next.classList.contains("category-header");
+                            // 5. Segunda pasada para mostrar las cabeceras de categoría si tienen al menos una fila visible
+                            const categoryHeaders = document.querySelectorAll('.category-header');
+                            categoryHeaders.forEach(header => {
+                                let nextSibling = header.nextElementSibling;
+                                let hasVisibleRows = false;
+                                while(nextSibling && !nextSibling.classList.contains('category-header')) {
+                                    if (nextSibling.classList.contains('main-row') && nextSibling.style.display !== 'none') {
+                                        hasVisibleRows = true;
+                                        break;
+                                    }
+                                    nextSibling = nextSibling.nextElementSibling;
+                                }
+                                header.style.display = hasVisibleRows ? "table-row" : "none";
+                            });
 
-                            // Si el separador está entre dos categorías *visibles* diferentes, lo mostramos.
-                            if (prevVisible && nextVisible) {
-                                separator.style.display = "table-row";
-                            } else {
-                                separator.style.display = "none";
-                            }
-                        });
+                            // 6. Tercera pasada para mostrar los separadores si hay un cambio de categoría visible
+                            const separatorRows = document.querySelectorAll('.separator-row');
+                            separatorRows.forEach(separator => {
+                                const prev = separator.previousElementSibling;
+                                const next = separator.nextElementSibling;
+                                
+                                const prevVisible = prev && prev.style.display === "table-row" && prev.classList.contains("category-header");
+                                const nextVisible = next && next.style.display === "table-row" && next.classList.contains("category-header");
+
+                                // Si el separador está entre dos categorías *visibles* diferentes, lo mostramos.
+                                if (prevVisible && nextVisible) {
+                                    separator.style.display = "table-row";
+                                } else {
+                                    separator.style.display = "none";
+                                }
+                            });
 
 
-                    }, 200); // Pequeño retraso para evitar ejecuciones rápidas
+                        }, 200); // Pequeño retraso para evitar ejecuciones rápidas
+                    }
                 }
                 
 
@@ -1375,24 +1385,62 @@ def generar_reporte():
                     }
                 });
             </script>
+        """
+        
+        # El HTML COMPLETO para el correo es la concatenación de todo.
+        html_body_completo = f"""
+        <html>
+        <head>
+            <title>ibexiaES - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0"> <meta name="robots" content="noindex">
+            {html_styles}
+        </head>
+        <body>
+            {html_content}
+            {html_script}
         </body>
         </html>
         """
+        
         # ******************************************************************************
         # *************** FIN DE LA MODIFICACIÓN DE LA SECCIÓN HTML ********************
         # ******************************************************************************
+        
+        # Ahora, 'html_body_completo' contiene la versión con <html>, <head>, <body>, etc.,
+        # que es la que se envía por correo (con el adjunto).
+        
+        # SIN EMBARGO, LA FUNCIÓN 'enviar_email_con_adjunto' ya crea ese envoltorio.
+        # Por lo tanto, el contenido que se debe pasar a 'enviar_email_con_adjunto' es:
+        # 1. Los estilos (para que se vean en el adjunto).
+        # 2. El contenido principal.
+        # 3. El script (para que funcione la tabla).
+        
+        # Concatenamos las tres secciones sin las etiquetas <style> y <script> para pasar un bloque HTML limpio.
+        html_para_email_body = f"""
+            {html_styles}
+            {html_content}
+            {html_script}
+        """
 
         
         asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} oportunidades detectadas hoy {datetime.today().strftime('%d/%m/%Y')}"
-        # CÓDIGO CORREGIDO: Añade el nombre del archivo
         nombre_archivo_base = f"reporte_ibexia_{datetime.today().strftime('%Y%m%d')}"
 
-        enviar_email_con_adjunto(html_body, asunto, nombre_archivo_base)
+        enviar_email_con_adjunto(html_para_email_body, asunto, nombre_archivo_base)
+        
+        # Devolver SÓLO el código HTML que se necesita para el hueco de WordPress (sin <style> ni <script>
+        # para que se puedan poner en el <head> de WordPress si es necesario, pero con la opción
+        # de poner todo en un solo bloque si se usa un bloque HTML.
+        
+        # PARA FACILITAR LA INSERCIÓN: Devolveremos un bloque único con <style>, contenido y <script>.
+        # Si la plataforma de WordPress permite insertar todo de golpe, esta es la solución más sencilla.
+        return html_styles + html_content + html_script 
 
     except Exception as e:
         # Nota: La excepción de Google Sheets por falta de variables de entorno (GOOGLE_APPLICATION_CREDENTIALS) 
         # sigue activa en leer_google_sheets().
         print(f"❌ Error al ejecutar el script principal: {e}")
+        return None
 
 if __name__ == '__main__':
     generar_reporte()
