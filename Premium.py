@@ -858,7 +858,7 @@ def generar_reporte():
                 display: flex;
                 justify-content: center; /* Centrar el grupo de botones */
                 gap: 20px; /* Espacio entre los botones */
-                margin: 40px 0 20px 0; /* AUMENTADO: 40px arriba, 0 a los lados, 20px abajo */
+                margin: 90px 0 20px 0; /* AUMENTADO: 40px arriba, 0 a los lados, 20px abajo */
                 flex-wrap: wrap; /* Permitir que los botones se envuelvan en pantallas pequeñas */
             }}
             .action-button {{
@@ -1005,16 +1005,16 @@ def generar_reporte():
                 
                 <div id="button-group">
                     <div class="button-item">
-                        <a href="enlace 1" class="action-button">MIS INVERSIONES</a>
+                        <a href="https://ibexia.es/operaciones-compraventa-octubre/" class="action-button">MIS INVERSIONES</a>
                         <div class="button-description">Acceso a todas nuestras operaciones actualizadas a día de hoy</div>
                     </div>
                     <div class="button-item">
-                        <a href="enlace 2" class="action-button">ANÁLISIS DETALLADOS</a>
+                        <a href="https://ibexia.es/category/analisis-acciones/" class="action-button">ANÁLISIS DETALLADOS</a>
                         <div class="button-description">Los valores que hemos analizado en detalle por fecha</div>
                     </div>
                     <div class="button-item">
-                        <a href="enlace 3" class="action-button">BOTÓN 3</a>
-                        <div class="button-description">Descripción 3</div>
+                        <a href="enlace 3" class="action-button"> </a>
+                        <div class="button-description"> </div>
                     </div>
                 </div>
                 <div id="scroll-top" style="overflow-x: auto; display: none;">
