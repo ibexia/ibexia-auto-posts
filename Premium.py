@@ -309,12 +309,12 @@ def obtener_datos_yfinance(ticker):
         
         # --- Lógica de Detección de Última Operación (Compra o Venta) ---
         comprado_status = "NO"
-        precio_compra = "N/A" # Precio de compra de la posición ABIERTA (SI COMPRADO="SI") o CERRADA (SI COMPRADO="NO")
-        fecha_compra = "N/A"   # Fecha de compra de la posición ABIERTA (SI COMPRADO="SI") o CERRADA (SI COMPRADO="NO")
+        precio_compra = "N/A" 
+        fecha_compra = "N/A"   
         
         precio_venta_cierre = "N/A"
         fecha_venta_cierre = "N/A"
-        beneficio_ultima_op = "N/A" # Beneficio de la operación CERRADA
+        beneficio_ultima_op = "N/A" 
         
         smi_series_copy = hist_extended['SMI'].copy()
         pendientes_smi = smi_series_copy.diff()
@@ -325,12 +325,13 @@ def obtener_datos_yfinance(ticker):
             pendiente_prev = pendientes_smi.iloc[i - 1]
             pendiente_curr = pendientes_smi.iloc[i]
             
-            # Condición de VENTA (Bajando después de subir, sugiere cierre)
+            # Condición de VENTA (Bajando después de subir, sugiere cierre) - Se detecta en el índice 'i'
             if pendiente_curr < 0 and pendiente_prev >= 0:
-                # Si se detecta una señal de venta, significa que la posición anterior (COMPRA) se cierra
                 
-                precio_venta_cierre = hist_extended['Close'].iloc[i]
-                fecha_venta_cierre = hist_extended.index[i].strftime('%d/%m/%Y')
+                # --- CORRECCIÓN: Usar precio y fecha del día ANTERIOR (i-1) al cambio de pendiente ---
+                precio_venta_cierre = hist_extended['Close'].iloc[i-1]
+                fecha_venta_cierre = hist_extended.index[i-1].strftime('%d/%m/%Y')
+                # -------------------------------------------------------------------------------------
 
                 precio_compra_op_cerrada = "N/A"
                 fecha_compra_op_cerrada = "N/A"
@@ -341,30 +342,34 @@ def obtener_datos_yfinance(ticker):
                     p_prev_compra = pendientes_smi.iloc[j - 1]
                     smi_prev_compra = hist_extended['SMI'].iloc[j - 1]
                     
+                    # Condición de COMPRA (Subiendo después de bajar) - Se detecta en el índice 'j'
                     if p_curr_compra > 0 and p_prev_compra <= 0 and smi_prev_compra < 40:
-                        precio_compra_op_cerrada = hist_extended['Close'].iloc[j]
-                        fecha_compra_op_cerrada = hist_extended.index[j].strftime('%d/%m/%Y')
+                        
+                        # --- CORRECCIÓN: Usar precio y fecha del día ANTERIOR (j-1) al cambio de pendiente ---
+                        precio_compra_op_cerrada = hist_extended['Close'].iloc[j-1]
+                        fecha_compra_op_cerrada = hist_extended.index[j-1].strftime('%d/%m/%Y')
+                        # -------------------------------------------------------------------------------------
                         
                         # Cálculo de Beneficio de la operación CERRADA
                         beneficio_ultima_op = calcular_beneficio_perdida(precio_compra_op_cerrada, precio_venta_cierre)
                         
-                        # **CORRECCIÓN DE LÓGICA:**
                         # Se asigna el precio y fecha de la compra de la operación CERRADA
-                        # a las variables que el HTML usa para mostrarlas.
                         precio_compra = precio_compra_op_cerrada
                         fecha_compra = fecha_compra_op_cerrada
-                        # **FIN DE LA CORRECCIÓN**
                         
                         break
                         
                 comprado_status = "NO"
                 break
             
-            # Condición de COMPRA (Subiendo después de bajar, sugiere apertura)
+            # Condición de COMPRA (Subiendo después de bajar, sugiere apertura) - Se detecta en el índice 'i'
             elif pendiente_curr > 0 and pendiente_prev <= 0 and smi_prev < 40:
                 comprado_status = "SI"
-                precio_compra = hist_extended['Close'].iloc[i]
-                fecha_compra = hist_extended.index[i].strftime('%d/%m/%Y')
+                
+                # --- CORRECCIÓN: Usar precio y fecha del día ANTERIOR (i-1) al cambio de pendiente ---
+                precio_compra = hist_extended['Close'].iloc[i-1]
+                fecha_compra = hist_extended.index[i-1].strftime('%d/%m/%Y')
+                # -------------------------------------------------------------------------------------
                 
                 # Al estar COMPRADO, no hay datos de venta/cierre aún, solo el beneficio simulado
                 precio_venta_cierre = "N/A"
@@ -430,13 +435,13 @@ def obtener_datos_yfinance(ticker):
             # --- Nuevos Campos Semanales ---
             "SMI_SEMANAL": smi_weekly,
             "ESTADO_SMI_SEMANAL": estado_smi_weekly,
-            "ADVERTENCIA_SEMANAL": "NO", # Se inicializa y se modifica en clasificar_empresa
-            "OBSERVACION_SEMANAL": observacion_semanal, # Nuevo campo con el texto de la observación semanal
+            "ADVERTENCIA_SEMANAL": "NO", 
+            "OBSERVACION_SEMANAL": observacion_semanal, 
             # --- Nuevos Campos de Operativa ---
             "PRECIO_VENTA_CIERRE": precio_venta_cierre,
             "FECHA_VENTA_CIERRE": fecha_venta_cierre,
-            "BENEFICIO_ULTIMA_OP": beneficio_ultima_op, # Beneficio numérico o "N/A"
-            "BENEFICIO_ACTUAL": beneficio_actual, # Beneficio numérico o "N/A" (si COMPRADO=SI)
+            "BENEFICIO_ULTIMA_OP": beneficio_ultima_op,
+            "BENEFICIO_ACTUAL": beneficio_actual, 
         }
 
     except Exception as e:
