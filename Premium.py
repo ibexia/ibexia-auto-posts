@@ -1005,12 +1005,12 @@ def generar_reporte():
                 
                 <div id="button-group">
                     <div class="button-item">
-                        <a href="enlace 1" class="action-button">BOTÓN 1</a>
-                        <div class="button-description">Descripción 1</div>
+                        <a href="enlace 1" class="action-button">MIS INVERSIONES</a>
+                        <div class="button-description">Acceso a todas nuestras operaciones actualizadas a día de hoy</div>
                     </div>
                     <div class="button-item">
-                        <a href="enlace 2" class="action-button">BOTÓN 2</a>
-                        <div class="button-description">Descripción 2</div>
+                        <a href="enlace 2" class="action-button">ANÁLISIS DETALLADOS</a>
+                        <div class="button-description">Los valores que hemos analizado en detalle por fecha</div>
                     </div>
                     <div class="button-item">
                         <a href="enlace 3" class="action-button">BOTÓN 3</a>
