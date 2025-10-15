@@ -790,8 +790,17 @@ def generar_reporte():
                 min-height: 100vh;
                 /* 100vw también en el body para prevenir el encogimiento. */
                 width: 100vw !important; 
-                /* Ya no es necesario aquí: overflow-x: hidden !important; */
             }}
+            
+            /* 🛑 SOLUCIÓN DEFINITIVA 3/3: ATAQUE DIRECTO AL ELEMENTO DE COOKIES QUE PUEDE ESTAR CAUSANDO EL SCROLL LATERAL */
+            /* Esta regla está diseñada para prevenir que cualquier elemento fijo o flotante de Google exceda el ancho, forzándolo a desaparecer si lo hace. */
+            div[style*="position: fixed"], div[style*="z-index"] {{
+                max-width: 100vw !important; /* Limita el ancho al 100% del viewport */
+                overflow-x: hidden !important; /* Asegura que no se desborde */
+                left: 0 !important; /* Fija su posición a la izquierda para corregir desplazamiento */
+                right: 0 !important; /* Fija su posición a la derecha para corregir desplazamiento */
+            }}
+            
             .main-container {{
                 max-width: 1200px;
                 width: 95%;
@@ -1004,6 +1013,7 @@ def generar_reporte():
                 background-color: #ffffff;
             }}
         </style>
+
 
 
         </head>
