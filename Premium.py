@@ -781,47 +781,26 @@ def generar_reporte():
                     border-radius: 8px;
                     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
                 }}
-                /* ESTILO TÍTULO IBEXIAES TIPO GOOGLE */
-                #main-title {
-                    font-size: 6em; /* Tamaño grande */
-                    font-weight: 400; /* Fuente más ligera */
-                    margin-bottom: 20px;
-                    /* Implementación del color de Google */
-                    text-align: center;
-                }
-                #main-title span {
-                    /* Define los colores de Google */
-                    font-weight: bold;
-                }
-                #main-title span:nth-child(1) { color: #4285F4; } /* Azul */
-                #main-title span:nth-child(2) { color: #EA4335; } /* Rojo */
-                #main-title span:nth-child(3) { color: #FBBC05; } /* Amarillo */
-                #main-title span:nth-child(4) { color: #4285F4; } /* Azul */
-                #main-title span:nth-child(5) { color: #34A853; } /* Verde */
-                #main-title span:nth-child(6) { color: #EA4335; } /* Rojo */
-
-                h2 {
+                h2 {{
                     color: #343a40;
                     text-align: center;
                     font-size: 1.5em;
                     margin-bottom: 30px; /* Aumentar margen */
-                    display: none; /* Ocultamos el h2 anterior */
-                }
-                p {
+                }}
+                p {{
                     color: #6c757d;
                     text-align: center;
                     font-size: 0.9em;
-                }
+                }}
                 
                 /* ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
-                #search-container {
+                #search-container {{
                     display: flex; /* Para centrar el input */
                     flex-direction: column;
                     align-items: center;
-                    margin-top: 10vh; /* Centrado vertical más dramático */
                     margin-bottom: 50px; /* Más espacio */
-                }
-                #searchInput {
+                }}
+                #searchInput {{
                     width: 70%; /* Cambio: Más ancho */
                     max-width: 600px;
                     padding: 15px 20px; /* Cambio: Más padding, más grande */
@@ -832,11 +811,11 @@ def generar_reporte():
                     box-sizing: border-box;
                     transition: box-shadow 0.3s ease-in-out;
                     text-align: center;
-                }
-                #searchInput:focus {
+                }}
+                #searchInput:focus {{
                     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Sombra al enfocar */
                     outline: none;
-                }
+                }}
                 /* FIN DEL ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
 
                 .table-container {{
@@ -929,11 +908,9 @@ def generar_reporte():
         </head>
         <body>
             <div class="main-container">
-                <h1 id="main-title" class="text-center">ibexiaES</h1>
+                <h2 class="text-center">Resumen Diario de Oportunidades</h2>
+                
                 <div id="search-container">
-                    <h1 id="main-title" class="text-center">
-                        <span>i</span><span>b</span><span>e</span><span>x</span><span>i</span><span>a</span>ES
-                    </h1>
                     <input type="text" id="searchInput" placeholder="Buscar empresa por nombre o ticker (Ej: Inditex, SAN.MC)...">
                 </div>
                 
