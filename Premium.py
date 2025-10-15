@@ -575,9 +575,12 @@ def formatear_valor(valor):
     return str(valor)
 
 def generar_html(datos_analizados):
-    # ... (El resto de la función generar_html no se modifica) ...
+    # ******************************************************************************
+    # *************** INICIO DE LA MODIFICACIÓN DE LA SECCIÓN HTML *******************
+    # ******************************************************************************
     
-    html_template_start = """
+    # Convertimos a F-string para inyectar la fecha correctamente
+    html_template_start = f"""
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -586,59 +589,59 @@ def generar_html(datos_analizados):
     <title>Reporte de Análisis Bursátil IBEXIA</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
-        h1 { color: #007bff; text-align: center; margin-bottom: 20px; }
-        .header-info { text-align: center; margin-bottom: 30px; font-size: 1.1em; color: #555; }
-        .company-card { background-color: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 20px; padding: 20px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }
-        .company-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .company-header h2 { margin: 0; color: #333; }
-        .recommendation { font-weight: bold; padding: 5px 10px; border-radius: 5px; color: white; }
-        .COMPRA { background-color: #28a745; }
-        .VENTA-CIERRE { background-color: #dc3545; }
-        .MANTENER, .NEUTRO { background-color: #ffc107; color: #333; }
-        .ALERTA-CIERRE { background-color: #ff5722; }
-        .COMPRA-ALTO-RIESGO { background-color: #ff9800; color: #333; }
-        .VENTA-CIERRE-BAJO-RIESGO { background-color: #4CAF50; }
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }}
+        .container {{ max-width: 1200px; margin: auto; background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }}
+        h1 {{ color: #007bff; text-align: center; margin-bottom: 20px; }}
+        .header-info {{ text-align: center; margin-bottom: 30px; font-size: 1.1em; color: #555; }}
+        .company-card {{ background-color: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 20px; padding: 20px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }}
+        .company-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }}
+        .company-header h2 {{ margin: 0; color: #333; }}
+        .recommendation {{ font-weight: bold; padding: 5px 10px; border-radius: 5px; color: white; }}
+        .COMPRA {{ background-color: #28a745; }}
+        .VENTA-CIERRE {{ background-color: #dc3545; }}
+        .MANTENER, .NEUTRO {{ background-color: #ffc107; color: #333; }}
+        .ALERTA-CIERRE {{ background-color: #ff5722; }}
+        .COMPRA-ALTO-RIESGO {{ background-color: #ff9800; color: #333; }}
+        .VENTA-CIERRE-BAJO-RIESGO {{ background-color: #4CAF50; }}
         
-        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-top: 15px; }
-        .stat-box { background-color: #f0f8ff; padding: 10px; border-radius: 5px; border-left: 4px solid #007bff; }
-        .stat-box strong { display: block; font-size: 0.9em; color: #555; }
-        .stat-box span { font-size: 1.2em; font-weight: bold; color: #333; }
+        .grid-3 {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-top: 15px; }}
+        .stat-box {{ background-color: #f0f8ff; padding: 10px; border-radius: 5px; border-left: 4px solid #007bff; }}
+        .stat-box strong {{ display: block; font-size: 0.9em; color: #555; }}
+        .stat-box span {{ font-size: 1.2em; font-weight: bold; color: #333; }}
         
-        .data-table-container { 
+        .data-table-container {{ 
             overflow-x: auto; 
             margin-top: 20px; 
             border: 1px solid #ccc;
             border-radius: 5px;
-        }
-        .data-table { width: 100%; border-collapse: collapse; white-space: nowrap; }
-        .data-table th, .data-table td { border: 1px solid #e9ecef; padding: 12px 15px; text-align: left; }
-        .data-table th { background-color: #007bff; color: white; font-weight: bold; text-transform: uppercase; font-size: 0.9em; }
-        .data-table tr:nth-child(even) { background-color: #f7f7f7; }
-        .data-table tr:hover { background-color: #e9ecef; }
-        .scroll-top { overflow-x: scroll; height: 18px; opacity: 0; }
+        }}
+        .data-table {{ width: 100%; border-collapse: collapse; white-space: nowrap; }}
+        .data-table th, .data-table td {{ border: 1px solid #e9ecef; padding: 12px 15px; text-align: left; }}
+        .data-table th {{ background-color: #007bff; color: white; font-weight: bold; text-transform: uppercase; font-size: 0.9em; }}
+        .data-table tr:nth-child(even) {{ background-color: #f7f7f7; }}
+        .data-table tr:hover {{ background-color: #e9ecef; }}
+        .scroll-top {{ overflow-x: scroll; height: 18px; opacity: 0; }}
         
-        .filter-container { margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .filter-container input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 5px; width: 250px; }
+        .filter-container {{ margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }}
+        .filter-container input[type="text"] {{ padding: 8px; border: 1px solid #ccc; border-radius: 5px; width: 250px; }}
 
-        .operacion-historica {
+        .operacion-historica {{
             margin-top: 15px;
             padding: 10px;
             background-color: #e9f7ef; /* Light green background */
             border-left: 5px solid #28a745;
             border-radius: 4px;
-        }
+        }}
 
-        .operacion-historica strong {
+        .operacion-historica strong {{
             color: #333;
-        }
+        }}
 
-        .alerta-semanal {
+        .alerta-semanal {{
             color: #dc3545;
             font-weight: bold;
             margin-left: 10px;
-        }
+        }}
         
     </style>
 </head>
@@ -750,8 +753,10 @@ def generar_html(datos_analizados):
                         <td>{dato['OBSERVACION']}</td>
                     </tr>
                 """
-
-    html_template_end = f"""
+    
+    # IMPORTANTE: Se elimina la 'f' del inicio para que el código JavaScript dentro 
+    # de esta cadena no sea interpretado por Python como una expresión, lo que causaba el SyntaxError.
+    html_template_end = """
                 </tbody>
             </table>
         </div>
@@ -787,25 +792,28 @@ def generar_html(datos_analizados):
             });
 
             // Enfocar el campo de búsqueda al cargar (si es posible)
-            if (searchInput) {{
+            if (searchInput) { // Corregido: Llaves simples
                 searchInput.focus(); // Enfocar el campo de búsqueda al cargar
-            }}
+            }
             
             // Sincronizar el scroll lateral
-            if (tableContainer && scrollTop) {{
-                scrollTop.addEventListener('scroll', () => {{
+            if (tableContainer && scrollTop) { // Corregido: Llaves simples
+                scrollTop.addEventListener('scroll', () => {
                     tableContainer.scrollLeft = scrollTop.scrollLeft;
-                }});
+                });
                 
-                tableContainer.addEventListener('scroll', () => {{
+                tableContainer.addEventListener('scroll', () => {
                     scrollTop.scrollLeft = tableContainer.scrollLeft;
-                }});
-            }}
+                });
+            }
         });
     </script>
 </body>
 </html>
         """
+    # ******************************************************************************
+    # *************** FIN DE LA MODIFICACIÓN DE LA SECCIÓN HTML ********************
+    # ******************************************************************************
     
     return html_template_start + html_rows + html_template_end
 
