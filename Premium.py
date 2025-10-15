@@ -806,21 +806,19 @@ def generar_html(datos_analizados):
 
 
 def enviar_email_con_adjunto(html_body, asunto, nombre_archivo_base):
-    # ******************************************************************
-    # ******* CORRECCIÓN DEL ERROR DE 'NoneType' AQUÍ ******************
-    # ******************************************************************
+    
     smtp_server = os.getenv('SMTP_SERVER')
-    smtp_port_str = os.getenv('SMTP_PORT') # Leemos el puerto como string primero
+    smtp_port_str = os.getenv('SMTP_PORT') 
     email_user = os.getenv('EMAIL_USER')
     email_password = os.getenv('EMAIL_PASSWORD')
     email_recipient = os.getenv('EMAIL_RECIPIENT')
 
-    # 1. Validar que todas las variables estén definidas como cadenas no vacías
+    # CORRECCIÓN DE ROBUSTEZ: Verifica que todas las variables existan antes de intentar usarlas
     if not all([smtp_server, smtp_port_str, email_user, email_password, email_recipient]):
         print("❌ Error: Faltan variables de entorno para el envío de correo. Asegúrate de que SMTP_SERVER, SMTP_PORT, EMAIL_USER, EMAIL_PASSWORD y EMAIL_RECIPIENT están configuradas. Saltando envío.")
         return
         
-    # 2. Convertir el puerto a entero de forma segura
+    # CORRECCIÓN DE ROBUSTEZ: Conversión segura del puerto a entero
     try:
         smtp_port = int(smtp_port_str)
     except ValueError:
@@ -832,11 +830,10 @@ def enviar_email_con_adjunto(html_body, asunto, nombre_archivo_base):
     msg['To'] = email_recipient
     msg['Subject'] = asunto
 
-    # Adjuntar el HTML como archivo
+    # Adjuntar el HTML como parte del cuerpo y como archivo
     html_part = MIMEText(html_body, 'html')
     msg.attach(html_part)
     
-    # El archivo en formato html
     archivo_html = MIMEBase('application', 'octet-stream')
     archivo_html.set_payload(html_body.encode('utf-8'))
     encoders.encode_base64(archivo_html)
@@ -854,9 +851,7 @@ def enviar_email_con_adjunto(html_body, asunto, nombre_archivo_base):
         print(f"❌ Error al enviar el correo: {e}")
 
 def generar_reporte():
-    # ******************************************************************
-    # ******* ESTA FUNCIÓN NO SE MODIFICA, SE MANTIENE EL ORIGINAL ******
-    # ******************************************************************
+    
     try:
         # Se asume que leer_google_sheets y obtener_datos_yfinance existen
         all_tickers = list(tickers.values())
@@ -877,8 +872,9 @@ def generar_reporte():
             return
 
         # Ordenar por Recomendación (COMPRA, VENTA/CIERRE, MANTENER, NEUTRO)
-        orden_recomendacion = {"COMPRA": 4, "COMPRA (Cautelosa)": 3, "MANTENER": 2, "MANTENER (Espera)": 1, "NEUTRO": 0, "VENTA/CIERRE": -4, "VENTA/CIERRE (Cautelosa)": -3, "ALERTA CIERRE": -2, "COMPRA (ALTO RIESGO)": -1, "VENTA/CIERRE (BAJO RIESGO)": -5}
+        orden_recomendacion = {"COMPRA": 4, "COMPRA (Cautelosa)": 3, "MANTENER": 2, "MANTENER (Espera)": 1, "NEUTRO": 0, "VENTA/CIERRE": -4, "VENTA/CIERRE (Cautelosa)": -3, "ALERTA CIERRE": -2, "COMPRA (ALTO RIESGO)": -1, "VENTA/CIERRE (BAJO RIESGO)": -5, "MANTENER POSICIÓN": 10}
         
+        # Uso de .get con un valor por defecto bajo (-10) para manejar cualquier nueva recomendación
         datos_ordenados = sorted(datos_analizados, key=lambda x: orden_recomendacion.get(x["RECOMENDACION"].split('(')[0].strip(), -10), reverse=True)
 
 
@@ -886,7 +882,6 @@ def generar_reporte():
         html_body = generar_html(datos_ordenados)
         
         asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} oportunidades detectadas hoy {datetime.today().strftime('%d/%m/%Y')}"
-        # CÓDIGO CORREGIDO: Añade el nombre del archivo
         nombre_archivo_base = f"reporte_ibexia_{datetime.today().strftime('%Y%m%d')}"
 
         enviar_email_con_adjunto(html_body, asunto, nombre_archivo_base)
