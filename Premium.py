@@ -666,26 +666,26 @@ def generar_reporte():
 
             <script>
                 // Los datos se pasan de Python a JavaScript como una cadena JSON
-                const data = JSON.parse('{json.dumps(datos_ordenados).replace("'", r"\'").replace('\\', '\\\\')}');
-                let currentSortCol = -1;
-                let isAscending = true;
-                const CAPITAL_INICIAL = 10000;
+                var data = JSON.parse('{json.dumps(datos_ordenados).replace("'", r"\'").replace('\\', '\\\\')}');
+                var currentSortCol = -1;
+                var isAscending = true;
+                var CAPITAL_INICIAL = 10000;
 
                 // Función para dar formato de número con separador de miles y decimales
                 function formatNumber(num) {{
                     if (num === null || num === undefined || isNaN(num) || num === 'N/A') return 'N/A';
-                    let floatNum = parseFloat(num);
+                    var floatNum = parseFloat(num);
                     return floatNum.toLocaleString('es-ES', {{ minimumFractionDigits: 3, maximumFractionDigits: 3 }});
                 }}
 
                 function getProfitLoss(precioCompra, precioActual) {{
                     if (precioCompra === 'N/A' || precioActual === 'N/A') return 'N/A';
-                    let pc = parseFloat(precioCompra);
-                    let pa = parseFloat(precioActual);
+                    var pc = parseFloat(precioCompra);
+                    var pa = parseFloat(precioActual);
                     if (pc <= 0 || pa <= 0) return 'N/A';
 
-                    let acciones = CAPITAL_INICIAL / pc;
-                    let beneficio = (pa - pc) * acciones;
+                    var acciones = CAPITAL_INICIAL / pc;
+                    var beneficio = (pa - pc) * acciones;
                     return beneficio;
                 }}
                 
@@ -706,16 +706,16 @@ def generar_reporte():
                 }}
 
                 function generateTable(dataArray) {{
-                    const tbody = document.getElementById('table-body');
+                    var tbody = document.getElementById('table-body');
                     tbody.innerHTML = ''; // Limpiar la tabla
                     
                     dataArray.forEach(data => {{
-                        const profitLossSim = getProfitLoss(data.PRECIO_COMPRA, data.PRECIO_ACTUAL);
-                        const profitLossSimFormatted = formatNumber(profitLossSim);
-                        const profitLossClass = profitLossSim !== 'N/A' ? (profitLossSim >= 0 ? 'success' : 'warning') : 'info';
+                        var profitLossSim = getProfitLoss(data.PRECIO_COMPRA, data.PRECIO_ACTUAL);
+                        var profitLossSimFormatted = formatNumber(profitLossSim);
+                        var profitLossClass = profitLossSim !== 'N/A' ? (profitLossSim >= 0 ? 'success' : 'warning') : 'info';
 
                         // CORRECCIÓN: Usar concatenación de cadenas en JS para evitar el error de f-string en Python
-                        let rowHTML = '<tr>' +
+                        var rowHTML = '<tr>' +
                             '<td class="sticky-col"><strong class="info">' + data.TICKER + '</strong><br>' + data.NOMBRE_EMPRESA + '</td>' +
                             '<td>' + getStatusLabel(data.OPORTUNIDAD) + '</td>' +
                             '<td data-value="' + data.PRECIO_ACTUAL + '">' + formatNumber(data.PRECIO_ACTUAL) + '€</td>' +
@@ -735,19 +735,19 @@ def generar_reporte():
                         // ******************************************************************************
 
                         // --- Generar Historial de Operaciones ---
-                        let operacionesDetalle = '';
-                        let numOperacionesCompletadas = Math.min(data.SIM_COMPRAS.length, data.SIM_VENTAS.length);
-                        let compras = data.SIM_COMPRAS;
-                        let ventas = data.SIM_VENTAS;
+                        var operacionesDetalle = '';
+                        var numOperacionesCompletadas = Math.min(data.SIM_COMPRAS.length, data.SIM_VENTAS.length);
+                        var compras = data.SIM_COMPRAS;
+                        var ventas = data.SIM_VENTAS;
 
                         // 1. Posición Abierta (Si la hay)
                         if (data.COMPRADO === "SI") {
-                            let ultimaCompra = compras[compras.length - 1];
-                            let precioActual = parseFloat(data.PRECIO_ACTUAL);
-                            let precioCompra = parseFloat(ultimaCompra.precio);
-                            let gananciaActual = getProfitLoss(precioCompra, precioActual);
-                            let estadoGanancia = gananciaActual !== 'N/A' ? (gananciaActual >= 0 ? "Ganancia" : "Pérdida") : 'N/A';
-                            let estiloGanancia = gananciaActual !== 'N/A' ? (gananciaActual >= 0 ? '#28a745' : '#dc3545') : '#007bff';
+                            var ultimaCompra = compras[compras.length - 1];
+                            var precioActual = parseFloat(data.PRECIO_ACTUAL);
+                            var precioCompra = parseFloat(ultimaCompra.precio);
+                            var gananciaActual = getProfitLoss(precioCompra, precioActual);
+                            var estadoGanancia = gananciaActual !== 'N/A' ? (gananciaActual >= 0 ? "Ganancia" : "Pérdida") : 'N/A';
+                            var estiloGanancia = gananciaActual !== 'N/A' ? (gananciaActual >= 0 ? '#28a745' : '#dc3545') : '#007bff';
 
                             operacionesDetalle += '<li style="color: #007bff; font-weight: bold; margin-bottom: 5px;">' +
                                 'POSICIÓN ABIERTA: Entrada en ' + ultimaCompra.fecha + ' a ' + 
@@ -758,12 +758,12 @@ def generar_reporte():
                         }
 
                         // 2. Operaciones Cerradas (Mostrar las más recientes primero)
-                        for (let i = numOperacionesCompletadas - 1; i >= 0; i--) { 
-                            let compra = compras[i];
-                            let venta = ventas[i];
-                            let ganancia = getProfitLoss(compra.precio, venta.precio);
-                            let estadoGanancia = ganancia !== 'N/A' ? (ganancia >= 0 ? "Ganancia" : "Pérdida") : 'N/A';
-                            let estiloGanancia = ganancia !== 'N/A' ? (ganancia >= 0 ? '#28a745' : '#dc3545') : '#555';
+                        for (var i = numOperacionesCompletadas - 1; i >= 0; i--) { 
+                            var compra = compras[i];
+                            var venta = ventas[i];
+                            var ganancia = getProfitLoss(compra.precio, venta.precio);
+                            var estadoGanancia = ganancia !== 'N/A' ? (ganancia >= 0 ? "Ganancia" : "Pérdida") : 'N/A';
+                            var estiloGanancia = ganancia !== 'N/A' ? (ganancia >= 0 ? '#28a745' : '#dc3545') : '#555';
 
                             operacionesDetalle += '<li style="margin-left: 15px; border-left: 2px solid #ccc; padding-left: 10px; margin-top: 5px;">' +
                                 'Operación CERRADA: <strong>Entrada</strong> en ' + compra.fecha + ' a ' + 
@@ -774,7 +774,7 @@ def generar_reporte():
                             '</li>';
                         }
 
-                        let historialOpHtml = '<ul style="list-style-type: none; padding-left: 0;">';
+                        var historialOpHtml = '<ul style="list-style-type: none; padding-left: 0;">';
                         if (operacionesDetalle) {
                             historialOpHtml += operacionesDetalle;
                         } else {
@@ -783,7 +783,7 @@ def generar_reporte():
                         historialOpHtml += '</ul>';
 
                         // Construir el contenido del desplegable usando concatenación
-                        let detailsContent = '<div style="display: flex; gap: 30px; justify-content: space-between;">' +
+                        var detailsContent = '<div style="display: flex; gap: 30px; justify-content: space-between;">' +
                             '<div style="flex: 1; min-width: 250px;">' +
                                 '<p style="margin-top: 0;"><strong>ESTADO DE COMPRA ALGORÍTMICO:</strong> ' + 
                                     '<span style="font-weight: bold; font-size: 1.1em; color: ' + (data.COMPRADO === 'SI' ? '#28a745' : '#dc3545') + ';">' + data.COMPRADO + '</span>' +
@@ -813,7 +813,7 @@ def generar_reporte():
                 }
                 
                 function toggleDetails(ticker) {{
-                    const detailsRow = document.getElementById('details-' + ticker);
+                    var detailsRow = document.getElementById('details-' + ticker);
                     if (detailsRow) {{
                         detailsRow.style.display = detailsRow.style.display === 'none' ? 'table-row' : 'none';
                     }}
@@ -822,22 +822,22 @@ def generar_reporte():
                 // --- Funciones de Búsqueda y Ordenación (Se mantienen) ---
 
                 function filterTable() {{
-                    const input = document.getElementById('searchInput');
-                    const filter = input.value.toUpperCase();
-                    const tbody = document.getElementById('table-body');
-                    const tr = tbody.getElementsByTagName('tr');
+                    var input = document.getElementById('searchInput');
+                    var filter = input.value.toUpperCase();
+                    var tbody = document.getElementById('table-body');
+                    var tr = tbody.getElementsByTagName('tr');
                     
-                    for (let i = 0; i < tr.length; i++) {{
-                        let row = tr[i];
+                    for (var i = 0; i < tr.length; i++) {{
+                        var row = tr[i];
                         if (row.classList.contains('details-row')) continue; // Saltar filas de detalle
 
-                        let display = 'none';
+                        var display = 'none';
                         // Buscar en Ticker (col 0), Oportunidad (col 1), y Nombre de Empresa
-                        const tickerCell = row.cells[0];
-                        const oportunidadCell = row.cells[1];
+                        var tickerCell = row.cells[0];
+                        var oportunidadCell = row.cells[1];
                         
                         // Obtener texto de la celda de oportunidad (sin las etiquetas HTML)
-                        const oportunidadText = oportunidadCell.textContent || oportunidadCell.innerText;
+                        var oportunidadText = oportunidadCell.textContent || oportunidadCell.innerText;
 
                         if (tickerCell.innerHTML.toUpperCase().indexOf(filter) > -1 || oportunidadText.toUpperCase().indexOf(filter) > -1) {{
                             display = '';
@@ -845,7 +845,7 @@ def generar_reporte():
                         
                         // Aplicar la visibilidad a la fila principal y a su fila de detalles
                         row.style.display = display;
-                        const detailsRow = document.getElementById('details-' + tickerCell.querySelector('strong').textContent);
+                        var detailsRow = document.getElementById('details-' + tickerCell.querySelector('strong').textContent);
                         if (detailsRow) {{
                             detailsRow.style.display = 'none'; // Siempre ocultar el detalle al filtrar
                         }}
@@ -858,9 +858,9 @@ def generar_reporte():
                 }}
 
                 function sortTable(n, type) {{
-                    const table = document.getElementById("data-table");
-                    const tbody = table.querySelector("tbody");
-                    const rows = Array.from(tbody.querySelectorAll("tr:not(.details-row)"));
+                    var table = document.getElementById("data-table");
+                    var tbody = table.querySelector("tbody");
+                    var rows = Array.from(tbody.querySelectorAll("tr:not(.details-row)"));
                     
                     if (currentSortCol === n) {{
                         isAscending = !isAscending;
@@ -873,15 +873,15 @@ def generar_reporte():
                     table.querySelectorAll('.sort-arrow').forEach(span => span.textContent = '');
 
                     // Establecer nueva flecha de ordenación
-                    const header = table.querySelectorAll('th')[n];
-                    const arrowSpan = header.querySelector('.sort-arrow');
+                    var header = table.querySelectorAll('th')[n];
+                    var arrowSpan = header.querySelector('.sort-arrow');
                     arrowSpan.textContent = isAscending ? ' ▲' : ' ▼';
 
 
                     rows.sort((rowA, rowB) => {{
-                        let cellA = rowA.cells[n];
-                        let cellB = rowB.cells[n];
-                        let valA, valB;
+                        var cellA = rowA.cells[n];
+                        var cellB = rowB.cells[n];
+                        var valA, valB;
 
                         if (type === 'number') {{
                             valA = parseFloat(cellA.getAttribute('data-value') || 0);
@@ -891,7 +891,7 @@ def generar_reporte():
                             valB = (cellB.textContent || cellB.innerText).toUpperCase();
                         }}
                         
-                        let comparison = 0;
+                        var comparison = 0;
                         if (valA > valB) {{
                             comparison = 1;
                         }} else if (valA < valB) {{
@@ -904,8 +904,8 @@ def generar_reporte():
                     // Reconstruir el tbody con las filas ordenadas y sus filas de detalle
                     tbody.innerHTML = '';
                     rows.forEach(row => {{
-                        const ticker = row.cells[0].querySelector('strong').textContent;
-                        const detailsRow = document.getElementById('details-' + ticker);
+                        var ticker = row.cells[0].querySelector('strong').textContent;
+                        var detailsRow = document.getElementById('details-' + ticker);
                         tbody.appendChild(row);
                         if (detailsRow) {{
                             tbody.appendChild(detailsRow);
@@ -917,7 +917,7 @@ def generar_reporte():
                 document.addEventListener('DOMContentLoaded', () => {{
                     generateTable(data);
                     
-                    const searchInput = document.getElementById('searchInput');
+                    var searchInput = document.getElementById('searchInput');
                     searchInput.addEventListener('keyup', filterTable);
                     
                     // Configurar el enfoque de la búsqueda
@@ -926,8 +926,8 @@ def generar_reporte():
                     }}
                     
                     // Sincronizar el scroll lateral
-                    const tableContainer = document.getElementById('table-container');
-                    const scrollTop = document.getElementById('scroll-top');
+                    var tableContainer = document.getElementById('table-container');
+                    var scrollTop = document.getElementById('scroll-top');
                     
                     if (tableContainer && scrollTop) {{
                         scrollTop.addEventListener('scroll', () => {{
