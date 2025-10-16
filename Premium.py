@@ -899,24 +899,24 @@ def generar_reporte():
             /* NUEVOS ESTILOS PARA LOS BOTONES */
             #button-group {{
                 display: flex;
-                justify-content: space-around; /* CAMBIO: Aumenta la separación entre los dos botones */
-                gap: 20px;
-                margin: 40px 0 20px 0; /* CAMBIO: Ajuste de margen superior e inferior */
+                justify-content: center; /* Centrar los botones en lugar de usar space-around */
+                gap: 15px; /* Reducir el gap para que quepan 3 botones */
+                margin: 40px 0 20px 0; 
                 flex-wrap: wrap; 
-                padding: 0 20px; /* Asegura que no se pegue a los bordes */
+                padding: 0 10px; /* Ajuste de padding */
             }}
             .action-button {{
                 text-decoration: none;
-                padding: 10px 20px;
+                padding: 10px 15px; /* Ajustar padding para que quepan 3 botones */
                 border: none;
                 border-radius: 8px;
-                font-size: 1.0em;
+                font-size: 0.9em; /* Reducir fuente */
                 font-weight: 600;
                 color: #ffffff;
                 background-color: #007bff; /* Azul primario */
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
                 transition: background-color 0.3s ease, box-shadow 0.3s ease;
-                min-width: 150px; /* Asegurar un ancho mínimo para adaptabilidad */
+                min-width: 100px; /* Asegurar un ancho mínimo para adaptabilidad */
                 text-align: center;
                 cursor: pointer;
                 display: block;
@@ -925,16 +925,24 @@ def generar_reporte():
                 background-color: #0056b3; /* Tono más oscuro al pasar el ratón */
                 box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
             }}
+            /* Estilo específico para el nuevo botón */
+            .action-button.full-analysis {{
+                background-color: #28a745; /* Verde para la acción de "Ver todo" */
+            }}
+            .action-button.full-analysis:hover {{
+                background-color: #1e7e34;
+            }}
+            
             .button-item {{
                 text-align: center;
-                max-width: 250px; 
+                max-width: 200px; /* Reducir el max-width */
                 flex-grow: 1;
                 flex-shrink: 1;
-                flex-basis: 40%; /* Ajuste para mayor separación */
+                flex-basis: auto; /* Dejar que flex lo calcule */
                 margin-bottom: 10px; 
             }}
             .button-description {{
-                font-size: 0.8em;
+                font-size: 0.75em; /* Reducir fuente */
                 color: #6c757d;
                 margin-top: 5px;
             }}
@@ -1240,6 +1248,10 @@ def generar_reporte():
                         <div class="button-description">Acceso a todas nuestras operaciones actualizadas a día de hoy</div>
                     </div>
                     <div class="button-item">
+                        <button onclick="showFullAnalysis()" class="action-button full-analysis">VER ANÁLISIS COMPLETO</button>
+                        <div class="button-description">Muestra todas las empresas listadas sin usar el buscador.</div>
+                    </div>
+                    <div class="button-item">
                         <a href="https://ibexia.es/category/analisis-acciones/" class="action-button">ANÁLISIS DETALLADOS</a>
                         <div class="button-description">Los valores que hemos analizado en detalle por fecha</div>
                     </div>
@@ -1272,12 +1284,13 @@ def generar_reporte():
                 const scrollTop = document.getElementById('scroll-top');
                 const searchInput = document.getElementById("searchInput");
                 const table = document.getElementById("myTable");
+                
                 // Verificar si la tabla existe antes de intentar obtener tbody y rows
                 if (table) {
                     const tbody = table.querySelector('tbody');
                     const rows = Array.from(tbody.getElementsByTagName("tr"));
                 
-                    // Función de filtrado
+                    // Función principal de filtrado
                     function filterTable() {
                         clearTimeout(filterTimeout); // Limpiar el temporizador anterior
                         
@@ -1297,30 +1310,20 @@ def generar_reporte():
                                 return; 
                             }
 
-                            let lastCategoryDisplayed = null;
-
                             for (let i = 0; i < rows.length; i++) {
                                 const row = rows[i];
                                 
-                                // 1. Manejar Separadores
-                                if (row.classList.contains("separator-row")) {
-                                    row.style.display = "none";
-                                    continue;
-                                }
-
-                                // 2. Manejar Filas de Categoría: inicialmente se ocultan por CSS y se muestran si su grupo tiene filas visibles
-                                if (row.classList.contains("category-header")) {
-                                    row.style.display = "none";
-                                    continue;
-                                }
-
-                                // 3. Manejar Filas Detalle/Observaciones: se mantienen ocultas
-                                if (row.classList.contains("collapsible-row") || row.classList.contains("observaciones-row")) {
+                                // Ocultar todas las filas que no son main-row, excepto las que se muestran a continuación
+                                if (row.classList.contains("separator-row") || 
+                                    row.classList.contains("category-header") || 
+                                    row.classList.contains("collapsible-row") || 
+                                    row.classList.contains("observaciones-row")) 
+                                {
                                     row.style.display = "none";
                                     continue;
                                 }
                                 
-                                // 4. Procesar Filas Principales
+                                // Procesar Filas Principales
                                 if (row.classList.contains("main-row")) {
                                     const name = row.getAttribute('data-name');
                                     const ticker = row.getAttribute('data-ticker');
@@ -1329,53 +1332,89 @@ def generar_reporte():
 
                                     if (isMatch) {
                                         row.style.display = "table-row";
-                                        // Marcar que esta categoría debe mostrarse (se procesará después del loop)
-                                        const currentCategory = row.previousElementSibling;
-                                        
-                                        if (currentCategory && currentCategory.classList.contains("category-header")) {
-                                            lastCategoryDisplayed = currentCategory;
-                                        }
-
                                     } else {
                                         row.style.display = "none";
                                     }
                                 }
                             }
                             
-                            // 5. Segunda pasada para mostrar las cabeceras de categoría si tienen al menos una fila visible
-                            const categoryHeaders = document.querySelectorAll('.category-header');
-                            categoryHeaders.forEach(header => {
-                                let nextSibling = header.nextElementSibling;
-                                let hasVisibleRows = false;
-                                while(nextSibling && !nextSibling.classList.contains('category-header')) {
-                                    if (nextSibling.classList.contains('main-row') && nextSibling.style.display !== 'none') {
-                                        hasVisibleRows = true;
-                                        break;
-                                    }
-                                    nextSibling = nextSibling.nextElementSibling;
-                                }
-                                header.style.display = hasVisibleRows ? "table-row" : "none";
-                            });
+                            // Segunda pasada para mostrar las cabeceras de categoría
+                            showCategoryHeaders();
 
-                            // 6. Tercera pasada para mostrar los separadores si hay un cambio de categoría visible
-                            const separatorRows = document.querySelectorAll('.separator-row');
-                            separatorRows.forEach(separator => {
-                                const prev = separator.previousElementSibling;
-                                const next = separator.nextElementSibling;
-                                
-                                const prevVisible = prev && prev.style.display === "table-row" && prev.classList.contains("category-header");
-                                const nextVisible = next && next.style.display === "table-row" && next.classList.contains("category-header");
-
-                                // Si el separador está entre dos categorías *visibles* diferentes, lo mostramos.
-                                if (prevVisible && nextVisible) {
-                                    separator.style.display = "table-row";
-                                } else {
-                                    separator.style.display = "none";
-                                }
-                            });
-
+                            // Tercera pasada para mostrar los separadores
+                            showSeparatorRows();
 
                         }, 200); // Pequeño retraso para evitar ejecuciones rápidas
+                    }
+                
+                    // Función para mostrar los resultados completos
+                    window.showFullAnalysis = function() {
+                        searchInput.value = ''; // Limpiar el campo de búsqueda
+                        
+                        // Mostrar la tabla y el scroll superior
+                        tableContainer.style.display = "block";
+                        if (scrollTop) {
+                            scrollTop.style.display = "block";
+                        }
+                        
+                        // Mostrar todas las filas principales
+                        for (let i = 0; i < rows.length; i++) {
+                            const row = rows[i];
+                            // Asegurarse de que los detalles (collapsible y observaciones) estén ocultos al inicio
+                            if (row.classList.contains("collapsible-row") || row.classList.contains("observaciones-row")) {
+                                row.style.display = "none";
+                            } 
+                            // Mostrar filas principales
+                            else if (row.classList.contains("main-row")) {
+                                row.style.display = "table-row";
+                            } 
+                            // Ocultar separadores y categorías (serán re-evaluados)
+                            else if (row.classList.contains("separator-row") || row.classList.contains("category-header")) {
+                                row.style.display = "none";
+                            }
+                        }
+                        
+                        // Mostrar las cabeceras de categoría
+                        showCategoryHeaders();
+
+                        // Mostrar los separadores
+                        showSeparatorRows();
+                    }
+                    
+                    // Lógica para mostrar las cabeceras de categoría
+                    function showCategoryHeaders() {
+                        const categoryHeaders = document.querySelectorAll('.category-header');
+                        categoryHeaders.forEach(header => {
+                            let nextSibling = header.nextElementSibling;
+                            let hasVisibleRows = false;
+                            while(nextSibling && !nextSibling.classList.contains('category-header')) {
+                                if (nextSibling.classList.contains('main-row') && nextSibling.style.display !== 'none') {
+                                    hasVisibleRows = true;
+                                    break;
+                                }
+                                nextSibling = nextSibling.nextElementSibling;
+                            }
+                            header.style.display = hasVisibleRows ? "table-row" : "none";
+                        });
+                    }
+                    
+                    // Lógica para mostrar los separadores
+                    function showSeparatorRows() {
+                        const separatorRows = document.querySelectorAll('.separator-row');
+                        separatorRows.forEach(separator => {
+                            const prev = separator.previousElementSibling;
+                            const next = separator.nextElementSibling;
+                            
+                            const prevVisible = prev && prev.style.display === "table-row" && prev.classList.contains("category-header");
+                            const nextVisible = next && next.style.display === "table-row" && next.classList.contains("category-header");
+
+                            // Si el separador está entre dos categorías *visibles* diferentes, lo mostramos.
+                            if (prevVisible && nextVisible) {
+                                separator.style.display = "table-row";
+                            } else {
+                                separator.style.display = "none";
+                            }
+                        });
                     }
                 }
                 
@@ -1421,16 +1460,7 @@ def generar_reporte():
         # *************** FIN DE LA MODIFICACIÓN DE LA SECCIÓN HTML ********************
         # ******************************************************************************
         
-        # Ahora, 'html_body_completo' contiene la versión con <html>, <head>, <body>, etc.,
-        # que es la que se envía por correo (con el adjunto).
-        
-        # SIN EMBARGO, LA FUNCIÓN 'enviar_email_con_adjunto' ya crea ese envoltorio.
-        # Por lo tanto, el contenido que se debe pasar a 'enviar_email_con_adjunto' es:
-        # 1. Los estilos (para que se vean en el adjunto).
-        # 2. El contenido principal.
-        # 3. El script (para que funcione la tabla).
-        
-        # Concatenamos las tres secciones sin las etiquetas <style> y <script> para pasar un bloque HTML limpio.
+        # Concatenamos las tres secciones para pasar un bloque HTML limpio para el email.
         html_para_email_body = f"""
             {html_styles}
             {html_content}
@@ -1443,12 +1473,7 @@ def generar_reporte():
 
         enviar_email_con_adjunto(html_para_email_body, asunto, nombre_archivo_base)
         
-        # Devolver SÓLO el código HTML que se necesita para el hueco de WordPress (sin <style> ni <script>
-        # para que se puedan poner en el <head> de WordPress si es necesario, pero con la opción
-        # de poner todo en un solo bloque si se usa un bloque HTML.
-        
-        # PARA FACILITAR LA INSERCIÓN: Devolveremos un bloque único con <style>, contenido y <script>.
-        # Si la plataforma de WordPress permite insertar todo de golpe, esta es la solución más sencilla.
+        # Devolver el bloque único con <style>, contenido y <script> para la inserción en WordPress.
         return html_styles + html_content + html_script 
 
     except Exception as e:
