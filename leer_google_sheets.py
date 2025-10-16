@@ -633,7 +633,7 @@ def construir_prompt_formateado(data):
     anuncio_html = """
     <div style="background-color: #f0f8ff; color: #333333; padding: 15px; margin: 20px 0; text-align: center; border-radius: 8px; border: 1px solid #cceeff;">
         <p style="font-size: 1.1em; margin: 0; font-weight: bold;">
-            Estamos desarrollando un nuevo sistema de **ALERTAS PREMIUM** actualmente gratuito. Con este servicio, no tendrás que esperar al análisis diario. En su lugar, verás un análisis detallado de todas las empresas que actualizamos tres veces al día. <a href="https://ibexia.es/contenido-premium/" style="color: #007bff; font-weight: bold; text-decoration: underline;">**ENTRA.**</a>
+            Este analísis detallado lo hacemos 1 vez por semana para cada empresa, si no quieres esperar en la pagina principal consulta tu empresa en el buscador, el análisis lo actualizamos tres veces al día. <a href="https://ibexia.es/" style="color: #007bff; font-weight: bold; text-decoration: underline;">**ENTRA.**</a>
         </p>
     </div>
     """
