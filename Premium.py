@@ -821,7 +821,7 @@ def generar_reporte():
                 font-size: 4.0em; /* Tamaño grande */
                 font-weight: 300;
                 margin-top: 20px;
-                margin-bottom: 0px; 
+                margin-bottom: 50px; 
                 letter-spacing: -0.05em; /* Juntar las letras */
             }}
             .google-style {{
@@ -830,26 +830,26 @@ def generar_reporte():
             }}
             .google-style span {{
                 font-weight: 700; /* Las letras de color son más gruesas */
-                border-radius: 5px; /* Sutil borde redondeado a cada letra para imitar la 'suavidad' de la opción 5 */
+                border-radius: 25px; /* Sutil borde redondeado a cada letra para imitar la 'suavidad' de la opción 5 */
                 display: inline-block; /* Necesario para que border-radius funcione */
                 padding: 0 1px; /* Espaciado mínimo para que se note el redondeado */
             }}
-            .google-style .i1 {{ color: #1A237E; }} /* Azul Índigo Muy Oscuro */
-            .google-style .b1 {{ color: #3F51B5; }} /* Azul Real Oscuro */
-            .google-style .e1 {{ color: #4CAF50; }} /* Verde Brillante */
-            .google-style .x1 {{ color: #00BCD4; }} /* Cian Brillante */
-            .google-style .i2 {{ color: #00ACC1; }} /* Cian Medio */
+            .google-style .i1 {{ color: #26A699; }} /* Azul Índigo Muy Oscuro */
+            .google-style .b1 {{ color: #26A699; }} /* Azul Real Oscuro */
+            .google-style .e1 {{ color: #26A699; }} /* Verde Brillante */
+            .google-style .x1 {{ color: #26A699; }} /* Cian Brillante */
+            .google-style .i2 {{ color: #26A699; }} /* Cian Medio */
             .google-style .a1 {{ color: #26A699; }} /* Verde Azulado */
             .google-style .es-final {{
-                font-size: 0.7em; 
-                font-weight: 700;
+                font-size: 0.5em; 
+                font-weight: 100;
                 color: #00BCD4; /* Cian Brillante */
-                vertical-align: top; 
+                vertical-align: bottom; 
                 margin-left: -0.1em; 
             }}
             p {{
                 color: #6c757d;
-                text-align: center;
+                text-align: left;
                 font-size: 0.9em;
             }}
             
