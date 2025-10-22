@@ -1258,7 +1258,7 @@ def generar_reporte():
                 </div>
                 
                 <br>
-                <p class="disclaimer"><strong>Aviso:</strong> El algoritmo de trading se basa en indicadores técnicos y no garantiza la rentabilidad. Utiliza esta información con tu propio análisis y criterio. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión. ¡Feliz trading!</p>
+                
             </div>
         """
         
