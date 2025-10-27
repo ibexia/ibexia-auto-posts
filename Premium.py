@@ -767,21 +767,25 @@ def generar_tabla_posiciones_abiertas(datos_completos):
     
     for data in posiciones_ordenadas:
         
-        # 4. Lógica para la recomendación de venta
+        # 4. Lógica para la recomendación de venta (AJUSTADO A LOS TEXTOS REQUERIDOS)
         oportunidad = data['OPORTUNIDAD']
         
         if "venta activada" in oportunidad.lower():
-            recomendacion = "VENDER AHORA"
-            clase_rec = "venta"
-        elif "riesgo de venta" in oportunidad.lower() or "vigilar" in oportunidad.lower():
-            recomendacion = "VALORANDO VENDER"
-            clase_rec = "vigilar" # Usamos la clase amarilla/naranja
-        elif "compra" in oportunidad.lower():
-            recomendacion = "MANTENER POSICIÓN"
-            clase_rec = "compra" # Usamos la clase verde
+            # Condición 1: Riesgo de Venta Activada
+            recomendacion = "VENDEREMOS HOY." 
+            clase_rec = "venta" # Rojo
+        elif "riesgo de venta" in oportunidad.lower():
+            # Condición 2: Riesgo de Venta
+            recomendacion = "VALORANDO VENDER AHORA." 
+            clase_rec = "vigilar" # Naranja/Amarillo (Riesgo alto)
+        elif "vigilar" in oportunidad.lower():
+            # Condición 3: VIGILAR
+            recomendacion = "NOS MANTENEMOS CON PRECAUCIÓN." 
+            clase_rec = "riesgo-compra" # Amarillo (Advertencia temprana)
         else:
-            recomendacion = "MANTENER POSICIÓN"
-            clase_rec = "compra"
+            # Condición 4: Todas las demás (Compra, Intermedio, etc.)
+            recomendacion = "NOS MANTENEMOS." 
+            clase_rec = "compra" # Verde
 
         
         # Obtener el nombre de la empresa sin el precio (lo pondremos en el tooltip/enlace)
@@ -1147,16 +1151,26 @@ def generar_reporte():
             }}
             
             /* ESTILOS AÑADIDOS PARA LA NUEVA TABLA DE POSICIONES ABIERTAS */
-            .open-positions-container table th, .open-positions-container table td {{
+            .open-positions-container table th, .open-positions-container table td {
                 font-size: 0.9em;
                 padding: 10px 6px;
-            }}
-            .open-positions-container table th {{
+            }
+            .open-positions-container table th {
                 background-color: #1A237E; /* Azul oscuro corporativo */
                 color: white;
                 font-weight: 700;
-            }}
+                /* IMPORTANTE: Para que el encabezado se desplace con el scroll, debe quitar position: sticky;
+                   o asegurarse de que la tabla interna no lo tenga. Dejaremos este estilo: */
+            }
+            /* AÑADA ESTE NUEVO BLOQUE DE ESTILOS */
+            .open-positions-container {
+                max-height: 300px; /* <--- ALTURA MÁXIMA PARA 5-6 FILAS. Puede ajustar este valor (Ej: 250px) */
+                overflow-y: auto;  /* <--- HABILITA EL SCROLL VERTICAL */
+                overflow-x: auto; /* <--- Mantiene el scroll horizontal si es necesario */
+            }
             /* FIN DE ESTILOS AÑADIDOS */
+
+            
 
         </style>
         """
