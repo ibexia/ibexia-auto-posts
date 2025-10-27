@@ -745,21 +745,25 @@ def generar_tabla_posiciones_abiertas(datos_completos):
     
     # 3. Generar el contenido HTML de la tabla
     
+    # **MODIFICACIÓN 1: Añadir el texto de advertencia sobre el desplazamiento**
     html_table = """
         <h3 style="text-align: center; color: #1A237E; margin-top: 50px; margin-bottom: 20px; font-size: 1.8em; border-bottom: 2px solid #e9ecef; padding-bottom: 10px;">
             <i class="fas fa-check-circle" style="color:#28a745; margin-right: 10px;"></i>
             Posiciones Abiertas (Cartera IBEXIA)
         </h3>
-        <div class="open-positions-container" style="overflow-x: auto; max-width: 100%;">
-            <table style="min-width: 700px; width: 100%; table-layout: auto; border: 1px solid #dee2e6;">
+        <p style="text-align: center; font-size: 1.0em; color: #dc3545; font-weight: bold; margin-bottom: 20px;">
+            ⚠️ Desliza hacia abajo dentro de la caja para ver todas las empresas en las que estamos invertidos.
+        </p>
+        <div class="open-positions-container" style="overflow-x: auto; max-width: 100%; height: 350px; overflow-y: scroll; border: 1px solid #dee2e6;">
+            <table style="min-width: 700px; width: 100%; table-layout: auto; border: 0;">
                 <thead>
                     <tr style="background-color: #f0f8ff;">
                         <th style="width: 20%;">EMPRESA (TICKER)</th>
                         <th style="width: 15%;">FECHA ENTRADA</th>
                         <th style="width: 15%;">PRECIO ENTRADA</th>
                         <th style="width: 15%;">PRECIO ACTUAL</th>
-                        <th style="width: 20%;">BENEFICIO ACTUAL (Simulado)</th>
-                        <th style="width: 15%;">RECOMENDACIÓN</th>
+                        <th style="width: 20%;">BENEFICIO A DÍA DE HOY</th>
+                        <th style="width: 15%;">ESTADO</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -767,25 +771,25 @@ def generar_tabla_posiciones_abiertas(datos_completos):
     
     for data in posiciones_ordenadas:
         
-        # 4. Lógica para la recomendación de venta (AJUSTADO A LOS TEXTOS REQUERIDOS)
-        oportunidad = data['OPORTUNIDAD']
+        # 4. **MODIFICACIÓN 4: Lógica para la columna ESTADO**
+        oportunidad = data['OPORTUNIDAD'].lower()
         
-        if "venta activada" in oportunidad.lower():
-            # Condición 1: Riesgo de Venta Activada
-            recomendacion = "VENDEREMOS HOY." 
-            clase_rec = "venta" # Rojo
-        elif "riesgo de venta" in oportunidad.lower():
-            # Condición 2: Riesgo de Venta
-            recomendacion = "VALORANDO VENDER AHORA." 
-            clase_rec = "vigilar" # Naranja/Amarillo (Riesgo alto)
-        elif "vigilar" in oportunidad.lower():
-            # Condición 3: VIGILAR
-            recomendacion = "NOS MANTENEMOS CON PRECAUCIÓN." 
-            clase_rec = "riesgo-compra" # Amarillo (Advertencia temprana)
-        else:
-            # Condición 4: Todas las demás (Compra, Intermedio, etc.)
-            recomendacion = "NOS MANTENEMOS." 
+        # Criterios de peor caso a mejor caso
+        if "venta activada" in oportunidad:
+            recomendacion = "VENDEREMOS HOY"
+            clase_rec = "venta"
+        elif "riesgo de venta" in oportunidad:
+            recomendacion = "VALORANDO VENDER AHORA"
+            clase_rec = "vigilar" # Amarillo/Naranja
+        elif "vigilar" in oportunidad or "intermedio" in oportunidad or "seguirá bajando" in oportunidad:
+            recomendacion = "NOS MANTENEMOS CON PRECAUCIÓN"
+            clase_rec = "vigilar"
+        elif "compra" in oportunidad:
+            recomendacion = "NOS MANTENEMOS"
             clase_rec = "compra" # Verde
+        else:
+            recomendacion = "NOS MANTENEMOS"
+            clase_rec = "compra"
 
         
         # Obtener el nombre de la empresa sin el precio (lo pondremos en el tooltip/enlace)
@@ -1151,26 +1155,20 @@ def generar_reporte():
             }}
             
             /* ESTILOS AÑADIDOS PARA LA NUEVA TABLA DE POSICIONES ABIERTAS */
-            .open-positions-container table th, .open-positions-container table td {
+            .open-positions-container table th, .open-positions-container table td {{
                 font-size: 0.9em;
                 padding: 10px 6px;
-            }
-            .open-positions-container table th {
+            }}
+            .open-positions-container table th {{
                 background-color: #1A237E; /* Azul oscuro corporativo */
                 color: white;
                 font-weight: 700;
-                /* IMPORTANTE: Para que el encabezado se desplace con el scroll, debe quitar position: sticky;
-                   o asegurarse de que la tabla interna no lo tenga. Dejaremos este estilo: */
-            }
-            /* AÑADA ESTE NUEVO BLOQUE DE ESTILOS */
-            .open-positions-container {
-                max-height: 300px; /* <--- ALTURA MÁXIMA PARA 5-6 FILAS. Puede ajustar este valor (Ej: 250px) */
-                overflow-y: auto;  /* <--- HABILITA EL SCROLL VERTICAL */
-                overflow-x: auto; /* <--- Mantiene el scroll horizontal si es necesario */
-            }
-            /* FIN DE ESTILOS AÑADIDOS */
-
+            }}
             
+            /* **MODIFICACIÓN 5: Estilo para la limitación de filas (NO NECESARIO si se usa overflow-y)** */
+            /* Se usa la propiedad `height` y `overflow-y: scroll` en el contenedor `open-positions-container` */
+
+            /* FIN DE ESTILOS AÑADIDOS */
 
         </style>
         """
@@ -1398,6 +1396,7 @@ def generar_reporte():
                 
                 """
         
+        # El generador de la tabla inferior ya incluye todas las modificaciones.
         html_content += generar_tabla_posiciones_abiertas(datos_completos)
         
         html_content += """
