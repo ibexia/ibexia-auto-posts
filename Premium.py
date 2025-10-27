@@ -718,6 +718,116 @@ def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
             os.remove(ruta_archivo)
         except OSError as e:
             print(f"⚠️ Error al intentar borrar el archivo temporal {ruta_archivo}: {e}")
+            
+# --------------------------------------------------------------------------------------
+# ------------------ NUEVA FUNCIÓN AÑADIDA PARA LA SEGUNDA TABLA ---------------------
+# --------------------------------------------------------------------------------------
+
+def generar_tabla_posiciones_abiertas(datos_completos):
+    
+    # 1. Filtrar solo las empresas que tienen COMPRADO == "SI"
+    posiciones_abiertas = [d for d in datos_completos if d.get('COMPRADO') == "SI"]
+    
+    if not posiciones_abiertas:
+        return "" # Devolver una cadena vacía si no hay posiciones abiertas
+        
+    # 2. Ordenar por FECHA_COMPRA (la fecha está en formato DD/MM/YYYY)
+    def key_sort_date(item):
+        fecha_str = item.get('FECHA_COMPRA')
+        try:
+            return datetime.strptime(fecha_str, '%d/%m/%Y')
+        except ValueError:
+            # Poner al final las que no tienen fecha válida o es "N/A"
+            return datetime.min 
+            
+    # Ordenar por fecha de compra, de la más antigua a la más reciente (ascendente)
+    posiciones_ordenadas = sorted(posiciones_abiertas, key=key_sort_date)
+    
+    # 3. Generar el contenido HTML de la tabla
+    
+    html_table = """
+        <h3 style="text-align: center; color: #1A237E; margin-top: 50px; margin-bottom: 20px; font-size: 1.8em; border-bottom: 2px solid #e9ecef; padding-bottom: 10px;">
+            <i class="fas fa-check-circle" style="color:#28a745; margin-right: 10px;"></i>
+            Posiciones Abiertas (Cartera IBEXIA)
+        </h3>
+        <div class="open-positions-container" style="overflow-x: auto; max-width: 100%;">
+            <table style="min-width: 700px; width: 100%; table-layout: auto; border: 1px solid #dee2e6;">
+                <thead>
+                    <tr style="background-color: #f0f8ff;">
+                        <th style="width: 20%;">EMPRESA (TICKER)</th>
+                        <th style="width: 15%;">FECHA ENTRADA</th>
+                        <th style="width: 15%;">PRECIO ENTRADA</th>
+                        <th style="width: 15%;">PRECIO ACTUAL</th>
+                        <th style="width: 20%;">BENEFICIO ACTUAL (Simulado)</th>
+                        <th style="width: 15%;">RECOMENDACIÓN</th>
+                    </tr>
+                </thead>
+                <tbody>
+    """
+    
+    for data in posiciones_ordenadas:
+        
+        # 4. Lógica para la recomendación de venta
+        oportunidad = data['OPORTUNIDAD']
+        
+        if "venta activada" in oportunidad.lower():
+            recomendacion = "VENDER AHORA"
+            clase_rec = "venta"
+        elif "riesgo de venta" in oportunidad.lower() or "vigilar" in oportunidad.lower():
+            recomendacion = "VALORANDO VENDER"
+            clase_rec = "vigilar" # Usamos la clase amarilla/naranja
+        elif "compra" in oportunidad.lower():
+            recomendacion = "MANTENER POSICIÓN"
+            clase_rec = "compra" # Usamos la clase verde
+        else:
+            recomendacion = "MANTENER POSICIÓN"
+            clase_rec = "compra"
+
+        
+        # Obtener el nombre de la empresa sin el precio (lo pondremos en el tooltip/enlace)
+        nombre_empresa_url = None
+        for nombre, ticker_val in tickers.items():
+            if ticker_val == data['TICKER']:
+                nombre_empresa_url = nombre
+                break
+        
+        if nombre_empresa_url:
+            empresa_link = f'https://ibexia.es/category/{nombre_empresa_url.lower()}/'
+        else:
+            empresa_link = '#'
+            
+        # Generar la fila de la tabla
+        html_table += f"""
+                    <tr>
+                        <td style="text-align: left; font-weight: bold;">
+                            <a href='{empresa_link}' target='_blank' style='text-decoration:none; color: #1A237E;'>
+                                {data['NOMBRE_EMPRESA']} 
+                                <span style='color: #6c757d; font-weight: normal; font-size: 0.9em;'>({data['TICKER']})</span>
+                            </a>
+                        </td>
+                        <td>{data['FECHA_COMPRA']}</td>
+                        <td>{formatear_numero(data['PRECIO_COMPRA'])}€</td>
+                        <td><span class="compra" style="color: #1A237E;">{formatear_numero(data['PRECIO_ACTUAL'])}€</span></td>
+                        <td>{formatear_beneficio(data['BENEFICIO_ACTUAL'])}</td>
+                        <td><span class="{clase_rec}" style="font-weight: bold;">{recomendacion}</span></td>
+                    </tr>
+        """
+        
+    html_table += """
+                </tbody>
+            </table>
+        </div>
+        <p style="text-align: center; margin-top: 15px; font-size: 0.9em; color: #1A237E;">
+            <i class="fas fa-info-circle" style="margin-right: 5px;"></i>
+            El beneficio actual es una simulación basada en una inversión de 10.000€ para cada operación.
+        </p>
+    """
+    
+    return html_table
+
+# --------------------------------------------------------------------------------------
+# ---------------- FIN DE LA NUEVA FUNCIÓN AÑADIDA PARA LA SEGUNDA TABLA ---------------
+# --------------------------------------------------------------------------------------
 
 def generar_reporte():
     try:
@@ -1035,6 +1145,19 @@ def generar_reporte():
                 text-align: left;
                 background-color: #ffffff;
             }}
+            
+            /* ESTILOS AÑADIDOS PARA LA NUEVA TABLA DE POSICIONES ABIERTAS */
+            .open-positions-container table th, .open-positions-container table td {{
+                font-size: 0.9em;
+                padding: 10px 6px;
+            }}
+            .open-positions-container table th {{
+                background-color: #1A237E; /* Azul oscuro corporativo */
+                color: white;
+                font-weight: 700;
+            }}
+            /* FIN DE ESTILOS AÑADIDOS */
+
         </style>
         """
         
@@ -1259,6 +1382,11 @@ def generar_reporte():
                 
                 <br>
                 
+                """
+        
+        html_content += generar_tabla_posiciones_abiertas(datos_completos)
+        
+        html_content += """
             </div>
         """
         
@@ -1447,6 +1575,7 @@ def generar_reporte():
         <head>
             <title>ibexiaES - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0"> <meta name="robots" content="noindex">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
             {html_styles}
         </head>
         <body>
