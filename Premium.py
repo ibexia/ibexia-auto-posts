@@ -825,10 +825,7 @@ def generar_tabla_posiciones_abiertas(datos_completos):
                 </tbody>
             </table>
         </div>
-        <p style="text-align: center; margin-top: 15px; font-size: 0.9em; color: #1A237E;">
-            <i class="fas fa-info-circle" style="margin-right: 5px;"></i>
-            El beneficio actual es una simulación basada en una inversión de 10.000€ para cada operación.
-        </p>
+
     """
     
     return html_table
