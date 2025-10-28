@@ -749,7 +749,7 @@ def generar_tabla_posiciones_abiertas(datos_completos):
     html_table = """
         <h3 style="text-align: center; color: #1A237E; margin-top: 50px; margin-bottom: 20px; font-size: 1.8em; border-bottom: 2px solid #e9ecef; padding-bottom: 10px;">
             <i class="fas fa-check-circle" style="color:#28a745; margin-right: 10px;"></i>
-            Posiciones Abiertas (Cartera IBEXIA)
+            Posiciones Abiertas (Cartera IBEXIAes)
         </h3>
         <p style="text-align: center; font-size: 1.0em; color: #dc3545; font-weight: bold; margin-bottom: 20px;">
             ⚠️ Desliza hacia abajo dentro de la caja para ver todas las empresas en las que estamos invertidos.
