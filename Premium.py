@@ -734,7 +734,7 @@ def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
             print(f"⚠️ Error al intentar borrar el archivo temporal {ruta_archivo}: {e}")
             
 # --------------------------------------------------------------------------------------
-# ------------------ NUEVA FUNCIÓN AÑADIDA PARA LA SEGUNDA TABLA ---------------------
+# ------------------ FUNCIÓN CORREGIDA PARA LAS POSICIONES ABIERTAS ---------------------
 # --------------------------------------------------------------------------------------
 
 def generar_tabla_posiciones_abiertas(datos_completos):
@@ -786,25 +786,24 @@ def generar_tabla_posiciones_abiertas(datos_completos):
     
     for data in posiciones_ordenadas:
         
-        # 4. Lógica para la columna ESTADO
+        # 4. Lógica para la columna ESTADO (AQUÍ SE APLICAN LOS CAMBIOS SOLICITADOS)
         oportunidad = data['OPORTUNIDAD'].lower()
         
-        # Criterios de peor caso a mejor caso
-        if "venta activada" in oportunidad:
-            recomendacion = "VENDEREMOS HOY"
+        # 1. VALORANDO VENDER AHORA (ROJO)
+        if "venta" in oportunidad:
+            recomendacion = "VALORANDO VENDER AHORA"
             clase_rec = "venta-op"
-        elif "riesgo de venta" in oportunidad:
-            recomendacion = "VALORANDO VENDER"
-            clase_rec = "vigilar-op" # Amarillo/Naranja
-        elif "vigilar" in oportunidad or "intermedio" in oportunidad or "seguirá bajando" in oportunidad:
-            recomendacion = "NOS MANTENEMOS"
+        # 2. NOS MANTENEMOS CON PRECAUCIÓN (AMARILLO)
+        elif "vigilar" in oportunidad or "intermedio" in oportunidad or "seguirá bajando" in oportunidad or "compra riesgo" in oportunidad:
+            recomendacion = "NOS MANTENEMOS CON PRECAUCIÓN"
             clase_rec = "vigilar-op"
+        # 3. NOS MANTENEMOS (VERDE)
         elif "compra" in oportunidad:
-            recomendacion = "NOS MANTENEMOS FUERTE"
-            clase_rec = "compra-op" # Verde
-        else:
             recomendacion = "NOS MANTENEMOS"
             clase_rec = "compra-op"
+        else:
+            recomendacion = "NOS MANTENEMOS CON PRECAUCIÓN" # Fallback
+            clase_rec = "vigilar-op"
 
         
         # Obtener el nombre de la empresa sin el precio (lo pondremos en el tooltip/enlace)
@@ -846,7 +845,7 @@ def generar_tabla_posiciones_abiertas(datos_completos):
     return html_table
 
 # --------------------------------------------------------------------------------------
-# ---------------- FIN DE LA NUEVA FUNCIÓN AÑADIDA PARA LA SEGUNDA TABLA ---------------
+# ---------------- FIN DE LA FUNCIÓN CORREGIDA PARA LAS POSICIONES ABIERTAS ---------------
 # --------------------------------------------------------------------------------------
 
 def generar_tabla_analisis(datos_ordenados):
@@ -1036,7 +1035,7 @@ def generar_tabla_analisis(datos_ordenados):
     return html_table_styles
 
 # ***************************************************************
-# *** FUNCIÓN AUXILIAR MOVIDA AL ÁMBITO GLOBAL (CORRECCIÓN DEL ERROR) ***
+# *** FUNCIÓN AUXILIAR MOVIDA AL ÁMBITO GLOBAL (CORRECCIÓN DEL ERROR ANTERIOR) ***
 # ***************************************************************
 def obtener_clave_ordenacion(empresa):
     """Define la lógica de ordenación por prioridad."""
@@ -1333,7 +1332,7 @@ def generar_reporte():
                 text-align: center;
             }}
             .venta-op {{ background-color: #dc3545; color: white; }}
-            .vigilar-op {{ background-color: #ffc107; color: #343a40; }}
+            .vigilar-op {{ background-color: #ffc107; color: #343a40; }} /* AMARILLO para precaución */
             .compra-op {{ background-color: #28a745; color: white; }}
 
             
