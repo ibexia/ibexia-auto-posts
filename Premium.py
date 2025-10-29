@@ -309,7 +309,7 @@ def obtener_datos_yfinance(ticker):
         
         # --- Lógica de Detección de Última Operación (Compra o Venta) ---
         comprado_status = "NO"
-        precio_compra = "N/A" 
+        precio_compra = "N/A"
         fecha_compra = "N/A"   
         
         precio_venta_cierre = "N/A"
@@ -1035,6 +1035,29 @@ def generar_tabla_analisis(datos_ordenados):
     """
     return html_table_styles
 
+# ***************************************************************
+# *** FUNCIÓN AUXILIAR MOVIDA AL ÁMBITO GLOBAL (CORRECCIÓN DEL ERROR) ***
+# ***************************************************************
+def obtener_clave_ordenacion(empresa):
+    """Define la lógica de ordenación por prioridad."""
+    categoria = empresa['OPORTUNIDAD']
+    
+    prioridad = {
+        "Posibilidad de Compra Activada": 1, 
+        "Posibilidad de Compra": 2,         
+        "Compra RIESGO": 2.5,               
+        "VIGILAR": 3,
+        "Riesgo de Venta": 4,
+        "Riesgo de Venta Activada": 5,
+        "Seguirá bajando": 6,
+        "Intermedio": 7,
+    }
+
+    orden_interna = prioridad.get(categoria, 99) 
+
+    return (orden_interna, empresa['NOMBRE_EMPRESA'])
+# ***************************************************************
+
 
 def generar_reporte():
     try:
@@ -1057,24 +1080,7 @@ def generar_reporte():
                 
             time.sleep(1)
 
-        def obtener_clave_ordenacion(empresa):
-            categoria = empresa['OPORTUNIDAD']
-            
-            prioridad = {
-                "Posibilidad de Compra Activada": 1, 
-                "Posibilidad de Compra": 2,         
-                "Compra RIESGO": 2.5,               
-                "VIGILAR": 3,
-                "Riesgo de Venta": 4,
-                "Riesgo de Venta Activada": 5,
-                "Seguirá bajando": 6,
-                "Intermedio": 7,
-            }
-
-            orden_interna = prioridad.get(categoria, 99) 
-
-            return (orden_interna, empresa['NOMBRE_EMPRESA'])
-
+        # Ahora la función obtener_clave_ordenacion es accesible
         datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
         
         now_utc = datetime.utcnow()
@@ -1498,7 +1504,9 @@ def generar_reporte():
                     }
                     
                     // Asegurarse de que el scroll superior del contenedor principal sea 0 al cambiar de vista
-                    mainAnalysisContainer.scrollTop = 0; 
+                    if(mainAnalysisContainer) {
+                        mainAnalysisContainer.scrollTop = 0; 
+                    }
                 }
 
                 // --- LÓGICA DE FILTRADO (BUSCADOR Y BOTONES) ---
