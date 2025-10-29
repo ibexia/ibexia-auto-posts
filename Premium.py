@@ -1159,7 +1159,7 @@ def generar_reporte():
                 font-size: 0.9em;
                 font-weight: 600;
                 color: #495057;
-                background-color: #e9ecef;
+                background-color: #26A699;
                 transition: all 0.3s ease;
                 cursor: pointer;
                 flex-grow: 1; /* Permite que los botones crezcan si es necesario */
@@ -1246,7 +1246,7 @@ def generar_reporte():
             }}
             th {{
                 background-color: #1A237E; /* Azul oscuro */
-                color: white;
+                color: white !important;
                 font-weight: 600;
                 position: sticky;
                 top: 0;
