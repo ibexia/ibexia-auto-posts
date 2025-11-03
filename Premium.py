@@ -1070,7 +1070,7 @@ def generar_reporte():
                 overflow-y: auto;
                 height: 70vh;
                 position: relative;
-                display: none; 
+                display: block; 
                 max-width: 100%; 
             }}
             table {{
@@ -1562,7 +1562,7 @@ def generar_reporte():
                 document.addEventListener('DOMContentLoaded', function() {
                     if (searchInput) {
                         searchInput.addEventListener("keyup", filterTable);
-                        searchInput.focus(); // Enfocar el campo de búsqueda al cargar
+                        showFullAnalysis(); // Enfocar el campo de búsqueda al cargar
                     }
                     
                     // Sincronizar el scroll lateral
