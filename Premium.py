@@ -399,13 +399,13 @@ def obtener_datos_yfinance(ticker):
             if isinstance(smi_weekly, (int, float)):
                 estado_smi_weekly = "Sobrecompra" if smi_weekly > 40 else ("Sobreventa" if smi_weekly < -40 else "Intermedio")
                 
-                # Generar el texto de la observación semanal
+                # Generar el texto de la observación semanal (Cambiado de 'SMI' a 'Algoritmo')
                 if estado_smi_weekly == "Sobrecompra":
-                    observacion_semanal = f"El **SMI Semanal** ({formatear_numero(smi_weekly)}) está en zona de **Sobrecompra**. Sugiere que el precio ya ha subido mucho a largo plazo."
+                    observacion_semanal = f"El **Algoritmo Semanal** ({formatear_numero(smi_weekly)}) está en zona de **Sobrecompra**. Sugiere que el precio ya ha subido mucho a largo plazo."
                 elif estado_smi_weekly == "Sobreventa":
-                    observacion_semanal = f"El **SMI Semanal** ({formatear_numero(smi_weekly)}) está en zona de **Sobreventa**. Sugiere potencial de subida a largo plazo."
+                    observacion_semanal = f"El **Algoritmo Semanal** ({formatear_numero(smi_weekly)}) está en zona de **Sobreventa**. Sugiere potencial de subida a largo plazo."
                 else:
-                    observacion_semanal = f"El **SMI Semanal** ({formatear_numero(smi_weekly)}) está en zona **Intermedia**."
+                    observacion_semanal = f"El **Algoritmo Semanal** ({formatear_numero(smi_weekly)}) está en zona **Intermedia**."
                     
             else:
                 estado_smi_weekly = 'N/A'
@@ -577,10 +577,10 @@ def generar_observaciones(data):
 
     texto_observacion = f"<strong>Observaciones de {nombre_empresa}:</strong><br>"
     
-    # Nuevo texto de advertencia para insertar al inicio
+    # Nuevo texto de advertencia para insertar al inicio (Cambiado de 'SMI' a 'Algoritmo')
     advertencia_texto = ""
     if advertencia_semanal == "SI":
-        advertencia_texto = "<strong style='color:#ffc107;'>ADVERTENCIA SEMANAL: El SMI semanal está en zona de sobrecompra. No se recomienda comprar ya que la subida podría ser muy corta y con alto riesgo.</strong><br>"
+        advertencia_texto = "<strong style='color:#ffc107;'>ADVERTENCIA SEMANAL: El Algoritmo semanal está en zona de sobrecompra. No se recomienda comprar ya que la subida podría ser muy corta y con alto riesgo.</strong><br>"
 
 
     if oportunidad == "Posibilidad de Compra Activada":
@@ -592,9 +592,9 @@ def generar_observaciones(data):
         else:
             texto = f"El algoritmo detecta que el valor está en una zona de sobreventa con una tendencia bajista. Se ha detectado una oportunidad de {compra_si} para un posible rebote. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
     
-    # Nuevo bloque de Riesgo de Compra
+    # Nuevo bloque de Riesgo de Compra (Cambiado de 'SMI' a 'Algoritmo')
     elif oportunidad == "Compra RIESGO":
-        texto = f"El algoritmo detectó una señal de compra diaria, pero el **SMI Semanal** se encuentra en zona de **Sobrecompra** ({formatear_numero(data['SMI_SEMANAL'])}). Esto indica que el precio ya ha subido mucho a largo plazo, y la señal de rebote diaria podría ser muy breve. No se recomienda la compra en este momento. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
+        texto = f"El algoritmo detectó una señal de compra diaria, pero el **Algoritmo Semanal** se encuentra en zona de **Sobrecompra** ({formatear_numero(data['SMI_SEMANAL'])}). Esto indica que el precio ya ha subido mucho a largo plazo, y la señal de rebote diaria podría ser muy breve. No se recomienda la compra en este momento. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
 
     elif oportunidad == "VIGILAR":
         texto = f"El algoritmo se encuentra en una zona intermedia y muestra una tendencia alcista en sus últimos valores. Se sugiere vigilar de cerca, ya que una caída en el precio podría ser una señal de venta. {vende_si}. Se recomienda tener en cuenta los niveles de soporte ({soporte1}€) para saber hasta dónde podría bajar el precio. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
@@ -729,16 +729,7 @@ def generar_tabla_posiciones_abiertas(datos_completos):
     posiciones_abiertas = [d for d in datos_completos if d.get('COMPRADO') == "SI"]
     
     if not posiciones_abiertas:
-        # **MODIFICACIÓN: Devolver un bloque HTML con un mensaje en lugar de una cadena vacía**
-        return """
-            <h3 style="text-align: center; color: #1A237E; margin-top: 50px; margin-bottom: 20px; font-size: 1.8em; border-bottom: 2px solid #e9ecef; padding-bottom: 10px;">
-                <i class="fas fa-check-circle" style="color:#28a745; margin-right: 10px;"></i>
-                Posiciones Abiertas (Cartera IBEXIA)
-            </h3>
-            <p style="text-align: center; font-size: 1.1em; color: #dc3545; font-weight: bold; margin-bottom: 20px; padding: 15px; border: 1px dashed #dc3545; background-color: #f8d7da;">
-                Actualmente no hay posiciones abiertas según el algoritmo SMI-TV.
-            </p>
-        """
+        return "" # Devolver una cadena vacía si no hay posiciones abiertas
         
     # 2. Ordenar por FECHA_COMPRA (la fecha está en formato DD/MM/YYYY)
     def key_sort_date(item):
@@ -843,139 +834,8 @@ def generar_tabla_posiciones_abiertas(datos_completos):
 # ---------------- FIN DE LA NUEVA FUNCIÓN AÑADIDA PARA LA SEGUNDA TABLA ---------------
 # --------------------------------------------------------------------------------------
 
-
-# --------------------------------------------------------------------------------------
-# ---------------------- NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO --------------------------
-# --------------------------------------------------------------------------------------
-
-def generar_analisis_texto_empresa(data, index):
-    """Genera un bloque de texto HTML detallado para una sola empresa."""
-    
-    # 1. Recuperar datos y formatear
-    nombre_empresa = data['NOMBRE_EMPRESA']
-    ticker = data['TICKER']
-    precio_actual = formatear_numero(data['PRECIO_ACTUAL'])
-    tendencia = data['TENDENCIA_ACTUAL']
-    oportunidad = data['OPORTUNIDAD']
-    compra_si = data['COMPRA_SI']
-    vende_si = data['VENDE_SI']
-    soporte1 = formatear_numero(data['SOPORTE_1'])
-    resistencia1 = formatear_numero(data['RESISTENCIA_1'])
-    tipo_ema = data['TIPO_EMA']
-    valor_ema = formatear_numero(data['VALOR_EMA'])
-    smi_hoy = formatear_numero(data['SMI_HOY'])
-    estado_smi = data['ESTADO_SMI']
-    
-    comprado = data['COMPRADO'] == "SI"
-    
-    # Datos de Posición/Operativa
-    fecha_compra = data['FECHA_COMPRA']
-    precio_compra = formatear_numero(data['PRECIO_COMPRA'])
-    beneficio_actual_formateado = formatear_beneficio(data['BENEFICIO_ACTUAL'])
-    
-    # URL de la empresa para el H2
-    nombre_empresa_url = None
-    for nombre, ticker_val in tickers.items():
-        if ticker_val == data['TICKER']:
-            nombre_empresa_url = nombre
-            break
-    
-    if nombre_empresa_url:
-        empresa_link = f'https://ibexia.es/category/{nombre_empresa_url.lower()}/'
-    else:
-        empresa_link = '#'
-    
-    # 2. Definir Estilos y Contenedor
-    # El color del borde y fondo del contenedor cambia si está COMPRADO
-    border_color = "#28a745" if comprado else "#1A237E" # Verde si comprado, Azul oscuro si no
-    bg_color = "#e6ffe6" if comprado else "#f0f8ff"     # Verde claro si comprado, Azul claro si no
-    
-    html_bloque = f"""
-    <div style="border: 2px solid {border_color}; padding: 20px; margin-bottom: 30px; border-radius: 8px; background-color: {bg_color}; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-        
-        <h2 style="color: {border_color}; border-bottom: 2px solid {border_color}; padding-bottom: 10px; margin-top: 0; font-size: 2.0em;">
-            <a href='{empresa_link}' target='_blank' style='text-decoration:none; color:inherit;'>
-                {index}. ANÁLISIS DE {nombre_empresa} ({ticker})
-            </a>
-        </h2>
-        
-        {generar_observaciones(data)}
-        
-        <hr style="border: 0; border-top: 1px solid #ccc; margin: 15px 0;">
-        
-        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; font-size: 0.9em;">
-            
-            <div style="flex: 1 1 45%; min-width: 250px; margin-bottom: 15px; padding-right: 15px;">
-                <h3 style="color: #495057; font-size: 1.2em; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
-                    <i class="fas fa-chart-line" style="color:#007bff; margin-right: 5px;"></i>
-                    DATOS TÉCNICOS CLAVE
-                </h3>
-                <p>
-                    El precio actual es de <strong>{precio_actual}€</strong>. La tendencia diaria del SMI-TV es actualmente **{tendencia}** y el indicador se encuentra en zona de **{estado_smi}** ({smi_hoy}).<br>
-                    Según el algoritmo, la **Oportunidad** detectada es: <strong>{oportunidad}</strong>.
-                </p>
-                <p>
-                    <strong>Recomendación de Compra:</strong> {compra_si}.<br>
-                    <strong>Recomendación de Venta:</strong> {vende_si}.
-                </p>
-            </div>
-            
-            <div style="flex: 1 1 45%; min-width: 250px; margin-bottom: 15px;">
-                <h3 style="color: #495057; font-size: 1.2em; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
-                    <i class="fas fa-map-marker-alt" style="color:#007bff; margin-right: 5px;"></i>
-                    NIVELES Y EMA
-                </h3>
-                <p>
-                    El primer nivel de **Soporte** se encuentra en <strong>{soporte1}€</strong> y la **Resistencia** más cercana está en <strong>{resistencia1}€</strong>.
-                    La Media Móvil Exponencial (EMA 100) se sitúa en <strong>{valor_ema}€</strong> y actúa como **{tipo_ema}** para el precio actual.
-                </p>
-                <p>
-                    {data['OBSERVACION_SEMANAL']}
-                </p>
-            </div>
-            
-            <div style="flex: 1 1 100%; margin-top: 15px;">
-                <h3 style="color: #495057; font-size: 1.2em; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
-                    <i class="fas fa-hand-holding-usd" style="color:#007bff; margin-right: 5px;"></i>
-                    ESTADO DE OPERATIVA EN CARTERA
-                </h3>
-                
-                <div style="border: 1px solid #dee2e6; padding: 15px; border-radius: 6px; background-color: #ffffff;">
-                    
-                    <p style="margin: 0; padding: 0;">
-                        <strong>Posición Actual:</strong> <span style="font-weight: bold; color: {'#28a745' if comprado else '#dc3545'};">{data['COMPRADO']}</span>
-                    </p>
-                    
-                    {f"""
-                    <p style="margin: 5px 0 0 0; padding: 0;">
-                        <strong>Precio de Entrada:</strong> {precio_compra}€ (Fecha: {fecha_compra})<br>
-                        <strong>Beneficio Actual (Simulado en base a 10.000€):</strong> {beneficio_actual_formateado}
-                    </p>
-                    """ if comprado else 
-                    f"""
-                    <p style="margin: 5px 0 0 0; padding: 0;">
-                        <strong>No hay posición abierta.</strong> La última operación completa ({data['FECHA_VENTA_CIERRE']}) resultó en un beneficio de {formatear_beneficio(data['BENEFICIO_ULTIMA_OP'])}.
-                    </p>
-                    """}
-                    
-                </div>
-            </div>
-            
-        </div>
-        
-    </div>
-    """
-    
-    return html_bloque
-
-# --------------------------------------------------------------------------------------
-# -------------------- FIN DE LA NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO --------------------
-# --------------------------------------------------------------------------------------
-
-
 def generar_reporte():
     try:
-        # Aquí se mantiene la lectura de la hoja de Google
         all_tickers = leer_google_sheets()[1:]
         if not all_tickers:
             print("No hay tickers para procesar.")
@@ -995,14 +855,17 @@ def generar_reporte():
                 
             time.sleep(1)
 
-        # --- Lógica de ordenación MODIFICADA (se mantiene) ---
+        # --- Lógica de ordenación MODIFICADA para mover "Compra RIESGO" arriba ---
         def obtener_clave_ordenacion(empresa):
             categoria = empresa['OPORTUNIDAD']
             
+            # Se ajustan las prioridades para que "Compra RIESGO" esté en el grupo de compra (valores < 3)
+            # y darle una prioridad interna de 2.5, justo después de las compras fuertes (1 y 2).
+            
             prioridad = {
-                "Posibilidad de Compra Activada": 1, 
-                "Posibilidad de Compra": 2,         
-                "Compra RIESGO": 2.5,               
+                "Posibilidad de Compra Activada": 1, # Máxima prioridad de compra
+                "Posibilidad de Compra": 2,         # Segunda prioridad de compra
+                "Compra RIESGO": 2.5,               # TERCERA prioridad, pero aún en el grupo de Compra.
                 "VIGILAR": 3,
                 "Riesgo de Venta": 4,
                 "Riesgo de Venta Activada": 5,
@@ -1010,163 +873,793 @@ def generar_reporte():
                 "Intermedio": 7,
             }
 
-            orden_interna = prioridad.get(categoria, 99) 
+            orden_interna = prioridad.get(categoria, 99) # Si no está, al final
 
-            return (orden_interna, empresa['NOMBRE_EMPRESA']) 
+            return (orden_interna, empresa['NOMBRE_EMPRESA']) # Se ordena por la clave y luego por nombre
 
         datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
         
         # --- Fin de la lógica de ordenación MODIFICADA ---
         now_utc = datetime.utcnow()
         hora_actual = (now_utc + timedelta(hours=2)).strftime('%H:%M')
-        fecha_actual_str = datetime.today().strftime('%d de %B %Y').replace(datetime.today().strftime('%B'), ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][datetime.today().month-1])
-
-        # ******************************************************************************
-        # ******************** NUEVA SECCIÓN HTML BASADA EN TEXTO **********************
-        # ******************************************************************************
         
-        # 1. ESTILOS CSS INLINE (SIMPLIFICADOS)
+        # ******************************************************************************
+        # ******************** MODIFICACIÓN DE LA SECCIÓN HTML *************************
+        # ******************************************************************************
+        # Se define la variable 'html_body' para contener *SOLO* el contenido insertable.
+        # Se conservan los estilos y scripts que son necesarios para el funcionamiento de la tabla.
+        
+        # 1. ESTILOS CSS INLINE (NECESARIOS)
         html_styles = f"""
             <style>
-                * {{ box-sizing: border-box !important; }} 
-                .main-container {{
-                    max-width: 1200px;
-                    width: 95%;
-                    margin: 20px auto;
-                    background-color: #ffffff;
-                    padding: 15px;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    line-height: 1.6;
-                }}
-                h1 {{
-                    text-align: center;
-                    font-size: 2.5em;
-                    color: #1A237E;
-                    margin-bottom: 10px;
-                }}
-                p {{
-                    color: #495057;
-                    text-align: left;
-                    font-size: 1.0em;
-                    margin-bottom: 10px;
-                }}
-                strong {{
-                    font-weight: 700;
-                    color: #212529;
-                }}
-                /* Estilos para asegurar que los enlaces de beneficio se vean bien */
-                span[style*="color:#28a745"], span[style*="color:#dc3545"] {{
-                    font-weight: bold;
-                }}
-            </style>
+            /* 🛑 SOLUCIÓN DEFINITIVA 1/3: RESET UNIVERSAL DE BOX-SIZING. */
+            * {{
+                /* Esto asegura que el padding y los borders no hagan que los elementos excedan su ancho. */
+                box-sizing: border-box !important; 
+            }}
+            
+            /* 🛑 SOLUCIÓN DEFINITIVA 2/3: USAR VIEWPORT (vw) y ELIMINACIÓN FORZADA DEL SCROLL. */
+            /* ESTAS REGLAS DEBEN ESTAR EN LA HOJA DE ESTILOS DEL SITIO O EN UN <style> EN EL <head> */
+            /* SE ELIMINAN PORQUE PUEDEN ENTRAR EN CONFLICTO CON EL CSS GENERAL DE WORDPRESS */
+            /* html {{ 
+                width: 100vw !important; 
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow-x: hidden !important; 
+            }}
+            body {{
+                width: 100vw !important; 
+            }} */
+            
+            /* REGLA DE COOKIES FLOTANTES */
+            div[style*="position: fixed"], div[style*="z-index"] {{
+                max-width: 100vw !important; /* Limita el ancho al 100% del viewport */
+                overflow-x: hidden !important; /* Asegura que no se desborde */
+                left: 0 !important; /* Fija su posición a la izquierda para corregir desplazamiento */
+                right: 0 !important; /* Fija su posición a la derecha para corregir desplazamiento */
+            }}
+            
+            .main-container {{
+                max-width: 1200px;
+                width: 95%;
+                margin: 20px auto;
+                background-color: #ffffff;
+                padding: 15px;
+                border-radius: 8px;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Se mueve la fuente aquí */
+                background-color: #f8f9fa; /* Se mueve el color de fondo aquí */
+            }}
+            /* Estilo del título IBEXIA.ES (Tipo Google - Ajustado a ibexiaES) */
+            h2 {{
+                text-align: center;
+                font-size: 4.0em; /* Tamaño grande */
+                font-weight: 300;
+                margin-top: 20px;
+                margin-bottom: 50px; 
+                letter-spacing: -0.05em; /* Juntar las letras */
+            }}
+            .google-style {{
+                font-family: 'Product Sans', 'Arial', sans-serif; 
+                line-height: 1; 
+            }}
+            .google-style span {{
+                font-weight: 700; /* Las letras de color son más gruesas */
+                border-radius: 25px; /* Sutil borde redondeado a cada letra para imitar la 'suavidad' de la opción 5 */
+                display: inline-block; /* Necesario para que border-radius funcione */
+                padding: 0 1px; /* Espaciado mínimo para que se note el redondeado */
+            }}
+            .google-style .i1 {{ color: #26A699; }} /* Azul Índigo Muy Oscuro */
+            .google-style .b1 {{ color: #26A699; }} /* Azul Real Oscuro */
+            .google-style .e1 {{ color: #26A699; }} /* Verde Brillante */
+            .google-style .x1 {{ color: #26A699; }} /* Cian Brillante */
+            .google-style .i2 {{ color: #26A699; }} /* Cian Medio */
+            .google-style .a1 {{ color: #26A699; }} /* Verde Azulado */
+            .google-style .es-final {{
+                font-size: 0.5em; 
+                font-weight: 100;
+                color: #00BCD4; /* Cian Brillante */
+                vertical-align: bottom; 
+                margin-left: -0.1em; 
+            }}
+            p {{
+                color: #6c757d;
+                text-align: left;
+                font-size: 0.9em;
+            }}
+            
+            /* ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
+            #search-container {{
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                margin-bottom: 20px; /* Reducir margen inferior */
+            }}
+            #searchInput {{
+                width: 90%; /* Más ancho */
+                max-width: 800px; /* Límite */
+                padding: 15px 25px; /* Ajustar padding */
+                font-size: 1.2em;
+                border: 1px solid #dfe1e5; /* Borde más sutil */
+                border-radius: 24px;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+                transition: box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
+                text-align: center;
+            }}
+            #searchInput:focus {{
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+                border-color: #4285F4; /* Borde azul al enfocar */
+                outline: none;
+            }}
+            
+            /* Nuevo estilo para la fecha de actualización */
+            #update-date {{
+                font-size: 0.85em;
+                /* 🚀 CAMBIO 2: Color rojo oscuro (Dark Red) y alineación a la izquierda para acomodar dos textos */
+                color: #8b0000; 
+                margin-top: 5px; 
+                text-align: left; /* Se cambia a left para usar flex/inline-block */
+                display: flex; /* Usamos Flexbox para alinear contenido */
+                justify-content: center; /* Centrar el bloque completo horizontalmente */
+                width: 100%;
+            }}
+            /* Nuevo estilo para el texto de actualización de 2 horas */
+            .update-info-2h {{
+                color: #1A237E; /* Ejemplo de color azul oscuro */
+                font-weight: bold;
+                margin-left: 15px; /* Separación entre la fecha y la info de 2h */
+            }}
+            /* FIN DEL ESTILO DEL CAMPO DE BÚSQUEDA TIPO GOOGLE */
+
+            /* NUEVOS ESTILOS PARA LOS BOTONES */
+            #button-group {{
+                display: flex;
+                justify-content: center; /* Centrar los botones en lugar de usar space-around */
+                gap: 15px; /* Reducir el gap para que quepan 3 botones */
+                margin: 40px 0 20px 0; 
+                flex-wrap: wrap; 
+                padding: 0 10px; /* Ajuste de padding */
+            }}
+            .action-button {{
+                text-decoration: none;
+                padding: 10px 15px; /* Ajustar padding para que quepan 3 botones */
+                border: none;
+                border-radius: 8px;
+                font-size: 0.9em; /* Reducir fuente */
+                font-weight: 600;
+                color: #ffffff;
+                background-color: #007bff; /* Azul primario */
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                transition: background-color 0.3s ease, box-shadow 0.3s ease;
+                min-width: 100px; /* Asegurar un ancho mínimo para adaptabilidad */
+                text-align: center;
+                cursor: pointer;
+                display: block;
+            }}
+            .action-button:hover {{
+                background-color: #0056b3; /* Tono más oscuro al pasar el ratón */
+                box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+            }}
+            /* Estilo específico para el nuevo botón */
+            .action-button.full-analysis {{
+                background-color: #28a745; /* Verde para la acción de "Ver todo" */
+            }}
+            .action-button.full-analysis:hover {{
+                background-color: #1e7e34;
+            }}
+            
+            .button-item {{
+                text-align: center;
+                max-width: 200px; /* Reducir el max-width */
+                flex-grow: 1;
+                flex-shrink: 1;
+                flex-basis: auto; /* Dejar que flex lo calcule */
+                margin-bottom: 10px; 
+            }}
+            .button-description {{
+                font-size: 0.75em; /* Reducir fuente */
+                color: #6c757d;
+                margin-top: 5px;
+            }}
+            /* FIN DE NUEVOS ESTILOS PARA LOS BOTONES */
+
+
+
+            .table-container {{
+                overflow-x: auto;
+                overflow-y: auto;
+                height: 70vh;
+                position: relative;
+                display: block; 
+                max-width: 100%; 
+            }}
+            table {{
+                width: 100%;
+                table-layout: fixed;
+                margin: 10px auto 0 auto;
+                border-collapse: collapse;
+                font-size: 0.85em;
+            }}
+            th, td {{
+                border: 1px solid #e9ecef;
+                padding: 6px;
+                text-align: center;
+                vertical-align: middle;
+                white-space: normal;
+                line-height: 1.2;
+            }}
+            th {{
+                background-color: #e9ecef;
+                color: #495057;
+                font-weight: 600;
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                white-space: nowrap;
+            }}
+            .compra {{ color: #28a745; font-weight: bold; }}
+            .venta {{ color: #dc3545; font-weight: bold; }}
+            .riesgo-compra {{ color: #ffc107; font-weight: bold; }}
+            .comprado-si {{ background-color: #28a745; color: white; font-weight: bold; }}
+            .bg-green {{ background-color: #d4edda; color: #155724; }}
+            .bg-red {{ background-color: #f8d7da; color: #721c24; }}
+            .bg-highlight {{ background-color: #28a745; color: white; font-weight: bold; }}
+            .text-center {{ text-align: center; }}
+            .disclaimer {{ font-size: 0.8em; text-align: center; color: #6c757d; margin-top: 15px; }}
+            .small-text {{ font-size: 0.7em; color: #6c757d; }}
+            .green-cell {{ background-color: #d4edda; }}
+            .red-cell {{ background-color: #f8d7da; }}
+            .yellow-cell {{ background-color: #fff3cd; }}
+            .separator-row td {{ background-color: #e9ecef; height: 3px; padding: 0; border: none; }}
+            .category-header td {{
+                background-color: #495057;
+                color: white;
+                font-size: 1.1em;
+                font-weight: bold;
+                text-align: center;
+                padding: 10px;
+                border: none;
+                display: none;
+            }}
+            .observaciones-row td {{
+                background-color: #f9f9f9;
+                text-align: left;
+                font-size: 0.8em;
+                border: 1px solid #e9ecef;
+            }}
+            .stacked-text {{
+                line-height: 1.2;
+                font-size: 0.8em;
+                text-align: left; /* Alineación forzada para la primera columna */
+            }}
+            .vigilar {{ color: #ffc107; font-weight: bold; }}
+            
+            .collapsible-row {{
+                display: none;
+            }}
+            .expand-button {{
+                cursor: pointer;
+                color: #007bff;
+                font-weight: bold;
+                text-decoration: underline;
+            }}
+            .position-box {{
+                border: 1px solid #dee2e6;
+                border-radius: 6px;
+                padding: 10px;
+                margin: 5px 0;
+                text-align: left;
+                background-color: #ffffff;
+            }}
+            
+            /* ESTILOS AÑADIDOS PARA LA NUEVA TABLA DE POSICIONES ABIERTAS */
+            .open-positions-container table th, .open-positions-container table td {{
+                font-size: 0.9em;
+                padding: 10px 6px;
+            }}
+            .open-positions-container table th {{
+                background-color: #1A237E; /* Azul oscuro corporativo */
+                color: white;
+                font-weight: 700;
+            }}
+            
+            /* **MODIFICACIÓN 5: Estilo para la limitación de filas (NO NECESARIO si se usa overflow-y)** */
+            /* Se usa la propiedad `height` y `overflow-y: scroll` en el contenedor `open-positions-container` */
+
+            /* FIN DE ESTILOS AÑADIDOS */
+
+        </style>
         """
         
         # 2. CUERPO HTML (Contenido insertable en WordPress)
         html_content = f"""
             <div class="main-container">
+                <h2 class="google-style" style="margin-top: 20px; margin-bottom: 0px;">
+                    <span class="i1">i</span>
+                    <span class="b1">b</span>
+                    <span class="e1">e</span>
+                    <span class="x1">x</span>
+                    <span class="i2">i</span>
+                    <span class="a1">a</span>
+                    <span class="es-final">ES</span>
+                </h2>
                 
-                <h1>🔔 ALERTA DE OPORTUNIDADES Y ANÁLISIS DIARIO IBEXIA 🇪🇸</h1>
-                <p style="text-align: center; font-size: 1.1em; color: #8b0000; font-weight: bold;">
-                    Fecha de Actualización: {fecha_actual_str} | Hora: {hora_actual} (CET)
-                </p>
-                <hr style="border: 0; border-top: 2px solid #1A237E; margin: 30px 0;">
+                <div id="search-container">
+                    <input type="text" id="searchInput" placeholder="Buscar empresa por nombre o ticker (Ej: Inditex, SAN.MC)...">
+                    <div id="update-date">
+                        <span>
+                            fecha de actualización: {datetime.today().strftime('%d de %B %Y').replace(datetime.today().strftime('%B'), ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][datetime.today().month-1])} hora {hora_actual}
+                        </span>
+                        <span class="update-info-2h">
+                            (Los resultados de búsqueda están actualizados cada dos horas)
+                        </span>
+                    </div>
+                </div>
                 
+                <div id="scroll-top" style="overflow-x: auto; display: none;">
+                    <div style="min-width: 1400px;">&nbsp;</div>
+                </div>
+                
+                <div class="table-container" id="tableContainer">
+                    <table id="myTable">
+                        <thead>
+                            <tr>
+                                <th>Empresa, Precio y Recomendación</th>
+                                <th>Tendencia Diaria</th>
+                                <th>Oportunidad</th>
+                                <th>Compra si...</th>
+                                <th>Vende si...</th>
+                                <th>Análisis detallado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
         """
         
         if not datos_ordenados:
             html_content += """
-                <p style="text-align: center; font-size: 1.2em; color: #dc3545; font-weight: bold; padding: 20px; border: 1px solid #dc3545; background-color: #f8d7da;">
-                    No se encontraron empresas con datos válidos hoy.
-                </p>
+                            <tr><td colspan="6">No se encontraron empresas con datos válidos hoy.</td></tr>
             """
         else:
             previous_orden_grupo = None
-            empresa_count = 0
-            
             for i, data in enumerate(datos_ordenados):
                 
                 current_orden_grupo = obtener_clave_ordenacion(data)[0]
                 
-                # Lógica para encabezados de grupo (H3)
+                # Lógica para determinar el encabezado de categoría
                 es_primera_fila = previous_orden_grupo is None
                 es_cambio_grupo = current_orden_grupo != previous_orden_grupo
                 
                 if es_primera_fila or es_cambio_grupo:
                     
-                    if current_orden_grupo in [1, 2, 2.5]:
+                    # MODIFICACIÓN DE LA LÓGICA DE ENCABEZADO
+                    if current_orden_grupo in [1, 2, 2.5]: # Grupo de Compra (incluye Compra RIESGO con 2.5)
                         if previous_orden_grupo is None or previous_orden_grupo not in [1, 2, 2.5]:
+                            # Se añade la clase 'category-header-compra' para un control más fino en JS
                             html_content += """
-                                <h3 style="color: #28a745; font-size: 1.8em; margin-top: 40px; border-bottom: 1px solid #28a745;">
-                                    <i class="fas fa-arrow-up" style="margin-right: 10px;"></i>
-                                    OPORTUNIDADES DE COMPRA DETECTADAS
-                                </h3>
+                                <tr class="category-header category-header-compra"><td colspan="6">OPORTUNIDADES DE COMPRA</td></tr>
                             """
-                    elif current_orden_grupo in [3, 4, 5]:
+                    elif current_orden_grupo in [3, 4, 5]: # Grupo de Venta/Vigilancia
                         if previous_orden_grupo is None or previous_orden_grupo not in [3, 4, 5]:
+                            # Se añade la clase 'category-header-vigilar'
                             html_content += """
-                                <h3 style="color: #ffc107; font-size: 1.8em; margin-top: 40px; border-bottom: 1px solid #ffc107;">
-                                    <i class="fas fa-exclamation-triangle" style="margin-right: 10px;"></i>
-                                    ATENTOS A VENDER / VIGILANCIA
-                                </h3>
+                                <tr class="category-header category-header-vigilar"><td colspan="6">ATENTOS A VENDER/VIGILANCIA</td></tr>
                             """
-                    elif current_orden_grupo in [6, 7]:
+                    elif current_orden_grupo in [6, 7]: # Grupo Intermedio
                         if previous_orden_grupo is None or previous_orden_grupo not in [6, 7]:
+                            # Se añade la clase 'category-header-intermedio'
                             html_content += """
-                                <h3 style="color: #6c757d; font-size: 1.8em; margin-top: 40px; border-bottom: 1px solid #6c757d;">
-                                    <i class="fas fa-minus-circle" style="margin-right: 10px;"></i>
-                                    OTRAS EMPRESAS SIN MOVIMIENTOS RELEVANTES
-                                </h3>
+                                <tr class="category-header category-header-intermedio"><td colspan="6">OTRAS EMPRESAS SIN MOVIMIENTOS</td></tr>
                             """
-                    # Reiniciar el contador de empresas para esta sección
-                    empresa_count = 1
-                
-                # Generar el análisis de texto para la empresa
-                html_content += generar_analisis_texto_empresa(data, empresa_count)
-                
-                previous_orden_grupo = current_orden_grupo
-                empresa_count += 1
-        
-        # Agregar la tabla de Posiciones Abiertas al final
-        html_content += generar_tabla_posiciones_abiertas(datos_completos)
+                            
+                    # Poner un separador si no es la primera fila y hay cambio de grupo
+                    if not es_primera_fila and es_cambio_grupo:
+                        html_content += """
+                            <tr class="separator-row"><td colspan="6"></td></tr>
+                        """
 
+                # Lógica de corrección para el enlace
+                nombre_empresa_url = None
+                for nombre, ticker_val in tickers.items():
+                    if ticker_val == data['TICKER']:
+                        nombre_empresa_url = nombre
+                        break
+                
+                if nombre_empresa_url:
+                    empresa_link = f'https://ibexia.es/category/{nombre_empresa_url.lower()}/'
+                else:
+                    empresa_link = '#'
+                
+                # --- NUEVA LÓGICA DE LA PRIMERA COLUMNA (Cambios 3 y 5) ---
+                
+                # Status de la posición actual
+                if data['COMPRADO'] == "SI":
+                    comprado_status_html = "<span style='font-size: 0.9em; font-weight: 700; color: #28a745; display: block; margin-top: 5px;'>✅ INVERTIDO</span>"
+                else:
+                    comprado_status_html = "<span style='font-size: 0.9em; font-weight: 700; color: #dc3545; display: block; margin-top: 5px;'>❌ NO INVERTIDO</span>"
+                    
+                # Status de la recomendación principal
+                if current_orden_grupo in [1, 2, 2.5]: # Buy group
+                    rec_text = "COMPRA"
+                    rec_color = "#28a745"
+                elif current_orden_grupo in [4, 5]: # Sell group
+                    rec_text = "VENTA"
+                    rec_color = "#dc3545"
+                else:
+                    rec_text = "VIGILAR/NEUTRO"
+                    rec_color = "#ffc107"
+                    
+                rec_status_html = f"<span style='font-size: 1.0em; font-weight: 700; padding: 2px 5px; border-radius: 4px; background-color: {rec_color}; color: white; margin-top: 5px; display: inline-block;'>{rec_text}</span>"
+                    
+                # Texto de enlace clicable (Cambio 3)
+                link_text = "<span style='font-size: 0.75em; color: #007bff; font-weight: bold;'>&#9658; Ver Análisis Completo</span>"
+
+                # Contenido de la primera celda
+                nombre_con_precio = f"""
+                    <div class='stacked-text' style='text-align:left;'>
+                        <div style='display:flex; justify-content:space-between; align-items:center;'>
+                            <b>{data['NOMBRE_EMPRESA']}</b> 
+                            <span style='color: #6c757d; font-weight: normal; font-size: 0.9em;'>({data['TICKER']})</span>
+                        </div>
+                        ({formatear_numero(data['PRECIO_ACTUAL'])}€)
+                        
+                        <a href='{empresa_link}' target='_blank' style='text-decoration:none;'>{link_text}</a>
+                        
+                        <hr style='border: 0; border-top: 1px solid #e9ecef; margin: 5px 0;'>
+
+                        {rec_status_html}
+                        {comprado_status_html}
+                    </div>
+                """
+                # --- FIN DE LA NUEVA LÓGICA DE LA PRIMERA COLUMNA ---
+                
+                # Ajuste de clases para el estado 'Compra RIESGO' (texto amarillo, celda amarilla)
+                if "compra" in data['OPORTUNIDAD'].lower() and "riesgo" not in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "compra"
+                    celda_empresa_class = "green-cell"
+                elif "venta" in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "venta"
+                    celda_empresa_class = "red-cell"
+                elif "vigilar" in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "vigilar"
+                    celda_empresa_class = ""
+                elif "riesgo" in data['OPORTUNIDAD'].lower():
+                    clase_oportunidad = "riesgo-compra"
+                    celda_empresa_class = "yellow-cell"
+                else:
+                    clase_oportunidad = ""
+                    celda_empresa_class = ""
+                
+                
+                observaciones = generar_observaciones(data)
+                
+                # --- NUEVA SECCIÓN DE DATOS DE OPERATIVA (DENTRO DEL COLLAPSIBLE) ---
+                
+                # Bloque de la última operación CERRADA (Venta)
+                if data['BENEFICIO_ULTIMA_OP'] != "N/A":
+                    ultima_op_html = f"""
+                        <div class='position-box' style='background-color: #e9ecef;'>
+                            <b>ÚLTIMA OPERACIÓN CERRADA:</b>
+                            <ul>
+                                <li><strong>Compra:</strong> {formatear_numero(data['PRECIO_COMPRA'])}€ ({data['FECHA_COMPRA']})</li>
+                                <li><strong>Venta/Cierre:</strong> {formatear_numero(data['PRECIO_VENTA_CIERRE'])}€ ({data['FECHA_VENTA_CIERRE']})</li>
+                                <li><strong>Beneficio Cerrado:</strong> {formatear_beneficio(data['BENEFICIO_ULTIMA_OP'])} (Base 10.000€)</li>
+                            </ul>
+                        </div>
+                    """
+                else:
+                    ultima_op_html = "<p style='font-size:0.9em; margin-top:5px;'>No se detectó un ciclo completo (Compra->Venta) reciente.</p>"
+
+                # Bloque de Posición ABIERTA (Compra Actual)
+                if data['COMPRADO'] == "SI":
+                    posicion_actual_html = f"""
+                        <div class='position-box' style='border: 2px solid #28a745; background-color: #d4edda;'>
+                            <b>POSICIÓN ACTUAL: COMPRADO (✅)</b>
+                            <ul>
+                                <li><strong>Precio de Entrada:</strong> {formatear_numero(data['PRECIO_COMPRA'])}€ ({data['FECHA_COMPRA']})</li>
+                                <li><strong>Precio Actual:</strong> {formatear_numero(data['PRECIO_ACTUAL'])}€</li>
+                                <li><strong>Beneficio Actual (Simulado):</strong> {formatear_beneficio(data['BENEFICIO_ACTUAL'])} (Base 10.000€)</li>
+                            </ul>
+                        </div>
+                    """
+                else:
+                    posicion_actual_html = """
+                        <div class='position-box' style='border: 2px solid #dc3545; background-color: #f8d7da;'>
+                            <b>POSICIÓN ACTUAL: NO COMPRADO (❌)</b>
+                        </div>
+                    """
+                
+                
+                # --- FILAS DE REPORTE CON OBSERVACIÓN SEMANAL EN DETALLE ---
+                html_content += f"""
+                            <tr class="main-row" data-index="{i}" data-name="{data['NOMBRE_EMPRESA'].upper()}" data-ticker="{data['TICKER'].upper()}">
+                                <td class="{celda_empresa_class}">{nombre_con_precio}</td>
+                                <td>{data['TENDENCIA_ACTUAL']}</td>
+                                <td class="{clase_oportunidad}">{data['OPORTUNIDAD']}</td>
+                                <td>{data['COMPRA_SI']}</td>
+                                <td>{data['VENDE_SI']}</td>
+                                <td><span class="expand-button" onclick="toggleDetails({i})">Ver más...</span></td>
+                            </tr>
+                            <tr class="collapsible-row detailed-row-{i}">
+                                <td colspan="6">
+                                    <div style="display:flex; justify-content:space-between; align-items:flex-start; padding: 10px; flex-wrap: wrap;">
+                                        
+                                        <div style="flex-basis: 30%; text-align:left; padding-right: 10px;">
+                                            {posicion_actual_html}
+                                        </div>
+
+                                        <div style="flex-basis: 30%; text-align:left; padding-right: 10px;">
+                                            {ultima_op_html}
+                                        </div>
+                                        
+                                        <div style="flex-basis: 30%; text-align:left; font-size:0.9em;">
+                                            <div class='position-box'>
+                                                <b>EMA/SR</b><br>
+                                                EMA ({data['TIPO_EMA']}): <span style="font-weight:bold;">{formatear_numero(data['VALOR_EMA'])}€</span><br>
+                                                S1/R1: {formatear_numero(data['SOPORTE_1'])}€ / {formatear_numero(data['RESISTENCIA_1'])}€
+                                            </div>
+                                            <div class='position-box' style="margin-top:10px;">
+                                                <b>Análisis Semanal (Algoritmo)</b><br>
+                                                {data['OBSERVACION_SEMANAL']}
+                                            </div>
+                                        </div>
+                                        
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="observaciones-row detailed-row-{i}">
+                                <td colspan="6">{observaciones}</td>
+                            </tr>
+                """
+                previous_orden_grupo = current_orden_grupo
+        
         html_content += """
-                <hr style="border: 0; border-top: 1px dashed #ccc; margin: 30px 0;">
-                <p class="disclaimer" style="text-align: center; font-size: 0.8em; color: #6c757d;">
-                    <strong>Aviso Legal:</strong> La información contenida en este análisis se proporciona únicamente con fines educativos e informativos y no constituye asesoramiento de inversión, fiscal o legal. Las decisiones de inversión son de exclusiva responsabilidad del usuario.
-                </p>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="button-group">
+                    <div class="button-item">
+                        <a href="https://ibexia.es/operaciones-compraventa-octubre/" class="action-button">MIS INVERSIONES</a>
+                        <div class="button-description">Acceso a todas nuestras operaciones actualizadas a día de hoy</div>
+                    </div>
+                    <div class="button-item">
+                        <button onclick="showFullAnalysis()" class="action-button full-analysis">VER ANÁLISIS COMPLETO</button>
+                        <div class="button-description">Muestra todas las empresas listadas sin usar el buscador.</div>
+                    </div>
+                    <div class="button-item">
+                        <a href="https://ibexia.es/category/analisis-acciones/" class="action-button">ANÁLISIS DETALLADOS</a>
+                        <div class="button-description">Los valores que hemos analizado en detalle por fecha</div>
+                    </div>
+                </div>
+                
+                <br>
+                
+                """
+        
+        # El generador de la tabla inferior ya incluye todas las modificaciones.
+        html_content += generar_tabla_posiciones_abiertas(datos_completos)
+        
+        html_content += """
             </div>
         """
         
-        # 3. SCRIPT JAVASCRIPT (Ya no se necesita el de la tabla filtrable, solo Font Awesome)
-        # Se añade el enlace a Font Awesome para los iconos de la nueva estructura.
+        # 3. SCRIPT JAVASCRIPT (NECESARIO)
         html_script = """
-            <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+            <script>
+                // Función de acordeón para las filas individuales (Debe ser global para el onclick en el HTML)
+                function toggleDetails(index) {
+                    // Seleccionar la fila detallada (collapsible) y la fila de observaciones. Ambas usan la clase 'detailed-row-{index}'
+                    var detailedRows = document.querySelectorAll('.detailed-row-' + index);
+                    
+                    detailedRows.forEach(row => {
+                        // El estilo inicial es 'display: none;', se usa 'table-row' para que se muestre correctamente en la tabla.
+                        if (row) {
+                            row.style.display = row.style.display === "table-row" ? "none" : "table-row";
+                        }
+                    });
+                }
+
+                // Se utiliza una variable global o una referencia de cierre para el temporizador
+                let filterTimeout;
+                const tableContainer = document.getElementById("tableContainer");
+                const scrollTop = document.getElementById('scroll-top');
+                const searchInput = document.getElementById("searchInput");
+                const table = document.getElementById("myTable");
+                
+                // Verificar si la tabla existe antes de intentar obtener tbody y rows
+                if (table) {
+                    const tbody = table.querySelector('tbody');
+                    const rows = Array.from(tbody.getElementsByTagName("tr"));
+                
+                    // Función principal de filtrado
+                    function filterTable() {
+                        clearTimeout(filterTimeout); // Limpiar el temporizador anterior
+                        
+                        filterTimeout = setTimeout(() => {
+                            const filter = searchInput.value.toUpperCase().trim();
+                            const showTable = filter.length > 0;
+                            
+                            // Mostrar u ocultar la tabla y el scroll superior
+                            tableContainer.style.display = showTable ? "block" : "none";
+                            if (scrollTop) {
+                                scrollTop.style.display = showTable ? "block" : "none";
+                            }
+                            
+                            // Si no hay filtro, salimos
+                            if (!showTable) {
+                                // Al no haber filtro, todos los elementos están ocultos por el CSS inicial.
+                                return; 
+                            }
+
+                            for (let i = 0; i < rows.length; i++) {
+                                const row = rows[i];
+                                
+                                // Ocultar todas las filas que no son main-row, excepto las que se muestran a continuación
+                                if (row.classList.contains("separator-row") || 
+                                    row.classList.contains("category-header") || 
+                                    row.classList.contains("collapsible-row") || 
+                                    row.classList.contains("observaciones-row")) 
+                                {
+                                    row.style.display = "none";
+                                    continue;
+                                }
+                                
+                                // Procesar Filas Principales
+                                if (row.classList.contains("main-row")) {
+                                    const name = row.getAttribute('data-name');
+                                    const ticker = row.getAttribute('data-ticker');
+                                    
+                                    const isMatch = (name.indexOf(filter) > -1) || (ticker.indexOf(filter) > -1);
+
+                                    if (isMatch) {
+                                        row.style.display = "table-row";
+                                    } else {
+                                        row.style.display = "none";
+                                    }
+                                }
+                            }
+                            
+                            // Segunda pasada para mostrar las cabeceras de categoría
+                            showCategoryHeaders();
+
+                            // Tercera pasada para mostrar los separadores
+                            showSeparatorRows();
+
+                        }, 200); // Pequeño retraso para evitar ejecuciones rápidas
+                    }
+                
+                    // Función para mostrar los resultados completos
+                    window.showFullAnalysis = function() {
+                        searchInput.value = ''; // Limpiar el campo de búsqueda
+                        
+                        // Mostrar la tabla y el scroll superior
+                        tableContainer.style.display = "block";
+                        if (scrollTop) {
+                            scrollTop.style.display = "block";
+                        }
+                        
+                        // Mostrar todas las filas principales
+                        for (let i = 0; i < rows.length; i++) {
+                            const row = rows[i];
+                            // Asegurarse de que los detalles (collapsible y observaciones) estén ocultos al inicio
+                            if (row.classList.contains("collapsible-row") || row.classList.contains("observaciones-row")) {
+                                row.style.display = "none";
+                            } 
+                            // Mostrar filas principales
+                            else if (row.classList.contains("main-row")) {
+                                row.style.display = "table-row";
+                            } 
+                            // Ocultar separadores y categorías (serán re-evaluados)
+                            else if (row.classList.contains("separator-row") || row.classList.contains("category-header")) {
+                                row.style.display = "none";
+                            }
+                        }
+                        
+                        // Mostrar las cabeceras de categoría
+                        showCategoryHeaders();
+
+                        // Mostrar los separadores
+                        showSeparatorRows();
+                    }
+                    
+                    // Lógica para mostrar las cabeceras de categoría
+                    function showCategoryHeaders() {
+                        const categoryHeaders = document.querySelectorAll('.category-header');
+                        categoryHeaders.forEach(header => {
+                            let nextSibling = header.nextElementSibling;
+                            let hasVisibleRows = false;
+                            while(nextSibling && !nextSibling.classList.contains('category-header')) {
+                                if (nextSibling.classList.contains('main-row') && nextSibling.style.display !== 'none') {
+                                    hasVisibleRows = true;
+                                    break;
+                                }
+                                nextSibling = nextSibling.nextElementSibling;
+                            }
+                            header.style.display = hasVisibleRows ? "table-row" : "none";
+                        });
+                    }
+                    
+                    // Lógica para mostrar los separadores
+                    function showSeparatorRows() {
+                        const separatorRows = document.querySelectorAll('.separator-row');
+                        separatorRows.forEach(separator => {
+                            const prev = separator.previousElementSibling;
+                            const next = separator.nextElementSibling;
+                            
+                            const prevVisible = prev && prev.style.display === "table-row" && prev.classList.contains("category-header");
+                            const nextVisible = next && next.style.display === "table-row" && next.classList.contains("category-header");
+
+                            // Si el separador está entre dos categorías *visibles* diferentes, lo mostramos.
+                            if (prevVisible && nextVisible) {
+                                separator.style.display = "table-row";
+                            } else {
+                                separator.style.display = "none";
+                            }
+                        });
+                    }
+                }
+                
+
+                
+                // Asegurar que el script se ejecute cuando el DOM esté listo
+                document.addEventListener('DOMContentLoaded', function() {
+                    if (searchInput) {
+                        searchInput.addEventListener("keyup", filterTable);
+                        showFullAnalysis(); // Mostrar el análisis completo por defecto al cargar
+                    }
+                    
+                    // Sincronizar el scroll lateral
+                    if (tableContainer && scrollTop) {
+                        scrollTop.addEventListener('scroll', () => {
+                            tableContainer.scrollLeft = scrollTop.scrollLeft;
+                        });
+                        
+                        tableContainer.addEventListener('scroll', () => {
+                            scrollTop.scrollLeft = tableContainer.scrollLeft;
+                        });
+                    }
+                });
+            </script>
+        """
+        
+        # El HTML COMPLETO para el correo es la concatenación de todo.
+        html_body_completo = f"""
+        <html>
+        <head>
+            <title>ibexiaES - {datetime.today().strftime('%d/%m/%Y')} {hora_actual}</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0"> <meta name="robots" content="noindex">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+            {html_styles}
+        </head>
+        <body>
+            {html_content}
+            {html_script}
+        </body>
+        </html>
         """
         
         # ******************************************************************************
-        # *************** FIN DE LA NUEVA SECCIÓN HTML BASADA EN TEXTO *****************
+        # *************** FIN DE LA MODIFICACIÓN DE LA SECCIÓN HTML ********************
         # ******************************************************************************
         
-        # El HTML COMPLETO para el correo
+        # Concatenamos las tres secciones para pasar un bloque HTML limpio para el email.
         html_para_email_body = f"""
             {html_styles}
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
             {html_content}
+            {html_script}
         """
 
         
-        asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} análisis detallados hoy {datetime.today().strftime('%d/%m/%Y')}"
-        nombre_archivo_base = f"analisis_ibexia_{datetime.today().strftime('%Y%m%d')}"
+        asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} oportunidades detectadas hoy {datetime.today().strftime('%d/%m/%Y')}"
+        nombre_archivo_base = f"reporte_ibexia_{datetime.today().strftime('%Y%m%d')}"
 
-        # Enviamos el cuerpo HTML (sin tags <html>/<body>, que se añaden en la función de envío)
         enviar_email_con_adjunto(html_para_email_body, asunto, nombre_archivo_base)
         
-        # Devolver el bloque único con <style> y contenido para la inserción en WordPress.
-        return html_styles + html_content
+        # Devolver el bloque único con <style>, contenido y <script> para la inserción en WordPress.
+        return html_styles + html_content + html_script 
 
     except Exception as e:
+        # Nota: La excepción de Google Sheets por falta de variables de entorno (GOOGLE_APPLICATION_CREDENTIALS) 
+        # sigue activa en leer_google_sheets().
         print(f"❌ Error al ejecutar el script principal: {e}")
         return None
 
