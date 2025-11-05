@@ -849,7 +849,7 @@ def generar_tabla_posiciones_abiertas(datos_completos):
 # ---------------------- NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO (MODIFICADA) ---------------
 # --------------------------------------------------------------------------------------
 
-def generar_analisis_texto_empresa(data, is_first_group):
+def generar_analisis_texto_empresa(data, is_first_group, group_index):
     """Genera un bloque de texto HTML detallado para una sola empresa, encapsulando la mayor parte para desplegar con JS."""
     
     # 1. Recuperar datos y formatear
@@ -890,8 +890,8 @@ def generar_analisis_texto_empresa(data, is_first_group):
     
     if comprado:
         estado_operativa = "POSICIÓN ABIERTA"
-        color_bg_operativa = "#28a745" # Verde
         recomendacion_principal = "MANTENER"
+        
         if "venta activada" in oportunidad.lower():
             recomendacion_principal = "🚨 VENTA HOY"
             color_bg_operativa = "#dc3545" # Rojo
@@ -899,6 +899,11 @@ def generar_analisis_texto_empresa(data, is_first_group):
             recomendacion_principal = "⚠️ RIESGO DE VENTA"
             color_bg_operativa = "#ffc107" # Amarillo
             color_text_operativa = "#000000"
+        else: # Default is MANTENER
+            recomendacion_principal = "MANTENER"
+            # Color azul claro profesional para MANTENER (info de Bootstrap o similar)
+            color_bg_operativa = "#17a2b8" 
+            
     else:
         estado_operativa = "POSICIÓN CERRADA"
         color_bg_operativa = "#dc3545" # Rojo
@@ -917,10 +922,12 @@ def generar_analisis_texto_empresa(data, is_first_group):
              recomendacion_principal = "NEUTRAL"
              color_bg_operativa = "#6c757d"
              
-    # Determinar si la ficha debe estar abierta por defecto (solo el primer grupo)
-    display_detail = "block" if is_first_group else "none"
-    icon_class = "fa-chevron-up" if is_first_group else "fa-chevron-down"
-    button_text = "Cerrar Información" if is_first_group else "Ampliar Información"
+    # Determinar si la ficha debe estar abierta por defecto (solo las 3 primeras del primer grupo)
+    is_expanded_default = is_first_group and (group_index < 3)
+
+    display_detail = "block" if is_expanded_default else "none"
+    icon_class = "fa-chevron-up" if is_expanded_default else "fa-chevron-down"
+    button_text = "Cerrar Información" if is_expanded_default else "Ampliar Información"
 
     # 2. Estilos y Contenedor para la MINIFICHA (Parte Visible y Cuadrada)
     
@@ -950,7 +957,7 @@ def generar_analisis_texto_empresa(data, is_first_group):
             </div>
             
             <a href='{empresa_link}' target='_blank' class="resumen-item chart-link">
-                Ver Gráfico <i class="fas fa-external-link-alt" style="margin-left: 3px;"></i>
+                Ver Análisis Detallado y Gráfico <i class="fas fa-external-link-alt" style="margin-left: 3px;"></i>
             </a>
             
         </div>
@@ -1125,6 +1132,7 @@ def generar_reporte():
                     font-weight: bold;
                     display: flex;
                     align-items: center;
+                    cursor: pointer; /* Indica que es un elemento interactivo */
                 }}
                 .h3-compra {{
                     background-color: #e6f7ee; /* Verde suave */
@@ -1187,6 +1195,13 @@ def generar_reporte():
                     gap: 15px; 
                     margin-bottom: 20px;
                 }}
+                .collapsible-content {{
+                    /* El contenedor que se colapsa/expande */
+                    display: none; /* Por defecto se manejará en el código con "grid" o "none" */
+                }}
+                .collapsible-content .grid-container {{
+                    margin-bottom: 0;
+                }}
                 .empresa-analisis-block {{
                     /* Aspecto "Cuadrado" o más alto: forzamos altura mínima */
                     min-height: 250px; 
@@ -1198,7 +1213,7 @@ def generar_reporte():
                     background-color: #ffffff;
                     box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
                     line-height: 1.3;
-                    overflow: hidden; /* Importante para el botón que se movió */
+                    overflow: hidden; 
                 }}
                 .minificha-header {{
                     padding: 8px 10px; 
@@ -1208,11 +1223,13 @@ def generar_reporte():
                 .minificha-body-resumen {{
                     flex-grow: 1; /* Ocupa el espacio restante */
                     display: grid;
+                    /* Diseño 2 columnas: Precio arriba (2 col), Estado abajo (2 col), Cartera y Link */
                     grid-template-columns: 1fr 1fr;
                     gap: 5px;
                     padding: 10px;
                     text-align: center;
                     align-items: center;
+                    align-content: start; 
                 }}
                 .resumen-item {{
                     padding: 5px;
@@ -1225,12 +1242,14 @@ def generar_reporte():
                 .op-status-resumen {{
                     font-weight: bold;
                     font-size: 0.9em;
+                    grid-column: 1 / 3; /* Ocupa todo el ancho */
                 }}
                 .chart-link {{
                     text-decoration: none;
                     color: #007bff;
                     font-weight: bold;
-                    font-size: 0.9em;
+                    font-size: 0.85em; /* Ligeramente más pequeño para encajar el texto largo */
+                    grid-column: 1 / 3; /* Ocupa todo el ancho */
                 }}
                 .chart-link:hover {{
                     text-decoration: underline;
@@ -1288,23 +1307,29 @@ def generar_reporte():
             """
         else:
             previous_orden_grupo = None
-            is_first_group = True
+            group_fiches_count = 0
             
             for i, data in enumerate(datos_ordenados):
                 
                 current_orden_grupo = obtener_clave_ordenacion(data)[0]
                 
-                # Lógica para encabezados de grupo (H3) y contenedores de grid
                 es_primera_fila = previous_orden_grupo is None
                 es_cambio_grupo = current_orden_grupo != previous_orden_grupo
                 
                 if es_primera_fila or es_cambio_grupo:
                     
-                    # Cerrar el contenedor del grupo anterior
-                    if previous_orden_grupo is not None:
-                        html_content += "</div>"
+                    group_fiches_count = 0 
                     
-                    # Determinar el título y clase del nuevo grupo
+                    # Determinar si es el grupo de Compra (se queda abierto por defecto)
+                    is_compra_group = current_orden_grupo in [1, 2, 2.5]
+                    is_first_group = is_compra_group # Usado para la lógica de expansión de fichas internas
+
+                    # Cerrar el contenedor del grupo anterior (grid-container y collapsible-content)
+                    if previous_orden_grupo is not None:
+                        html_content += "</div>" # Cierra el grid-container
+                        html_content += "</div>" # Cierra el .collapsible-content wrapper
+                    
+                    # Determinar el título, clase e icono del nuevo grupo
                     if current_orden_grupo in [1, 2, 2.5]:
                         titulo = "OPORTUNIDADES DE COMPRA DETECTADAS"
                         clase = "h3-compra"
@@ -1314,36 +1339,49 @@ def generar_reporte():
                         titulo = "ATENTOS A VENDER / VIGILANCIA DE RIESGO"
                         clase = "h3-vigilar"
                         icono = "fas fa-eye"
-                        is_first_group = False
                         
                     elif current_orden_grupo in [6, 7]:
                         titulo = "OTRAS EMPRESAS SIN MOVIMIENTOS RELEVANTES"
                         clase = "h3-neutral"
                         icono = "fas fa-ellipsis-h"
-                        is_first_group = False
+                        
                     else:
                         titulo = "OTROS ANÁLISIS"
                         clase = "h3-neutral"
                         icono = "fas fa-info-circle"
-                        is_first_group = False
                         
-                    # Abrir el nuevo encabezado y contenedor
+                    # Abrir el nuevo encabezado (H3) y el contenedor colapsable
+                    
+                    # La primera sección NO es colapsable al hacer clic, solo visualmente
+                    onclick_event = f"onclick=\"toggleSection('{current_orden_grupo}')\"" if not is_compra_group else ""
+                    initial_icon_class = 'fa-chevron-up' if is_compra_group else 'fa-chevron-down'
+                    
                     html_content += f"""
-                        <h3 class="{clase}" data-group="{current_orden_grupo}">
+                        <h3 class="{clase}" data-group="{current_orden_grupo}" {onclick_event}>
                             <i class="{icono}" style="margin-right: 10px;"></i>
                             {titulo}
+                            <i class="fas {initial_icon_class}" style="margin-left: auto;" id="icon-group-{current_orden_grupo}"></i>
                         </h3>
+                    """
+                    
+                    # Collapsible wrapper for the content (FICHES)
+                    display_style = "display: grid;" if is_compra_group else "display: none;" 
+                        
+                    html_content += f"""
+                        <div id="collapsible-content-{current_orden_grupo}" class="collapsible-content" style="{display_style}">
                         <div class="grid-container" data-group="{current_orden_grupo}">
                     """
                 
-                # Generar la minificha para la empresa (pasamos si es del primer grupo)
-                html_content += generar_analisis_texto_empresa(data, is_first_group)
+                # Generar la minificha para la empresa (pasamos el índice dentro del grupo)
+                html_content += generar_analisis_texto_empresa(data, is_first_group, group_fiches_count)
+                group_fiches_count += 1
                 
                 previous_orden_grupo = current_orden_grupo
                 
-            # Cierre del último grid-container
+            # Cierre del último grid-container y collapsible-content
             if datos_ordenados:
-                html_content += "</div>"
+                html_content += "</div>" # Cierra el último grid-container
+                html_content += "</div>" # Cierra el último collapsible-content wrapper
         
         # Agregar la tabla de Posiciones Abiertas al final
         html_content += generar_tabla_posiciones_abiertas(datos_completos)
@@ -1360,7 +1398,7 @@ def generar_reporte():
         html_script = """
             <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
             <script>
-                // Función para desplegar/ocultar el detalle de la empresa
+                // Función para desplegar/ocultar el detalle de la empresa (fiche)
                 function toggleDetail(detailId, button) {
                     var detail = document.getElementById(detailId);
                     var icon = button.querySelector('i');
@@ -1372,61 +1410,115 @@ def generar_reporte():
                         button.innerHTML = 'Ampliar Información <i class="fas fa-chevron-down" style="margin-left: 5px;"></i>';
                     }
                 }
+
+                // Función para desplegar/ocultar SECCIONES enteras (H3)
+                function toggleSection(groupId) {
+                    var content = document.getElementById('collapsible-content-' + groupId);
+                    var icon = document.getElementById('icon-group-' + groupId);
+
+                    if (content.style.display === "none" || content.style.display === "") {
+                        content.style.display = "grid"; 
+                        icon.className = "fas fa-chevron-up";
+                    } else {
+                        content.style.display = "none";
+                        icon.className = "fas fa-chevron-down";
+                    }
+                }
                 
-                // Función de filtrado de empresas por nombre o ticker
+                // Función de filtrado de empresas (modificada para secciones)
                 function filterCompanies() {
                     var input, filter, blocks;
                     input = document.getElementById('company-search');
                     filter = input.value.toUpperCase();
                     blocks = document.getElementsByClassName('empresa-analisis-block');
+                    var groupsVisibility = {}; // Para rastrear si un grupo tiene elementos visibles
                     
+                    // Definición de grupos de Compra
+                    var compraGroups = ['1', '2', '2.5'];
+
+                    // 1. Ocultar/Mostrar bloques individuales
                     for (var i = 0; i < blocks.length; i++) {
                         var block = blocks[i];
                         var ticker = block.getAttribute('data-ticker').toUpperCase();
                         var nombre = block.getAttribute('data-nombre').toUpperCase();
-                        
-                        // Si el filtro coincide con el ticker o el nombre de la empresa
+                        var contentDiv = block.closest('.collapsible-content');
+                        if (!contentDiv) continue; // Asegurarse de que el bloque esté dentro de un contenedor colapsable
+                        var groupId = contentDiv.id.replace('collapsible-content-', '');
+
                         if (ticker.indexOf(filter) > -1 || nombre.indexOf(filter) > -1) {
-                            block.style.display = "flex"; // Mostrar la minificha (flex por el diseño vertical)
+                            block.style.display = "flex"; // Mostrar
+                            groupsVisibility[groupId] = true; // El grupo tiene al menos un elemento visible
                         } else {
-                            block.style.display = "none"; // Ocultar la minificha
+                            block.style.display = "none"; // Ocultar
                         }
                     }
                     
-                    // Lógica para ocultar/mostrar los encabezados de grupo (H3) y los grid-containers
-                    var h3s = document.querySelectorAll('.main-container h3');
-                    var gridContainers = document.getElementsByClassName('grid-container');
+                    // 2. Ocultar/Mostrar secciones (H3 y .collapsible-content) basadas en el resultado del filtro
+                    var h3s = document.querySelectorAll('.main-container h3[data-group]');
                     
-                    // Recorrer los contenedores de grid
-                    for (var j = 0; j < gridContainers.length; j++) {
-                        var container = gridContainers[j];
-                        var groupAttribute = container.getAttribute('data-group');
-                        var hasVisibleChild = false;
-                        
-                        // Verificar si algún bloque dentro del grid-container es visible
-                        var childBlocks = container.querySelectorAll('.empresa-analisis-block');
-                        for (var k = 0; k < childBlocks.length; k++) {
-                            // Usamos window.getComputedStyle para saber si realmente se está mostrando
-                            if (window.getComputedStyle(childBlocks[k]).display !== "none") {
-                                hasVisibleChild = true;
-                                break;
+                    for (var j = 0; j < h3s.length; j++) {
+                        var h3 = h3s[j];
+                        var groupId = h3.getAttribute('data-group');
+                        var content = document.getElementById('collapsible-content-' + groupId);
+                        var icon = document.getElementById('icon-group-' + groupId);
+                        var isCompraGroup = compraGroups.includes(groupId);
+
+                        if (groupsVisibility[groupId]) {
+                            // Mostrar la sección si hay coincidencias
+                            h3.style.display = "flex";
+                            
+                            // Si el filtro está activo, abrimos el contenido de todas las secciones
+                            if (filter.length > 0) {
+                                content.style.display = "grid";
+                                icon.className = "fas fa-chevron-up";
+                            } 
+                            // Si el filtro está vacío, restauramos el estado inicial (Solo Compra abierto, resto cerrado)
+                            else {
+                                if (isCompraGroup) {
+                                     content.style.display = "grid";
+                                     icon.className = "fas fa-chevron-up";
+                                } else {
+                                     content.style.display = "none";
+                                     icon.className = "fas fa-chevron-down";
+                                }
                             }
+                        } else {
+                            // Ocultar la sección entera si no hay coincidencias
+                            h3.style.display = "none";
+                            content.style.display = "none";
                         }
+                    }
+                    
+                    // 3. Restaurar estado inicial de apertura de las fiches (solo las 3 primeras del grupo Compra)
+                    if (filter.length === 0) {
+                        var compraBlocks = document.querySelectorAll('.collapsible-content[id*="collapsible-content-1"] .empresa-analisis-block, .collapsible-content[id*="collapsible-content-2"] .empresa-analisis-block, .collapsible-content[id*="collapsible-content-2\\.5"] .empresa-analisis-block');
                         
-                        // Buscar el H3 asociado (basado en el atributo data-group)
-                        var associatedH3 = document.querySelector('h3[data-group="' + groupAttribute + '"]');
-                        
-                        if (associatedH3) {
-                            if (hasVisibleChild) {
-                                associatedH3.style.display = "flex"; // Mostrar el H3
-                                container.style.display = "grid"; // Mostrar el grid
+                        for (var l = 0; l < compraBlocks.length; l++) {
+                            var detailId = 'detail-' + compraBlocks[l].getAttribute('data-ticker');
+                            var button = compraBlocks[l].querySelector('.expand-button');
+                            var detail = document.getElementById(detailId);
+                            
+                            var shouldBeOpen = l < 3;
+                            
+                            if (shouldBeOpen) {
+                                // Forzar apertura
+                                if (detail.style.display === "none" || detail.style.display === "") {
+                                    toggleDetail(detailId, button);
+                                }
                             } else {
-                                associatedH3.style.display = "none";
-                                container.style.display = "none"; // Ocultar el grid
+                                // Forzar cierre
+                                if (detail.style.display === "block") {
+                                    toggleDetail(detailId, button);
+                                }
                             }
                         }
                     }
                 }
+
+                // Se llama a filterCompanies al cargar la página para aplicar el estado por defecto
+                document.addEventListener('DOMContentLoaded', function() {
+                    filterCompanies();
+                });
             </script>
         """
         
