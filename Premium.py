@@ -846,15 +846,15 @@ def generar_tabla_posiciones_abiertas(datos_completos):
 
 
 # --------------------------------------------------------------------------------------
-# ---------------------- NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO --------------------------
+# ---------------------- NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO (MODIFICADA) ---------------
 # --------------------------------------------------------------------------------------
 
 def generar_analisis_texto_empresa(data):
-    """Genera un bloque de texto HTML detallado para una sola empresa."""
+    """Genera un bloque de texto HTML detallado para una sola empresa, encapsulando la mayor parte para desplegar con JS."""
     
     # 1. Recuperar datos y formatear
-    nombre_empresa = data['NOMBRE_EMPRESA']
     ticker = data['TICKER']
+    nombre_empresa = data['NOMBRE_EMPRESA']
     precio_actual = formatear_numero(data['PRECIO_ACTUAL'])
     tendencia = data['TENDENCIA_ACTUAL']
     oportunidad = data['OPORTUNIDAD']
@@ -873,6 +873,7 @@ def generar_analisis_texto_empresa(data):
     fecha_compra = data['FECHA_COMPRA']
     precio_compra = formatear_numero(data['PRECIO_COMPRA'])
     beneficio_actual_formateado = formatear_beneficio(data['BENEFICIO_ACTUAL'])
+    beneficio_ultima_op_formateado = formatear_beneficio(data['BENEFICIO_ULTIMA_OP'])
     
     # URL de la empresa para el H2
     nombre_empresa_url = None
@@ -886,129 +887,152 @@ def generar_analisis_texto_empresa(data):
     else:
         empresa_link = '#'
         
-    # Lógica para el bloque de recomendación principal (MEJORA DE VISIBILIDAD)
-    color_text_operativa = "#ffffff" # Por defecto, texto blanco
+    # Lógica para el bloque de recomendación principal
+    color_text_operativa = "#ffffff" 
     
     if comprado:
-        estado_operativa = "✅ POSICIÓN ABIERTA (COMPRADO)"
+        estado_operativa = "POSICIÓN ABIERTA (COMPRADO)"
         color_bg_operativa = "#28a745" # Verde
-        recomendacion_principal = f"MANTENER / {oportunidad.upper()}"
+        recomendacion_principal = "MANTENER"
         if "venta activada" in oportunidad.lower():
-            recomendacion_principal = "⚠️ VENTA RECOMENDADA HOY"
+            recomendacion_principal = "🚨 VENTA HOY"
             color_bg_operativa = "#dc3545" # Rojo
         elif "riesgo de venta" in oportunidad.lower():
-            recomendacion_principal = "🚨 RIESGO DE VENTA - VIGILAR"
+            recomendacion_principal = "⚠️ RIESGO DE VENTA"
             color_bg_operativa = "#ffc107" # Amarillo
-            color_text_operativa = "#000000" # Texto negro en amarillo
+            color_text_operativa = "#000000"
     else:
-        estado_operativa = "❌ POSICIÓN CERRADA (NO COMPRADO)"
+        estado_operativa = "POSICIÓN CERRADA"
         color_bg_operativa = "#dc3545" # Rojo
-        recomendacion_principal = oportunidad.upper()
-        if "compra activada" in oportunidad.lower():
-            recomendacion_principal = "🚀 COMPRA RECOMENDADA HOY"
+        recomendacion_principal = oportunidad.upper().replace('POSIBILIDAD DE ', '').replace('ACTIVADA', '').strip()
+        if "compra activada" in oportunidad.lower() or "posibilidad de compra" in oportunidad.lower():
+            recomendacion_principal = "🚀 COMPRA RECOMENDADA"
             color_bg_operativa = "#28a745" # Verde
-        elif "posibilidad de compra" in oportunidad.lower():
-             recomendacion_principal = "👍 POSIBILIDAD DE COMPRA"
-             color_bg_operativa = "#28a745" # Verde
         elif "compra riesgo" in oportunidad.lower():
              recomendacion_principal = "⚠️ COMPRA RIESGO"
              color_bg_operativa = "#ffc107"
              color_text_operativa = "#000000"
+        elif "vigilar" in oportunidad.lower():
+             recomendacion_principal = "VIGILAR"
+             color_bg_operativa = "#1A237E" # Azul oscuro para neutral/vigilar
+        elif "seguirá bajando" in oportunidad.lower() or "intermedio" in oportunidad.lower():
+             recomendacion_principal = "NEUTRAL"
+             color_bg_operativa = "#6c757d"
 
 
+    # 2. Estilos y Contenedor para la MINIFICHA (Parte Visible)
+    border_color = color_bg_operativa
     
-    # 2. Definir Estilos y Contenedor
-    # El color del borde y fondo del contenedor cambia si está COMPRADO
-    border_color = "#28a745" if comprado else "#1A237E" # Verde si comprado, Azul oscuro si no
-    bg_color = "#f3fff3" if comprado else "#f0f8ff"     # Verde claro si comprado, Azul claro si no
-    
-    html_bloque = f"""
-    <div class="empresa-analisis-block" data-ticker="{ticker}" data-nombre="{nombre_empresa}" style="border: 1px solid {border_color}; padding: 10px; margin-bottom: 15px; border-radius: 5px; background-color: {bg_color}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); line-height: 1.3;">
+    html_minificha = f"""
+    <div class="empresa-analisis-block" id="block-{ticker}" data-ticker="{ticker}" data-nombre="{nombre_empresa}" data-oportunidad="{oportunidad}" style="border: 1px solid #dee2e6; margin-bottom: 8px; border-radius: 5px; background-color: #f8f9fa; box-shadow: 0 1px 2px rgba(0,0,0,0.03); line-height: 1.2;">
         
-        <h2 style="color: {border_color}; border-bottom: 1px solid {border_color}; padding-bottom: 5px; margin-top: 0; margin-bottom: 5px; font-size: 1.4em;">
-            {nombre_empresa} ({ticker})
-            <span style="font-size: 0.8em; color: #6c757d; font-weight: normal; margin-left: 5px;">
-                [<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:#007bff;'>Ver Gráfico</a>]
-            </span>
-        </h2>
-        
-        <div class="main-recommendation" style="background-color: {color_bg_operativa}; border: 1px solid {border_color}; padding: 8px; margin-bottom: 8px; border-radius: 4px; text-align: center;">
-            <p style="margin: 0; font-size: 1.3em; font-weight: 900; color: {color_text_operativa}; line-height: 1.1;">
-                {estado_operativa}
-            </p>
-            <p style="margin: 5px 0 0 0; font-size: 1.1em; font-weight: bold; color: {color_text_operativa}; line-height: 1.1;">
-                RECOMENDACIÓN PRINCIPAL: {recomendacion_principal}
-            </p>
+        <div class="minificha-header" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid #e9ecef;">
+            
+            <h4 style="margin: 0; font-size: 1.0em; font-weight: bold; color: #1A237E;">
+                {nombre_empresa} <span style="font-weight: normal; color: #6c757d; font-size: 0.9em;">({ticker})</span>
+            </h4>
+            
+            <div class="current-price" style="font-size: 1.1em; font-weight: bold; color: #495057;">
+                {precio_actual}€
+            </div>
+            
         </div>
         
-        {generar_observaciones(data)}
-        
-        <hr style="border: 0; border-top: 1px dashed #ccc; margin: 8px 0;">
-        
-        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; font-size: 1.0em;">
+        <div class="minificha-body" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px;">
             
-            <div style="flex: 1 1 48%; min-width: 200px; margin-bottom: 5px; padding-right: 5px;">
-                <h3 style="color: #495057; font-size: 1.1em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 5px; margin-bottom: 3px;">
-                    <i class="fas fa-chart-line" style="color:#007bff; margin-right: 3px;"></i>
-                    DATOS CLAVE
-                </h3>
-                <p>
-                    Precio actual: <strong>{precio_actual}€</strong>. Tendencia **{tendencia}** en zona de **{estado_smi}** ({smi_hoy}).<br>
-                    Oportunidad: <strong>{oportunidad}</strong>.
-                </p>
-                <p style="margin-top: 5px;">
-                    <strong>Compra:</strong> {compra_si}.<br>
-                    <strong>Venta:</strong> {vende_si}.
-                </p>
+            <div class="status-indicator" style="background-color: {color_bg_operativa}; color: {color_text_operativa}; padding: 3px 8px; border-radius: 3px; font-weight: bold; font-size: 0.9em; text-align: center; min-width: 150px;">
+                {recomendacion_principal}
             </div>
             
-            <div style="flex: 1 1 48%; min-width: 200px; margin-bottom: 5px;">
-                <h3 style="color: #495057; font-size: 1.1em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 5px; margin-bottom: 3px;">
-                    <i class="fas fa-map-marker-alt" style="color:#007bff; margin-right: 3px;"></i>
-                    NIVELES Y EMA
-                </h3>
-                <p>
-                    **Soporte**: <strong>{soporte1}€</strong> | **Resistencia**: <strong>{resistencia1}€</strong>.<br>
-                    EMA 100 ({valor_ema}€) actúa como **{tipo_ema}**.
-                </p>
-                <p style="margin-top: 5px;">
-                    {data['OBSERVACION_SEMANAL'].replace('SMI', 'indicador')}
-                </p>
+            <div class="op-status" style="font-size: 0.9em; text-align: right; min-width: 150px;">
+                {f"<strong>Posición:</strong> {beneficio_actual_formateado}" if comprado else f"<strong>Última Op:</strong> {beneficio_ultima_op_formateado}"}
             </div>
             
-            <div style="flex: 1 1 100%; margin-top: 8px;">
-                <h3 style="color: #495057; font-size: 1.1em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 5px; margin-bottom: 3px;">
-                    <i class="fas fa-hand-holding-usd" style="color:#007bff; margin-right: 3px;"></i>
-                    ESTADO DE OPERATIVA
-                </h3>
+            <button onclick="toggleDetail('detail-{ticker}', this)" style="background-color: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 0.9em; font-weight: bold; margin-left: 10px; min-width: 120px;">
+                Ampliar Info <i class="fas fa-chevron-down" style="margin-left: 5px;"></i>
+            </button>
+            
+        </div>
+        
+        <div id="detail-{ticker}" class="full-detail" style="display: none; border-top: 1px dashed #e9ecef; padding: 10px;">
+        
+            <p style="margin: 0 0 8px 0; font-size: 0.95em;">
+                <strong style="font-size: 1.05em;">ESTADO DE OPERATIVA:</strong> 
+                <span style="background-color: {color_bg_operativa}; color: {color_text_operativa}; padding: 2px 5px; border-radius: 3px; font-weight: bold;">
+                    {estado_operativa}
+                </span>
+            </p>
+
+            {generar_observaciones(data)}
+            
+            <hr style="border: 0; border-top: 1px dashed #ccc; margin: 8px 0;">
+            
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; font-size: 0.95em;">
                 
-                <div style="border: 1px solid #dee2e6; padding: 5px; border-radius: 4px; background-color: #ffffff;">
-                    
-                    <p style="margin: 0; padding: 0;">
-                        <strong>Posición:</strong> <span style="font-weight: bold; color: {'#28a745' if comprado else '#dc3545'};">{data['COMPRADO']}</span>
+                <div style="flex: 1 1 48%; min-width: 200px; margin-bottom: 5px; padding-right: 5px;">
+                    <h5 style="color: #495057; font-size: 1em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 0px; margin-bottom: 3px;">
+                        <i class="fas fa-chart-line" style="color:#007bff; margin-right: 3px;"></i>
+                        DATOS CLAVE (DIARIO)
+                    </h5>
+                    <p>
+                        Precio actual: <strong>{precio_actual}€</strong>. SMI: **{estado_smi}** ({smi_hoy}).<br>
+                        Tendencia: **{tendencia}**. Oportunidad: <strong>{oportunidad}</strong>.
                     </p>
-                    
-                    {f"""
-                    <p style="margin: 3px 0 0 0; padding: 0;">
-                        <strong>Entrada:</strong> {precio_compra}€ (Fecha: {fecha_compra})<br>
-                        <strong>Beneficio Actual (Simulado):</strong> {beneficio_actual_formateado}
+                    <p style="margin-top: 5px;">
+                        <strong>Compra:</strong> {compra_si}.<br>
+                        <strong>Venta:</strong> {vende_si}.
                     </p>
-                    """ if comprado else 
-                    f"""
-                    <p style="margin: 3px 0 0 0; padding: 0;">
-                        <strong>No hay inversión abierta.</strong> Última operación ({data['FECHA_VENTA_CIERRE']}) resultó en un beneficio de {formatear_beneficio(data['BENEFICIO_ULTIMA_OP'])}.
+                </div>
+                
+                <div style="flex: 1 1 48%; min-width: 200px; margin-bottom: 5px;">
+                    <h5 style="color: #495057; font-size: 1em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 0px; margin-bottom: 3px;">
+                        <i class="fas fa-map-marker-alt" style="color:#007bff; margin-right: 3px;"></i>
+                        NIVELES
+                    </h5>
+                    <p>
+                        **Soporte**: <strong>{soporte1}€</strong> | **Resistencia**: <strong>{resistencia1}€</strong>.<br>
+                        EMA 100 ({valor_ema}€) actúa como **{tipo_ema}**.
                     </p>
-                    """}
+                    <p style="margin-top: 5px;">
+                        <i class="fas fa-sync" style="color:#6c757d; margin-right: 3px;"></i> 
+                        {data['OBSERVACION_SEMANAL'].replace('SMI', 'indicador')}
+                    </p>
+                </div>
+                
+                <div style="flex: 1 1 100%; margin-top: 8px;">
+                    <h5 style="color: #495057; font-size: 1em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 5px; margin-bottom: 3px;">
+                        <i class="fas fa-hand-holding-usd" style="color:#007bff; margin-right: 3px;"></i>
+                        POSICIÓN ACTUAL
+                    </h5>
                     
+                    <div style="border: 1px solid #dee2e6; padding: 5px; border-radius: 4px; background-color: #ffffff;">
+                        
+                        {f"""
+                        <p style="margin: 0; padding: 0;">
+                            <strong>Entrada:</strong> {precio_compra}€ (Fecha: {fecha_compra})<br>
+                            <strong>Beneficio Actual (Simulado):</strong> {beneficio_actual_formateado}
+                        </p>
+                        """ if comprado else 
+                        f"""
+                        <p style="margin: 0; padding: 0;">
+                            <strong>No hay inversión abierta.</strong> Última operación ({data['FECHA_VENTA_CIERRE']}) resultó en un beneficio de {beneficio_ultima_op_formateado}.
+                        </p>
+                        """}
+                         <p style="margin: 5px 0 0 0; text-align: right;">
+                             <a href='{empresa_link}' target='_blank' style='text-decoration:none; color:#dc3545; font-weight: bold; font-size: 0.95em;'>
+                                 Ampliar Análisis y Gráfico <i class="fas fa-external-link-alt"></i>
+                             </a>
+                         </p>
+                        
+                    </div>
                 </div>
             </div>
-            
         </div>
         
     </div>
     """
     
-    return html_bloque
+    return html_minificha
 
 # --------------------------------------------------------------------------------------
 # -------------------- FIN DE LA NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO --------------------
@@ -1054,6 +1078,7 @@ def generar_reporte():
 
             orden_interna = prioridad.get(categoria, 99) 
 
+            # Ordenar por oportunidad de compra/venta, y dentro de cada grupo, alfabéticamente por nombre
             return (orden_interna, empresa['NOMBRE_EMPRESA']) 
 
         datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
@@ -1081,58 +1106,59 @@ def generar_reporte():
                     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                     line-height: 1.4;
-                    font-size: 0.85em; /* Tamaño de fuente base reducido */
+                    font-size: 0.9em; /* Tamaño de fuente base pequeño */
                 }}
                 h1 {{
                     text-align: center;
-                    font-size: 1.5em; /* Reducido */
+                    font-size: 1.5em; 
                     color: #1A237E;
                     margin-bottom: 5px;
                     margin-top: 5px;
                 }}
                 h2, h3 {{
-                    margin-top: 10px; 
-                    margin-bottom: 5px;
+                    margin-top: 15px; 
+                    margin-bottom: 8px;
                 }}
                 p {{
                     color: #495057;
                     text-align: left;
-                    font-size: 1em; /* Respeta el tamaño base de 0.85em */
-                    margin: 0 0 5px 0; /* Margen minimizado */
+                    font-size: 1em; /* Respeta el tamaño base de 0.9em */
+                    margin: 0 0 5px 0; 
                 }}
                 strong {{
                     font-weight: 700;
                     color: #212529;
                 }}
-                /* Estilos para asegurar que los enlaces de beneficio se vean bien */
-                span[style*="color:#28a745"], span[style*="color:#dc3545"] {{
-                    font-weight: bold;
-                }}
-                /* Estilos del Buscador - ESTILO GOOGLE */
+                /* Estilos del Buscador - ESTILO PROFESIONAL Y GRANDE */
                 #search-input-container {{
                     text-align: center;
-                    margin-bottom: 20px; /* Más espacio abajo */
+                    margin-bottom: 20px; 
                     padding: 10px 0;
                 }}
                 #company-search {{
-                    padding: 12px 20px; /* Más grande */
-                    border: 1px solid #ced4da; /* Borde más sutil */
-                    border-radius: 25px; /* Más redondeado (pastilla) */
+                    padding: 12px 20px; 
+                    border: 1px solid #ced4da; 
+                    border-radius: 6px; 
                     width: 100%;
-                    max-width: 650px; /* Más ancho */
-                    font-size: 1.2em; /* Fuente más grande */
+                    max-width: 700px; /* Más ancho */
+                    font-size: 1.1em; /* Fuente grande */
                     outline: none;
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra para que destaque */
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
                     transition: box-shadow 0.3s ease-in-out;
                 }}
                 #company-search:focus {{
-                    border-color: #4285F4; /* Color de Google al hacer focus */
-                    box-shadow: 0 1px 6px rgba(32,33,36,.28);
+                    border-color: #1A237E; 
+                    box-shadow: 0 0 0 0.2rem rgba(26, 35, 126, .25);
                 }}
-                /* Estilos de la tabla */
+                /* Estilos de la tabla de posiciones */
                 .open-positions-container table td, .open-positions-container table th {{
                     padding: 3px 5px !important;
                     line-height: 1.3;
+                    font-size: 0.9em;
+                }}
+                /* Estilo de los iconos de Chevron para el botón */
+                .fa-chevron-up, .fa-chevron-down {{
+                    transition: transform 0.3s ease-in-out;
                 }}
             </style>
         """
@@ -1174,33 +1200,55 @@ def generar_reporte():
                     if current_orden_grupo in [1, 2, 2.5]:
                         if previous_orden_grupo is None or previous_orden_grupo not in [1, 2, 2.5]:
                             html_content += """
-                                <h3 style="color: #28a745; font-size: 1.2em; margin-top: 20px; border-bottom: 1px solid #28a745; padding-bottom: 3px;">
+                                <h3 style="color: #28a745; font-size: 1.2em; margin-top: 20px; border-bottom: 2px solid #28a745; padding-bottom: 3px;">
                                     <i class="fas fa-arrow-up" style="margin-right: 5px;"></i>
                                     OPORTUNIDADES DE COMPRA DETECTADAS
                                 </h3>
+                                <div class="grid-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px;">
                             """
+                        # Cierre del div si se sale de este grupo
+                        if previous_orden_grupo is not None and previous_orden_grupo not in [1, 2, 2.5]:
+                            html_content += "</div>"
+
                     elif current_orden_grupo in [3, 4, 5]:
                         if previous_orden_grupo is None or previous_orden_grupo not in [3, 4, 5]:
+                            # Cierre del div si se sale del grupo anterior
+                            if previous_orden_grupo in [1, 2, 2.5, 6, 7] or previous_orden_grupo is None and i > 0:
+                                html_content += "</div>"
+                                
                             html_content += """
-                                <h3 style="color: #ffc107; font-size: 1.2em; margin-top: 20px; border-bottom: 1px solid #ffc107; padding-bottom: 3px;">
+                                <h3 style="color: #ffc107; font-size: 1.2em; margin-top: 20px; border-bottom: 2px solid #ffc107; padding-bottom: 3px;">
                                     <i class="fas fa-exclamation-triangle" style="margin-right: 5px;"></i>
                                     ATENTOS A VENDER / VIGILANCIA
                                 </h3>
+                                <div class="grid-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px;">
                             """
+                        # Cierre del div si se sale de este grupo
+                        if previous_orden_grupo is not None and previous_orden_grupo not in [3, 4, 5]:
+                            html_content += "</div>"
+
                     elif current_orden_grupo in [6, 7]:
                         if previous_orden_grupo is None or previous_orden_grupo not in [6, 7]:
+                            # Cierre del div si se sale del grupo anterior
+                            if previous_orden_grupo in [1, 2, 2.5, 3, 4, 5] or previous_orden_grupo is None and i > 0:
+                                html_content += "</div>"
+                                
                             html_content += """
-                                <h3 style="color: #6c757d; font-size: 1.2em; margin-top: 20px; border-bottom: 1px solid #6c757d; padding-bottom: 3px;">
+                                <h3 style="color: #6c757d; font-size: 1.2em; margin-top: 20px; border-bottom: 2px solid #6c757d; padding-bottom: 3px;">
                                     <i class="fas fa-minus-circle" style="margin-right: 5px;"></i>
                                     OTRAS EMPRESAS SIN MOVIMIENTOS RELEVANTES
                                 </h3>
+                                <div class="grid-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px;">
                             """
-                
-                # Generar el análisis de texto para la empresa
-                # Se elimina el index de la llamada a la función
+
+                # Generar la minificha para la empresa
                 html_content += generar_analisis_texto_empresa(data)
                 
                 previous_orden_grupo = current_orden_grupo
+                
+            # Cierre del último grid-container
+            if datos_ordenados:
+                html_content += "</div>"
         
         # Agregar la tabla de Posiciones Abiertas al final
         html_content += generar_tabla_posiciones_abiertas(datos_completos)
@@ -1213,12 +1261,26 @@ def generar_reporte():
             </div>
         """
         
-        # 3. SCRIPT JAVASCRIPT (Para el buscador)
+        # 3. SCRIPT JAVASCRIPT (Para el buscador y el desplegable)
         html_script = """
             <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
             <script>
+                // Función para desplegar/ocultar el detalle de la empresa
+                function toggleDetail(detailId, button) {
+                    var detail = document.getElementById(detailId);
+                    var icon = button.querySelector('i');
+                    if (detail.style.display === "none" || detail.style.display === "") {
+                        detail.style.display = "block";
+                        button.innerHTML = 'Cerrar Info <i class="fas fa-chevron-up" style="margin-left: 5px;"></i>';
+                    } else {
+                        detail.style.display = "none";
+                        button.innerHTML = 'Ampliar Info <i class="fas fa-chevron-down" style="margin-left: 5px;"></i>';
+                    }
+                }
+                
+                // Función de filtrado de empresas por nombre o ticker
                 function filterCompanies() {
-                    var input, filter, blocks, h2, txtValue;
+                    var input, filter, blocks;
                     input = document.getElementById('company-search');
                     filter = input.value.toUpperCase();
                     blocks = document.getElementsByClassName('empresa-analisis-block');
@@ -1230,9 +1292,44 @@ def generar_reporte():
                         
                         // Si el filtro coincide con el ticker o el nombre de la empresa
                         if (ticker.indexOf(filter) > -1 || nombre.indexOf(filter) > -1) {
-                            block.style.display = "";
+                            block.style.display = "block"; // Mostrar la minificha
                         } else {
-                            block.style.display = "none";
+                            block.style.display = "none"; // Ocultar la minificha
+                        }
+                    }
+                    
+                    // Lógica para ocultar/mostrar los encabezados de grupo (H3)
+                    var h3s = document.querySelectorAll('.main-container h3');
+                    var gridContainers = document.getElementsByClassName('grid-container');
+                    
+                    // Recorrer los contenedores de grid
+                    for (var j = 0; j < gridContainers.length; j++) {
+                        var container = gridContainers[j];
+                        var hasVisibleChild = false;
+                        
+                        // Verificar si algún bloque dentro del grid-container es visible
+                        var childBlocks = container.querySelectorAll('.empresa-analisis-block');
+                        for (var k = 0; k < childBlocks.length; k++) {
+                            if (childBlocks[k].style.display !== "none") {
+                                hasVisibleChild = true;
+                                break;
+                            }
+                        }
+                        
+                        // El encabezado H3 que precede inmediatamente al contenedor
+                        var previousSibling = container.previousElementSibling;
+                        while (previousSibling && previousSibling.tagName !== 'H3') {
+                            previousSibling = previousSibling.previousElementSibling;
+                        }
+                        
+                        if (previousSibling && previousSibling.tagName === 'H3') {
+                            if (hasVisibleChild) {
+                                previousSibling.style.display = "block";
+                                container.style.display = "grid"; // Mostrar el grid
+                            } else {
+                                previousSibling.style.display = "none";
+                                container.style.display = "none"; // Ocultar el grid
+                            }
                         }
                     }
                 }
