@@ -1,7 +1,3 @@
-{
-type: python code
-fileName: Premium (1)_modificado.py
-fullContent:
 import os
 import json
 import smtplib
