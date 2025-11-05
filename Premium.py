@@ -616,8 +616,7 @@ def generar_observaciones(data):
         texto = f"El algoritmo se encuentra en una zona de sobreventa y muestra una tendencia alcista en sus últimos valores, lo que activa una señal de compra fuerte. Se recomienda comprar para aprovechar un posible rebote, con un objetivo de precio en la zona de resistencia. La EMA de 100 periodos se encuentra en {valor_ema}€, actuando como un nivel de {tipo_ema}."
     
     # Se añade la advertencia al inicio del texto de la observación
-    # REDUCCIÓN DE FUENTE: p style="font-size: 0.9em;"
-    return f'<p style="text-align:left; color:#000; font-size: 0.9em;">{texto_observacion.strip()}{advertencia_texto}{texto.strip()}</p>'
+    return f'<p style="text-align:left; color:#000;">{texto_observacion.strip()}{advertencia_texto}{texto.strip()}</p>'
 
 
 def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
@@ -732,13 +731,12 @@ def generar_tabla_posiciones_abiertas(datos_completos):
     
     if not posiciones_abiertas:
         # **MODIFICACIÓN: Devolver un bloque HTML con un mensaje en lugar de una cadena vacía**
-        # REDUCCIÓN DE FUENTE: h3 1.4em, p 0.9em
         return """
-            <h3 style="text-align: center; color: #1A237E; margin-top: 50px; margin-bottom: 20px; font-size: 1.4em; border-bottom: 2px solid #e9ecef; padding-bottom: 10px;">
-                <i class="fas fa-check-circle" style="color:#28a745; margin-right: 10px;"></i>
+            <h3 style="text-align: center; color: #1A237E; margin-top: 30px; margin-bottom: 10px; font-size: 1.5em; border-bottom: 1px solid #e9ecef; padding-bottom: 5px;">
+                <i class="fas fa-check-circle" style="color:#28a745; margin-right: 8px;"></i>
                 Posiciones Abiertas (Cartera IBEXIA)
             </h3>
-            <p style="text-align: center; font-size: 0.9em; color: #dc3545; font-weight: bold; margin-bottom: 20px; padding: 15px; border: 1px dashed #dc3545; background-color: #f8d7da;">
+            <p style="text-align: center; font-size: 0.9em; color: #dc3545; font-weight: bold; margin-bottom: 20px; padding: 10px; border: 1px dashed #dc3545; background-color: #f8d7da;">
                 Actualmente no hay posiciones abiertas según el algoritmo.
             </p>
         """
@@ -757,26 +755,25 @@ def generar_tabla_posiciones_abiertas(datos_completos):
     
     # 3. Generar el contenido HTML de la tabla
     
-    # **MODIFICACIÓN 1: Añadir el texto de advertencia sobre el desplazamiento**
-    # REDUCCIÓN DE FUENTE: h3 1.4em, p 0.9em
+    # Se han ajustado los tamaños de fuente, márgenes y paddings para compactar la tabla.
     html_table = """
-        <h3 style="text-align: center; color: #1A237E; margin-top: 50px; margin-bottom: 20px; font-size: 1.4em; border-bottom: 2px solid #e9ecef; padding-bottom: 10px;">
-            <i class="fas fa-check-circle" style="color:#28a745; margin-right: 10px;"></i>
+        <h3 style="text-align: center; color: #1A237E; margin-top: 30px; margin-bottom: 10px; font-size: 1.5em; border-bottom: 1px solid #e9ecef; padding-bottom: 5px;">
+            <i class="fas fa-check-circle" style="color:#28a745; margin-right: 8px;"></i>
             Posiciones Abiertas (Cartera IBEXIA)
         </h3>
-        <p style="text-align: center; font-size: 0.9em; color: #dc3545; font-weight: bold; margin-bottom: 20px;">
-            ⚠️ Desliza hacia abajo dentro de la caja para ver todas las empresas en las que estamos invertidos.
+        <p style="text-align: center; font-size: 0.9em; color: #dc3545; font-weight: bold; margin-bottom: 10px;">
+            ⚠️ Desliza horizontalmente para ver todos los datos.
         </p>
-        <div class="open-positions-container" style="overflow-x: auto; max-width: 100%; height: 350px; overflow-y: scroll; border: 1px solid #dee2e6; font-size: 0.85em;">
-            <table style="min-width: 700px; width: 100%; table-layout: auto; border: 0;">
+        <div class="open-positions-container" style="overflow-x: auto; max-width: 100%; height: 300px; overflow-y: scroll; border: 1px solid #dee2e6;">
+            <table style="min-width: 700px; width: 100%; table-layout: auto; border: 0; font-size: 0.9em;">
                 <thead>
                     <tr style="background-color: #f0f8ff;">
-                        <th style="width: 20%;">EMPRESA (TICKER)</th>
-                        <th style="width: 15%;">FECHA ENTRADA</th>
-                        <th style="width: 15%;">PRECIO ENTRADA</th>
-                        <th style="width: 15%;">PRECIO ACTUAL</th>
-                        <th style="width: 20%;">BENEFICIO A DÍA DE HOY</th>
-                        <th style="width: 15%;">ESTADO</th>
+                        <th style="width: 20%; padding: 5px 8px;">EMPRESA (TICKER)</th>
+                        <th style="width: 15%; padding: 5px 8px;">FECHA ENTRADA</th>
+                        <th style="width: 15%; padding: 5px 8px;">PRECIO ENTRADA</th>
+                        <th style="width: 15%; padding: 5px 8px;">PRECIO ACTUAL</th>
+                        <th style="width: 20%; padding: 5px 8px;">BENEFICIO A DÍA DE HOY</th>
+                        <th style="width: 15%; padding: 5px 8px;">ESTADO</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -818,20 +815,19 @@ def generar_tabla_posiciones_abiertas(datos_completos):
             empresa_link = '#'
             
         # Generar la fila de la tabla
-        # REDUCCIÓN DE FUENTE: font-size en open-positions-container aplica a TD.
         html_table += f"""
                     <tr>
-                        <td style="text-align: left; font-weight: bold;">
+                        <td style="text-align: left; font-weight: bold; padding: 4px 8px;">
                             <a href='{empresa_link}' target='_blank' style='text-decoration:none; color: #1A237E;'>
                                 {data['NOMBRE_EMPRESA']} 
-                                <span style='color: #6c757d; font-weight: normal; font-size: 1em;'>({data['TICKER']})</span>
+                                <span style='color: #6c757d; font-weight: normal; font-size: 0.8em;'>({data['TICKER']})</span>
                             </a>
                         </td>
-                        <td>{data['FECHA_COMPRA']}</td>
-                        <td>{formatear_numero(data['PRECIO_COMPRA'])}€</td>
-                        <td><span class="compra" style="color: #1A237E;">{formatear_numero(data['PRECIO_ACTUAL'])}€</span></td>
-                        <td>{formatear_beneficio(data['BENEFICIO_ACTUAL'])}</td>
-                        <td><span class="{clase_rec}" style="font-weight: bold;">{recomendacion}</span></td>
+                        <td style="padding: 4px 8px;">{data['FECHA_COMPRA']}</td>
+                        <td style="padding: 4px 8px;">{formatear_numero(data['PRECIO_COMPRA'])}€</td>
+                        <td style="padding: 4px 8px;"><span class="compra" style="color: #1A237E;">{formatear_numero(data['PRECIO_ACTUAL'])}€</span></td>
+                        <td style="padding: 4px 8px;">{formatear_beneficio(data['BENEFICIO_ACTUAL'])}</td>
+                        <td style="padding: 4px 8px;"><span class="{clase_rec}" style="font-weight: bold;">{recomendacion}</span></td>
                     </tr>
         """
         
@@ -850,11 +846,11 @@ def generar_tabla_posiciones_abiertas(datos_completos):
 
 
 # --------------------------------------------------------------------------------------
-# ---------------------- NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO --------------------------
+# ---------------------- FUNCIÓN DE ANÁLISIS DE TEXTO MODIFICADA --------------------------
 # --------------------------------------------------------------------------------------
 
 def generar_analisis_texto_empresa(data):
-    """Genera un bloque de texto HTML detallado para una sola empresa."""
+    """Genera un bloque de texto HTML detallado para una sola empresa (Más compacto)."""
     
     # 1. Recuperar datos y formatear
     nombre_empresa = data['NOMBRE_EMPRESA']
@@ -913,90 +909,86 @@ def generar_analisis_texto_empresa(data):
              color_operativa = "#28a745" # Verde
 
     
-    # 2. Definir Estilos y Contenedor
-    # El color del borde y fondo del contenedor cambia si está COMPRADO
-    border_color = "#28a745" if comprado else "#1A237E" # Verde si comprado, Azul oscuro si no
-    bg_color = "#e6ffe6" if comprado else "#f0f8ff"     # Verde claro si comprado, Azul claro si no
+    # 2. Definir Estilos y Contenedor (REDUCIDOS)
+    border_color = "#28a745" if comprado else "#1A237E" 
+    bg_color = "#e6ffe6" if comprado else "#f0f8ff"     
     
     html_bloque = f"""
-    <div class="empresa-analisis-block" data-ticker="{ticker}" data-nombre="{nombre_empresa}" style="border: 2px solid {border_color}; padding: 20px; margin-bottom: 30px; border-radius: 8px; background-color: {bg_color}; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+    <div class="empresa-analisis-block" data-ticker="{ticker}" data-nombre="{nombre_empresa}" style="border: 1px solid {border_color}; padding: 10px; margin-bottom: 15px; border-radius: 6px; background-color: {bg_color}; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
         
-        <h2 style="color: {border_color}; border-bottom: 2px solid {border_color}; padding-bottom: 10px; margin-top: 0; font-size: 1.6em;">
+        <h2 style="color: {border_color}; border-bottom: 1px solid {border_color}; padding-bottom: 5px; margin-top: 0; font-size: 1.4em; display: inline-block;">
             {nombre_empresa} ({ticker})
-            <span style="font-size: 0.5em; color: #6c757d; font-weight: normal; margin-left: 10px;">
-                [<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:#007bff;'>Ver Gráfico y Último Análisis</a>]
+            <span style="font-size: 0.6em; color: #6c757d; font-weight: normal; margin-left: 10px;">
+                [<a href='{empresa_link}' target='_blank' style='text-decoration:none; color:#007bff;'>Ver Análisis</a>]
             </span>
         </h2>
         
-        <div class="main-recommendation" style="background-color: #ffffff; border: 1px solid #dee2e6; padding: 15px; margin-bottom: 15px; border-radius: 6px; text-align: center;">
-            <p style="margin: 0; font-size: 1.0em; font-weight: bold; color: {color_operativa};">
+        <div class="main-recommendation" style="background-color: #ffffff; border: 1px solid #dee2e6; padding: 5px; margin-bottom: 10px; border-radius: 4px; text-align: center;">
+            <p style="margin: 0; font-size: 0.9em; font-weight: bold; color: {color_operativa};">
                 ESTADO EN CARTERA: {estado_operativa}
-            </p>
-            <p style="margin: 5px 0 0 0; font-size: 1.2em; font-weight: bold; color: {color_operativa};">
-                RECOMENDACIÓN PRINCIPAL: {recomendacion_principal}
+                <span style="margin-left: 20px; font-size: 1.0em; color: #dee2e6;">|</span>
+                RECOMENDACIÓN: {recomendacion_principal}
             </p>
         </div>
         
         {generar_observaciones(data)}
         
-        <hr style="border: 0; border-top: 1px solid #ccc; margin: 15px 0;">
+        <hr style="border: 0; border-top: 1px dashed #ccc; margin: 10px 0;">
         
-        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; font-size: 0.85em;">
+        <div style="display: flex; flex-wrap: wrap; font-size: 0.8em; margin-top: 10px;">
             
-            <div style="flex: 1 1 45%; min-width: 250px; margin-bottom: 15px; padding-right: 15px;">
-                <h3 style="color: #495057; font-size: 1.1em; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+            <div style="flex: 1 1 50%; min-width: 250px; padding-right: 10px;">
+                <h4 style="color: #495057; font-size: 1.0em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 0; margin-bottom: 5px;">
                     <i class="fas fa-chart-line" style="color:#007bff; margin-right: 5px;"></i>
-                    DATOS TÉCNICOS CLAVE
-                </h3>
-                <p>
-                    El precio actual es de <strong>{precio_actual}€</strong>. La tendencia diaria del algoritmo es actualmente **{tendencia}** y el indicador se encuentra en zona de **{estado_smi}** ({smi_hoy}).<br>
-                    Según el algoritmo, la **Oportunidad** detectada es: <strong>{oportunidad}</strong>.
-                </p>
-                <p>
-                    <strong>Recomendación de Compra:</strong> {compra_si}.<br>
-                    <strong>Recomendación de Venta:</strong> {vende_si}.
+                    CLAVES TÉCNICAS
+                </h4>
+                <p style="margin: 0 0 5px 0;">
+                    Precio: <strong>{precio_actual}€</strong>. Tendencia Diaria: **{tendencia}**. Estado SMI: <strong>{estado_smi}</strong> ({smi_hoy}).<br>
+                    <strong>Oportunidad:</strong> {oportunidad}.
                 </p>
             </div>
             
-            <div style="flex: 1 1 45%; min-width: 250px; margin-bottom: 15px;">
-                <h3 style="color: #495057; font-size: 1.1em; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+            <div style="flex: 1 1 50%; min-width: 250px; padding-left: 10px;">
+                <h4 style="color: #495057; font-size: 1.0em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 0; margin-bottom: 5px;">
                     <i class="fas fa-map-marker-alt" style="color:#007bff; margin-right: 5px;"></i>
                     NIVELES Y EMA
-                </h3>
-                <p>
-                    El primer nivel de **Soporte** se encuentra en <strong>{soporte1}€</strong> y la **Resistencia** más cercana está en <strong>{resistencia1}€</strong>.
-                    La Media Móvil Exponencial (EMA 100) se sitúa en <strong>{valor_ema}€</strong> y actúa como **{tipo_ema}** para el precio actual.
+                </h4>
+                <p style="margin: 0 0 5px 0;">
+                    **Soporte**: <strong>{soporte1}€</strong> | **Resistencia**: <strong>{resistencia1}€</strong>.<br>
+                    EMA 100 ({valor_ema}€) actúa como **{tipo_ema}**.
                 </p>
-                <p>
+            </div>
+            
+            <div style="flex: 1 1 100%; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">
+                <h4 style="color: #495057; font-size: 1.0em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 0; margin-bottom: 5px;">
+                    <i class="fas fa-hand-holding-usd" style="color:#007bff; margin-right: 5px;"></i>
+                    ESTADO DE OPERATIVA
+                </h4>
+                
+                <p style="margin: 0;">
+                    <strong>Posición:</strong> <span style="font-weight: bold; color: {'#28a745' if comprado else '#dc3545'};">{data['COMPRADO']}</span> 
+                    {f"""
+                    | **Entrada**: {precio_compra}€ ({fecha_compra}) 
+                    | **Beneficio Actual**: {beneficio_actual_formateado}
+                    """ if comprado else 
+                    f"""
+                    | No hay posición abierta. Última Op. Cerrada: {formatear_beneficio(data['BENEFICIO_ULTIMA_OP'])}.
+                    """}
+                </p>
+                
+                <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #6c757d;">
+                    <i class="fas fa-calendar-week" style="margin-right: 3px;"></i>
                     {data['OBSERVACION_SEMANAL'].replace('SMI', 'indicador')}
                 </p>
             </div>
-            
-            <div style="flex: 1 1 100%; margin-top: 15px;">
-                <h3 style="color: #495057; font-size: 1.1em; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
-                    <i class="fas fa-hand-holding-usd" style="color:#007bff; margin-right: 5px;"></i>
-                    ESTADO DE OPERATIVA EN CARTERA
-                </h3>
-                
-                <div style="border: 1px solid #dee2e6; padding: 15px; border-radius: 6px; background-color: #ffffff;">
-                    
-                    <p style="margin: 0; padding: 0;">
-                        <strong>Posición Actual:</strong> <span style="font-weight: bold; color: {'#28a745' if comprado else '#dc3545'};">{data['COMPRADO']}</span>
-                    </p>
-                    
-                    {f"""
-                    <p style="margin: 5px 0 0 0; padding: 0;">
-                        <strong>Precio de Entrada:</strong> {precio_compra}€ (Fecha: {fecha_compra})<br>
-                        <strong>Beneficio Actual (Simulado en base a 10.000€):</strong> {beneficio_actual_formateado}
-                    </p>
-                    """ if comprado else 
-                    f"""
-                    <p style="margin: 5px 0 0 0; padding: 0;">
-                        <strong>No hay posición abierta.</strong> La última operación completa ({data['FECHA_VENTA_CIERRE']}) resultó en un beneficio de {formatear_beneficio(data['BENEFICIO_ULTIMA_OP'])}.
-                    </p>
-                    """}
-                    
-                </div>
+
+            <div style="flex: 1 1 100%; margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 10px; font-size: 0.85em;">
+                 <p style="margin: 0 0 5px 0;">
+                    <strong>Recomendación Compra:</strong> {compra_si}.
+                </p>
+                <p style="margin: 0;">
+                    <strong>Recomendación Venta:</strong> {vende_si}.
+                </p>
             </div>
             
         </div>
@@ -1007,7 +999,7 @@ def generar_analisis_texto_empresa(data):
     return html_bloque
 
 # --------------------------------------------------------------------------------------
-# -------------------- FIN DE LA NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO --------------------
+# -------------------- FIN DE LA FUNCIÓN DE ANÁLISIS DE TEXTO MODIFICADA --------------------
 # --------------------------------------------------------------------------------------
 
 
@@ -1060,36 +1052,40 @@ def generar_reporte():
         fecha_actual_str = datetime.today().strftime('%d de %B %Y').replace(datetime.today().strftime('%B'), ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][datetime.today().month-1])
 
         # ******************************************************************************
-        # ******************** NUEVA SECCIÓN HTML BASADA EN TEXTO **********************
+        # ******************** NUEVA SECCIÓN HTML BASADA EN TEXTO (COMPACTA) ***********
         # ******************************************************************************
         
-        # 1. ESTILOS CSS INLINE (SIMPLIFICADOS)
-        # REDUCCIÓN DE FUENTE: Cambios en font-size y line-height
+        # 1. ESTILOS CSS INLINE (SIMPLIFICADOS Y COMPACTADOS)
         html_styles = f"""
             <style>
                 * {{ box-sizing: border-box !important; }} 
                 .main-container {{
                     max-width: 1200px;
                     width: 95%;
-                    margin: 20px auto;
+                    margin: 15px auto; 
                     background-color: #ffffff;
                     padding: 15px;
                     border-radius: 8px;
                     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    line-height: 1.4; /* Reducido */
+                    line-height: 1.5; 
                 }}
                 h1 {{
                     text-align: center;
-                    font-size: 2.0em; /* Reducido */
+                    font-size: 2.2em; 
                     color: #1A237E;
-                    margin-bottom: 10px;
+                    margin-bottom: 8px;
+                }}
+                h3 {{
+                     margin-top: 25px;
+                     margin-bottom: 10px;
                 }}
                 p {{
                     color: #495057;
                     text-align: left;
-                    font-size: 0.9em; /* Reducido */
-                    margin-bottom: 10px;
+                    font-size: 0.9em; 
+                    margin-bottom: 5px; 
+                    line-height: 1.4; 
                 }}
                 strong {{
                     font-weight: 700;
@@ -1102,29 +1098,33 @@ def generar_reporte():
                 /* Estilos del Buscador */
                 #search-input-container {{
                     text-align: center;
-                    margin-bottom: 20px;
+                    margin-bottom: 15px; 
                 }}
                 #company-search {{
-                    padding: 10px 15px;
-                    border: 2px solid #1A237E;
-                    border-radius: 5px;
+                    padding: 8px 12px; 
+                    border: 1px solid #1A237E; 
+                    border-radius: 4px;
                     width: 100%;
-                    max-width: 500px;
-                    font-size: 1.0em; /* Reducido */
+                    max-width: 400px; 
+                    font-size: 1.0em; 
                     outline: none;
+                }}
+                /* New styles for the compact recommendation text */
+                .main-recommendation p {{
+                    font-size: 0.9em !important;
+                    margin: 0 !important;
                 }}
             </style>
         """
         
         # 2. CUERPO HTML (Contenido insertable en WordPress)
-        # REDUCCIÓN DE FUENTE: p del encabezado
         html_content = f"""
             <div class="main-container">
                 
-                <p style="text-align: center; font-size: 0.9em; color: #8b0000; font-weight: bold;">
+                <p style="text-align: center; font-size: 1.0em; color: #8b0000; font-weight: bold;">
                     Análisis Diario IBEXIA - Fecha de Actualización: {fecha_actual_str} | Hora: {hora_actual} (CET)
                 </p>
-                <hr style="border: 0; border-top: 2px solid #1A237E; margin: 30px 0;">
+                <hr style="border: 0; border-top: 2px solid #1A237E; margin: 20px 0;">
                 
                 <div id="search-input-container">
                     <input type="text" id="company-search" placeholder="Buscar por Nombre de Empresa o Ticker..." onkeyup="filterCompanies()" style="display: block; margin-left: auto; margin-right: auto; max-width: 90%;" />
@@ -1134,7 +1134,7 @@ def generar_reporte():
         
         if not datos_ordenados:
             html_content += """
-                <p style="text-align: center; font-size: 0.9em; color: #dc3545; font-weight: bold; padding: 20px; border: 1px solid #dc3545; background-color: #f8d7da;">
+                <p style="text-align: center; font-size: 1.2em; color: #dc3545; font-weight: bold; padding: 20px; border: 1px solid #dc3545; background-color: #f8d7da;">
                     No se encontraron empresas con datos válidos hoy.
                 </p>
             """
@@ -1153,28 +1153,25 @@ def generar_reporte():
                     
                     if current_orden_grupo in [1, 2, 2.5]:
                         if previous_orden_grupo is None or previous_orden_grupo not in [1, 2, 2.5]:
-                            # REDUCCIÓN DE FUENTE: h3 1.5em
                             html_content += """
-                                <h3 style="color: #28a745; font-size: 1.5em; margin-top: 40px; border-bottom: 1px solid #28a745;">
-                                    <i class="fas fa-arrow-up" style="margin-right: 10px;"></i>
+                                <h3 style="color: #28a745; font-size: 1.5em; margin-top: 30px; border-bottom: 1px solid #28a745; padding-bottom: 3px;">
+                                    <i class="fas fa-arrow-up" style="margin-right: 8px;"></i>
                                     OPORTUNIDADES DE COMPRA DETECTADAS
                                 </h3>
                             """
                     elif current_orden_grupo in [3, 4, 5]:
                         if previous_orden_grupo is None or previous_orden_grupo not in [3, 4, 5]:
-                            # REDUCCIÓN DE FUENTE: h3 1.5em
                             html_content += """
-                                <h3 style="color: #ffc107; font-size: 1.5em; margin-top: 40px; border-bottom: 1px solid #ffc107;">
-                                    <i class="fas fa-exclamation-triangle" style="margin-right: 10px;"></i>
+                                <h3 style="color: #ffc107; font-size: 1.5em; margin-top: 30px; border-bottom: 1px solid #ffc107; padding-bottom: 3px;">
+                                    <i class="fas fa-exclamation-triangle" style="margin-right: 8px;"></i>
                                     ATENTOS A VENDER / VIGILANCIA
                                 </h3>
                             """
                     elif current_orden_grupo in [6, 7]:
                         if previous_orden_grupo is None or previous_orden_grupo not in [6, 7]:
-                            # REDUCCIÓN DE FUENTE: h3 1.5em
                             html_content += """
-                                <h3 style="color: #6c757d; font-size: 1.5em; margin-top: 40px; border-bottom: 1px solid #6c757d;">
-                                    <i class="fas fa-minus-circle" style="margin-right: 10px;"></i>
+                                <h3 style="color: #6c757d; font-size: 1.5em; margin-top: 30px; border-bottom: 1px solid #6c757d; padding-bottom: 3px;">
+                                    <i class="fas fa-minus-circle" style="margin-right: 8px;"></i>
                                     OTRAS EMPRESAS SIN MOVIMIENTOS RELEVANTES
                                 </h3>
                             """
@@ -1188,7 +1185,6 @@ def generar_reporte():
         # Agregar la tabla de Posiciones Abiertas al final
         html_content += generar_tabla_posiciones_abiertas(datos_completos)
 
-        # REDUCCIÓN DE FUENTE: p del aviso legal 0.8em
         html_content += """
                 <hr style="border: 0; border-top: 1px dashed #ccc; margin: 30px 0;">
                 <p class="disclaimer" style="text-align: center; font-size: 0.8em; color: #6c757d;">
