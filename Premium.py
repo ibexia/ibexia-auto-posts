@@ -855,9 +855,6 @@ def generar_analisis_texto_empresa(data):
     # 1. Recuperar datos y formatear
     nombre_empresa = data['NOMBRE_EMPRESA']
     ticker = data['TICKER']
-    # Sanitizar el nombre para usarlo como ID HTML (eliminar espacios y caracteres no alfanuméricos)
-    sanitized_name = re.sub(r'[^a-zA-Z0-9]', '', nombre_empresa).lower()
-    
     precio_actual = formatear_numero(data['PRECIO_ACTUAL'])
     tendencia = data['TENDENCIA_ACTUAL']
     oportunidad = data['OPORTUNIDAD']
@@ -925,9 +922,8 @@ def generar_analisis_texto_empresa(data):
     border_color = "#28a745" if comprado else "#1A237E" # Verde si comprado, Azul oscuro si no
     bg_color = "#f3fff3" if comprado else "#f0f8ff"     # Verde claro si comprado, Azul claro si no
     
-    # MODIFICACIÓN CLAVE: Añadir el ID para el índice alfabético
     html_bloque = f"""
-    <div class="empresa-analisis-block" id="empresa-{sanitized_name}" data-ticker="{ticker}" data-nombre="{nombre_empresa}" style="border: 1px solid {border_color}; padding: 10px; margin-bottom: 15px; border-radius: 5px; background-color: {bg_color}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); line-height: 1.3;">
+    <div class="empresa-analisis-block" data-ticker="{ticker}" data-nombre="{nombre_empresa}" style="border: 1px solid {border_color}; padding: 10px; margin-bottom: 15px; border-radius: 5px; background-color: {bg_color}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); line-height: 1.3;">
         
         <h2 style="color: {border_color}; border-bottom: 1px solid {border_color}; padding-bottom: 5px; margin-top: 0; margin-bottom: 5px; font-size: 1.4em;">
             {nombre_empresa} ({ticker})
@@ -1041,46 +1037,31 @@ def generar_reporte():
                 
             time.sleep(1)
 
-        # --- Lógica de ordenación MODIFICADA: Ahora es alfabética por NOMBRE_EMPRESA ---
-        # Se elimina la función auxiliar 'obtener_clave_ordenacion' que ordenaba por prioridad.
-        datos_ordenados = sorted(datos_completos, key=lambda x: x['NOMBRE_EMPRESA'])
-        # --- Fin de la lógica de ordenación MODIFICADA ---
+        # --- Lógica de ordenación MODIFICADA (se mantiene) ---
+        def obtener_clave_ordenacion(empresa):
+            categoria = empresa['OPORTUNIDAD']
+            
+            prioridad = {
+                "Posibilidad de Compra Activada": 1, 
+                "Posibilidad de Compra": 2,         
+                "Compra RIESGO": 2.5,               
+                "VIGILAR": 3,
+                "Riesgo de Venta": 4,
+                "Riesgo de Venta Activada": 5,
+                "Seguirá bajando": 6,
+                "Intermedio": 7,
+            }
+
+            orden_interna = prioridad.get(categoria, 99) 
+
+            return (orden_interna, empresa['NOMBRE_EMPRESA']) 
+
+        datos_ordenados = sorted(datos_completos, key=obtener_clave_ordenacion)
         
+        # --- Fin de la lógica de ordenación MODIFICADA ---
         now_utc = datetime.utcnow()
         hora_actual = (now_utc + timedelta(hours=2)).strftime('%H:%M')
         fecha_actual_str = datetime.today().strftime('%d de %B %Y').replace(datetime.today().strftime('%B'), ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][datetime.today().month-1])
-
-        
-        # --- NUEVA LÓGICA PARA EL ÍNDICE ALFABÉTICO ---
-        letras_presentes = set()
-        for data in datos_ordenados:
-            letras_presentes.add(data['NOMBRE_EMPRESA'][0].upper())
-            
-        indice_alfabetico_html = '<div class="alphabet-index-container" style="position: sticky; top: 10px; width: 50px; float: left; margin-right: 10px; z-index: 10; font-family: sans-serif;">'
-        alfabeto_completo = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        
-        for letra in alfabeto_completo:
-            if letra in letras_presentes:
-                # El enlace apunta al ID de la primera empresa que empieza por esa letra
-                first_name = [d['NOMBRE_EMPRESA'] for d in datos_ordenados if d['NOMBRE_EMPRESA'].startswith(letra)][0]
-                sanitized_name = re.sub(r'[^a-zA-Z0-9]', '', first_name).lower()
-                
-                indice_alfabetico_html += f"""
-                    <a href="#empresa-{sanitized_name}" onclick="highlightCompany('{sanitized_name}')" style="display: block; text-decoration: none; color: #1A237E; font-weight: bold; padding: 2px 0; text-align: center; border-bottom: 1px solid #f0f0f0; background-color: #f0f8ff; font-size: 0.9em;" title="Ir a {letra}">
-                        {letra}
-                    </a>
-                """
-            else:
-                 # Letras sin empresas (deshabilitadas)
-                indice_alfabetico_html += f"""
-                    <span style="display: block; color: #ced4da; padding: 2px 0; text-align: center; border-bottom: 1px solid #f0f0f0; font-size: 0.9em;">
-                        {letra}
-                    </span>
-                """
-                
-        indice_alfabetico_html += '</div>'
-        # -------------------------------------------
-
 
         # ******************************************************************************
         # ******************** NUEVA SECCIÓN HTML BASADA EN TEXTO **********************
@@ -1090,14 +1071,10 @@ def generar_reporte():
         html_styles = f"""
             <style>
                 * {{ box-sizing: border-box !important; }} 
-                .main-container-wrapper {{ /* Nuevo contenedor principal */
-                    display: flex;
-                    justify-content: center;
-                    margin: 10px auto;
-                }}
                 .main-container {{
                     max-width: 1200px;
-                    width: 100%;
+                    width: 95%;
+                    margin: 10px auto;
                     background-color: #ffffff;
                     padding: 10px;
                     border-radius: 5px;
@@ -1157,42 +1134,22 @@ def generar_reporte():
                     padding: 3px 5px !important;
                     line-height: 1.3;
                 }}
-                
-                /* MEDIA QUERY para que el índice desaparezca en móvil */
-                @media (max-width: 768px) {{
-                    .alphabet-index-container {{
-                        display: none !important;
-                    }}
-                    .content-blocks-wrapper {{
-                        margin-left: 0 !important;
-                        width: 100% !important;
-                    }}
-                }}
-                
-                /* Estilo de resaltado temporal */
-                .highlight {{
-                    box-shadow: 0 0 10px 3px #ffc107 !important;
-                    transition: box-shadow 0.5s ease-in-out;
-                }}
             </style>
         """
         
         # 2. CUERPO HTML (Contenido insertable en WordPress)
         html_content = f"""
-            <div class="main-container-wrapper">
-                {indice_alfabetico_html}
+            <div class="main-container">
+                <h1>ANÁLISIS DIARIO IBEXIA</h1>
+                <p style="text-align: center; font-size: 1.0em; color: #8b0000; font-weight: bold; margin-bottom: 5px;">
+                    Fecha de Actualización: {fecha_actual_str} | Hora: {hora_actual} (CET)
+                </p>
+                <hr style="border: 0; border-top: 1px solid #1A237E; margin: 15px 0;">
                 
-                <div class="main-container content-blocks-wrapper" style="margin-left: 10px; flex-grow: 1; max-width: 100%;">
-                    <h1>ANÁLISIS DIARIO IBEXIA</h1>
-                    <p style="text-align: center; font-size: 1.0em; color: #8b0000; font-weight: bold; margin-bottom: 5px;">
-                        Fecha de Actualización: {fecha_actual_str} | Hora: {hora_actual} (CET)
-                    </p>
-                    <hr style="border: 0; border-top: 1px solid #1A237E; margin: 15px 0;">
-                    
-                    <div id="search-input-container">
-                        <input type="text" id="company-search" placeholder="Buscar por Nombre de Empresa o Ticker..." onkeyup="filterCompanies()" />
-                    </div>
-                    
+                <div id="search-input-container">
+                    <input type="text" id="company-search" placeholder="Buscar por Nombre de Empresa o Ticker..." onkeyup="filterCompanies()" />
+                </div>
+                
         """
         
         if not datos_ordenados:
@@ -1202,36 +1159,64 @@ def generar_reporte():
                 </p>
             """
         else:
+            previous_orden_grupo = None
             
-            # Nuevo título general para la lista alfabética
-            html_content += """
-                <h3 style="color: #1A237E; font-size: 1.2em; margin-top: 20px; border-bottom: 1px solid #1A237E; padding-bottom: 3px; text-align: center;">
-                    <i class="fas fa-list-alt" style="margin-right: 5px;"></i>
-                    LISTADO ALFABÉTICO DE EMPRESAS
-                </h3>
-            """
-            
-            # Se genera el contenido de todas las fichas
             for i, data in enumerate(datos_ordenados):
-                # Se eliminan los títulos de grupo (OPORTUNIDADES, VIGILANCIA, OTRAS)
+                
+                current_orden_grupo = obtener_clave_ordenacion(data)[0]
+                
+                # Lógica para encabezados de grupo (H3)
+                es_primera_fila = previous_orden_grupo is None
+                es_cambio_grupo = current_orden_grupo != previous_orden_grupo
+                
+                if es_primera_fila or es_cambio_grupo:
+                    
+                    if current_orden_grupo in [1, 2, 2.5]:
+                        if previous_orden_grupo is None or previous_orden_grupo not in [1, 2, 2.5]:
+                            html_content += """
+                                <h3 style="color: #28a745; font-size: 1.2em; margin-top: 20px; border-bottom: 1px solid #28a745; padding-bottom: 3px;">
+                                    <i class="fas fa-arrow-up" style="margin-right: 5px;"></i>
+                                    OPORTUNIDADES DE COMPRA DETECTADAS
+                                </h3>
+                            """
+                    elif current_orden_grupo in [3, 4, 5]:
+                        if previous_orden_grupo is None or previous_orden_grupo not in [3, 4, 5]:
+                            html_content += """
+                                <h3 style="color: #ffc107; font-size: 1.2em; margin-top: 20px; border-bottom: 1px solid #ffc107; padding-bottom: 3px;">
+                                    <i class="fas fa-exclamation-triangle" style="margin-right: 5px;"></i>
+                                    ATENTOS A VENDER / VIGILANCIA
+                                </h3>
+                            """
+                    elif current_orden_grupo in [6, 7]:
+                        if previous_orden_grupo is None or previous_orden_grupo not in [6, 7]:
+                            html_content += """
+                                <h3 style="color: #6c757d; font-size: 1.2em; margin-top: 20px; border-bottom: 1px solid #6c757d; padding-bottom: 3px;">
+                                    <i class="fas fa-minus-circle" style="margin-right: 5px;"></i>
+                                    OTRAS EMPRESAS SIN MOVIMIENTOS RELEVANTES
+                                </h3>
+                            """
+                
+                # Generar el análisis de texto para la empresa
+                # Se elimina el index de la llamada a la función
                 html_content += generar_analisis_texto_empresa(data)
                 
+                previous_orden_grupo = current_orden_grupo
         
         # Agregar la tabla de Posiciones Abiertas al final
         html_content += generar_tabla_posiciones_abiertas(datos_completos)
 
         html_content += """
-                    <hr style="border: 0; border-top: 1px dashed #ccc; margin: 15px 0;">
-                    <p class="disclaimer" style="text-align: center; font-size: 0.8em; color: #6c757d;">
-                        <strong>Aviso Legal:</strong> La información contenida en este análisis se proporciona únicamente con fines educativos e informativos y no constituye asesoramiento de inversión, fiscal o legal. Las decisiones de inversión son de exclusiva responsabilidad del usuario.
-                    </p>
-                </div> </div> """
+                <hr style="border: 0; border-top: 1px dashed #ccc; margin: 15px 0;">
+                <p class="disclaimer" style="text-align: center; font-size: 0.8em; color: #6c757d;">
+                    <strong>Aviso Legal:</strong> La información contenida en este análisis se proporciona únicamente con fines educativos e informativos y no constituye asesoramiento de inversión, fiscal o legal. Las decisiones de inversión son de exclusiva responsabilidad del usuario.
+                </p>
+            </div>
+        """
         
-        # 3. SCRIPT JAVASCRIPT (Para el buscador y el índice alfabético)
+        # 3. SCRIPT JAVASCRIPT (Para el buscador)
         html_script = """
             <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
             <script>
-                // Función de búsqueda existente, se mantiene
                 function filterCompanies() {
                     var input, filter, blocks, h2, txtValue;
                     input = document.getElementById('company-search');
@@ -1250,28 +1235,6 @@ def generar_reporte():
                             block.style.display = "none";
                         }
                     }
-                }
-                
-                // Nueva función para resaltar la empresa al hacer clic en el índice
-                function highlightCompany(id) {
-                    // 1. Eliminar resaltado de cualquier bloque anterior
-                    var highlighted = document.querySelector('.highlight');
-                    if (highlighted) {
-                        highlighted.classList.remove('highlight');
-                    }
-                    
-                    // 2. Añadir clase de resaltado al bloque
-                    var block = document.getElementById('empresa-' + id);
-                    if (block) {
-                        block.classList.add('highlight');
-                    }
-                    
-                    // 3. Volver a eliminar el resaltado después de un tiempo
-                    setTimeout(function() {
-                        if (block) {
-                            block.classList.remove('highlight');
-                        }
-                    }, 3000); // 3 segundos
                 }
             </script>
         """
@@ -1304,5 +1267,3 @@ def generar_reporte():
 
 if __name__ == '__main__':
     generar_reporte()
-
-}
