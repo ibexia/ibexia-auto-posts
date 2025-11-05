@@ -1108,19 +1108,26 @@ def generar_reporte():
                 span[style*="color:#28a745"], span[style*="color:#dc3545"] {{
                     font-weight: bold;
                 }}
-                /* Estilos del Buscador */
+                /* Estilos del Buscador - ESTILO GOOGLE */
                 #search-input-container {{
                     text-align: center;
-                    margin-bottom: 10px;
+                    margin-bottom: 20px; /* Más espacio abajo */
+                    padding: 10px 0;
                 }}
                 #company-search {{
-                    padding: 5px 10px;
-                    border: 1px solid #1A237E;
-                    border-radius: 3px;
+                    padding: 12px 20px; /* Más grande */
+                    border: 1px solid #ced4da; /* Borde más sutil */
+                    border-radius: 25px; /* Más redondeado (pastilla) */
                     width: 100%;
-                    max-width: 500px;
-                    font-size: 1em;
+                    max-width: 650px; /* Más ancho */
+                    font-size: 1.2em; /* Fuente más grande */
                     outline: none;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra para que destaque */
+                    transition: box-shadow 0.3s ease-in-out;
+                }}
+                #company-search:focus {{
+                    border-color: #4285F4; /* Color de Google al hacer focus */
+                    box-shadow: 0 1px 6px rgba(32,33,36,.28);
                 }}
                 /* Estilos de la tabla */
                 .open-positions-container table td, .open-positions-container table th {{
@@ -1140,7 +1147,7 @@ def generar_reporte():
                 <hr style="border: 0; border-top: 1px solid #1A237E; margin: 15px 0;">
                 
                 <div id="search-input-container">
-                    <input type="text" id="company-search" placeholder="Buscar por Nombre de Empresa o Ticker..." onkeyup="filterCompanies()" style="display: block; margin-left: auto; margin-right: auto; max-width: 90%;" />
+                    <input type="text" id="company-search" placeholder="Buscar por Nombre de Empresa o Ticker..." onkeyup="filterCompanies()" />
                 </div>
                 
         """
