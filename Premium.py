@@ -849,9 +849,9 @@ def generar_tabla_posiciones_abiertas(datos_completos):
 # ---------------------- NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO (MODIFICADA) ---------------
 # --------------------------------------------------------------------------------------
 
-def generar_analisis_texto_empresa(data, is_expanded_default, is_alternate_bg):
+def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index):
     """Genera un bloque de texto HTML detallado para una sola empresa.
-       Acepta un nuevo parámetro is_alternate_bg para el fondo alterno."""
+       Acepta un nuevo parámetro ficha_color_index para el fondo alterno."""
     
     # 1. Recuperar datos y formatear
     ticker = data['TICKER']
@@ -929,7 +929,8 @@ def generar_analisis_texto_empresa(data, is_expanded_default, is_alternate_bg):
     button_text = "Cerrar Información" if is_expanded_default else "Ampliar Información"
 
     # Determinar la clase de fondo de la ficha
-    ficha_class = "empresa-analisis-block-alt" if is_alternate_bg else "empresa-analisis-block"
+    # MODIFICACIÓN: Usar el índice para alternar entre 4 fondos
+    ficha_class = f"empresa-analisis-block-{ficha_color_index}"
 
     # 2. Estilos y Contenedor para la MINIFICHA (Parte Visible y Cuadrada)
     
@@ -1102,7 +1103,7 @@ def generar_reporte():
         # ******************** NUEVA SECCIÓN HTML BASADA EN TEXTO **********************
         # ******************************************************************************
         
-        # 1. ESTILOS CSS INLINE (MODIFICADOS PARA MINIMIZAR ALTURA Y TAMAÑO DE FUENTE Y CUADRICULAR)
+        # 1. ESTILOS CSS INLINE (MODIFICADOS PARA 4 FONDOS DE FICHA Y ELIMINAR ACORDEÓN)
         html_styles = f"""
             <style>
                 * {{ box-sizing: border-box !important; }} 
@@ -1134,7 +1135,7 @@ def generar_reporte():
                     font-weight: bold;
                     display: flex;
                     align-items: center;
-                    /* Cursor por defecto: auto. Solo el grupo de Compra tendrá la opción de colapsar en JS */
+                    cursor: default; /* Eliminamos el cursor pointer en todos */
                 }}
                 .h3-compra {{
                     background-color: #e6f7ee; /* Verde suave */
@@ -1198,34 +1199,41 @@ def generar_reporte():
                     margin-bottom: 20px;
                 }}
                 .collapsible-content {{
-                    /* El contenedor que se colapsa/expande */
-                    display: none; /* Por defecto se manejará en el código con "grid" o "none" */
+                    /* Ya no se usa como colapsable, sino como contenedor */
+                    display: grid; 
                 }}
                 .collapsible-content .grid-container {{
                     margin-bottom: 0;
                 }}
                 
-                /* Estilo base para las fichas */
-                .empresa-analisis-block, .empresa-analisis-block-alt {{
-                    /* Altura mínima para la ficha cerrada: header + body(4 items) + footer */
+                /* Estilo base para las fichas (MODIFICADO para 4 fondos)*/
+                .empresa-analisis-block-1, .empresa-analisis-block-2, .empresa-analisis-block-3, .empresa-analisis-block-4 {{
                     min-height: 180px; 
                     display: flex;
                     flex-direction: column;
                     justify-content: space-between; 
                     border: 1px solid #dee2e6; 
                     border-radius: 5px; 
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Sombra más fuerte para distinguirlas */
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
                     line-height: 1.3;
                     overflow: hidden; 
                 }}
 
                 /* Fondo 1 */
-                .empresa-analisis-block {{
+                .empresa-analisis-block-1 {{
                     background-color: #fcfcfc; /* Blanco muy suave */
                 }}
-                /* Fondo 2 (Alternativo) */
-                .empresa-analisis-block-alt {{
+                /* Fondo 2 (Alternativo Azul) */
+                .empresa-analisis-block-2 {{
                     background-color: #f7f9fd; /* Azul clarísimo */
+                }}
+                /* Fondo 3 (Alternativo Naranja/Crema) */
+                .empresa-analisis-block-3 {{
+                    background-color: #fcf9f7; /* Naranja clarísimo */
+                }}
+                 /* Fondo 4 (Alternativo Verde) */
+                .empresa-analisis-block-4 {{
+                    background-color: #f7fcf7; /* Verde clarísimo */
                 }}
 
                 .minificha-header {{
@@ -1312,7 +1320,7 @@ def generar_reporte():
                 
         """
         
-        # *** MODIFICACIÓN: Insertar la tabla de Posiciones Abiertas AQUÍ ***
+        # *** Insertar la tabla de Posiciones Abiertas ***
         html_content += generar_tabla_posiciones_abiertas(datos_completos)
         html_content += '<hr style="border: 0; border-top: 1px solid #1A237E; margin: 25px 0 15px 0;">'
         # ********************************************************************
@@ -1339,15 +1347,6 @@ def generar_reporte():
                     
                     group_fiches_count = 0 
                     
-                    # Determinar si es el grupo de Compra
-                    is_compra_group = current_orden_grupo in [1, 2, 2.5]
-                    # La variable is_first_group ya no se usa, pero se mantiene la lógica de grupos
-
-                    # Cerrar el contenedor del grupo anterior (grid-container y collapsible-content)
-                    if previous_orden_grupo is not None:
-                        html_content += "</div>" # Cierra el grid-container
-                        html_content += "</div>" # Cierra el .collapsible-content wrapper
-                    
                     # Determinar el título, clase e icono del nuevo grupo
                     if current_orden_grupo in [1, 2, 2.5]:
                         titulo = "OPORTUNIDADES DE COMPRA DETECTADAS"
@@ -1369,40 +1368,37 @@ def generar_reporte():
                         clase = "h3-neutral"
                         icono = "fas fa-info-circle"
                         
-                    # Abrir el nuevo encabezado (H3) y el contenedor colapsable
+                    # Cerrar el contenedor del grupo anterior (grid-container y collapsible-content)
+                    if previous_orden_grupo is not None:
+                        html_content += "</div>" # Cierra el grid-container
+                        html_content += "</div>" # Cierra el .collapsible-content wrapper
                     
-                    # *** MODIFICACIÓN: Quitar el acordeón de las secciones VIGILAR/NEUTRAL ***
-                    onclick_event = f"onclick=\"toggleSection('{current_orden_grupo}')\"" if is_compra_group else "" # Solo el grupo de Compra tiene el evento onclick
-                    initial_icon_class = 'fa-chevron-up' if is_compra_group else ('fa-chevron-up' if current_orden_grupo not in [6, 7] else 'fa-chevron-down')
-                    
-                    # Los grupos que no se colapsan siempre estarán abiertos
-                    display_content = "grid" if not is_compra_group else "none" 
-                    
+                    # Abrir el nuevo encabezado (H3) 
+                    # MODIFICACIÓN: Se elimina el onclick y el icono de cierre para que todas las secciones estén abiertas
                     html_content += f"""
-                        <h3 class="{clase}" data-group="{current_orden_grupo}" {onclick_event} style="cursor: {'pointer' if is_compra_group else 'default'};">
+                        <h3 class="{clase}" data-group="{current_orden_grupo}" style="cursor: default;">
                             <i class="{icono}" style="margin-right: 10px;"></i>
                             {titulo}
-                            <i class="fas {initial_icon_class}" style="margin-left: auto; {'display: none;' if not is_compra_group else ''}" id="icon-group-{current_orden_grupo}"></i>
                         </h3>
                     """
                     
                     # Collapsible wrapper for the content (FICHES)
-                    # El grupo de Compra empieza cerrado, los otros grupos (vigilar/neutral) empiezan abiertos
-                    display_style = "display: grid;" if not is_compra_group else "display: none;" 
+                    # MODIFICACIÓN: Se fuerza a display: grid (abierto) para todos los grupos.
+                    display_style = "display: grid;"
                         
                     html_content += f"""
                         <div id="collapsible-content-{current_orden_grupo}" class="collapsible-content" style="{display_style}">
                         <div class="grid-container" data-group="{current_orden_grupo}">
                     """
                 
-                # *** MODIFICACIÓN: Lógica de expansión por defecto para las 3 primeras fichas de CADA GRUPO ***
+                # *** Lógica: Apertura de las 3 primeras fichas por defecto ***
                 is_expanded_default = group_fiches_count < 3
 
-                # *** MODIFICACIÓN: Alternancia de fondo ***
-                is_alternate_bg = group_fiches_count % 2 != 0
-
+                # *** MODIFICACIÓN: Alternancia de fondo entre 4 colores ***
+                ficha_color_index = (i % 4) + 1 # Cicla entre 1, 2, 3, 4
+                
                 # Generar la minificha para la empresa
-                html_content += generar_analisis_texto_empresa(data, is_expanded_default, is_alternate_bg)
+                html_content += generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index)
                 group_fiches_count += 1
                 
                 previous_orden_grupo = current_orden_grupo
@@ -1421,19 +1417,13 @@ def generar_reporte():
             </div>
         """
         
-        # 3. SCRIPT JAVASCRIPT (Para el buscador y el desplegable)
+        # 3. SCRIPT JAVASCRIPT (MODIFICADO para eliminar el control de colapso de secciones)
         html_script = """
             <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
             <script>
-                // Grupos que NO deben tener colapso al hacer clic en H3: VIGILAR, RIESGO, SEGUIRA BAJANDO, INTERMEDIO.
-                // Es decir, los grupos 3, 4, 5, 6, 7 y 99. Solo 1, 2, 2.5 (COMPRA) mantendrán el colapso H3.
-                var nonCollapsibleGroups = ['3', '4', '5', '6', '7', '99'];
-                var compraGroups = ['1', '2', '2.5'];
-
-                // Función para desplegar/ocultar el detalle de la empresa (fiche)
+                // Función para desplegar/ocultar el detalle de la empresa (ficha)
                 function toggleDetail(detailId, button) {
                     var detail = document.getElementById(detailId);
-                    // No necesitamos el icono del botón aquí, ya que el texto se actualiza en la función
                     if (detail.style.display === "none" || detail.style.display === "") {
                         detail.style.display = "block";
                         button.innerHTML = 'Cerrar Información <i class="fas fa-chevron-up" style="margin-left: 5px;"></i>';
@@ -1443,30 +1433,15 @@ def generar_reporte():
                     }
                 }
 
-                // Función para desplegar/ocultar SECCIONES enteras (H3) - SOLO PARA GRUPOS DE COMPRA
-                function toggleSection(groupId) {
-                    if (nonCollapsibleGroups.includes(groupId)) return; // Ignorar el evento si es un grupo no colapsable
-                    
-                    var content = document.getElementById('collapsible-content-' + groupId);
-                    var icon = document.getElementById('icon-group-' + groupId);
-
-                    if (content.style.display === "none" || content.style.display === "") {
-                        content.style.display = "grid"; 
-                        icon.className = "fas fa-chevron-up";
-                    } else {
-                        content.style.display = "none";
-                        icon.className = "fas fa-chevron-down";
-                    }
-                }
+                // La función toggleSection ha sido eliminada ya que ninguna sección debe ser colapsable/acordeón.
                 
                 // Función de filtrado de empresas (modificada para secciones y fiches)
                 function filterCompanies() {
                     var input, filter, blocks;
                     input = document.getElementById('company-search');
                     filter = input.value.toUpperCase();
-                    blocks = document.getElementsByClassName('empresa-analisis-block');
-                    var blocksAlt = document.getElementsByClassName('empresa-analisis-block-alt');
-                    blocks = Array.from(blocks).concat(Array.from(blocksAlt)); // Combinar las listas
+                    // Capturamos los 4 tipos de bloques de fondo
+                    blocks = document.querySelectorAll('.empresa-analisis-block-1, .empresa-analisis-block-2, .empresa-analisis-block-3, .empresa-analisis-block-4');
                     
                     var groupsVisibility = {}; // Para rastrear si un grupo tiene elementos visibles
 
@@ -1494,31 +1469,12 @@ def generar_reporte():
                         var h3 = h3s[j];
                         var groupId = h3.getAttribute('data-group');
                         var content = document.getElementById('collapsible-content-' + groupId);
-                        var icon = document.getElementById('icon-group-' + groupId);
-                        var isCollapsible = compraGroups.includes(groupId); // Solo Compra es colapsable
 
                         if (groupsVisibility[groupId]) {
                             // Mostrar la sección si hay coincidencias
                             h3.style.display = "flex";
-                            
-                            // Si el filtro está activo, abrimos el contenido de todas las secciones
-                            if (filter.length > 0) {
-                                content.style.display = "grid";
-                                if (icon) icon.className = "fas fa-chevron-up";
-                            } 
-                            // Si el filtro está vacío, restauramos el estado inicial (Solo Compra cerrado, resto abierto - según el HTML generado)
-                            else {
-                                // Forzamos la apertura de los grupos NO colapsables, y el cierre/apertura inicial de Compra
-                                if (isCollapsible) {
-                                     // Al cargar, el grupo de compra empieza CERRADO (display: none en el HTML), lo forzamos a CERRADO si no hay filtro.
-                                     content.style.display = "none";
-                                     if (icon) icon.className = "fas fa-chevron-down";
-                                } else {
-                                     // Los demás grupos (vigilar/neutral) empiezan ABIERTOS
-                                     content.style.display = "grid"; 
-                                     if (icon) icon.className = "fas fa-chevron-up"; // Aunque el icono no se muestre, se actualiza
-                                }
-                            }
+                            // Forzar apertura del contenido de la sección si hay coincidencias (es su estado por defecto)
+                            content.style.display = "grid"; 
                         } else {
                             // Ocultar la sección entera si no hay coincidencias
                             h3.style.display = "none";
@@ -1526,18 +1482,20 @@ def generar_reporte():
                         }
                     }
                     
-                    // 3. Restaurar estado inicial de apertura de las fiches (solo las 3 primeras de CADA grupo)
+                    // 3. Restaurar estado inicial de apertura de las fiches (solo las 3 primeras de CADA grupo) si el filtro está vacío
                     if (filter.length === 0) {
-                        var allBlocks = document.querySelectorAll('.empresa-analisis-block, .empresa-analisis-block-alt');
+                        var allBlocks = document.querySelectorAll('.empresa-analisis-block-1, .empresa-analisis-block-2, .empresa-analisis-block-3, .empresa-analisis-block-4');
                         var groupCounters = {};
 
                         for (var l = 0; l < allBlocks.length; l++) {
                             var block = allBlocks[l];
+                            // Si el bloque está oculto por un filtro anterior, saltar. (Debería ser 'flex' aquí si filter.length === 0)
+                            if (block.style.display === "none") continue; 
+                            
                             var contentDiv = block.closest('.collapsible-content');
                             if (!contentDiv) continue;
                             var groupId = contentDiv.id.replace('collapsible-content-', '');
                             
-                            // Inicializar contador
                             if (!groupCounters[groupId]) {
                                 groupCounters[groupId] = 0;
                             }
@@ -1551,47 +1509,31 @@ def generar_reporte():
                             if (shouldBeOpen) {
                                 // Forzar apertura (si está cerrado)
                                 if (detail.style.display === "none" || detail.style.display === "") {
-                                    // Usamos la función original de JS que actualiza el texto/icono
                                     toggleDetail(detailId, button); 
                                 }
                             } else {
                                 // Forzar cierre (si está abierto)
                                 if (detail.style.display === "block") {
-                                    // Usamos la función original de JS que actualiza el texto/icono
                                     toggleDetail(detailId, button);
                                 }
                             }
                             
-                            // Incrementar contador SOLO si el bloque está visible (lo está sin filtro)
-                            if (block.style.display !== "none") {
-                                groupCounters[groupId]++;
-                            }
+                            groupCounters[groupId]++;
                         }
                         
-                        // Una vez restaurado el estado de las fichas, forzamos el cierre de la sección COMPRA, 
-                        // ya que por defecto en el HTML empieza ABIERTA para mostrar las 3 fichas, pero
-                        // el usuario quiere que esté CERRADA al inicio.
-                        var compraContent = document.getElementById('collapsible-content-1');
-                        var compraIcon = document.getElementById('icon-group-1');
-                        
-                        if (compraContent) {
-                            compraContent.style.display = "none";
-                            if (compraIcon) compraIcon.className = "fas fa-chevron-down";
-                        }
-                        
-                        // Aseguramos que los grupos NO colapsables sigan ABIERTOS
-                        for (var k = 0; k < nonCollapsibleGroups.length; k++) {
-                            var nonCollapsibleContent = document.getElementById('collapsible-content-' + nonCollapsibleGroups[k]);
-                            if (nonCollapsibleContent) {
-                                nonCollapsibleContent.style.display = "grid";
-                            }
+                        // Asegurar que las secciones (H3 y content) estén visibles (porque no hay filtro)
+                        for (var k = 0; k < h3s.length; k++) {
+                            var h3_k = h3s[k];
+                            var content_k = document.getElementById('collapsible-content-' + h3_k.getAttribute('data-group'));
+                            h3_k.style.display = "flex";
+                            content_k.style.display = "grid"; 
                         }
                     }
                 }
 
                 // Se llama a filterCompanies al cargar la página para aplicar el estado por defecto
                 document.addEventListener('DOMContentLoaded', function() {
-                    // Esperamos un momento para asegurar que todo el DOM esté listo y las funciones se puedan llamar
+                    // La función se llama para asegurar que las 3 primeras fichas se abran por defecto.
                     setTimeout(filterCompanies, 50); 
                 });
             </script>
