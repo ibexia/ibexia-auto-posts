@@ -1221,19 +1221,19 @@ def generar_reporte():
 
                 /* Fondo 1 - ROSA PÁLIDO */
                 .empresa-analisis-block-1 {{
-                    background-color: #fff7f7; 
+                    background-color: #FFE0E0; 
                 }}
                 /* Fondo 2 (Alternativo AZUL PÁLIDO) */
                 .empresa-analisis-block-2 {{
-                    background-color: #f7f7ff; 
+                    background-color: #D1D1FF; 
                 }}
                 /* Fondo 3 (Alternativo VERDE PÁLIDO) */
                 .empresa-analisis-block-3 {{
-                    background-color: #f7fff7; 
+                    background-color: #D1FFD1; 
                 }}
                  /* Fondo 4 (Alternativo AMARILLO/CREMA PÁLIDO) */
                 .empresa-analisis-block-4 {{
-                    background-color: #fffff7; 
+                    background-color: #FFFFC7; 
                 }}
 
                 .minificha-header {{
