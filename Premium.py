@@ -1103,7 +1103,7 @@ def generar_reporte():
         # ******************** NUEVA SECCIÓN HTML BASADA EN TEXTO **********************
         # ******************************************************************************
         
-        # 1. ESTILOS CSS INLINE (MODIFICADOS PARA 4 FONDOS DE FICHA Y ELIMINAR ACORDEÓN)
+        # 1. ESTILOS CSS INLINE (MODIFICADOS PARA 4 FONDOS DE FICHA MÁS VISIBLES)
         html_styles = f"""
             <style>
                 * {{ box-sizing: border-box !important; }} 
@@ -1206,7 +1206,7 @@ def generar_reporte():
                     margin-bottom: 0;
                 }}
                 
-                /* Estilo base para las fichas (MODIFICADO para 4 fondos)*/
+                /* Estilo base para las fichas */
                 .empresa-analisis-block-1, .empresa-analisis-block-2, .empresa-analisis-block-3, .empresa-analisis-block-4 {{
                     min-height: 180px; 
                     display: flex;
@@ -1219,21 +1219,21 @@ def generar_reporte():
                     overflow: hidden; 
                 }}
 
-                /* Fondo 1 */
+                /* Fondo 1 - ROSA PÁLIDO */
                 .empresa-analisis-block-1 {{
-                    background-color: #fcfcfc; /* Blanco muy suave */
+                    background-color: #fff7f7; 
                 }}
-                /* Fondo 2 (Alternativo Azul) */
+                /* Fondo 2 (Alternativo AZUL PÁLIDO) */
                 .empresa-analisis-block-2 {{
-                    background-color: #f7f9fd; /* Azul clarísimo */
+                    background-color: #f7f7ff; 
                 }}
-                /* Fondo 3 (Alternativo Naranja/Crema) */
+                /* Fondo 3 (Alternativo VERDE PÁLIDO) */
                 .empresa-analisis-block-3 {{
-                    background-color: #fcf9f7; /* Naranja clarísimo */
+                    background-color: #f7fff7; 
                 }}
-                 /* Fondo 4 (Alternativo Verde) */
+                 /* Fondo 4 (Alternativo AMARILLO/CREMA PÁLIDO) */
                 .empresa-analisis-block-4 {{
-                    background-color: #f7fcf7; /* Verde clarísimo */
+                    background-color: #fffff7; 
                 }}
 
                 .minificha-header {{
