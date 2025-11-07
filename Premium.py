@@ -935,7 +935,7 @@ def generar_reporte():
             print("No se generó análisis para ninguna empresa.")
             return
 
-        # 1. Ordenar datos (Primero Compras, luego Vigilar/Venta, luego Neutral)
+        # 1. Ordenar datos (Primero Compra, luego Vigilar/Venta, luego Neutral)
         # La prioridad 8 (Compra RIESGO) se coloca detrás de la 2 (Posibilidad de Compra) pero antes de 3 (VIGILAR)
         # para que se muestre en el grupo 2, pero al final de él.
         datos_ordenados = sorted(datos_completos, key=lambda x: x['ORDEN_PRIORIDAD'])
@@ -1191,17 +1191,18 @@ def generar_reporte():
         """
 
         # ******************************************************************************
-        # *************** COMIENZO DE LA LÓGICA DE ESCRITURA PARA EL WIDGET *************
+        # *************** ZONA CRUCIAL: GENERACIÓN DEL ARCHIVO PHP *********************
         # ******************************************************************************
         
         # 1. CONSTRUIR EL HTML COMPLETO PARA EL WIDGET
         # Esta es la cadena final que contiene estilos, link, contenido y scripts.
         html_para_widget = f"""{html_styles}<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">{html_content}{html_script}"""
         
-        # 2. FORMATEAR EL CONTENIDO PARA EL ARCHIVO PHP (ESCAPANDO COMILLAS SIMPLES)
-        # Escapar las comillas simples ('') dentro del HTML evita romper la sintaxis del 'return' de PHP.
+        # 2. FORMATEAR EL CONTENIDO PARA EL ARCHIVO PHP (Aseguramos el RETURN)
+        # Escapamos las comillas simples ('') dentro del HTML para evitar romper la sintaxis PHP.
         html_escaped = html_para_widget.replace("'", "\\'") 
         
+        # ESTO GENERA EL CONTENIDO FINAL CON LA SENTENCIA PHP 'return'
         php_content_to_write = f"""<?php 
 // ESTE ARCHIVO FUE GENERADO AUTOMÁTICAMENTE POR PREMIUM.py EL {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}
 
@@ -1222,11 +1223,10 @@ return '
             print(f"❌ ERROR al escribir widget-data.php en {widget_data_path}: {e}")
             
         # ******************************************************************************
-        # ************************* FIN DE LA LÓGICA DE ESCRITURA *************************
+        # ************************* FIN DE LA ZONA CRUCIAL *****************************
         # ******************************************************************************
 
         # El HTML COMPLETO para el correo
-        # Usamos la variable ya construida 'html_para_widget'
         html_para_email_body = html_para_widget 
 
         
