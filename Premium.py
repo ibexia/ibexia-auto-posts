@@ -99,11 +99,6 @@ tickers = {
     'Urbas': 'URB.MC',
 }
 
-# El directorio donde se guardará el archivo PHP listo para WordPress
-RUTA_ARCHIVO_WP = './widget-data-listo.php' 
-# Opcionalmente puedes cambiar esto a la ruta absoluta de tu servidor si lo ejecutas ahí.
-
-
 def leer_google_sheets():
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
     if not credentials_json:
@@ -558,7 +553,7 @@ def clasificar_empresa(data):
             data['ORDEN_PRIORIDAD'] = prioridad["Riesgo de Venta Activada"]
         else:
             data['OPORTUNIDAD'] = "Intermedio"
-            data['COMPRA_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
+            data['COMPRA_SI'] = "NO COMPRAR"
             data['VENDE_SI'] = "NO PREVEEMOS GIRO EN ESTOS MOMENTOS"
             data['ORDEN_PRIORIDAD'] = prioridad["Intermedio"]
     
@@ -623,34 +618,199 @@ def generar_observaciones(data):
     # Se añade la advertencia al inicio del texto de la observación
     return f'<p style="text-align:left; color:#000; margin: 0 0 5px 0;">{texto_observacion.strip()}{advertencia_texto}{texto.strip()}</p>'
 
-# ***************************************************************
-# NUEVA FUNCIÓN AÑADIDA PARA GENERAR EL ARCHIVO PHP LISTO
-# ***************************************************************
-def generar_archivo_widget_php(html_completo):
-    """
-    Esta función envuelve el HTML generado por Python en la sintaxis PHP necesaria 
-    (<?php return '...';) y guarda el archivo.
-    """
-    # Usamos Heredoc (EOT) para evitar problemas con las comillas simples o dobles en el HTML
-    php_template = f"""<?php 
-// Archivo de datos generado automáticamente por Premium.py
-// IMPORTANTE: Este archivo debe sobrescribirse diariamente y subirse como 'widget-data.php' a la carpeta del plugin de WordPress.
-return <<<EOT
-{html_completo}
-EOT;
-"""
-    
-    # Guardamos el contenido en el archivo
-    try:
-        with open(RUTA_ARCHIVO_WP, 'w', encoding='utf-8') as f:
-            f.write(php_template)
-        print(f"✅ Archivo '{RUTA_ARCHIVO_WP}' generado con éxito, listo para subir a WordPress.")
-    except Exception as e:
-        print(f"❌ Error al escribir el archivo PHP: {e}")
-# ***************************************************************
-# FIN DE LA NUEVA FUNCIÓN
-# ***************************************************************
 
+def generar_html_posiciones(datos_completos):
+    posiciones_abiertas = [data for data in datos_completos if data['COMPRADO'] == "SI"]
+    
+    if not posiciones_abiertas:
+        return """ <h3 style="text-align: center; color: #1A237E; margin-top: 20px; margin-bottom: 10px; font-size: 1.2em; border-bottom: 1px solid #e9ecef; padding-bottom: 5px;"> <i class="fas fa-check-circle" style="color:#6c757d; margin-right: 5px;"></i> Posiciones Abiertas (Cartera IBEXIA) </h3> <p style="text-align: center; font-size: 0.9em; color: #6c757d; margin-bottom: 10px;"> Actualmente no hay posiciones abiertas según el algoritmo. </p> """
+
+    # 2. Ordenar por FECHA_COMPRA (la fecha está en formato DD/MM/YYYY)
+    def key_sort_date(item):
+        fecha_str = item.get('FECHA_COMPRA')
+        try:
+            return datetime.strptime(fecha_str, '%d/%m/%Y')
+        except ValueError:
+            # Poner al final las que no tienen fecha válida o es "N/A"
+            return datetime.min 
+
+    # Ordenar por fecha de compra, de la más antigua a la más reciente (ascendente)
+    posiciones_ordenadas = sorted(posiciones_abiertas, key=key_sort_date)
+
+    # 3. Generar el contenido HTML de la tabla
+    # **MODIFICACIÓN 1: Añadir el texto de advertencia sobre el desplazamiento**
+    html_table = """
+    <h3 style="text-align: center; color: #1A237E; margin-top: 20px; margin-bottom: 10px; font-size: 1.2em; border-bottom: 1px solid #e9ecef; padding-bottom: 5px;">
+        <i class="fas fa-check-circle" style="color:#28a745; margin-right: 5px;"></i> Posiciones Abiertas (Cartera IBEXIA)
+    </h3>
+    <p style="text-align: center; font-size: 0.9em; color: #dc3545; font-weight: bold; margin-bottom: 10px;">
+        ⚠️ Desliza hacia abajo dentro de la caja para ver todas las empresas en las que estamos invertidos.
+    </p>
+    <div class="open-positions-container" style="overflow-x: auto; max-width: 100%; height: 250px; overflow-y: scroll; border: 1px solid #dee2e6;">
+        <table style="min-width: 600px; width: 100%; table-layout: auto; border: 0; font-size: 0.95em;">
+            <thead>
+                <tr style="background-color: #f0f8ff;">
+                    <th style="width: 20%; padding: 5px;">EMPRESA (TICKER)</th>
+                    <th style="width: 15%; padding: 5px;">FECHA ENTRADA</th>
+                    <th style="width: 15%; padding: 5px;">PRECIO ENTRADA</th>
+                    <th style="width: 15%; padding: 5px;">PRECIO ACTUAL</th>
+                    <th style="width: 15%; padding: 5px;">BENEFICIO / PÉRDIDA</th>
+                    <th style="width: 20%; padding: 5px;">RECOMENDACIÓN HOY</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+    
+    for data in posiciones_ordenadas:
+        empresa_link = f"https://finance.yahoo.com/quote/{data['TICKER']}"
+        
+        recomendacion = data['OPORTUNIDAD']
+        if 'compra' in recomendacion.lower():
+            clase_rec = 'compra-op'
+        elif 'venta' in recomendacion.lower():
+            clase_rec = 'venta-op'
+        elif 'vigilar' in recomendacion.lower():
+            clase_rec = 'vigilar-op'
+        else:
+            clase_rec = 'neutro-op'
+
+        html_table += f"""
+        <tr>
+            <td style="text-align: left; font-weight: bold; padding: 3px 5px;">
+                <a href='{empresa_link}' target='_blank' style='text-decoration:none; color: #1A237E;'>
+                    {data['NOMBRE_EMPRESA']} <span style='color: #6c757d; font-weight: normal; font-size: 0.9em;'>({data['TICKER']})</span>
+                </a>
+            </td>
+            <td style="padding: 3px 5px;">{data['FECHA_COMPRA']}</td>
+            <td style="padding: 3px 5px;">{formatear_numero(data['PRECIO_COMPRA'])}€</td>
+            <td style="padding: 3px 5px;"><span class="compra" style="color: #1A237E;">{formatear_numero(data['PRECIO_ACTUAL'])}€</span></td>
+            <td style="padding: 3px 5px;">{formatear_beneficio(data['BENEFICIO_ACTUAL'])}</td>
+            <td style="padding: 3px 5px;"><span class="{clase_rec}" style="font-weight: bold;">{recomendacion}</span></td>
+        </tr>
+        """
+    
+    html_table += """
+            </tbody>
+        </table>
+    </div>
+    """
+    return html_table
+
+# --------------------------------------------------------------------------------------
+# ---------------------- NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO (MODIFICADA) ---------------
+# --------------------------------------------------------------------------------------
+def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index):
+    """Genera un bloque de texto HTML detallado para una sola empresa. Acepta un nuevo parámetro ficha_color_index para el fondo alterno."""
+    
+    # 1. Recuperar datos y formatear
+    ticker = data['TICKER']
+    nombre_empresa = data['NOMBRE_EMPRESA']
+    precio_actual = formatear_numero(data['PRECIO_ACTUAL'])
+    oportunidad = data['OPORTUNIDAD']
+    compra_si = data['COMPRA_SI']
+    vende_si = data['VENDE_SI']
+    soporte1 = formatear_numero(data['SOPORTE_1'])
+    resistencia1 = formatear_numero(data['RESISTENCIA_1'])
+    tipo_ema = data['TIPO_EMA']
+    valor_ema = formatear_numero(data['VALOR_EMA'])
+    smi_hoy = formatear_numero(data['SMI_HOY'])
+    estado_smi = data['ESTADO_SMI']
+    
+    comprado = data['COMPRADO'] == "SI"
+    fecha_compra = data['FECHA_COMPRA']
+    precio_compra = formatear_numero(data['PRECIO_COMPRA'])
+    beneficio_actual_formateado = formatear_beneficio(data['BENEFICIO_ACTUAL'])
+    
+    empresa_link = f"https://finance.yahoo.com/quote/{ticker}"
+
+    # Lógica de colores y textos
+    color_text_operativa = "#ffffff"
+    if "compra" in oportunidad.lower() or "compra riesgo" in oportunidad.lower():
+        recomendacion_principal = "COMPRA"
+        color_bg_operativa = "#28a745" # Verde
+    elif "venta" in oportunidad.lower() or "vigilar" in oportunidad.lower():
+        recomendacion_principal = "VENTA / VIGILANCIA"
+        color_bg_operativa = "#dc3545" # Rojo
+    elif "seguirá bajando" in oportunidad.lower() or "intermedio" in oportunidad.lower():
+        recomendacion_principal = "NEUTRAL"
+        color_bg_operativa = "#6c757d" # Gris neutral
+
+    # Determinar el estado inicial del detalle
+    display_detail = "block" if is_expanded_default else "none"
+    icon_class = "fa-chevron-up" if is_expanded_default else "fa-chevron-down"
+    button_text = "Cerrar Información" if is_expanded_default else "Ampliar Información"
+    
+    # Determinar la clase de fondo de la ficha
+    # MODIFICACIÓN: Usar el índice para alternar entre 4 fondos
+    ficha_class = f"empresa-analisis-block-{ficha_color_index}"
+
+    # 2. Estilos y Contenedor para la MINIFICHA (Parte Visible y Cuadrada)
+    # El aspecto cuadrado se maneja con la clase CSS .empresa-analisis-block
+    html_minificha = f"""
+    <div class="{ficha_class}" id="block-{ticker}" data-ticker="{ticker}" data-nombre="{nombre_empresa}" data-oportunidad="{oportunidad}">
+        <div class="minificha-header">
+            <h4 style="margin: 0; font-size: 1.0em; font-weight: bold; color: #1A237E;">
+                {nombre_empresa} <span style="font-weight: normal; color: #6c757d; font-size: 0.9em;">({ticker})</span>
+            </h4>
+        </div>
+        <div class="minificha-body-resumen">
+            <div class="resumen-item current-price">
+                <span style="font-size: 1.1em; font-weight: bold; color: #495057;">{precio_actual}€</span>
+            </div>
+            <div class="resumen-item op-status-resumen" style="background-color: {color_bg_operativa}; color: {color_text_operativa};">
+                {recomendacion_principal}
+            </div>
+            <div class="resumen-item comprado-status" style="font-size: 0.9em; font-weight: bold;">
+                {f"En Cartera: <span style='color:#28a745;'>SÍ</span>" if comprado else f"En Cartera: <span style='color:#dc3545;'>NO</span>"}
+            </div>
+            <a href='{empresa_link}' target='_blank' class="resumen-item chart-link">
+                Ver Análisis Detallado y Gráfico <i class="fas fa-external-link-alt" style="margin-left: 5px;"></i>
+            </a>
+        </div>
+
+        <div id="detail-{ticker}" class="detail-container" style="display: {display_detail};">
+            <div class="detail-content">
+                
+                {generar_observaciones(data)}
+
+                <h5 style="color: #495057; font-size: 1em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 5px; margin-bottom: 3px;">
+                    <i class="fas fa-chart-line" style="color:#007bff; margin-right: 3px;"></i> NIVELES CLAVE
+                </h5>
+                <div style="border: 1px solid #dee2e6; padding: 5px; border-radius: 4px; background-color: #ffffff;">
+                    <p style="margin: 0; padding: 0;"><strong>SMI/Estado:</strong> {smi_hoy} ({estado_smi})<br>
+                    <strong>Soporte/Resistencia 1:</strong> {soporte1}€ / {resistencia1}€<br>
+                    <strong>EMA 100 ({tipo_ema}):</strong> {valor_ema}€</p>
+                </div>
+                
+                <h5 style="color: #495057; font-size: 1em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 5px; margin-bottom: 3px;">
+                    <i class="fas fa-hand-holding-usd" style="color:#007bff; margin-right: 3px;"></i> POSICIÓN ACTUAL
+                </h5>
+                <div style="border: 1px solid #dee2e6; padding: 5px; border-radius: 4px; background-color: #ffffff;">
+                    {f"""
+                    <p style="margin: 0; padding: 0;">
+                        <strong>Entrada:</strong> {precio_compra}€ (Fecha: {fecha_compra})<br>
+                        <strong>Beneficio Actual (Simulado):</strong> {beneficio_actual_formateado}
+                    </p>
+                    """ if comprado else f"""
+                    <p style="margin: 0; padding: 0;">
+                        <strong>No hay inversión abierta.</strong> Última operación ({data['FECHA_VENTA_CIERRE']}) resultó en un beneficio de {formatear_beneficio(data['BENEFICIO_ULTIMA_OP'])}.
+                    </p>
+                    """}
+                </div>
+            </div>
+        </div>
+        <div class="minificha-footer">
+            <button class="expand-button" onclick="toggleDetail('detail-{ticker}', this)" data-ticker="{ticker}">
+                {button_text} <i class="fas {icon_class}" style="margin-left: 5px;"></i>
+            </button>
+        </div>
+    </div>
+    """
+    return html_minificha
+
+# --------------------------------------------------------------------------------------
+# -------------------- FIN DE LA NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO --------------------
+# --------------------------------------------------------------------------------------
 
 def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
     """
@@ -685,21 +845,20 @@ def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
         </body>
         </html>
         """
-        with open(ruta_archivo, "w", encoding="utf-8") as f:
-            # Ahora guardamos el HTML completo que se generó y se pasó como argumento
-            # NOTA: La variable 'texto_generado' en esta función ahora SOLO contiene el cuerpo HTML.
-            # Se ha reajustado 'html_completo' arriba para envolverlo.
+        # La variable 'texto_generado' en esta función ahora SOLO contiene el cuerpo HTML.
+        # Se ha reajustado 'html_completo' arriba para envolverlo.
+        with open(ruta_archivo, 'w', encoding='utf-8') as f:
             f.write(html_completo)
     except Exception as e:
         print(f"❌ Error al escribir el archivo {ruta_archivo}: {e}")
         return
-
+    
     # 3. Construcción del mensaje MIME
     msg = MIMEMultipart()
     msg['From'] = remitente_header # Ej: "IBEXIA.es <info@ibexia.es>"
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
-    
+
     # Cuerpo del email
     msg.attach(MIMEText("Adjunto el análisis en formato HTML.", 'plain'))
 
@@ -708,7 +867,7 @@ def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
         with open(ruta_archivo, "rb") as attachment:
             part = MIMEBase("application", "octet-stream")
             part.set_payload(attachment.read())
-        
+
         # Codificación y cabeceras para el adjunto
         encoders.encode_base64(part)
         part.add_header(
@@ -724,263 +883,39 @@ def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
         except OSError:
             pass
         return
-        
+
     # 4. Conexión al servidor Brevo SMTP
     try:
         print(f"🌐 Intentando conectar a Brevo SMTP: {servidor_smtp}:{puerto_smtp}")
         servidor = smtplib.SMTP(servidor_smtp, puerto_smtp)
-        servidor.starttls() 
-        
+        servidor.starttls()
+
         print(f"🔑 Intentando iniciar sesión con el usuario: {remitente_login}")
         # Usa el login y la clave de Brevo para la autenticación
         servidor.login(remitente_login, password)
-        
+
         print(f"✉️ Enviando correo a: {destinatario} desde: {remitente_visible_email}")
         # Usa el email visible como el remitente de la transacción
         servidor.sendmail(remitente_visible_email, destinatario, msg.as_string())
         servidor.quit()
         print("✅ Correo enviado exitosamente a Brevo.")
+
     except smtplib.SMTPAuthenticationError:
-        print(f"❌ ERROR de Autenticación SMTP. Verifica el login y la clave SMTP de Brevo: {remitente_login}")
+        print(f"❌ ERROR de Autenticación SMTP. Verifica las credenciales de Brevo.")
     except Exception as e:
-        print(f"❌ Error al enviar el correo vía SMTP: {e}")
+        print(f"❌ ERROR al conectar o enviar por SMTP: {e}")
     finally:
-        # 5. Limpieza (Borrar archivo temporal)
+        # 5. Limpieza (Borrar el archivo temporal)
         try:
             os.remove(ruta_archivo)
-            print(f"🗑️ Archivo temporal {ruta_archivo} eliminado.")
-        except OSError as e:
-            print(f"⚠️ Advertencia: No se pudo eliminar el archivo temporal {ruta_archivo}: {e}")
-
-def generar_html_posiciones_abiertas(datos_completos):
-    # Función original para generar la tabla de posiciones
-    # La implementación es muy extensa y se mantiene la lógica tal cual, solo se añade el fragmento de la clase 'empresa-analisis-block-1' en el snippet para referencia si fuera necesaria una modificación
-    
-    # --- Lógica de Posiciones Abiertas (Cartera) ---
-    posiciones_abiertas = [data for data in datos_completos if data['COMPRADO'] == "SI"]
-    
-    if not posiciones_abiertas:
-        return """ <p style="text-align: center; color: #495057; margin-top: 15px;">Actualmente no hay posiciones abiertas según el algoritmo. </p> """
-
-    # 1. Definir la URL del análisis detallado (se asume que existe en WordPress)
-    base_url = "https://tuweb.com/analisis/" 
-    
-    # 2. Ordenar por FECHA_COMPRA (la fecha está en formato DD/MM/YYYY)
-    def key_sort_date(item):
-        fecha_str = item.get('FECHA_COMPRA')
-        try:
-            return datetime.strptime(fecha_str, '%d/%m/%Y')
-        except ValueError:
-            # Poner al final las que no tienen fecha válida o es "N/A"
-            return datetime.min
-
-    # Ordenar por fecha de compra, de la más antigua a la más reciente (ascendente)
-    posiciones_ordenadas = sorted(posiciones_abiertas, key=key_sort_date)
-
-    # 3. Generar el contenido HTML de la tabla
-    # **MODIFICACIÓN 1: Añadir el texto de advertencia sobre el desplazamiento**
-    html_table = """
-        <h3 style="text-align: center; color: #1A237E; margin-top: 20px; margin-bottom: 10px; font-size: 1.2em; border-bottom: 1px solid #e9ecef; padding-bottom: 5px;">
-            <i class="fas fa-check-circle" style="color:#28a745; margin-right: 5px;"></i> Posiciones Abiertas (Cartera IBEXIA)
-        </h3>
-        <p style="text-align: center; font-size: 0.9em; color: #dc3545; font-weight: bold; margin-bottom: 10px;">
-            ⚠️ Desliza hacia abajo dentro de la caja para ver todas las empresas en las que estamos invertidos.
-        </p>
-        <div class="open-positions-container" style="overflow-x: auto; max-width: 100%; height: 250px; overflow-y: scroll; border: 1px solid #dee2e6;">
-        <table style="min-width: 600px; width: 100%; table-layout: auto; border: 0; font-size: 0.95em;">
-            <thead>
-                <tr style="background-color: #f0f8ff;">
-                    <th style="width: 20%; padding: 5px;">EMPRESA (TICKER)</th>
-                    <th style="width: 15%; padding: 5px;">FECHA ENTRADA</th>
-                    <th style="width: 15%; padding: 5px;">PRECIO ENTRADA</th>
-                    <th style="width: 15%; padding: 5px;">PRECIO ACTUAL</th>
-                    <th style="width: 20%; padding: 5px;">BENEFICIO / PÉRDIDA</th>
-                    <th style="width: 15%; padding: 5px;">RECOMENDACIÓN</th>
-                </tr>
-            </thead>
-            <tbody>
-    """
-
-    for data in posiciones_ordenadas:
-        empresa_link = base_url + data['NOMBRE_EMPRESA'].lower().replace(' ', '-')
-        beneficio_actual_formateado = formatear_beneficio(data['BENEFICIO_ACTUAL'])
-        
-        # Determinar recomendación
-        oportunidad = data['OPORTUNIDAD']
-        if "compra" in oportunidad.lower():
-            recomendacion = "COMPRAR"
-            clase_rec = "compra"
-        elif "venta" in oportunidad.lower() or "vigilar" in oportunidad.lower():
-            recomendacion = "VIGILAR"
-            clase_rec = "vigilar"
-        else:
-            recomendacion = "MANTENER"
-            clase_rec = "neutral"
-        
-        html_table += f"""
-            <tr>
-                <td style="text-align: left; font-weight: bold; padding: 3px 5px;">
-                    <a href='{empresa_link}' target='_blank' style='text-decoration:none; color: #1A237E;'>
-                        {data['NOMBRE_EMPRESA']} <span style='color: #6c757d; font-weight: normal; font-size: 0.9em;'>({data['TICKER']})</span>
-                    </a>
-                </td>
-                <td style="padding: 3px 5px;">{data['FECHA_COMPRA']}</td>
-                <td style="padding: 3px 5px;">{formatear_numero(data['PRECIO_COMPRA'])}€</td>
-                <td style="padding: 3px 5px;"><span class="compra" style="color: #1A237E;">{formatear_numero(data['PRECIO_ACTUAL'])}€</span></td>
-                <td style="padding: 3px 5px;">{formatear_beneficio(data['BENEFICIO_ACTUAL'])}</td>
-                <td style="padding: 3px 5px;"><span class="{clase_rec}" style="font-weight: bold;">{recomendacion}</span></td>
-            </tr>
-        """
-        
-    html_table += """
-            </tbody>
-        </table>
-        </div>
-    """
-    return html_table
-
-# --------------------------------------------------------------------------------------
-# ---------------- FIN DE LA SEGUNDA FUNCIÓN AÑADIDA PARA LA SEGUNDA TABLA ---------------
-# --------------------------------------------------------------------------------------
-
-
-# --------------------------------------------------------------------------------------
-# ---------------------- NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO (MODIFICADA) ---------------
-# --------------------------------------------------------------------------------------
-def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index):
-    """Genera un bloque de texto HTML detallado para una sola empresa. Acepta un nuevo parámetro ficha_color_index para el fondo alterno."""
-    
-    # 1. Recuperar datos y formatear
-    ticker = data['TICKER']
-    nombre_empresa = data['NOMBRE_EMPRESA']
-    precio_actual = formatear_numero(data['PRECIO_ACTUAL'])
-    oportunidad = data['OPORTUNIDAD']
-    compra_si = data['COMPRA_SI']
-    vende_si = data['VENDE_SI']
-    soporte1 = formatear_numero(data['SOPORTE_1'])
-    resistencia1 = formatear_numero(data['RESISTENCIA_1'])
-    tipo_ema = data['TIPO_EMA']
-    valor_ema = formatear_numero(data['VALOR_EMA'])
-    smi_hoy = formatear_numero(data['SMI_HOY'])
-    estado_smi = data['ESTADO_SMI']
-    comprado = data['COMPRADO'] == "SI"
-
-    # Datos de Posición/Operativa
-    fecha_compra = data['FECHA_COMPRA']
-    precio_compra = formatear_numero(data['PRECIO_COMPRA'])
-    beneficio_actual_formateado = formatear_beneficio(data['BENEFICIO_ACTUAL'])
-    
-    # URL del enlace
-    base_url = "https://tuweb.com/analisis/"
-    empresa_link = base_url + nombre_empresa.lower().replace(' ', '-')
-
-    # Determinar recomendación principal y colores (para la minificha)
-    color_bg_operativa = "#e0f7fa" # Default: Intermedio/gris
-    color_text_operativa = "#006064"
-    if "compra" in oportunidad.lower() and "riesgo" not in oportunidad.lower():
-        recomendacion_principal = "COMPRA"
-        color_bg_operativa = "#e8f5e9"
-        color_text_operativa = "#2e7d32"
-    elif "venta" in oportunidad.lower():
-        recomendacion_principal = "VENTA / RIESGO"
-        color_bg_operativa = "#ffebee"
-        color_text_operativa = "#c62828"
-    elif "vigilar" in oportunidad.lower():
-        recomendacion_principal = "VIGILAR"
-        color_bg_operativa = "#fffde7"
-        color_text_operativa = "#f9a825"
-    else: # intermedio / seguirá bajando / neutral/vigilar
-        recomendacion_principal = "NEUTRAL"
-        color_bg_operativa = "#6c757d"
-        color_text_operativa = "#ffffff"
-
-    # Determinar el estado inicial del detalle
-    display_detail = "block" if is_expanded_default else "none"
-    icon_class = "fa-chevron-up" if is_expanded_default else "fa-chevron-down"
-    button_text = "Cerrar Información" if is_expanded_default else "Ampliar Información"
-
-    # Determinar la clase de fondo de la ficha
-    # MODIFICACIÓN: Usar el índice para alternar entre 4 fondos
-    ficha_class = f"empresa-analisis-block empresa-analisis-block-{ficha_color_index}"
-    
-    # 2. Estilos y Contenedor para la MINIFICHA (Parte Visible y Cuadrada)
-    # El aspecto cuadrado se maneja con la clase CSS .empresa-analisis-block
-    html_minificha = f"""
-        <div class="{ficha_class}" id="block-{ticker}" data-ticker="{ticker}" data-nombre="{nombre_empresa}" data-oportunidad="{oportunidad}">
-            <div class="minificha-header">
-                <h4 style="margin: 0; font-size: 1.0em; font-weight: bold; color: #1A237E;">
-                    {nombre_empresa} <span style="font-weight: normal; color: #6c757d; font-size: 0.9em;">({ticker})</span>
-                </h4>
-            </div>
-            
-            <div class="minificha-body-resumen">
-                <div class="resumen-item current-price">
-                    <span style="font-size: 1.1em; font-weight: bold; color: #495057;">{precio_actual}€</span>
-                </div>
-                <div class="resumen-item op-status-resumen" style="background-color: {color_bg_operativa}; color: {color_text_operativa};">
-                    {recomendacion_principal}
-                </div>
-                <div class="resumen-item comprado-status" style="font-size: 0.9em; font-weight: bold;">
-                    {f"En Cartera: <span style='color:#28a745;'>SÍ</span>" if comprado else f"En Cartera: <span style='color:#dc3545;'>NO</span>"}
-                </div>
-                <a href='{empresa_link}' target='_blank' class="resumen-item chart-link">
-                    Ver Análisis Detallado y Gráfico <i class="fas fa-external-link-alt" style="margin-left: 3px;"></i>
-                </a>
-            </div>
-            
-            <div id="detail-{ticker}" class="full-detail" style="display: {display_detail}; border-top: 1px solid #ccc; padding-top: 10px;">
-                {generar_observaciones(data)}
-                
-                <div style="padding: 5px; background-color: #f7f7f7; border-radius: 4px;">
-                    <h5 style="color: #495057; font-size: 1em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 5px; margin-bottom: 3px;">
-                        <i class="fas fa-chart-line" style="color:#28a745; margin-right: 3px;"></i> CLAVES OPERATIVAS
-                    </h5>
-                    <p style="margin: 0;"><strong>SMI Hoy:</strong> {smi_hoy} ({estado_smi})</p>
-                    <p style="margin: 0;"><strong>EMA 100:</strong> {valor_ema}€ ({tipo_ema})</p>
-                    <p style="margin: 0;"><strong>Soporte 1:</strong> {soporte1}€</p>
-                    <p style="margin: 0;"><strong>Resistencia 1:</strong> {resistencia1}€</p>
-
-                    <h5 style="color: #495057; font-size: 1em; border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-top: 5px; margin-bottom: 3px;">
-                        <i class="fas fa-hand-holding-usd" style="color:#007bff; margin-right: 3px;"></i> POSICIÓN ACTUAL
-                    </h5>
-                    <div style="border: 1px solid #dee2e6; padding: 5px; border-radius: 4px; background-color: #ffffff;">
-                    {f"""
-                        <p style="margin: 0; padding: 0;">
-                            <strong>Entrada:</strong> {precio_compra}€ (Fecha: {fecha_compra})<br>
-                            <strong>Beneficio Actual (Simulado):</strong> {beneficio_actual_formateado}
-                        </p>
-                    """ if comprado else f"""
-                        <p style="margin: 0; padding: 0;">
-                            <strong>No hay inversión abierta.</strong> Última operación ({data['FECHA_VENTA_CIERRE']}) resultó en un beneficio de {formatear_beneficio(data['BENEFICIO_ULTIMA_OP'])}.
-                        </p>
-                    """}
-                    </div>
-                </div>
-            </div>
-
-            <div class="minificha-footer">
-                <button class="expand-button" onclick="toggleDetail('detail-{ticker}', this)" data-ticker="{ticker}">
-                    {button_text} <i class="fas {icon_class}" style="margin-left: 5px;"></i>
-                </button>
-            </div>
-        </div>
-    """
-    return html_minificha
-
-# --------------------------------------------------------------------------------------
-# -------------------- FIN DE LA NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO --------------------
-# --------------------------------------------------------------------------------------
+        except OSError:
+            pass
 
 
 def generar_reporte():
     try:
         # Aquí se mantiene la lectura de la hoja de Google
         all_tickers = leer_google_sheets()[1:]
-        
-        # --- Simulación de tickers si no hay conexión ---
-        # all_tickers = list(tickers.values()) # Descomentar para debug sin Google Sheets
-        # -----------------------------------------------
-        
         if not all_tickers:
             print("No hay tickers para procesar.")
             return
@@ -993,178 +928,170 @@ def generar_reporte():
                 if data:
                     datos_completos.append(clasificar_empresa(data))
             except Exception as e:
-                print(f"❌ Error al procesar {ticker}: {e}. Saltando a la siguiente empresa...")
-                continue
-            time.sleep(1) # Pequeña pausa para no sobrecargar las APIs
-        
-        # 1. Separar por grupos y ordenar
-        # Orden de prioridad: 1 (Compra Activada) -> 2 (Posible Compra) -> 8 (Compra Riesgo) -> 3 (Vigilar) -> 4 (Riesgo Venta) -> 5 (Riesgo Venta Activada) -> 6 (Seguirá Bajando) -> 7 (Intermedio)
-        datos_ordenados = sorted(datos_completos, key=lambda x: (x.get('ORDEN_PRIORIDAD', 7), x.get('SMI_HOY', 0) * -1))
+                print(f"Error procesando {ticker}: {e}")
+                time.sleep(1) # Espera un poco antes de seguir
 
-        # 2. Generar HTML de la tabla de posiciones abiertas
-        html_tabla_posiciones = generar_html_posiciones_abiertas(datos_ordenados)
+        if not datos_completos:
+            print("No se generó análisis para ninguna empresa.")
+            return
+
+        # 1. Ordenar datos (Primero Compras, luego Vigilar/Venta, luego Neutral)
+        # La prioridad 8 (Compra RIESGO) se coloca detrás de la 2 (Posibilidad de Compra) pero antes de 3 (VIGILAR)
+        # para que se muestre en el grupo 2, pero al final de él.
+        datos_ordenados = sorted(datos_completos, key=lambda x: x['ORDEN_PRIORIDAD'])
         
-        # 3. Generar HTML de las fichas de análisis
-        html_content = ""
+        # 2. Generar el HTML de las posiciones abiertas (Tabla de Inversión)
+        html_posiciones = generar_html_posiciones(datos_ordenados)
+
+        # 3. Generar el HTML de las fichas de análisis (Acordeón)
+        html_content = f"""<div class="main-widget-container"><div id="analisis-diario-widget">"""
+        
+        # Sección de la tabla de posiciones (si aplica)
+        html_content += html_posiciones
+        
+        # Bloque de Título
+        html_content += f"""<h1 style="text-align: center; font-size: 1.5em; color: #1A237E; margin-bottom: 5px; margin-top: 5px;">RESUMEN DE OPORTUNIDADES HOY {datetime.today().strftime('%d/%m/%Y')}</h1>"""
+        
+        # Buscador
+        html_content += """
+        <div id="search-input-container">
+            <input type="text" id="company-search" placeholder="Buscar por Ticker o Nombre..." onkeyup="filterCompanies()">
+        </div>
+        """
+
+        # Generar las fichas agrupadas
         previous_orden_grupo = None
-        group_fiches_count = 0
+        group_counters = {}
         
-        # Estilos CSS (Parte estática que debe ir SIEMPRE)
+        for i, data in enumerate(datos_ordenados):
+            current_orden_grupo = data['ORDEN_PRIORIDAD']
+
+            if current_orden_grupo not in group_counters:
+                group_counters[current_orden_grupo] = 0
+
+            if previous_orden_grupo is None or current_orden_grupo != previous_orden_grupo:
+                
+                # Cierra el contenedor del grupo anterior (grid-container y collapsible-content)
+                if previous_orden_grupo is not None:
+                    html_content += "</div>" # Cierra el grid-container
+                    html_content += "</div>" # Cierra el .collapsible-content wrapper
+
+                # Definir título y estilos del nuevo grupo
+                if current_orden_grupo in [1, 2, 8]: # Compra
+                    titulo = "OPORTUNIDADES DE COMPRA DETECTADAS"
+                    clase = "h3-compra"
+                    icono = "fas fa-leaf"
+                elif current_orden_grupo in [3, 4, 5]: # Vigilar/Venta
+                    titulo = "ATENTOS A VENDER / VIGILANCIA DE RIESGO"
+                    clase = "h3-vigilar"
+                    icono = "fas fa-eye"
+                elif current_orden_grupo in [6, 7]: # Neutral/Otros
+                    titulo = "OTRAS EMPRESAS SIN MOVIMIENTOS RELEVANTES"
+                    clase = "h3-neutral"
+                    icono = "fas fa-ellipsis-h"
+                else:
+                    titulo = "OTROS ANÁLISIS"
+                    clase = "h3-neutral"
+                    icono = "fas fa-info-circle"
+                    
+                # Abrir el nuevo encabezado (H3)
+                # MODIFICACIÓN: Se elimina el onclick y el icono de cierre para que todas las secciones estén abiertas
+                html_content += f"""
+                <h3 class="{clase}" data-group="{current_orden_grupo}" style="cursor: default;">
+                    <i class="{icono}" style="margin-right: 10px;"></i> {titulo}
+                </h3>
+                """
+                
+                # Collapsible wrapper for the content (FICHES)
+                # MODIFICACIÓN: Se fuerza a display: grid (abierto) para todos los grupos.
+                display_style = "display: grid;"
+                html_content += f"""
+                <div id="collapsible-content-{current_orden_grupo}" class="collapsible-content" style="{display_style}">
+                    <div class="grid-container" data-group="{current_orden_grupo}">
+                """
+                previous_orden_grupo = current_orden_grupo
+
+            # *** Lógica: Apertura de las 3 primeras fichas por defecto ***
+            is_expanded_default = group_counters[current_orden_grupo] < 3
+            
+            # *** MODIFICACIÓN: Alternancia de fondo entre 4 colores ***
+            ficha_color_index = (i % 4) + 1 # Cicla entre 1, 2, 3, 4
+
+            # Generar la minificha para la empresa
+            html_content += generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index)
+            
+            group_counters[current_orden_grupo] += 1
+            
+        # Cierre final de los últimos contenedores
+        if previous_orden_grupo is not None:
+            html_content += "</div>" # Cierra el grid-container
+            html_content += "</div>" # Cierra el .collapsible-content wrapper
+            
+        html_content += "</div>" # Cierra el div#analisis-diario-widget
+
+        # 4. Estilos CSS (Completo)
         html_styles = """
             <style>
-                /* Estilos Generales para el Contenedor del Widget */
-                .widget-contenedor { 
-                    padding: 20px; 
-                    background-color: #f8f9fa; /* Gris muy claro */
-                    border-radius: 12px; 
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-                    font-family: 'Arial', sans-serif;
-                    max-width: 100%;
-                    margin: 0 auto;
-                }
-                .main-container { padding: 10px; }
+                .main-widget-container { font-family: 'Arial', sans-serif; max-width: 100%; margin: auto; padding: 10px; background-color: #f7f7f7; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+                h1 { text-align: center; font-size: 1.5em; color: #1A237E; margin-bottom: 5px; margin-top: 5px; }
+                h3 { margin-top: 20px; margin-bottom: 8px; padding: 5px 10px; border-radius: 4px; font-size: 1.2em; font-weight: bold; display: flex; align-items: center; cursor: default; /* Eliminamos el cursor pointer en todos */ }
+                .h3-compra { background-color: #e6f7ee; /* Verde suave */ color: #1a7e4b; /* Verde oscuro */ border-left: 5px solid #28a745; }
+                .h3-vigilar { background-color: #fff9e6; /* Amarillo suave */ color: #997b00; /* Naranja oscuro */ border-left: 5px solid #ffc107; }
+                .h3-neutral { background-color: #f2f2f2; /* Gris suave */ color: #495057; /* Gris oscuro */ border-left: 5px solid #6c757d; }
+                p { color: #495057; text-align: left; font-size: 1em; margin: 0 0 5px 0; }
+                strong { font-weight: 700; color: #212529; }
                 
-                /* Grid y Fichas */
-                .grid-container {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* 280px mínimo para móviles/tablets */
-                    gap: 20px;
-                    margin-bottom: 20px;
-                    padding-bottom: 10px;
-                }
-                .empresa-analisis-block {
-                    border-radius: 10px;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                    transition: all 0.3s;
-                    min-height: 250px; /* Asegura un tamaño mínimo para todas */
-                    cursor: default;
-                }
-                
-                /* Alternancia de fondos para las fichas (NO TOCAR) */
-                .empresa-analisis-block-1 { background-color: #ffffff; }
-                .empresa-analisis-block-2 { background-color: #f7f7f7; }
-                .empresa-analisis-block-3 { background-color: #ffffff; }
-                .empresa-analisis-block-4 { background-color: #f7f7f7; }
+                /* Estilos del Buscador - GRANDE Y LLAMATIVO */
+                #search-input-container { text-align: center; margin-bottom: 20px; padding: 10px 0; background-color: #f0f8ff; /* Fondo muy suave para destacar el buscador */ border-radius: 8px; border: 1px solid #1A237E; }
+                #company-search { padding: 15px 25px; /* Más grande */ width: 90%; max-width: 500px; border-radius: 30px; border: 2px solid #1A237E; font-size: 1.1em; outline: none; transition: border-color 0.3s, box-shadow 0.3s; }
+                #company-search:focus { border-color: #007bff; box-shadow: 0 0 8px rgba(0, 123, 255, 0.2); }
 
-                /* Estilos del Encabezado de la Ficha */
-                .minificha-header { 
-                    padding: 8px 10px; 
-                    border-bottom: 1px solid #e9ecef; 
-                    background-color: inherit; /* Hereda del padre para el fondo alterno */
-                }
-                .minificha-body-resumen {
-                    flex-grow: 1;
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 5px;
-                    padding: 10px;
-                    text-align: center;
-                    align-items: center;
-                    align-content: start;
-                }
+                /* Estilos del Grid de Fichas */
+                .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-top: 10px; }
+                
+                /* Estilos de Fichas Individuales */
+                .empresa-analisis-block-1, .empresa-analisis-block-2, .empresa-analisis-block-3, .empresa-analisis-block-4 { border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s; border: 1px solid #ddd; }
+                .empresa-analisis-block-1 { background-color: #e6f7ee; } /* Verde claro */
+                .empresa-analisis-block-2 { background-color: #fff9e6; } /* Amarillo claro */
+                .empresa-analisis-block-3 { background-color: #f0f8ff; } /* Azul claro */
+                .empresa-analisis-block-4 { background-color: #f2f2f2; } /* Gris claro */
+                
+                .empresa-analisis-block-1:hover, .empresa-analisis-block-2:hover, .empresa-analisis-block-3:hover, .empresa-analisis-block-4:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
+
+                /* Minificha (Parte Visible) */
+                .minificha-header { padding: 8px 10px; border-bottom: 1px solid #e9ecef; background-color: inherit; /* Hereda del padre para el fondo alterno */ }
+                .minificha-body-resumen { flex-grow: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 10px; text-align: center; align-items: center; align-content: start; }
                 .resumen-item { padding: 5px; border-radius: 3px; }
                 .current-price { grid-column: 1 / 3; font-size: 1.1em; }
                 .op-status-resumen { font-weight: bold; font-size: 0.9em; grid-column: 1 / 3; /* Ocupa todo el ancho */ }
                 .chart-link { text-decoration: none; color: #007bff; font-weight: bold; font-size: 0.85em; grid-column: 1 / 3; /* Ocupa todo el ancho */ }
                 .chart-link:hover { text-decoration: underline; }
-                .minificha-footer { 
-                    padding: 8px 10px; 
-                    border-top: 1px solid #e9ecef; 
-                    text-align: center; 
-                    background-color: #f8f9fa; /* Gris claro para el footer */
-                }
-                .expand-button {
-                    width: 100%;
-                    background-color: #1A237E;
-                    color: white;
-                    border: none;
-                    padding: 8px 10px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 0.95em;
-                    font-weight: bold;
-                    transition: background-color 0.3s;
-                }
+                
+                /* Detalle (Parte Expandible) */
+                .detail-container { padding: 10px; border-top: 1px solid #e9ecef; background-color: white; }
+                .detail-container p { font-size: 0.9em; line-height: 1.4; }
+                
+                .minificha-footer { padding: 8px 10px; border-top: 1px solid #e9ecef; text-align: center; background-color: #f8f9fa; /* Gris claro para el footer */ }
+                .expand-button { width: 100%; background-color: #1A237E; color: white; border: none; padding: 8px 10px; border-radius: 4px; cursor: pointer; font-size: 0.95em; font-weight: bold; transition: background-color 0.3s; }
                 .expand-button:hover { background-color: #0056b3; }
-
+                
                 /* Estilos de la tabla de posiciones (Mantenidos) */
-                .open-positions-container table td, .open-positions-container table th { 
-                    padding: 3px 5px !important; 
-                    line-height: 1.3; 
-                    font-size: 0.9em; 
-                }
+                .open-positions-container table td, .open-positions-container table th { padding: 3px 5px; border-bottom: 1px solid #dee2e6; text-align: center; vertical-align: middle; }
+                .open-positions-container table { border-collapse: collapse; }
+                .open-positions-container thead th { position: sticky; top: 0; background-color: #f0f8ff; z-index: 10; font-weight: bold; font-size: 0.9em; }
 
-                /* Estilos de los Encabezados de Sección (H3) */
-                h1 { 
-                    text-align: center; 
-                    font-size: 1.5em; 
-                    color: #1A237E; 
-                    margin-bottom: 5px; 
-                    margin-top: 5px; 
-                }
-                h3 { 
-                    margin-top: 20px; 
-                    margin-bottom: 8px; 
-                    padding: 5px 10px; 
-                    border-radius: 4px; 
-                    font-size: 1.2em; 
-                    font-weight: bold; 
-                    display: flex; 
-                    align-items: center; 
-                    cursor: default; /* Eliminamos el cursor pointer en todos */
-                }
-                .h3-compra { 
-                    background-color: #e6f7ee; /* Verde suave */ 
-                    color: #1a7e4b; /* Verde oscuro */ 
-                    border-left: 5px solid #28a745; 
-                }
-                .h3-vigilar { 
-                    background-color: #fff9e6; /* Amarillo suave */ 
-                    color: #997b00; /* Naranja oscuro */ 
-                    border-left: 5px solid #ffc107; 
-                }
-                .h3-neutral { 
-                    background-color: #f2f2f2; /* Gris suave */ 
-                    color: #495057; /* Gris oscuro */ 
-                    border-left: 5px solid #6c757d; 
-                }
-                p { color: #495057; text-align: left; font-size: 1em; margin: 0 0 5px 0; }
-                strong { font-weight: 700; color: #212529; } 
-
-                /* Estilos del Buscador - GRANDE Y LLAMATIVO */
-                #search-input-container {
-                    text-align: center; 
-                    margin-bottom: 20px; 
-                    padding: 10px 0; 
-                    background-color: #f0f8ff; /* Fondo muy suave para destacar el buscador */
-                    border-radius: 8px; 
-                    border: 1px solid #1A237E;
-                }
-                #company-search {
-                    padding: 15px 25px; /* Más grande */
-                    border: 3px solid #1A237E; /* Borde más grueso y azul oscuro */
-                    border-radius: 25px; 
-                    width: 80%;
-                    max-width: 500px;
-                    font-size: 1.1em;
-                    text-align: center;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-                    transition: all 0.3s;
-                }
-                #company-search:focus {
-                    box-shadow: 0 0 10px rgba(26, 35, 126, 0.5);
-                    outline: none;
-                }
             </style>
         """
 
-        # Script JavaScript (Parte estática que debe ir SIEMPRE)
+        # 5. Scripts (Completo)
         html_script = """
             <script>
-                // Función para expandir/colapsar el detalle de la ficha
+                document.addEventListener('DOMContentLoaded', function() {
+                    console.log("Widget Análisis Diario: Fichas cargadas y listas.");
+                    // Forzar el filtro al inicio para expandir los 3 primeros de cada grupo
+                    filterCompanies(); 
+                });
+
                 function toggleDetail(detailId, button) {
                     var detail = document.getElementById(detailId);
                     if (detail.style.display === "none" || detail.style.display === "") {
@@ -1176,8 +1103,6 @@ def generar_reporte():
                     }
                 }
 
-                // La función toggleSection ha sido eliminada ya que ninguna sección debe ser colapsable/acordeón.
-
                 // Función de filtrado de empresas (modificada para secciones y fiches)
                 function filterCompanies() {
                     var input, filter, blocks;
@@ -1185,199 +1110,140 @@ def generar_reporte():
                     filter = input.value.toUpperCase();
                     
                     // Capturamos los 4 tipos de bloques de fondo
-                    blocks = document.querySelectorAll('.empresa-analisis-block');
-                    
+                    blocks = document.querySelectorAll('.empresa-analisis-block-1, .empresa-analisis-block-2, .empresa-analisis-block-3, .empresa-analisis-block-4');
                     var groupsVisibility = {}; // Para rastrear si un grupo tiene elementos visibles
-                    
+                    var groupCounters = {}; // Para rastrear los contadores por grupo
+
                     // 1. Ocultar/Mostrar bloques individuales
                     for (var i = 0; i < blocks.length; i++) {
                         var block = blocks[i];
                         var ticker = block.getAttribute('data-ticker').toUpperCase();
                         var nombre = block.getAttribute('data-nombre').toUpperCase();
-                        
-                        // Encontramos el contenedor del grupo
                         var contentDiv = block.closest('.collapsible-content');
                         if (!contentDiv) continue;
                         
                         var groupId = contentDiv.id.replace('collapsible-content-', '');
-
+                        
                         if (ticker.indexOf(filter) > -1 || nombre.indexOf(filter) > -1) {
                             block.style.display = "flex"; // Mostrar
                             groupsVisibility[groupId] = true;
+                            
+                            // Lógica de expansión forzada para las 3 primeras y cuando no hay filtro
+                            if (filter === "") {
+                                if (groupCounters[groupId] === undefined) {
+                                    groupCounters[groupId] = 0;
+                                }
+                                
+                                var detailId = 'detail-' + block.getAttribute('data-ticker');
+                                var detail = document.getElementById(detailId);
+                                var button = block.querySelector('.expand-button');
+                                
+                                var shouldBeOpen = groupCounters[groupId] < 3;
+                                
+                                if (shouldBeOpen) {
+                                    // Forzar apertura (si está cerrado)
+                                    if (detail.style.display === "none" || detail.style.display === "") {
+                                        toggleDetail(detailId, button);
+                                    }
+                                } else {
+                                    // Forzar cierre (si está abierto)
+                                    if (detail.style.display === "block") {
+                                        toggleDetail(detailId, button);
+                                    }
+                                }
+                                groupCounters[groupId]++;
+                            }
+
                         } else {
                             block.style.display = "none"; // Ocultar
                         }
                     }
 
                     // 2. Ocultar/Mostrar secciones (H3 y .collapsible-content) basadas en el resultado del filtro
-                    var h3s = document.querySelectorAll('.main-container h3[data-group]');
+                    var h3s = document.querySelectorAll('.h3-compra, .h3-vigilar, .h3-neutral');
                     for (var j = 0; j < h3s.length; j++) {
                         var h3 = h3s[j];
                         var groupId = h3.getAttribute('data-group');
                         var content = document.getElementById('collapsible-content-' + groupId);
                         
-                        if (groupsVisibility[groupId]) {
-                            h3.style.display = "flex"; // Mostrar el H3
-                            content.style.display = "grid"; // Mostrar el contenedor de la cuadrícula
+                        if (groupsVisibility[groupId] || filter === "") {
+                            // Mostrar si hay elementos visibles o si no hay filtro (caso inicial)
+                            h3.style.display = "flex";
+                            content.style.display = "grid"; // Forzamos grid
                         } else {
-                            h3.style.display = "none"; // Ocultar el H3
-                            content.style.display = "none"; // Ocultar el contenedor de la cuadrícula
+                            // Ocultar si el filtro está activo y no hay coincidencias en el grupo
+                            h3.style.display = "none";
+                            content.style.display = "none";
                         }
                     }
-                }
-                
-                // Función para asegurar que las 3 primeras fichas de cada grupo estén abiertas
-                function initialExpand() {
-                    var h3s = document.querySelectorAll('.main-container h3[data-group]');
-                    var groupCounters = {};
 
+                    // Asegurar que las secciones (H3 y content) estén visibles (porque no hay filtro)
                     for (var k = 0; k < h3s.length; k++) {
-                        var groupId = h3s[k].getAttribute('data-group');
-                        groupCounters[groupId] = 0;
-
-                        var blocks = document.querySelectorAll('#collapsible-content-' + groupId + ' .empresa-analisis-block');
-                        
-                        for (var i = 0; i < blocks.length; i++) {
-                            var block = blocks[i];
-                            var button = block.querySelector('.expand-button');
-                            var detail = block.querySelector('.full-detail');
-                            var detailId = detail.id;
-                            
-                            if (!button || !detail) continue;
-
-                            var shouldBeOpen = groupCounters[groupId] < 3;
-
-                            if (shouldBeOpen) {
-                                // Forzar apertura (si está cerrado)
-                                if (detail.style.display === "none" || detail.style.display === "") {
-                                    toggleDetail(detailId, button);
-                                }
-                            } else {
-                                // Forzar cierre (si está abierto)
-                                if (detail.style.display === "block") {
-                                    toggleDetail(detailId, button);
-                                }
-                            }
-                            groupCounters[groupId]++;
+                        var h3_k = h3s[k];
+                        var content_k = document.getElementById('collapsible-content-' + h3_k.getAttribute('data-group'));
+                        if (filter === "") {
+                            h3_k.style.display = "flex";
+                            content_k.style.display = "grid";
                         }
                     }
                 }
-                
-                // Inicializar listeners
-                document.addEventListener('DOMContentLoaded', function() {
-                    var searchInput = document.getElementById('company-search');
-                    if (searchInput) {
-                        searchInput.addEventListener('keyup', filterCompanies);
-                    }
-                    // Ejecutar el expandido inicial al cargar el DOM
-                    initialExpand();
-                });
             </script>
         """
 
-        # Lógica de agrupación y generación de fichas
-        for i, data in enumerate(datos_ordenados):
-            current_orden_grupo = data.get('ORDEN_PRIORIDAD', 7)
-            
-            # Si el grupo ha cambiado, cerramos el anterior y abrimos el nuevo encabezado
-            if current_orden_grupo != previous_orden_grupo:
-                
-                # Definir título y clase del nuevo encabezado
-                if current_orden_grupo in [1, 2, 8]:
-                    titulo = "MEJORES OPORTUNIDADES DE COMPRA"
-                    clase = "h3-compra"
-                    icono = "fas fa-leaf"
-                elif current_orden_grupo in [3, 4, 5]:
-                    titulo = "ATENTOS A VENDER / VIGILANCIA DE RIESGO"
-                    clase = "h3-vigilar"
-                    icono = "fas fa-eye"
-                elif current_orden_grupo in [6, 7]:
-                    titulo = "OTRAS EMPRESAS SIN MOVIMIENTOS RELEVANTES"
-                    clase = "h3-neutral"
-                    icono = "fas fa-ellipsis-h"
-                else:
-                    titulo = "OTROS ANÁLISIS"
-                    clase = "h3-neutral"
-                    icono = "fas fa-info-circle"
-
-                # Cerrar el contenedor del grupo anterior (grid-container y collapsible-content)
-                if previous_orden_grupo is not None:
-                    html_content += "</div>" # Cierra el grid-container
-                    html_content += "</div>" # Cierra el .collapsible-content wrapper
-                
-                # Abrir el nuevo encabezado (H3)
-                # MODIFICACIÓN: Se elimina el onclick y el icono de cierre para que todas las secciones estén abiertas
-                html_content += f"""
-                    <h3 class="{clase}" data-group="{current_orden_grupo}" style="cursor: default;">
-                        <i class="{icono}" style="margin-right: 10px;"></i> {titulo} 
-                    </h3>
-                """
-                
-                # Collapsible wrapper for the content (FICHES)
-                # MODIFICACIÓN: Se fuerza a display: grid (abierto) para todos los grupos.
-                display_style = "display: grid;"
-                html_content += f"""
-                    <div id="collapsible-content-{current_orden_grupo}" class="collapsible-content" style="{display_style}">
-                        <div class="grid-container" data-group="{current_orden_grupo}">
-                """
-                group_fiches_count = 0 # Reiniciar contador de fichas para el nuevo grupo
-            
-            # *** Lógica: Apertura de las 3 primeras fichas por defecto ***
-            is_expanded_default = group_fiches_count < 3
-            
-            # *** MODIFICACIÓN: Alternancia de fondo entre 4 colores ***
-            ficha_color_index = (i % 4) + 1 # Cicla entre 1, 2, 3, 4
-            
-            # Generar la minificha para la empresa
-            html_content += generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index)
-            
-            group_fiches_count += 1
-            previous_orden_grupo = current_orden_grupo
-
-        # Cerrar el último grupo
-        if previous_orden_grupo is not None:
-            html_content += "</div>" # Cierra el grid-container
-            html_content += "</div>" # Cierra el .collapsible-content wrapper
+        # ******************************************************************************
+        # *************** COMIENZO DE LA LÓGICA DE ESCRITURA PARA EL WIDGET *************
+        # ******************************************************************************
         
-        # 4. Ensamblar el HTML final del widget
-        html_final = f"""
-            <div class="widget-contenedor">
-                <h1>{datetime.today().strftime('%d/%m/%Y')} | ANÁLISIS DIARIO IBEXIA</h1>
-                <div id="search-input-container">
-                    <input type="text" id="company-search" placeholder="Buscar por Ticker o Nombre de Empresa...">
-                </div>
-                {html_tabla_posiciones}
-                <div class="main-container">
-                    {html_content}
-                </div>
-            </div>
-        """
+        # 1. CONSTRUIR EL HTML COMPLETO PARA EL WIDGET
+        # Esta es la cadena final que contiene estilos, link, contenido y scripts.
+        html_para_widget = f"""{html_styles}<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">{html_content}{html_script}"""
         
-        # 5. Combinar todo para la salida (incluyendo estilos y script)
-        html_completo_para_wp = f"""
-            {html_styles}
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-            {html_final}
-            {html_script} 
-        """
+        # 2. FORMATEAR EL CONTENIDO PARA EL ARCHIVO PHP (ESCAPANDO COMILLAS SIMPLES)
+        # Escapar las comillas simples ('') dentro del HTML evita romper la sintaxis del 'return' de PHP.
+        html_escaped = html_para_widget.replace("'", "\\'") 
+        
+        php_content_to_write = f"""<?php 
+// ESTE ARCHIVO FUE GENERADO AUTOMÁTICAMENTE POR PREMIUM.py EL {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}
 
-        # 6. Envío de correo (lógica original)
+return '
+{html_escaped}
+';
+"""
+        
+        # 3. ESCRIBIR EL ARCHIVO widget-data.php
+        # Esto calcula la ruta relativa al script Premium.py y lo guarda en la misma carpeta.
+        widget_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'widget-data.php')
+        
+        try:
+            with open(widget_data_path, 'w', encoding='utf-8') as f:
+                f.write(php_content_to_write)
+            print(f"✅ Archivo widget-data.php generado y actualizado exitosamente en: {widget_data_path}")
+        except Exception as e:
+            print(f"❌ ERROR al escribir widget-data.php en {widget_data_path}: {e}")
+            
+        # ******************************************************************************
+        # ************************* FIN DE LA LÓGICA DE ESCRITURA *************************
+        # ******************************************************************************
+
+        # El HTML COMPLETO para el correo
+        # Usamos la variable ya construida 'html_para_widget'
+        html_para_email_body = html_para_widget 
+
+        
         asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} análisis detallados hoy {datetime.today().strftime('%d/%m/%Y')}"
         nombre_archivo_base = f"analisis_ibexia_{datetime.today().strftime('%Y%m%d')}"
-        enviar_email_con_adjunto(html_completo_para_wp, asunto, nombre_archivo_base)
-        
-        
-        # ***************************************************************
-        # NUEVA LÍNEA: Generamos el archivo PHP LISTO para WordPress
-        # ***************************************************************
-        generar_archivo_widget_php(html_completo_para_wp)
 
-
-        # Devolver el bloque único con <style>, <link>, contenido y <script> para la inserción en WordPress (por si se usa).
-        return html_completo_para_wp
+        # Enviamos el cuerpo HTML (sin tags <html>/<body>, que se añaden en la función de envío)
+        enviar_email_con_adjunto(html_para_email_body, asunto, nombre_archivo_base)
+        
+        # Devolver el bloque único con <style>, <link>, contenido y <script> para la inserción en WordPress.
+        return html_para_widget
 
     except Exception as e:
-        print(f"❌ Error al ejecutar el script principal: {e}")
+        print(f"❌ Error al ejecutar el reporte: {e}")
+        return f"Error en la generación del reporte: {e}"
 
-if __name__ == "__main__":
-    generar_reporte()
+if __name__ == '__main__':
+    print("--- INICIANDO PROCESO DE ANÁLISIS ---")
+    resultado = generar_reporte()
+    print("--- PROCESO COMPLETADO ---")
