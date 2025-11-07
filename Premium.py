@@ -662,7 +662,8 @@ def generar_html_posiciones(datos_completos):
     """
     
     for data in posiciones_ordenadas:
-        empresa_link = f"https://finance.yahoo.com/quote/{data['TICKER']}"
+        # Se mantiene el enlace de Yahoo en esta tabla para referencia rápida
+        empresa_link = f"https://finance.yahoo.com/quote/{data['TICKER']}" 
         
         recomendacion = data['OPORTUNIDAD']
         if 'compra' in recomendacion.lower():
@@ -697,13 +698,13 @@ def generar_html_posiciones(datos_completos):
     return html_table
 
 # --------------------------------------------------------------------------------------
-# ---------------------- NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO (MODIFICADA) ---------------
+# ---------------------- FUNCIÓN DE ANÁLISIS DE TEXTO (MODIFICADA) ---------------------
 # --------------------------------------------------------------------------------------
 def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index):
     """Genera un bloque de texto HTML detallado para una sola empresa. Acepta un nuevo parámetro ficha_color_index para el fondo alterno."""
     
     # 1. Recuperar datos y formatear
-    ticker = data['TICKER']
+    ticker_yf = data['TICKER'] # TICKER_YC is like 'PHM.MC'
     nombre_empresa = data['NOMBRE_EMPRESA']
     precio_actual = formatear_numero(data['PRECIO_ACTUAL'])
     oportunidad = data['OPORTUNIDAD']
@@ -721,7 +722,11 @@ def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index)
     precio_compra = formatear_numero(data['PRECIO_COMPRA'])
     beneficio_actual_formateado = formatear_beneficio(data['BENEFICIO_ACTUAL'])
     
-    empresa_link = f"https://finance.yahoo.com/quote/{ticker}"
+    # --- CAMBIO 2: Enlace a ibexia.es/TICKER_BASE/ ---
+    # Extraer el ticker base (ej. 'PHM' de 'PHM.MC')
+    ticker_base = ticker_yf.split('.')[0]
+    # Crear el enlace con el formato requerido
+    empresa_link = f"https://ibexia.es/{ticker_base.upper()}/" 
 
     # Lógica de colores y textos
     color_text_operativa = "#ffffff"
@@ -735,22 +740,22 @@ def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index)
         recomendacion_principal = "NEUTRAL"
         color_bg_operativa = "#6c757d" # Gris neutral
 
-    # Determinar el estado inicial del detalle
+    # --- CAMBIO 1 (Parte 1): Determinar el estado inicial del detalle ---
+    # La variable is_expanded_default SIEMPRE SERÁ True, forzando la apertura.
     display_detail = "block" if is_expanded_default else "none"
     icon_class = "fa-chevron-up" if is_expanded_default else "fa-chevron-down"
     button_text = "Cerrar Información" if is_expanded_default else "Ampliar Información"
     
     # Determinar la clase de fondo de la ficha
-    # MODIFICACIÓN: Usar el índice para alternar entre 4 fondos
     ficha_class = f"empresa-analisis-block-{ficha_color_index}"
 
     # 2. Estilos y Contenedor para la MINIFICHA (Parte Visible y Cuadrada)
     # El aspecto cuadrado se maneja con la clase CSS .empresa-analisis-block
     html_minificha = f"""
-    <div class="{ficha_class}" id="block-{ticker}" data-ticker="{ticker}" data-nombre="{nombre_empresa}" data-oportunidad="{oportunidad}">
+    <div class="{ficha_class}" id="block-{ticker_yf}" data-ticker="{ticker_yf}" data-nombre="{nombre_empresa}" data-oportunidad="{oportunidad}">
         <div class="minificha-header">
             <h4 style="margin: 0; font-size: 1.0em; font-weight: bold; color: #1A237E;">
-                {nombre_empresa} <span style="font-weight: normal; color: #6c757d; font-size: 0.9em;">({ticker})</span>
+                {nombre_empresa} <span style="font-weight: normal; color: #6c757d; font-size: 0.9em;">({ticker_yf})</span>
             </h4>
         </div>
         <div class="minificha-body-resumen">
@@ -768,7 +773,7 @@ def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index)
             </a>
         </div>
 
-        <div id="detail-{ticker}" class="detail-container" style="display: {display_detail};">
+        <div id="detail-{ticker_yf}" class="detail-container" style="display: {display_detail};">
             <div class="detail-content">
                 
                 {generar_observaciones(data)}
@@ -800,7 +805,7 @@ def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index)
             </div>
         </div>
         <div class="minificha-footer">
-            <button class="expand-button" onclick="toggleDetail('detail-{ticker}', this)" data-ticker="{ticker}">
+            <button class="expand-button" onclick="toggleDetail('detail-{ticker_yf}', this)" data-ticker="{ticker_yf}">
                 {button_text} <i class="fas {icon_class}" style="margin-left: 5px;"></i>
             </button>
         </div>
@@ -809,12 +814,10 @@ def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index)
     return html_minificha
 
 # --------------------------------------------------------------------------------------
-# -------------------- FIN DE LA NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO --------------------
+# -------------------- FIN DE LA FUNCIÓN DE ANÁLISIS DE TEXTO --------------------------
 # --------------------------------------------------------------------------------------
 
-# **************************************************************************************
-# *** MODIFICACIÓN APLICADA: LA FUNCIÓN AHORA SÓLO ADJUNTA widget-data.php ***
-# **************************************************************************************
+
 def enviar_email_con_adjunto(asunto_email):
     """
     Envía un correo electrónico a través de Brevo (Sendinblue) con el archivo PHP adjunto,
@@ -885,9 +888,6 @@ def enviar_email_con_adjunto(asunto_email):
         print(f"❌ ERROR de Autenticación SMTP. Verifica las credenciales de Brevo.")
     except Exception as e:
         print(f"❌ ERROR al conectar o enviar por SMTP: {e}")
-# **************************************************************************************
-# *** FIN DE LA MODIFICACIÓN ***
-# **************************************************************************************
 
 
 def generar_reporte():
@@ -914,8 +914,6 @@ def generar_reporte():
             return
 
         # 1. Ordenar datos (Primero Compra, luego Vigilar/Venta, luego Neutral)
-        # La prioridad 8 (Compra RIESGO) se coloca detrás de la 2 (Posibilidad de Compra) pero antes de 3 (VIGILAR)
-        # para que se muestre en el grupo 2, pero al final de él.
         datos_ordenados = sorted(datos_completos, key=lambda x: x['ORDEN_PRIORIDAD'])
         
         # 2. Generar el HTML de las posiciones abiertas (Tabla de Inversión)
@@ -973,7 +971,6 @@ def generar_reporte():
                     icono = "fas fa-info-circle"
                     
                 # Abrir el nuevo encabezado (H3)
-                # MODIFICACIÓN: Se elimina el onclick y el icono de cierre para que todas las secciones estén abiertas
                 html_content += f"""
                 <h3 class="{clase}" data-group="{current_orden_grupo}" style="cursor: default;">
                     <i class="{icono}" style="margin-right: 10px;"></i> {titulo}
@@ -981,7 +978,7 @@ def generar_reporte():
                 """
                 
                 # Collapsible wrapper for the content (FICHES)
-                # MODIFICACIÓN: Se fuerza a display: grid (abierto) para todos los grupos.
+                # Se fuerza a display: grid (abierto) para todos los grupos.
                 display_style = "display: grid;"
                 html_content += f"""
                 <div id="collapsible-content-{current_orden_grupo}" class="collapsible-content" style="{display_style}">
@@ -989,8 +986,8 @@ def generar_reporte():
                 """
                 previous_orden_grupo = current_orden_grupo
 
-            # *** Lógica: Apertura de las 3 primeras fichas por defecto ***
-            is_expanded_default = group_counters[current_orden_grupo] < 3
+            # *** CAMBIO 1 (Parte 2): Forzar que todas las fichas salgan abiertas por defecto ***
+            is_expanded_default = True
             
             # *** MODIFICACIÓN: Alternancia de fondo entre 4 colores ***
             ficha_color_index = (i % 4) + 1 # Cicla entre 1, 2, 3, 4
@@ -1066,7 +1063,7 @@ def generar_reporte():
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
                     console.log("Widget Análisis Diario: Fichas cargadas y listas.");
-                    // Forzar el filtro al inicio para expandir los 3 primeros de cada grupo
+                    // Forzar el filtro al inicio para mantener todas las fichas abiertas
                     filterCompanies(); 
                 });
 
@@ -1087,10 +1084,8 @@ def generar_reporte():
                     input = document.getElementById('company-search');
                     filter = input.value.toUpperCase();
                     
-                    // Capturamos los 4 tipos de bloques de fondo
                     blocks = document.querySelectorAll('.empresa-analisis-block-1, .empresa-analisis-block-2, .empresa-analisis-block-3, .empresa-analisis-block-4');
                     var groupsVisibility = {}; // Para rastrear si un grupo tiene elementos visibles
-                    var groupCounters = {}; // Para rastrear los contadores por grupo
 
                     // 1. Ocultar/Mostrar bloques individuales
                     for (var i = 0; i < blocks.length; i++) {
@@ -1106,31 +1101,23 @@ def generar_reporte():
                             block.style.display = "flex"; // Mostrar
                             groupsVisibility[groupId] = true;
                             
-                            // Lógica de expansión forzada para las 3 primeras y cuando no hay filtro
+                            // *** Cambio para mantener ABIERTAS por defecto, solo se contraen si se filtra ***
+                            var detailId = 'detail-' + block.getAttribute('data-ticker');
+                            var detail = document.getElementById(detailId);
+                            var button = block.querySelector('.expand-button');
+                            
                             if (filter === "") {
-                                if (groupCounters[groupId] === undefined) {
-                                    groupCounters[groupId] = 0;
+                                // Mantiene Abierto por defecto
+                                if (detail.style.display === "none" || detail.style.display === "") {
+                                    toggleDetail(detailId, button);
                                 }
-                                
-                                var detailId = 'detail-' + block.getAttribute('data-ticker');
-                                var detail = document.getElementById(detailId);
-                                var button = block.querySelector('.expand-button');
-                                
-                                var shouldBeOpen = groupCounters[groupId] < 3;
-                                
-                                if (shouldBeOpen) {
-                                    // Forzar apertura (si está cerrado)
-                                    if (detail.style.display === "none" || detail.style.display === "") {
-                                        toggleDetail(detailId, button);
-                                    }
-                                } else {
-                                    // Forzar cierre (si está abierto)
-                                    if (detail.style.display === "block") {
-                                        toggleDetail(detailId, button);
-                                    }
+                            } else {
+                                // Cierra si se filtra y no hay necesidad de abrir
+                                if (detail.style.display === "block") {
+                                    toggleDetail(detailId, button);
                                 }
-                                groupCounters[groupId]++;
                             }
+                            // **************************************************************************
 
                         } else {
                             block.style.display = "none"; // Ocultar
@@ -1207,9 +1194,6 @@ return '
         # El asunto del correo
         asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} análisis detallados hoy {datetime.today().strftime('%d/%m/%Y')}"
 
-        # **************************************************************************************
-        # *** MODIFICACIÓN APLICADA: LLAMADA A LA FUNCIÓN DE EMAIL CON UN ÚNICO PARÁMETRO ***
-        # **************************************************************************************
         # Enviamos el archivo PHP que acabamos de generar
         enviar_email_con_adjunto(asunto)
         
