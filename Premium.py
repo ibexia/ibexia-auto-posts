@@ -812,9 +812,12 @@ def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index)
 # -------------------- FIN DE LA NUEVA FUNCIÓN DE ANÁLISIS DE TEXTO --------------------
 # --------------------------------------------------------------------------------------
 
-def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
+# **************************************************************************************
+# *** MODIFICACIÓN APLICADA: LA FUNCIÓN AHORA SÓLO ADJUNTA widget-data.php ***
+# **************************************************************************************
+def enviar_email_con_adjunto(asunto_email):
     """
-    Envía un correo electrónico a través de Brevo (Sendinblue) con un archivo HTML adjunto,
+    Envía un correo electrónico a través de Brevo (Sendinblue) con el archivo PHP adjunto,
     utilizando la configuración SMTP hardcodeada.
     """
     # 1. CONFIGURACIÓN HARDCODEADA DE BREVO Y DESTINATARIO
@@ -830,86 +833,61 @@ def enviar_email_con_adjunto(texto_generado, asunto_email, nombre_archivo):
     # Esta dirección se usará como remitente en la transacción SMTP
     remitente_visible_email = match_remitente_email.group(1) if match_remitente_email else remitente_login
     
-    ruta_archivo = f"{nombre_archivo}.html"
+    # --- LA RUTA DEL ARCHIVO A ADJUNTAR ES AHORA widget-data.php ---
+    ruta_archivo_adjunto = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'widget-data.php')
+    nombre_adjunto = 'widget-data.php'
     
-    # 2. Guardar el contenido generado en un archivo local temporal
-    try:
-        # Se guarda el HTML COMPLETO, incluyendo head y body, para el envío por email
-        html_completo = f"""
-        <html>
-        <head>
-            <title>{asunto_email}</title>
-            </head>
-        <body>
-            {texto_generado}
-        </body>
-        </html>
-        """
-        # La variable 'texto_generado' en esta función ahora SOLO contiene el cuerpo HTML.
-        # Se ha reajustado 'html_completo' arriba para envolverlo.
-        with open(ruta_archivo, 'w', encoding='utf-8') as f:
-            f.write(html_completo)
-    except Exception as e:
-        print(f"❌ Error al escribir el archivo {ruta_archivo}: {e}")
+    # 2. Comprobación y Construcción del mensaje MIME
+    if not os.path.exists(ruta_archivo_adjunto):
+        print(f"❌ ERROR: El archivo {nombre_adjunto} no existe. No se puede adjuntar.")
         return
-    
-    # 3. Construcción del mensaje MIME
+
     msg = MIMEMultipart()
-    msg['From'] = remitente_header # Ej: "IBEXIA.es <info@ibexia.es>"
+    msg['From'] = remitente_header 
     msg['To'] = destinatario
     msg['Subject'] = asunto_email
 
-    # Cuerpo del email
-    msg.attach(MIMEText("Adjunto el análisis en formato HTML.", 'plain'))
+    # Cuerpo del email (Solo texto, ya que el adjunto es el importante)
+    msg.attach(MIMEText(f"Adjunto el archivo de datos {nombre_adjunto} con el análisis diario. Sustituye este archivo en tu plugin de WordPress.", 'plain'))
 
-    # Adjuntar el archivo HTML
+    # Adjuntar el archivo PHP
     try:
-        with open(ruta_archivo, "rb") as attachment:
-            part = MIMEBase("application", "octet-stream")
+        with open(ruta_archivo_adjunto, "rb") as attachment:
+            part = MIMEBase("application", "x-php") # Tipo MIME correcto para PHP
             part.set_payload(attachment.read())
 
         # Codificación y cabeceras para el adjunto
         encoders.encode_base64(part)
         part.add_header(
             "Content-Disposition",
-            f"attachment; filename= {ruta_archivo}",
+            f"attachment; filename= {nombre_adjunto}",
         )
         msg.attach(part)
     except Exception as e:
-        print(f"❌ Error al adjuntar el archivo {ruta_archivo}: {e}")
-        # Asegurarse de que el archivo temporal se borre incluso si falla el adjunto
-        try:
-            os.remove(ruta_archivo)
-        except OSError:
-            pass
+        print(f"❌ Error al adjuntar el archivo {nombre_adjunto}: {e}")
         return
 
-    # 4. Conexión al servidor Brevo SMTP
+    # 3. Conexión al servidor Brevo SMTP
     try:
         print(f"🌐 Intentando conectar a Brevo SMTP: {servidor_smtp}:{puerto_smtp}")
         servidor = smtplib.SMTP(servidor_smtp, puerto_smtp)
         servidor.starttls()
 
         print(f"🔑 Intentando iniciar sesión con el usuario: {remitente_login}")
-        # Usa el login y la clave de Brevo para la autenticación
         servidor.login(remitente_login, password)
 
         print(f"✉️ Enviando correo a: {destinatario} desde: {remitente_visible_email}")
-        # Usa el email visible como el remitente de la transacción
         servidor.sendmail(remitente_visible_email, destinatario, msg.as_string())
         servidor.quit()
-        print("✅ Correo enviado exitosamente a Brevo.")
+        print("✅ Correo enviado exitosamente a Brevo con el archivo PHP adjunto.")
 
     except smtplib.SMTPAuthenticationError:
         print(f"❌ ERROR de Autenticación SMTP. Verifica las credenciales de Brevo.")
     except Exception as e:
         print(f"❌ ERROR al conectar o enviar por SMTP: {e}")
-    finally:
-        # 5. Limpieza (Borrar el archivo temporal)
-        try:
-            os.remove(ruta_archivo)
-        except OSError:
-            pass
+# **************************************************************************************
+# *** FIN DE LA MODIFICACIÓN ***
+# **************************************************************************************
 
 
 def generar_reporte():
@@ -1226,15 +1204,14 @@ return '
         # ************************* FIN DE LA ZONA CRUCIAL *****************************
         # ******************************************************************************
 
-        # El HTML COMPLETO para el correo
-        html_para_email_body = html_para_widget 
-
-        
+        # El asunto del correo
         asunto = f"🔔 Alertas y Oportunidades IBEXIA: {len(datos_ordenados)} análisis detallados hoy {datetime.today().strftime('%d/%m/%Y')}"
-        nombre_archivo_base = f"analisis_ibexia_{datetime.today().strftime('%Y%m%d')}"
 
-        # Enviamos el cuerpo HTML (sin tags <html>/<body>, que se añaden en la función de envío)
-        enviar_email_con_adjunto(html_para_email_body, asunto, nombre_archivo_base)
+        # **************************************************************************************
+        # *** MODIFICACIÓN APLICADA: LLAMADA A LA FUNCIÓN DE EMAIL CON UN ÚNICO PARÁMETRO ***
+        # **************************************************************************************
+        # Enviamos el archivo PHP que acabamos de generar
+        enviar_email_con_adjunto(asunto)
         
         # Devolver el bloque único con <style>, <link>, contenido y <script> para la inserción en WordPress.
         return html_para_widget
