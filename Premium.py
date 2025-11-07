@@ -662,8 +662,13 @@ def generar_html_posiciones(datos_completos):
     """
     
     for data in posiciones_ordenadas:
-        # Se mantiene el enlace de Yahoo en esta tabla para referencia rápida
-        empresa_link = f"https://finance.yahoo.com/quote/{data['TICKER']}" 
+        # --- MODIFICACIÓN DE ENLACE INICIA AQUÍ ---
+        # Extraer el ticker base (ej. 'PHM' de 'PHM.MC')
+        ticker_yf = data['TICKER']
+        ticker_base = ticker_yf.split('.')[0]
+        # Crear el enlace con el formato requerido: ibexia.es/TICKER_BASE/
+        empresa_link = f"https://ibexia.es/{ticker_base.upper()}/" 
+        # --- MODIFICACIÓN DE ENLACE TERMINA AQUÍ ---
         
         recomendacion = data['OPORTUNIDAD']
         if 'compra' in recomendacion.lower():
