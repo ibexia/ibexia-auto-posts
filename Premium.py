@@ -619,11 +619,15 @@ def generar_observaciones(data):
     return f'<p style="text-align:left; color:#000; margin: 0 0 5px 0;">{texto_observacion.strip()}{advertencia_texto}{texto.strip()}</p>'
 
 
-def generar_html_posiciones(datos_completos):
+def generar_html_posiciones(datos_completos, fecha_actual_str):
     posiciones_abiertas = [data for data in datos_completos if data['COMPRADO'] == "SI"]
     
+    # --- MODIFICACIÓN 1: Actualizar Título con la fecha y hora de la generación ---
+    titulo_personalizado = f"Posiciones Abiertas (Cartera IBEXIA) Actualizado a fecha {fecha_actual_str}."
+
     if not posiciones_abiertas:
-        return """ <h3 style="text-align: center; color: #1A237E; margin-top: 20px; margin-bottom: 10px; font-size: 1.2em; border-bottom: 1px solid #e9ecef; padding-bottom: 5px;"> <i class="fas fa-check-circle" style="color:#6c757d; margin-right: 5px;"></i> Posiciones Abiertas (Cartera IBEXIA) </h3> <p style="text-align: center; font-size: 0.9em; color: #6c757d; margin-bottom: 10px;"> Actualmente no hay posiciones abiertas según el algoritmo. </p> """
+        return f""" <h3 style="text-align: center; color: #1A237E; margin-top: 20px; margin-bottom: 10px; font-size: 1.2em; border-bottom: 1px solid #e9ecef; padding-bottom: 5px;"> <i class="fas fa-check-circle" style="color:#6c757d; margin-right: 5px;"></i> {titulo_personalizado} </h3> <p style="text-align: center; font-size: 0.9em; color: #6c757d; margin-bottom: 10px;"> Actualmente no hay posiciones abiertas según el algoritmo. </p> """
+    # -----------------------------------------------------------------------------
 
     # 2. Ordenar por FECHA_COMPRA (la fecha está en formato DD/MM/YYYY)
     def key_sort_date(item):
@@ -638,10 +642,10 @@ def generar_html_posiciones(datos_completos):
     posiciones_ordenadas = sorted(posiciones_abiertas, key=key_sort_date)
 
     # 3. Generar el contenido HTML de la tabla
-    # **MODIFICACIÓN 1: Añadir el texto de advertencia sobre el desplazamiento**
-    html_table = """
+    # **MODIFICACIÓN 1: Usar el título personalizado**
+    html_table = f"""
     <h3 style="text-align: center; color: #1A237E; margin-top: 20px; margin-bottom: 10px; font-size: 1.2em; border-bottom: 1px solid #e9ecef; padding-bottom: 5px;">
-        <i class="fas fa-check-circle" style="color:#28a745; margin-right: 5px;"></i> Posiciones Abiertas (Cartera IBEXIA)
+        <i class="fas fa-check-circle" style="color:#28a745; margin-right: 5px;"></i> {titulo_personalizado}
     </h3>
     <p style="text-align: center; font-size: 0.9em; color: #dc3545; font-weight: bold; margin-bottom: 10px;">
         ⚠️ Desliza hacia abajo dentro de la caja para ver todas las empresas en las que estamos invertidos.
@@ -705,7 +709,7 @@ def generar_html_posiciones(datos_completos):
 # --------------------------------------------------------------------------------------
 # ---------------------- FUNCIÓN DE ANÁLISIS DE TEXTO (MODIFICADA) ---------------------
 # --------------------------------------------------------------------------------------
-def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index):
+def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index, fecha_corta_str):
     """Genera un bloque de texto HTML detallado para una sola empresa. Acepta un nuevo parámetro ficha_color_index para el fondo alterno."""
     
     # 1. Recuperar datos y formatear
@@ -753,11 +757,19 @@ def generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index)
     
     # Determinar la clase de fondo de la ficha
     ficha_class = f"empresa-analisis-block-{ficha_color_index}"
+    
+    # --- MODIFICACIÓN 2: Texto de actualización en la cabecera de la ficha ---
+    html_cabecera_actualizacion = f"""
+    <div style="font-size: 0.8em; text-align: right; color: #495057; padding: 5px 10px 0 10px; font-weight: bold;">
+        Actualizado a las {fecha_corta_str}
+    </div>
+    """
 
     # 2. Estilos y Contenedor para la MINIFICHA (Parte Visible y Cuadrada)
     # El aspecto cuadrado se maneja con la clase CSS .empresa-analisis-block
     html_minificha = f"""
     <div class="{ficha_class}" id="block-{ticker_yf}" data-ticker="{ticker_yf}" data-nombre="{nombre_empresa}" data-oportunidad="{oportunidad}">
+        {html_cabecera_actualizacion}
         <div class="minificha-header">
             <h4 style="margin: 0; font-size: 1.0em; font-weight: bold; color: #1A237E;">
                 {nombre_empresa} <span style="font-weight: normal; color: #6c757d; font-size: 0.9em;">({ticker_yf})</span>
@@ -897,6 +909,14 @@ def enviar_email_con_adjunto(asunto_email):
 
 def generar_reporte():
     try:
+        # --- MODIFICACIÓN: Obtener la fecha y hora de inicio del reporte ---
+        now = datetime.now()
+        # Formato para el título de la tabla: "11 de noviembre a las 14:03 horas"
+        fecha_actual_str = now.strftime('%d de ') + now.strftime('%B').lower() + now.strftime(' a las %H:%M horas')
+        # Formato para la cabecera de la ficha: "14:03 del dia 11/11/25"
+        fecha_corta_str = now.strftime('%H:%M del día %d/%m/%y')
+        # -------------------------------------------------------------------
+        
         # Aquí se mantiene la lectura de la hoja de Google
         all_tickers = leer_google_sheets()[1:]
         if not all_tickers:
@@ -922,7 +942,8 @@ def generar_reporte():
         datos_ordenados = sorted(datos_completos, key=lambda x: x['ORDEN_PRIORIDAD'])
         
         # 2. Generar el HTML de las posiciones abiertas (Tabla de Inversión)
-        html_posiciones = generar_html_posiciones(datos_ordenados)
+        # --- MODIFICACIÓN: Pasar fecha_actual_str a la función ---
+        html_posiciones = generar_html_posiciones(datos_ordenados, fecha_actual_str)
 
         # 3. Generar el HTML de las fichas de análisis (Acordeón)
         html_content = f"""<div class="main-widget-container"><div id="analisis-diario-widget">"""
@@ -998,7 +1019,8 @@ def generar_reporte():
             ficha_color_index = (i % 4) + 1 # Cicla entre 1, 2, 3, 4
 
             # Generar la minificha para la empresa
-            html_content += generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index)
+            # --- MODIFICACIÓN: Pasar fecha_corta_str a la función ---
+            html_content += generar_analisis_texto_empresa(data, is_expanded_default, ficha_color_index, fecha_corta_str)
             
             group_counters[current_orden_grupo] += 1
             
