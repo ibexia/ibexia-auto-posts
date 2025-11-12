@@ -839,8 +839,12 @@ def construir_prompt_formateado(data):
         """
 
         # --- INICIO MODIFICACIÓN DEL GRÁFICO (VELAS JAPONESAS) ---
+        # MODIFICACIÓN CLAVE AQUÍ: Usamos un fondo más claro para el contenedor DIV (#f8f9fa) 
+        # para contrastar con el fondo del CHART, o eliminamos el fondo del div si el CHART ya lo tiene.
+        # En este caso, cambiamos el DIV contenedor a un color neutro (blanco/gris claro) y dejamos
+        # que Chart.js gestione el área de dibujo. O MEJOR: quitamos el color de fondo del div para que use el color de fondo de la web.
         chart_html = f"""
-        <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
+        <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; padding: 20px; border-radius: 10px; background-color: #f8f9fa;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
@@ -920,7 +924,8 @@ def construir_prompt_formateado(data):
                         legend: {{
                             display: true,
                             labels: {{
-                                color: '#e0e0e0'
+                                // Mantenemos blanco para un buen contraste si la página web es oscura
+                                color: '#333'
                             }}
                         }},
                         tooltip: {{
@@ -993,7 +998,7 @@ def construir_prompt_formateado(data):
                     scales: {{
                         x: {{
                             ticks: {{
-                                color: '#e0e0e0'
+                                color: '#333' // Color más oscuro para ticks en fondo claro
                             }},
                             grid: {{
                                 color: 'rgba(128, 128, 128, 0.2)'
@@ -1006,14 +1011,14 @@ def construir_prompt_formateado(data):
                             title: {{
                                 display: true,
                                 text: 'Precio (EUR)',
-                                color: '#e0e0e0'
+                                color: '#333'
                             }},
                             ticks: {{
-                                color: '#e0e0e0'
+                                color: '#333' // Color más oscuro para ticks en fondo claro
                             }},
                             grid: {{
                                 color: 'rgba(128, 128, 128, 0.2)',
-                                drawOnChartArea: false
+                                drawOnChartArea: true // Aseguramos que se dibuje la cuadrícula
                             }}
                         }},
                         y1: {{
@@ -1023,7 +1028,7 @@ def construir_prompt_formateado(data):
                             title: {{
                                 display: true,
                                 text: 'Nuestro Algoritmo',
-                                color: '#e0e0e0'
+                                color: '#333'
                             }},
                             grid: {{
                                 drawOnChartArea: false,
@@ -1032,7 +1037,7 @@ def construir_prompt_formateado(data):
                             max: 100,
                             ticks: {{
                                 stepSize: 25,
-                                color: '#e0e0e0'
+                                color: '#333' // Color más oscuro para ticks en fondo claro
                             }}
                         }}
                     }}
