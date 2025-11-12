@@ -24,7 +24,6 @@ def safe_json_dump(data_list):
     """
     # json.dumps convierte None a 'null' y los floats a formato JavaScript (con punto decimal)
     # Se asegura de que la lista solo contenga valores o None, para que json.dumps funcione.
-    # CORRECCIÓN DE SYNTAX ERROR EN ESTA LÍNEA (LÍNEA 25)
     return json.dumps([val if val is not None else None for val in data_list])
 
 
@@ -145,7 +144,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
     # Iterar sobre los datos históricos para encontrar señales
     for i in range(2, len(smis)):
-        print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:.3f}, SMI[i]={smis[i]:.3f}, pendiente[i]={pendientes_smi[i]:.3f}, pendiente[i-1]={pendientes_smi[i-1]:.3f}")
+        # print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:.3f}, SMI[i]={smis[i]:.3f}, pendiente[i]={pendientes_smi[i]:.3f}, pendiente[i-1]={pendientes_smi[i-1]:.3f}")
         # Señal de compra: la pendiente del SMI cambia de negativa a positiva y no está en sobrecompra
         # Se anticipa un día la compra y se añade la condición de sobrecompra
         if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0:
@@ -154,11 +153,11 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                     posicion_abierta = True
                     precio_compra_actual = precios[i-1]
                     compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
-                    print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.3f}")
-                else:
-                    print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.3f})")
-            else:
-                print(f"❌ No compra en {fechas[i-1]}: Ya hay posición abierta")
+                    # print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.3f}")
+                # else:
+                    # print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.3f})")
+            # else:
+                # print(f"❌ No compra en {fechas[i-1]}: Ya hay posición abierta")
 
         # Señal de venta: la pendiente del SMI cambia de positiva a negativa (anticipando un día)
         elif i >= 1 and pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0:
@@ -167,9 +166,9 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
                 num_acciones = capital_inicial / precio_compra_actual
                 ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
-                print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.3f}")
-            else:
-                print(f"❌ No venta en {fechas[i-1]}: No hay posición abierta")
+                # print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.3f}")
+            # else:
+                # print(f"❌ No venta en {fechas[i-1]}: No hay posición abierta")
 
     # --- Generación de la lista HTML de operaciones completadas (SIEMPRE) ---
     operaciones_html = ""
@@ -235,10 +234,6 @@ def obtener_datos_yfinance(ticker):
         # Ampliar periodo para el SMI, soportes/resistencias y simulación
         hist_extended = stock.history(period="90d", interval="1d")
         hist_extended = calculate_smi_tv(hist_extended)
-
-        # Usar un historial más corto (30d) solo si es necesario, pero nos enfocaremos en hist_extended
-        # hist = stock.history(period="30d", interval="1d") # Ya no es necesario cargar dos veces
-        # hist = calculate_smi_tv(hist)
 
         # Obtener datos históricos para el volumen del día anterior completo
         hist_recent = stock.history(period="5d", interval="1d") 
@@ -724,7 +719,7 @@ def construir_prompt_formateado(data):
         precios_reales_grafico_completo = precios_reales_grafico_completo[:max_len]
 
         
-        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON Y PREPARACIÓN DE OHLC ----
+        # ---- INICIO: SERIALIZACIÓN JSON Y PREPARACIÓN DE OHLC ----
         # Serializar todos los arrays para garantizar que None se convierte a 'null'
         labels_json = safe_json_dump(labels_total)
         smi_json = safe_json_dump(smi_desplazados_para_grafico)
@@ -743,7 +738,7 @@ def construir_prompt_formateado(data):
         
         ohlc_lineas_json = safe_json_dump(ohlc_lineas)
         ohlc_cuerpos_json = safe_json_dump(ohlc_cuerpos)
-        # ---- FIN DE LA CORRECCIÓN Y PREPARACIÓN DE OHLC ----
+        # ---- FIN: SERIALIZACIÓN JSON Y PREPARACIÓN DE OHLC ----
         
         # Reemplazo para la sección de análisis detallado del gráfico
         analisis_grafico_html = f"""
@@ -857,17 +852,19 @@ def construir_prompt_formateado(data):
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
         <script>
             // Función para determinar el color de la barra (cuerpo de la vela)
+            // REFORZADA PARA EVITAR FALLOS EN EL ÁREA DE PROYECCIÓN (DATOS NULOS)
             function getBarColor(context) {{
                 // Acceder a los datos originales de OHLC (deserializado)
                 var ohlc_data = {json.dumps(data.get('OHLC_30_DIAS', []))};
                 var dataIndex = context.dataIndex;
-                
-                // Si estamos en la parte proyectada (sin datos OHLC), usamos un color por defecto
-                if (dataIndex >= ohlc_data.length) return 'transparent'; 
+
+                // CRITICAL ROBUSTNESS CHECK: 
+                // 1. Si el punto de datos en el dataset es null (ej: zona de proyección)
+                // 2. O si estamos fuera del rango de datos OHLC reales
+                if (context.dataset.data[dataIndex] === null || dataIndex >= ohlc_data.length) return 'transparent';
                 
                 var ohlc_point = ohlc_data[dataIndex];
                 // Si la vela es alcista (cierre > apertura) es verde (#4CAF50), si es bajista es rojo (#F44336)
-                // Se usa el cierre/apertura del punto para determinar el color
                 return ohlc_point.c > ohlc_point.o ? '#4CAF50' : '#F44336'; 
             }}
             
@@ -973,16 +970,16 @@ def construir_prompt_formateado(data):
                                          var ohlc_data = {json.dumps(data.get('OHLC_30_DIAS', []))};
                                          var dataIndex = context.dataIndex;
                                          
-                                         if (dataIndex < ohlc_data.length) {{
-                                             var ohlc_point = ohlc_data[dataIndex];
-                                             return [
-                                                'Apertura: ' + ohlc_point.o.toFixed(3) + '€',
-                                                'Cierre: ' + ohlc_point.c.toFixed(3) + '€',
-                                                'Máximo: ' + ohlc_point.h.toFixed(3) + '€',
-                                                'Mínimo: ' + ohlc_point.l.toFixed(3) + '€'
-                                             ];
-                                         }}
-                                         return 'Cuerpo Open-Close (Velas)';
+                                         // CRITICAL ROBUSTNESS CHECK: Si estamos fuera del rango de datos OHLC reales, omitir el detalle de la vela
+                                         if (dataIndex >= ohlc_data.length) return 'Cuerpo Open-Close (Proyección)'; 
+
+                                         var ohlc_point = ohlc_data[dataIndex];
+                                         return [
+                                            'Apertura: ' + ohlc_point.o.toFixed(3) + '€',
+                                            'Cierre: ' + ohlc_point.c.toFixed(3) + '€',
+                                            'Máximo: ' + ohlc_point.h.toFixed(3) + '€',
+                                            'Mínimo: ' + ohlc_point.l.toFixed(3) + '€'
+                                         ];
                                     }}
                                     
                                     if (label) {{
@@ -1253,15 +1250,15 @@ def enviar_email(texto_generado, asunto_email, nombre_archivo):
         
     # 4. Conexión al servidor Brevo SMTP
     try:
-        print(f"🌐 Intentando conectar a Brevo SMTP: {servidor_smtp}:{puerto_smtp}")
+        # print(f"🌐 Intentando conectar a Brevo SMTP: {servidor_smtp}:{puerto_smtp}")
         servidor = smtplib.SMTP(servidor_smtp, puerto_smtp)
         servidor.starttls() 
         
-        print(f"🔑 Intentando iniciar sesión con el usuario: {remitente_login}")
+        # print(f"🔑 Intentando iniciar sesión con el usuario: {remitente_login}")
         # Usa el login y la clave de Brevo para la autenticación
         servidor.login(remitente_login, password)
         
-        print(f"✉️ Enviando correo a: {destinatario} desde: {remitente_visible_email}")
+        # print(f"✉️ Enviando correo a: {destinatario} desde: {remitente_visible_email}")
         # Usa el email visible como el remitente de la transacción
         servidor.sendmail(remitente_visible_email, destinatario, msg.as_string())
         
