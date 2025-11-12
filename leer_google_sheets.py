@@ -145,7 +145,7 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
 
     # Iterar sobre los datos históricos para encontrar señales
     for i in range(2, len(smis)):
-        # print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:.3f}, SMI[i]={smis[i]:.3f}, pendiente[i]={pendientes_smi[i]:.3f}, pendiente[i-1]={pendientes_smi[i-1]:.3f}")
+        print(f"[{fechas[i]}] SMI[i-1]={smis[i-1]:.3f}, SMI[i]={smis[i]:.3f}, pendiente[i]={pendientes_smi[i]:.3f}, pendiente[i-1]={pendientes_smi[i-1]:.3f}")
         # Señal de compra: la pendiente del SMI cambia de negativa a positiva y no está en sobrecompra
         # Se anticipa un día la compra y se añade la condición de sobrecompra
         if i >= 1 and pendientes_smi[i] > 0 and pendientes_smi[i-1] <= 0:
@@ -154,11 +154,11 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                     posicion_abierta = True
                     precio_compra_actual = precios[i-1]
                     compras.append({'fecha': fechas[i-1], 'precio': precio_compra_actual})
-                    # print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.3f}")
-                # else:
-                    # print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.3f})")
-            # else:
-                # print(f"❌ No compra en {fechas[i-1]}: Ya hay posición abierta")
+                    print(f"✅ COMPRA: {fechas[i-1]} a {precio_compra_actual:.3f}")
+                else:
+                    print(f"❌ No compra en {fechas[i-1]}: SMI demasiado alto ({smis[i-1]:.3f})")
+            else:
+                print(f"❌ No compra en {fechas[i-1]}: Ya hay posición abierta")
 
         # Señal de venta: la pendiente del SMI cambia de positiva a negativa (anticipando un día)
         elif i >= 1 and pendientes_smi[i] < 0 and pendientes_smi[i-1] >= 0:
@@ -167,9 +167,9 @@ def calcular_ganancias_simuladas(precios, smis, fechas, capital_inicial=10000):
                 ventas.append({'fecha': fechas[i-1], 'precio': precios[i-1]})
                 num_acciones = capital_inicial / precio_compra_actual
                 ganancia_total += (precios[i-1] - precio_compra_actual) * num_acciones
-                # print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.3f}")
-            # else:
-                # print(f"❌ No venta en {fechas[i-1]}: No hay posición abierta")
+                print(f"✅ VENTA: {fechas[i-1]} a {precios[i-1]:.3f}")
+            else:
+                print(f"❌ No venta en {fechas[i-1]}: No hay posición abierta")
 
     # --- Generación de la lista HTML de operaciones completadas (SIEMPRE) ---
     operaciones_html = ""
@@ -355,7 +355,7 @@ def obtener_datos_yfinance(ticker):
 
 
         # Nuevas variables para los gráficos con offset y proyección
-        OFFSET_DIAS = 0 # El SMI de hoy (D) se alinea con el precio de hoy
+        OFFSET_DIAS = 0 # El SMI de hoy (D) se alinea con el precio de D+4
         PROYECCION_FUTURA_DIAS = 5 # Días a proyectar después del último precio real
 
         # Aseguramos tener suficientes datos para el historial, el offset y la proyección
@@ -482,45 +482,6 @@ def obtener_datos_yfinance(ticker):
             else:
                 tendencia_ibexia = "cambio de tendencia"
 
-        # --- INICIO NUEVA LÓGICA CANDLESTICK ---
-        hist_for_ohlc = hist_extended.tail(30)
-        
-        ohlc_data_raw = [] # Para el JS callback
-        ohlc_lineas = [] # Para Dataset 1 (Sombras High-Low)
-        ohlc_cuerpos = [] # Para Dataset 2 (Cuerpos Open-Close)
-        
-        for index, row in hist_for_ohlc.iterrows():
-            # Raw OHLC data for JS callback
-            ohlc_data_raw.append({
-                'o': round(row['Open'], 3),
-                'h': round(row['High'], 3),
-                'l': round(row['Low'], 3),
-                'c': round(row['Close'], 3)
-            })
-            
-            # Data for lineas (Shadows) - y: mean of high/low, base: low, high: high
-            ohlc_lineas.append({
-                'y': round((row['Low'] + row['High']) / 2, 3), # Bar center
-                'base': round(row['Low'], 3),
-                'y_max': round(row['High'], 3) # Max point for the bar
-            })
-            
-            # Data for cuerpos (Bodies) - y: mean of open/close, base: min(o,c), high: max(o,c)
-            o = round(row['Open'], 3)
-            c = round(row['Close'], 3)
-            ohlc_cuerpos.append({
-                'y': round((o + c) / 2, 3), # Bar center
-                'base': round(min(o, c), 3),
-                'y_max': round(max(o, c), 3) # Max point for the bar
-            })
-
-        # Para el área de proyección (5 días): Añadir 'None' a los arrays de datos
-        for _ in range(PROYECCION_FUTURA_DIAS):
-            ohlc_data_raw.append(None)
-            ohlc_lineas.append(None)
-            ohlc_cuerpos.append(None)
-        # --- FIN NUEVA LÓGICA CANDLESTICK ---
-
 
         datos = {
             "TICKER": ticker,
@@ -552,11 +513,7 @@ def obtener_datos_yfinance(ticker):
             'PRECIOS_PARA_SIMULACION': precios_para_simulacion,
             'SMI_PARA_SIMULACION': smi_historico_para_simulacion,
             'FECHAS_PARA_SIMULACION': fechas_para_simulacion,
-            "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS,
-            # DATOS CANDLESTICK
-            "OHLC_30_DIAS": ohlc_data_raw,      
-            "OHLC_LINEAS": ohlc_lineas,        
-            "OHLC_CUERPOS": ohlc_cuerpos,      
+            "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
         }
         
         # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO Y RIESGO SEMANAL ---
@@ -635,11 +592,6 @@ def construir_prompt_formateado(data):
     cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
     OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 0) # Corregido a 0 para el nuevo manejo
     PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
-    
-    # NUEVOS DATOS PARA CANDLESTICK
-    ohlc_data_raw = data.get('OHLC_30_DIAS', [])
-    ohlc_lineas = data.get('OHLC_LINEAS', [])
-    ohlc_cuerpos = data.get('OHLC_CUERPOS', [])
 
 
     # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
@@ -714,7 +666,7 @@ def construir_prompt_formateado(data):
     num_labels_hist = len(labels_historial)
     num_labels_total = len(labels_total)
 
-    if not smi_historico_para_grafico or num_labels_total == 0:
+    if not smi_historico_para_grafico or not cierres_para_grafico_total or num_labels_total == 0:
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico.</p>"
     else:
         # Asegurar que SMI tenga el mismo número de puntos que las etiquetas totales (rellenando con null)
@@ -743,7 +695,7 @@ def construir_prompt_formateado(data):
              # Esto debería estar resuelto por el manejo en yfinance, pero lo forzamos a null si hay un desajuste
              precios_reales_grafico.extend([None] * (num_labels_hist - len(precios_reales_grafico)))
 
-        # Asegurar que todos los datasets tengan la misma longitud que labels_total
+        # Aseguramos que todos los datasets tengan la misma longitud que labels_total
         max_len = num_labels_total
         smi_desplazados_para_grafico = smi_desplazados_para_grafico[:max_len]
         data_proyectada = data_proyectada[:max_len]
@@ -753,16 +705,12 @@ def construir_prompt_formateado(data):
         precios_reales_grafico_completo = precios_reales_grafico_completo[:max_len]
 
         
-        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON (incluyendo OHLC) ----
+        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON ----
         # Serializar todos los arrays para garantizar que None se convierte a 'null'
         labels_json = safe_json_dump(labels_total)
         smi_json = safe_json_dump(smi_desplazados_para_grafico)
+        precios_reales_json = safe_json_dump(precios_reales_grafico_completo)
         data_proyectada_json = safe_json_dump(data_proyectada)
-        
-        # NUEVOS ARRAYS PARA CANDLESTICK
-        ohlc_data_raw_json = json.dumps(ohlc_data_raw) # Raw data is dumped without safe_json_dump on top layer
-        ohlc_lineas_json = safe_json_dump(ohlc_lineas)
-        ohlc_cuerpos_json = safe_json_dump(ohlc_cuerpos)
         # ---- FIN DE LA CORRECCIÓN ----
         
         # Reemplazo para la sección de análisis detallado del gráfico
@@ -868,75 +816,23 @@ def construir_prompt_formateado(data):
         <p style="text-align: center; color: #aaaaaa; margin-top: 15px;">{estado_actual}</p>
         """
 
-        # --- INICIO MODIFICACIÓN DEL GRÁFICO (SIMULACIÓN DE VELAS JAPONESAS SIN LIB. EXTERNA) ---
+        # El gráfico en sí, que debe ir antes que el análisis
+        # Usamos los arrays de datos corregidos: smi_desplazados_para_grafico, precios_reales_grafico_completo, data_proyectada
         chart_html = f"""
-        <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px; border: 2px solid #4a4a5e;">
-            <canvas id="smiPrecioChart"></canvas>
+        <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
+            <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
         <script>
-            // Función para determinar el color de la barra (cuerpo de la vela)
-            // REFORZADA para EVITAR FALLOS en el ÁREA DE PROYECCIÓN (DATOS NULOS)
-            function getBarColor(context) {{
-                // Acceder a los datos originales de OHLC (deserializado)
-                var ohlc_data = {ohlc_data_raw_json};
-                var dataIndex = context.dataIndex;
-                
-                // Si el índice está fuera del rango de datos OHLC reales, devuelve transparente.
-                if (dataIndex >= ohlc_data.length) return 'transparent'; 
-
-                var ohlc_point = ohlc_data[dataIndex];
-                
-                // Comprobación de seguridad EXTREMA: si el punto de datos es undefined/null, devuelve transparente.
-                // Esto es CRÍTICO para el área de proyección y para datos faltantes.
-                if (!ohlc_point) return 'transparent';
-
-                // Si la vela es alcista (cierre > apertura) es verde (#4CAF50), si es bajista es rojo (#F44336)
-                return ohlc_point.c > ohlc_point.o ? '#4CAF50' : '#F44336'; 
-            }}
-            
             // Configuración del gráfico
             var ctx = document.getElementById('smiPrecioChart').getContext('2d');
             var smiPrecioChart = new Chart(ctx, {{
-                type: 'line', // Usamos line como tipo base para manejar múltiples ejes
+                type: 'line',
                 data: {{
                     labels: {labels_json},
                     datasets: [
                         {{
-                            // Dataset 1: Líneas de Sombra (High-Low)
-                            label: 'Rango High-Low (Velas)',
-                            data: {ohlc_lineas_json},
-                            borderColor: '#ffffff', // Color fijo para la sombra (blanco/gris claro)
-                            backgroundColor: 'transparent',
-                            yAxisID: 'y',
-                            type: 'bar', 
-                            barThickness: 1, 
-                            borderWidth: 1,
-                            borderRadius: 0,
-                            skipNull: true,
-                            pointRadius: 0,
-                            hitRadius: 0,
-                            hoverRadius: 0,
-                            order: 1 // Dibuja primero
-                        }},
-                        {{
-                            // Dataset 2: Cuerpos de Vela (Open-Close)
-                            label: 'Cuerpo Open-Close (Velas)',
-                            data: {ohlc_cuerpos_json}, 
-                            borderColor: getBarColor, 
-                            backgroundColor: getBarColor, 
-                            yAxisID: 'y',
-                            type: 'bar', 
-                            barThickness: 5, 
-                            borderWidth: 1,
-                            borderRadius: 0,
-                            skipNull: true,
-                            pointRadius: 0,
-                            order: 0 // Dibuja encima de la sombra
-                        }},
-                        {{
-                            // Dataset de SMI
                             label: 'Nuestro Algoritmo',
                             data: {smi_json},
                             borderColor: '#00bfa5',
@@ -944,13 +840,20 @@ def construir_prompt_formateado(data):
                             yAxisID: 'y1',
                             pointRadius: 0,
                             borderWidth: 2,
-                            tension: 0.1,
-                            type: 'line',
-                            order: -1 
+                            tension: 0.1
                         }},
                         {{
-                            // Dataset de Precio Proyectado (Línea)
-                            label: 'Precio Proyectado (Cierre)',
+                            label: 'Precio Real',
+                            data: {precios_reales_json},
+                            borderColor: '#2979ff',
+                            backgroundColor: 'rgba(41, 121, 255, 0.2)',
+                            yAxisID: 'y',
+                            pointRadius: 0,
+                            borderWidth: 2,
+                            tension: 0.1
+                        }},
+                        {{
+                            label: 'Precio Proyectado',
                             data: {data_proyectada_json},
                             borderColor: '#ffc107',
                             borderDash: [5, 5],
@@ -958,9 +861,7 @@ def construir_prompt_formateado(data):
                             yAxisID: 'y',
                             pointRadius: 0,
                             borderWidth: 2,
-                            tension: 0.1,
-                            type: 'line',
-                            order: -1 
+                            tension: 0.1
                         }}
                     ]
                 }},
@@ -975,11 +876,7 @@ def construir_prompt_formateado(data):
                         legend: {{
                             display: true,
                             labels: {{
-                                color: '#e0e0e0',
-                                // Ocultar la leyenda del dataset de la "sombra"
-                                filter: function(legendItem, chartData) {{
-                                    return legendItem.datasetIndex !== 0; 
-                                }}
+                                color: '#e0e0e0'
                             }}
                         }},
                         tooltip: {{
@@ -993,40 +890,11 @@ def construir_prompt_formateado(data):
                             callbacks: {{
                                 label: function(context) {{
                                     let label = context.dataset.label || '';
-                                    
-                                    if (context.datasetIndex === 1) {{ // Para el cuerpo de la vela (índice 1)
-                                         var ohlc_data = {ohlc_data_raw_json};
-                                         var dataIndex = context.dataIndex;
-                                         
-                                         // Comprobación de seguridad: Si estamos fuera del rango de datos OHLC reales, retornar mensaje de proyección.
-                                         var ohlc_point = ohlc_data[dataIndex];
-
-                                         // Comprobación de seguridad EXTREMA: Si el punto es nulo (proyección) o no tiene las propiedades esperadas
-                                         if (dataIndex >= ohlc_data.length || !ohlc_point || ohlc_point.o === undefined) return 'Cuerpo Open-Close (Proyección)'; 
-
-                                         // Formateo seguro para evitar toFixed(3) sobre undefined/null
-                                         var apertura = ohlc_point.o !== undefined ? ohlc_point.o.toFixed(3) : 'N/A';
-                                         var cierre = ohlc_point.c !== undefined ? ohlc_point.c.toFixed(3) : 'N/A';
-                                         var maximo = ohlc_point.h !== undefined ? ohlc_point.h.toFixed(3) : 'N/A';
-                                         var minimo = ohlc_point.l !== undefined ? ohlc_point.l.toFixed(3) : 'N/A';
-
-                                         return [
-                                            'Apertura: ' + apertura + '€',
-                                            'Cierre: ' + cierre + '€',
-                                            'Máximo: ' + maximo + '€',
-                                            'Mínimo: ' + minimo + '€'
-                                         ];
-                                    }}
-                                    
                                     if (label) {{
                                         label += ': ';
                                     }}
-                                    // Para otros datasets (SMI, Proyección), usar context.parsed.y que ya fue validado por Chart.js
                                     if (context.parsed.y !== null) {{
-                                        label += context.parsed.y.toFixed(3);
-                                        if (context.dataset.yAxisID === 'y') {{
-                                            label += '€';
-                                        }}
+                                        label += context.parsed.y.toFixed(2) + '€';
                                     }}
                                     return label;
                                 }}
@@ -1081,7 +949,7 @@ def construir_prompt_formateado(data):
                                 color: '#e0e0e0'
                             }},
                             grid: {{
-                                color: 'rgba(255, 255, 255, 0.4)' 
+                                color: 'rgba(128, 128, 128, 0.2)'
                             }}
                         }},
                         y: {{
@@ -1097,8 +965,8 @@ def construir_prompt_formateado(data):
                                 color: '#e0e0e0'
                             }},
                             grid: {{
-                                color: 'rgba(255, 255, 255, 0.4)', 
-                                drawOnChartArea: true 
+                                color: 'rgba(128, 128, 128, 0.2)',
+                                drawOnChartArea: false
                             }}
                         }},
                         y1: {{
@@ -1125,7 +993,6 @@ def construir_prompt_formateado(data):
             }});
         </script>
         """
-        # --- FIN MODIFICACIÓN DEL GRÁFICO ---
     
     # MODIFICACIÓN: Incluir SMI Semanal en la tabla de resumen
     tabla_resumen = f"""
