@@ -236,6 +236,10 @@ def obtener_datos_yfinance(ticker):
         hist_extended = stock.history(period="90d", interval="1d")
         hist_extended = calculate_smi_tv(hist_extended)
 
+        # Usar un historial más corto (30d) solo si es necesario, pero nos enfocaremos en hist_extended
+        # hist = stock.history(period="30d", interval="1d") # Ya no es necesario cargar dos veces
+        # hist = calculate_smi_tv(hist)
+
         # Obtener datos históricos para el volumen del día anterior completo
         hist_recent = stock.history(period="5d", interval="1d") 
         
@@ -377,7 +381,7 @@ def obtener_datos_yfinance(ticker):
             first_smi_val = smi_history_full.iloc[0] if not smi_history_full.empty else 0.0
             smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
 
-        # Precios de CIERRE para el gráfico: 30 días DESPLAZADOS
+        # Precios para el gráfico: 30 días DESPLAZADOS
         precios_reales_para_grafico = []
         # Para un offset de 0 (el SMI de hoy se alinea con el precio de hoy), tomamos los últimos 30 precios
         if len(cierres_history_full) >= 30:
@@ -386,21 +390,6 @@ def obtener_datos_yfinance(ticker):
             # Rellenar con el primer precio disponible o el precio actual
             first_price_val = cierres_history_full.iloc[0] if not cierres_history_full.empty else current_price
             precios_reales_para_grafico = [first_price_val] * (30 - len(cierres_history_full)) + cierres_history_full.tolist()
-
-        # **NUEVO:** Historial OHLC para las velas japonesas (últimos 30 días)
-        ohlc_history_full = hist_extended[['Open', 'High', 'Low', 'Close']].dropna()
-        ohlc_30_dias = []
-        if len(ohlc_history_full) >= 30:
-            # Formato de diccionario para Chart.js
-            ohlc_30_dias = [{'o': round(row['Open'], 3), 'h': round(row['High'], 3), 'l': round(row['Low'], 3), 'c': round(row['Close'], 3)} 
-                            for index, row in ohlc_history_full.tail(30).iterrows()]
-        else:
-             # Si no hay 30 días completos, al menos asegurar el formato para los que sí hay (o usar un marcador)
-            if not ohlc_history_full.empty:
-                ohlc_30_dias = [{'o': round(row['Open'], 3), 'h': round(row['High'], 3), 'l': round(row['Low'], 3), 'c': round(row['Close'], 3)} 
-                                for index, row in ohlc_history_full.iterrows()]
-            # Rellenar con marcadores si es necesario (aunque Chart.js maneja la falta de datos si el array es más corto)
-
         
         # Asegurarse de que las etiquetas de fecha coincidan con los 30 días de datos
         if len(fechas_historial) < 30 and len(cierres_history_full.tail(30)) > 0:
@@ -493,6 +482,21 @@ def obtener_datos_yfinance(ticker):
             else:
                 tendencia_ibexia = "cambio de tendencia"
 
+        
+        # --- INICIO: ADICIÓN DE DATOS OHLC PARA VELAS JAPONESAS ---
+        # Extraer y formatear los datos OHLC de los últimos 30 días para Chart.js
+        ohlc_df_30d = hist_extended.tail(30)
+        ohlc_datos_30d = []
+        if not ohlc_df_30d.empty:
+            for index, row in ohlc_df_30d.iterrows():
+                ohlc_datos_30d.append({
+                    'o': round(row['Open'], 3),
+                    'h': round(row['High'], 3),
+                    'l': round(row['Low'], 3),
+                    'c': round(row['Close'], 3)
+                })
+        # --- FIN: ADICIÓN DE DATOS OHLC PARA VELAS JAPONESAS ---
+
 
         datos = {
             "TICKER": ticker,
@@ -525,7 +529,7 @@ def obtener_datos_yfinance(ticker):
             'SMI_PARA_SIMULACION': smi_historico_para_simulacion,
             'FECHAS_PARA_SIMULACION': fechas_para_simulacion,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS,
-            "OHLC_30_DIAS": ohlc_30_dias # <--- **NUEVO DATO CLAVE**
+            "OHLC_30_DIAS": ohlc_datos_30d # NUEVO DATO PARA EL GRÁFICO DE VELAS
         }
         
         # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO Y RIESGO SEMANAL ---
@@ -597,7 +601,7 @@ def construir_prompt_formateado(data):
 
     # NUEVO FORMATO: "Analisis actualizado el FECHA de NOMBRE DE LA EMPRESA."
     fecha_actual_str = datetime.today().strftime('%d/%m/%Y')
-    titulo_post = f"Análisis actualizado el {fecha_actual_str} de {data['NOMBRE_EMPRESA']}."
+    titulo_post = f"Análisis actualizado el {fecha_actual_str} de {data['NOMBRE_EMPRESA']}. "
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
@@ -677,9 +681,12 @@ def construir_prompt_formateado(data):
     labels_total = labels_historial + labels_proyeccion
     num_labels_hist = len(labels_historial)
     num_labels_total = len(labels_total)
+    
+    # Recuperar datos OHLC
+    ohlc_datos = data.get('OHLC_30_DIAS', [])
 
-    if not smi_historico_para_grafico or not cierres_para_grafico_total or num_labels_total == 0:
-        chart_html = "<p>No hay suficientes datos válidos para generar el gráfico.</p>"
+    if not smi_historico_para_grafico or not cierres_para_grafico_total or num_labels_total == 0 or not ohlc_datos: # Se añade la verificación de OHLC_30_DIAS
+        chart_html = "<p>No hay suficientes datos válidos para generar el gráfico (OHLC/SMI/Proyección).</p>"
     else:
         # Asegurar que SMI tenga el mismo número de puntos que las etiquetas totales (rellenando con null)
         smi_desplazados_para_grafico = smi_historico_para_grafico + [None] * PROYECCION_FUTURA_DIAS
@@ -715,19 +722,28 @@ def construir_prompt_formateado(data):
         # Rellenar el array de precios reales con 'null' para el área de proyección
         precios_reales_grafico_completo = precios_reales_grafico[:num_labels_hist] + [None] * PROYECCION_FUTURA_DIAS
         precios_reales_grafico_completo = precios_reales_grafico_completo[:max_len]
+
         
-        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON Y ROBUSTEZ ----
+        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON Y PREPARACIÓN DE OHLC ----
         # Serializar todos los arrays para garantizar que None se convierte a 'null'
         labels_json = safe_json_dump(labels_total)
         smi_json = safe_json_dump(smi_desplazados_para_grafico)
+        # precios_reales_json ya no se usa, solo para la línea de Proyección
         data_proyectada_json = safe_json_dump(data_proyectada)
         
-        # **NUEVO:** Serializar los datos OHLC para el gráfico de velas
-        ohlc_json = json.dumps(data.get('OHLC_30_DIAS', []))
+        # Adaptar los datos OHLC para la simulación de velas con el tipo 'bar'
+        # Usamos el formato [Low, High] para dibujar la línea (sombra) y un color
+        ohlc_lineas = [{'x': i, 'y': [d['l'], d['h']]} for i, d in enumerate(ohlc_datos)]
+        # También necesitamos los cuerpos (Open/Close). Min/Max para que la barra se dibuje correctamente.
+        ohlc_cuerpos = [{'x': i, 'y': [min(d['o'], d['c']), max(d['o'], d['c'])]} for i, d in enumerate(ohlc_datos)]
+
+        # Rellenar con null la parte de proyección para ambos
+        ohlc_lineas.extend([None] * (num_labels_total - len(ohlc_lineas)))
+        ohlc_cuerpos.extend([None] * (num_labels_total - len(ohlc_cuerpos)))
         
-        # **NUEVO:** Serializar el historial de precios de cierre para la capa de robustez
-        precios_reales_grafico_completo_json = safe_json_dump(precios_reales_grafico_completo)
-        # ---- FIN DE LA CORRECCIÓN ----
+        ohlc_lineas_json = safe_json_dump(ohlc_lineas)
+        ohlc_cuerpos_json = safe_json_dump(ohlc_cuerpos)
+        # ---- FIN DE LA CORRECCIÓN Y PREPARACIÓN DE OHLC ----
         
         # Reemplazo para la sección de análisis detallado del gráfico
         analisis_grafico_html = f"""
@@ -832,60 +848,67 @@ def construir_prompt_formateado(data):
         <p style="text-align: center; color: #aaaaaa; margin-top: 15px;">{estado_actual}</p>
         """
 
-        # --- INICIO MODIFICACIÓN DEL GRÁFICO (VELAS JAPONESAS) Y ROBUSTEZ ---
+        # --- INICIO MODIFICACIÓN DEL GRÁFICO (SIMULACIÓN DE VELAS JAPONESAS SIN LIB. EXTERNA) ---
         chart_html = f"""
         <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px; border: 2px solid #4a4a5e;">
             <canvas id="smiPrecioChart"></canvas>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.0/dist/chartjs-chart-financial.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
         <script>
-            // Función para determinar el color de la vela
-            function getCandleColor(context) {{
-                var data = context.dataset.data[context.dataIndex];
-                if (!data) return 'rgba(128, 128, 128, 0.5)';
+            // Función para determinar el color de la barra (cuerpo de la vela)
+            function getBarColor(context) {{
+                // Acceder a los datos originales de OHLC (deserializado)
+                var ohlc_data = {json.dumps(data.get('OHLC_30_DIAS', []))};
+                var dataIndex = context.dataIndex;
+                
+                // Si estamos en la parte proyectada (sin datos OHLC), usamos un color por defecto
+                if (dataIndex >= ohlc_data.length) return 'transparent'; 
+                
+                var ohlc_point = ohlc_data[dataIndex];
                 // Si la vela es alcista (cierre > apertura) es verde (#4CAF50), si es bajista es rojo (#F44336)
-                return data.c > data.o ? '#4CAF50' : '#F44336'; 
+                // Se usa el cierre/apertura del punto para determinar el color
+                return ohlc_point.c > ohlc_point.o ? '#4CAF50' : '#F44336'; 
             }}
             
-            // Función para determinar el color del borde de la vela
-            function getCandleBorderColor(context) {{
-                var data = context.dataset.data[context.dataIndex];
-                if (!data) return 'rgba(128, 128, 128, 0.5)';
-                return data.c > data.o ? '#4CAF50' : '#F44336';
-            }}
-
             // Configuración del gráfico
             var ctx = document.getElementById('smiPrecioChart').getContext('2d');
             var smiPrecioChart = new Chart(ctx, {{
-                type: 'line',
+                type: 'line', // Usamos line como tipo base para manejar múltiples ejes
                 data: {{
                     labels: {labels_json},
                     datasets: [
                         {{
-                            // Dataset de Velas Japonesas (Prioridad)
-                            label: 'Velas Japonesas (OHLC)',
-                            data: {ohlc_json}, 
-                            borderColor: getCandleBorderColor,
-                            backgroundColor: getCandleColor,
-                            yAxisID: 'y',
-                            type: 'candlestick', 
-                            borderWidth: 1,
-                            pointRadius: 0,
-                            tension: 0
-                        }},
-                        {{
-                            // Dataset de Precio Cierre Histórico (ROBUSTEZ Y REFERENCIA)
-                            label: 'Cierre Histórico (Referencia)',
-                            data: {precios_reales_grafico_completo_json},
-                            borderColor: 'rgba(255, 255, 255, 0.3)', // Color blanco muy tenue
+                            // Dataset 1: Líneas de Sombra (High-Low)
+                            label: 'Rango High-Low (Velas)',
+                            data: {ohlc_lineas_json},
+                            borderColor: getBarColor, // Color de la sombra (igual al cuerpo)
                             backgroundColor: 'transparent',
                             yAxisID: 'y',
+                            type: 'bar', // Usamos 'bar' para dibujar barras verticales [low, high]
+                            barThickness: 1, // Grosor muy fino para la sombra
+                            borderWidth: 1.5,
+                            borderRadius: 0,
+                            skipNull: true,
                             pointRadius: 0,
+                            hitRadius: 0,
+                            hoverRadius: 0,
+                            order: 1 // Dibuja primero
+                        }},
+                        {{
+                            // Dataset 2: Cuerpos de Vela (Open-Close)
+                            label: 'Cuerpo Open-Close (Velas)',
+                            data: {ohlc_cuerpos_json}, 
+                            borderColor: getBarColor, // Color del borde del cuerpo
+                            backgroundColor: getBarColor, // Color de relleno del cuerpo
+                            yAxisID: 'y',
+                            type: 'bar', // Usamos 'bar' para dibujar barras verticales [min(O,C), max(O,C)]
+                            barThickness: 5, // Grosor del cuerpo de la vela
                             borderWidth: 1,
-                            tension: 0.1,
-                            type: 'line'
+                            borderRadius: 0,
+                            skipNull: true,
+                            pointRadius: 0,
+                            order: 0 // Dibuja encima de la sombra
                         }},
                         {{
                             // Dataset de SMI
@@ -897,7 +920,8 @@ def construir_prompt_formateado(data):
                             pointRadius: 0,
                             borderWidth: 2,
                             tension: 0.1,
-                            type: 'line'
+                            type: 'line',
+                            order: -1 // Líneas encima de las barras
                         }},
                         {{
                             // Dataset de Precio Proyectado (Línea)
@@ -910,7 +934,8 @@ def construir_prompt_formateado(data):
                             pointRadius: 0,
                             borderWidth: 2,
                             tension: 0.1,
-                            type: 'line'
+                            type: 'line',
+                            order: -1 // Líneas encima de las barras
                         }}
                     ]
                 }},
@@ -925,7 +950,11 @@ def construir_prompt_formateado(data):
                         legend: {{
                             display: true,
                             labels: {{
-                                color: '#e0e0e0'
+                                color: '#e0e0e0',
+                                // Ocultar la leyenda del dataset de la "sombra"
+                                filter: function(legendItem, chartData) {{
+                                    return legendItem.datasetIndex !== 0; 
+                                }}
                             }}
                         }},
                         tooltip: {{
@@ -939,15 +968,31 @@ def construir_prompt_formateado(data):
                             callbacks: {{
                                 label: function(context) {{
                                     let label = context.dataset.label || '';
+                                    
+                                    if (context.datasetIndex === 1) {{ // Para el cuerpo de la vela (índice 1)
+                                         var ohlc_data = {json.dumps(data.get('OHLC_30_DIAS', []))};
+                                         var dataIndex = context.dataIndex;
+                                         
+                                         if (dataIndex < ohlc_data.length) {{
+                                             var ohlc_point = ohlc_data[dataIndex];
+                                             return [
+                                                'Apertura: ' + ohlc_point.o.toFixed(3) + '€',
+                                                'Cierre: ' + ohlc_point.c.toFixed(3) + '€',
+                                                'Máximo: ' + ohlc_point.h.toFixed(3) + '€',
+                                                'Mínimo: ' + ohlc_point.l.toFixed(3) + '€'
+                                             ];
+                                         }}
+                                         return 'Cuerpo Open-Close (Velas)';
+                                    }}
+                                    
                                     if (label) {{
                                         label += ': ';
                                     }}
-                                    // Callback específico para Velas Japonesas
-                                    if (context.dataset.type === 'candlestick' && context.parsed._custom) {{
-                                        const data = context.parsed._custom;
-                                        label = 'O: ' + data.o.toFixed(2) + '€, H: ' + data.h.toFixed(2) + '€, L: ' + data.l.toFixed(2) + '€, C: ' + data.c.toFixed(2) + '€';
-                                    }} else if (context.parsed.y !== null) {{
-                                        label += context.parsed.y.toFixed(2) + '€';
+                                    if (context.parsed.y !== null) {{
+                                        label += context.parsed.y.toFixed(3);
+                                        if (context.dataset.yAxisID === 'y') {{
+                                            label += '€';
+                                        }}
                                     }}
                                     return label;
                                 }}
@@ -1046,8 +1091,7 @@ def construir_prompt_formateado(data):
             }});
         </script>
         """
-        # --- FIN MODIFICACIÓN DEL GRÁFICO (VELAS JAPONESAS) Y ROBUSTEZ ---
-
+        # --- FIN MODIFICACIÓN DEL GRÁFICO ---
     
     # MODIFICACIÓN: Incluir SMI Semanal en la tabla de resumen
     tabla_resumen = f"""
