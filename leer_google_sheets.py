@@ -355,7 +355,7 @@ def obtener_datos_yfinance(ticker):
 
 
         # Nuevas variables para los gráficos con offset y proyección
-        OFFSET_DIAS = 0 # El SMI de hoy (D) se alinea con el precio de D+4
+        OFFSET_DIAS = 0 # El SMI de hoy (D) se alinea con el precio de hoy
         PROYECCION_FUTURA_DIAS = 5 # Días a proyectar después del último precio real
 
         # Aseguramos tener suficientes datos para el historial, el offset y la proyección
@@ -743,7 +743,7 @@ def construir_prompt_formateado(data):
              # Esto debería estar resuelto por el manejo en yfinance, pero lo forzamos a null si hay un desajuste
              precios_reales_grafico.extend([None] * (num_labels_hist - len(precios_reales_grafico)))
 
-        # Aseguramos que todos los datasets tengan la misma longitud que labels_total
+        # Asegurar que todos los datasets tengan la misma longitud que labels_total
         max_len = num_labels_total
         smi_desplazados_para_grafico = smi_desplazados_para_grafico[:max_len]
         data_proyectada = data_proyectada[:max_len]
@@ -998,21 +998,30 @@ def construir_prompt_formateado(data):
                                          var ohlc_data = {ohlc_data_raw_json};
                                          var dataIndex = context.dataIndex;
                                          
-                                         // Comprobación de seguridad EXTREMA: Si estamos fuera del rango de datos OHLC reales, o el punto es nulo, retornar un mensaje simple.
+                                         // Comprobación de seguridad: Si estamos fuera del rango de datos OHLC reales, retornar mensaje de proyección.
                                          var ohlc_point = ohlc_data[dataIndex];
-                                         if (dataIndex >= ohlc_data.length || !ohlc_point) return 'Cuerpo Open-Close (Proyección)'; 
+
+                                         // Comprobación de seguridad EXTREMA: Si el punto es nulo (proyección) o no tiene las propiedades esperadas
+                                         if (dataIndex >= ohlc_data.length || !ohlc_point || ohlc_point.o === undefined) return 'Cuerpo Open-Close (Proyección)'; 
+
+                                         // Formateo seguro para evitar toFixed(3) sobre undefined/null
+                                         var apertura = ohlc_point.o !== undefined ? ohlc_point.o.toFixed(3) : 'N/A';
+                                         var cierre = ohlc_point.c !== undefined ? ohlc_point.c.toFixed(3) : 'N/A';
+                                         var maximo = ohlc_point.h !== undefined ? ohlc_point.h.toFixed(3) : 'N/A';
+                                         var minimo = ohlc_point.l !== undefined ? ohlc_point.l.toFixed(3) : 'N/A';
 
                                          return [
-                                            'Apertura: ' + ohlc_point.o.toFixed(3) + '€',
-                                            'Cierre: ' + ohlc_point.c.toFixed(3) + '€',
-                                            'Máximo: ' + ohlc_point.h.toFixed(3) + '€',
-                                            'Mínimo: ' + ohlc_point.l.toFixed(3) + '€'
+                                            'Apertura: ' + apertura + '€',
+                                            'Cierre: ' + cierre + '€',
+                                            'Máximo: ' + maximo + '€',
+                                            'Mínimo: ' + minimo + '€'
                                          ];
                                     }}
                                     
                                     if (label) {{
                                         label += ': ';
                                     }}
+                                    // Para otros datasets (SMI, Proyección), usar context.parsed.y que ya fue validado por Chart.js
                                     if (context.parsed.y !== null) {{
                                         label += context.parsed.y.toFixed(3);
                                         if (context.dataset.yAxisID === 'y') {{
