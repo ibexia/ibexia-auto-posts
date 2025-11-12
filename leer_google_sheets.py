@@ -360,18 +360,19 @@ def obtener_datos_yfinance(ticker):
 
         # Aseguramos tener suficientes datos para el historial, el offset y la proyección
         smi_history_full = hist_extended['SMI'].dropna() # Ahora el SMI final está en 'SMI'
-        cierres_history_full = hist_extended['Close'].dropna()
+        # MODIFICACIÓN: Usar las columnas Open, High, Low, Close para el gráfico
+        historial_ohlc = hist_extended[['Open', 'High', 'Low', 'Close']].dropna()
 
         # Calcula el volumen promedio de los últimos 30 días usando hist_extended
         volumen_promedio_30d = hist_extended['Volume'].tail(30).mean()
 
 
         # Fechas reales de cotización para los últimos 30 días
-        fechas_historial = cierres_history_full.tail(30).index.strftime("%d/%m").tolist()
-        ultima_fecha_historial = cierres_history_full.index[-1] if not cierres_history_full.empty else datetime.today()
+        fechas_historial = historial_ohlc.tail(30).index.strftime("%d/%m").tolist()
+        ultima_fecha_historial = historial_ohlc.index[-1] if not historial_ohlc.empty else datetime.today()
         fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
         
-        # --- MANEJO ROBUSTO DE LOS 30 DÍAS DE DATOS PARA EL GRÁFICO ---
+        # --- MANEJO ROBUSTO DE LOS 30 DÍAS DE DATOS PARA EL GRÁFICO (OHLC) ---
         # SMI para los 30 días del gráfico
         smi_historico_para_grafico = []
         if len(smi_history_full) >= 30:
@@ -381,31 +382,46 @@ def obtener_datos_yfinance(ticker):
             first_smi_val = smi_history_full.iloc[0] if not smi_history_full.empty else 0.0
             smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
 
-        # Precios para el gráfico: 30 días DESPLAZADOS
-        precios_reales_para_grafico = []
-        # Para un offset de 0 (el SMI de hoy se alinea con el precio de hoy), tomamos los últimos 30 precios
-        if len(cierres_history_full) >= 30:
-            precios_reales_para_grafico = cierres_history_full.tail(30).tolist()
+        # MODIFICACIÓN: Datos OHLC para el gráfico
+        ohlc_reales_para_grafico = []
+        # Para un offset de 0, tomamos los últimos 30 precios
+        if len(historial_ohlc) >= 30:
+            ohlc_data = historial_ohlc.tail(30)
+            # Formato de Chart.js para CandleStick: {x: index, y: [o, h, l, c]}
+            ohlc_reales_para_grafico = [{'x': i, 'y': [row['Open'], row['High'], row['Low'], row['Close']]} 
+                                        for i, row in enumerate(ohlc_data.itertuples())]
+            
+            # También necesitamos los precios de cierre para la simulación
+            precios_reales_para_grafico = ohlc_data['Close'].tolist()
         else:
-            # Rellenar con el primer precio disponible o el precio actual
-            first_price_val = cierres_history_full.iloc[0] if not cierres_history_full.empty else current_price
-            precios_reales_para_grafico = [first_price_val] * (30 - len(cierres_history_full)) + cierres_history_full.tolist()
+            # Rellenar con el primer precio disponible o el precio actual para que la longitud sea 30
+            first_price_val = historial_ohlc['Close'].iloc[0] if not historial_ohlc.empty else current_price
+            
+            ohlc_fill = [{'x': i, 'y': [first_price_val, first_price_val, first_price_val, first_price_val]} 
+                         for i in range(30 - len(historial_ohlc))]
+            
+            ohlc_data = historial_ohlc
+            ohlc_reales_para_grafico = ohlc_fill + [{'x': i + (30 - len(historial_ohlc)), 'y': [row['Open'], row['High'], row['Low'], row['Close']]} 
+                                                   for i, row in enumerate(ohlc_data.itertuples())]
+            
+            precios_reales_para_grafico = [first_price_val] * (30 - len(historial_ohlc)) + ohlc_data['Close'].tolist()
         
         # Asegurarse de que las etiquetas de fecha coincidan con los 30 días de datos
-        if len(fechas_historial) < 30 and len(cierres_history_full.tail(30)) > 0:
+        if len(fechas_historial) < 30 and len(historial_ohlc.tail(30)) > 0:
             # Crear etiquetas de relleno si los datos históricos son menos de 30
             num_fill = 30 - len(fechas_historial)
-            fecha_temp = cierres_history_full.index[0] if not cierres_history_full.empty else datetime.today()
+            fecha_temp = historial_ohlc.index[0] if not historial_ohlc.empty else datetime.today()
             fechas_relleno = [(fecha_temp - timedelta(days=i)).strftime("%d/%m (ant.)") for i in range(num_fill, 0, -1)]
             fechas_historial = fechas_relleno + fechas_historial
 
         # Validar la longitud final para evitar problemas en Chart.js
-        if len(smi_historico_para_grafico) != 30 or len(precios_reales_para_grafico) != 30 or len(fechas_historial) != 30:
+        if len(smi_historico_para_grafico) != 30 or len(ohlc_reales_para_grafico) != 30 or len(fechas_historial) != 30:
              # Si después de todo no coinciden, es mejor abortar la generación del gráfico
-             print(f"❌ Error crítico de longitud de arrays. SMI: {len(smi_historico_para_grafico)}, Precios: {len(precios_reales_para_grafico)}, Fechas: {len(fechas_historial)}")
+             print(f"❌ Error crítico de longitud de arrays. SMI: {len(smi_historico_para_grafico)}, OHLC: {len(ohlc_reales_para_grafico)}, Fechas: {len(fechas_historial)}")
              # Usaremos un historial vacío para forzar un mensaje de error en el HTML
              smi_historico_para_grafico = []
-             precios_reales_para_grafico = []
+             ohlc_reales_para_grafico = []
+             precios_reales_para_grafico = [] # Importante para la simulación
              fechas_historial = []
 
 
@@ -447,21 +463,26 @@ def obtener_datos_yfinance(ticker):
                 # Aplanado en zona media: proyectamos lateral
                 movimiento_diario = 0.0
 
-        for _ in range(PROYECCION_FUTURA_DIAS):
+        for i in range(PROYECCION_FUTURA_DIAS):
             siguiente_precio = ultimo_precio_conocido * (1 + movimiento_diario)
             siguiente_precio = round(siguiente_precio, 3)
             precios_proyectados.append(siguiente_precio)
             ultimo_precio_conocido = siguiente_precio
+            # MODIFICACIÓN: El dataset de velas proyectadas es una lista de Nones
+            ohlc_reales_para_grafico.append(None) # Rellenar para que el array de velas tenga la longitud total
+
 
         # --- Fin de la NUEVA lógica lineal ---
 
         # Unir precios reales y proyectados
+        # El precio de cierre real se usa para la simulación
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
         precio_proyectado_dia_5 = cierres_para_grafico_total[-1] if cierres_para_grafico_total else current_price # Último precio proyectado a 5 días
 
         # Guarda los datos para la simulación
         smi_historico_para_simulacion = [round(s, 3) for s in smi_history_full.tail(30).tolist()]
-        precios_para_simulacion = precios_reales_para_grafico
+        # Importante: para la simulación usamos solo los cierres históricos (30 días)
+        precios_para_simulacion = precios_reales_para_grafico 
         fechas_para_simulacion = hist_extended.tail(30).index.strftime("%d/%m/%Y").tolist() # CORREGIDO: ahora se aplica .tail() al DataFrame
         
         # Lógica de tendencia para la nota
@@ -499,7 +520,7 @@ def obtener_datos_yfinance(ticker):
             "SMI_SEMANAL": smi_semanal, # NUEVA ADICIÓN
             "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
             "tendencia_ibexia": tendencia_ibexia, # Renombrado de TENDENCIA_NOTA
-            "CIERRES_30_DIAS": precios_reales_para_grafico, # Usar los 30 días ya limpios y completos
+            "CIERRES_30_DIAS": precios_reales_para_grafico, # Usar los 30 días ya limpios y completos (para simulación)
             "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico, # Renombrado
             "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total,
             "OFFSET_DIAS_GRAFICO": OFFSET_DIAS,
@@ -513,7 +534,10 @@ def obtener_datos_yfinance(ticker):
             'PRECIOS_PARA_SIMULACION': precios_para_simulacion,
             'SMI_PARA_SIMULACION': smi_historico_para_simulacion,
             'FECHAS_PARA_SIMULACION': fechas_para_simulacion,
-            "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
+            "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS,
+            # NUEVOS DATOS PARA EL GRÁFICO DE VELAS:
+            "OHLC_REALES_PARA_GRAFICO": ohlc_reales_para_grafico,
+            "PRECIOS_PROYECTADOS": precios_proyectados # La lista de 5 valores proyectados
         }
         
         # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO Y RIESGO SEMANAL ---
@@ -665,6 +689,10 @@ def construir_prompt_formateado(data):
     labels_total = labels_historial + labels_proyeccion
     num_labels_hist = len(labels_historial)
     num_labels_total = len(labels_total)
+    
+    # NUEVOS DATOS
+    ohlc_reales_para_grafico = data.get("OHLC_REALES_PARA_GRAFICO", [])
+    precios_proyectados = data.get("PRECIOS_PROYECTADOS", [])
 
     if not smi_historico_para_grafico or not cierres_para_grafico_total or num_labels_total == 0:
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico.</p>"
@@ -676,40 +704,31 @@ def construir_prompt_formateado(data):
         # [null] * (días_historial - 1) + [último precio real] + [precios_proyectados]
         # Esto asegura que la línea proyectada comience exactamente en el último punto del precio real
         precios_reales_grafico = data.get('CIERRES_30_DIAS', [])
-        precios_proyectados = cierres_para_grafico_total[num_labels_hist:]
         
         data_proyectada = []
         if num_labels_hist > 0 and precios_reales_grafico:
             # Rellenar con null antes del último punto de precio real
             data_proyectada = [None] * (num_labels_hist - 1)
-            # Agregar el último precio real (el punto de conexión)
+            # Agregar el último precio real (el punto de conexión, que es el cierre)
             data_proyectada.append(precios_reales_grafico[-1])
             # Agregar la proyección
             data_proyectada.extend(precios_proyectados)
         else:
              data_proyectada = [None] * num_labels_total # Si no hay historial, no hay proyección
         
-        # Si el precio real tiene menos de 30 puntos (por la lógica de rellenado en yfinance),
-        # también debemos asegurarnos de que el array de precios reales tenga la longitud de las etiquetas históricas.
-        if len(precios_reales_grafico) < num_labels_hist:
-             # Esto debería estar resuelto por el manejo en yfinance, pero lo forzamos a null si hay un desajuste
-             precios_reales_grafico.extend([None] * (num_labels_hist - len(precios_reales_grafico)))
-
+        # El dataset de velas (OHLC) ya tiene la longitud total (30 históricos + Nones para la proyección)
+        
         # Aseguramos que todos los datasets tengan la misma longitud que labels_total
         max_len = num_labels_total
         smi_desplazados_para_grafico = smi_desplazados_para_grafico[:max_len]
         data_proyectada = data_proyectada[:max_len]
         
-        # Rellenar el array de precios reales con 'null' para el área de proyección
-        precios_reales_grafico_completo = precios_reales_grafico[:num_labels_hist] + [None] * PROYECCION_FUTURA_DIAS
-        precios_reales_grafico_completo = precios_reales_grafico_completo[:max_len]
-
-        
         # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON ----
         # Serializar todos los arrays para garantizar que None se convierte a 'null'
         labels_json = safe_json_dump(labels_total)
         smi_json = safe_json_dump(smi_desplazados_para_grafico)
-        precios_reales_json = safe_json_dump(precios_reales_grafico_completo)
+        # MODIFICACIÓN: Serializamos los datos OHLC, que ya están en el formato de Chart.js
+        ohlc_json = json.dumps(ohlc_reales_para_grafico) 
         data_proyectada_json = safe_json_dump(data_proyectada)
         # ---- FIN DE LA CORRECCIÓN ----
         
@@ -817,18 +836,20 @@ def construir_prompt_formateado(data):
         """
 
         # El gráfico en sí, que debe ir antes que el análisis
-        # Usamos los arrays de datos corregidos: smi_desplazados_para_grafico, precios_reales_grafico_completo, data_proyectada
+        # Usamos los arrays de datos corregidos: smi_desplazados_para_grafico, ohlc_json, data_proyectada
         chart_html = f"""
         <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.min.js"></script>
         <script>
             // Configuración del gráfico
             var ctx = document.getElementById('smiPrecioChart').getContext('2d');
             var smiPrecioChart = new Chart(ctx, {{
-                type: 'line',
+                // MODIFICACIÓN: Usamos el tipo 'bar' para que el plugin de financial funcione, aunque el tipo 'candlestick' es manejado internamente
+                type: 'bar',
                 data: {{
                     labels: {labels_json},
                     datasets: [
@@ -840,17 +861,34 @@ def construir_prompt_formateado(data):
                             yAxisID: 'y1',
                             pointRadius: 0,
                             borderWidth: 2,
-                            tension: 0.1
+                            tension: 0.1,
+                            type: 'line' // Aseguramos que el SMI sea una línea
                         }},
+                        // MODIFICACIÓN: Dataset de Velas Japonesas (Tipo Candlestick)
                         {{
-                            label: 'Precio Real',
-                            data: {precios_reales_json},
-                            borderColor: '#2979ff',
-                            backgroundColor: 'rgba(41, 121, 255, 0.2)',
+                            label: 'Precio Real (Velas)',
+                            data: {ohlc_json},
+                            // Configuración del plugin financial
+                            type: 'candlestick',
                             yAxisID: 'y',
-                            pointRadius: 0,
-                            borderWidth: 2,
-                            tension: 0.1
+                            // Colores de las velas:
+                            borderColor: function(context) {{
+                                var dataPoint = context.dataset.data[context.dataIndex];
+                                // Si es un punto histórico, dibuja la vela
+                                if (dataPoint && Array.isArray(dataPoint.y)) {{ 
+                                    return dataPoint.y[3] > dataPoint.y[0] ? '#4CAF50' : '#F44336'; // Cierre > Apertura (Green) : Cierre < Apertura (Red)
+                                }}
+                                return 'rgba(0,0,0,0)'; // No dibujar borde en puntos nulos
+                            }},
+                            backgroundColor: function(context) {{
+                                var dataPoint = context.dataset.data[context.dataIndex];
+                                // Si es un punto histórico, dibuja la vela
+                                if (dataPoint && Array.isArray(dataPoint.y)) {{ 
+                                    return dataPoint.y[3] > dataPoint.y[0] ? '#4CAF50' : '#F44336'; // Cierre > Apertura (Green) : Cierre < Apertura (Red)
+                                }}
+                                return 'rgba(0,0,0,0)'; // No dibujar fondo en puntos nulos
+                            }},
+                            borderWidth: 1.5
                         }},
                         {{
                             label: 'Precio Proyectado',
@@ -859,9 +897,10 @@ def construir_prompt_formateado(data):
                             borderDash: [5, 5],
                             backgroundColor: 'rgba(255, 193, 7, 0.2)',
                             yAxisID: 'y',
-                            pointRadius: 0,
+                            pointRadius: 3, // Punto de conexión visible
                             borderWidth: 2,
-                            tension: 0.1
+                            tension: 0.1,
+                            type: 'line' // Aseguramos que la proyección sea una línea
                         }}
                     ]
                 }},
@@ -888,13 +927,23 @@ def construir_prompt_formateado(data):
                             borderColor: '#4a4a5e',
                             borderWidth: 1,
                             callbacks: {{
+                                // MODIFICACIÓN: Añadir callback para mostrar los 4 precios (OHLC) en el tooltip de las velas
                                 label: function(context) {{
                                     let label = context.dataset.label || '';
                                     if (label) {{
                                         label += ': ';
                                     }}
+                                    if (context.dataset.type === 'candlestick' && context.parsed.y !== null) {{
+                                        // Los datos de la vela están en [O, H, L, C]
+                                        return [
+                                            'Apertura: ' + context.parsed.y[0].toFixed(3) + '€',
+                                            'Máximo: ' + context.parsed.y[1].toFixed(3) + '€',
+                                            'Mínimo: ' + context.parsed.y[2].toFixed(3) + '€',
+                                            'Cierre: ' + context.parsed.y[3].toFixed(3) + '€'
+                                        ];
+                                    }}
                                     if (context.parsed.y !== null) {{
-                                        label += context.parsed.y.toFixed(2) + '€';
+                                        label += context.parsed.y.toFixed(3) + '€';
                                     }}
                                     return label;
                                 }}
@@ -961,8 +1010,12 @@ def construir_prompt_formateado(data):
                                 text: 'Precio (EUR)',
                                 color: '#e0e0e0'
                             }},
+                            // MODIFICACIÓN: Asegurar que el eje Y de precio se ajusta a los datos OHLC
                             ticks: {{
-                                color: '#e0e0e0'
+                                color: '#e0e0e0',
+                                callback: function(value, index, values) {{
+                                    return value.toFixed(3) + '€';
+                                }}
                             }},
                             grid: {{
                                 color: 'rgba(128, 128, 128, 0.2)',
