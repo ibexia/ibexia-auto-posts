@@ -715,17 +715,18 @@ def construir_prompt_formateado(data):
         # Rellenar el array de precios reales con 'null' para el área de proyección
         precios_reales_grafico_completo = precios_reales_grafico[:num_labels_hist] + [None] * PROYECCION_FUTURA_DIAS
         precios_reales_grafico_completo = precios_reales_grafico_completo[:max_len]
-
         
-        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON ----
+        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON Y ROBUSTEZ ----
         # Serializar todos los arrays para garantizar que None se convierte a 'null'
         labels_json = safe_json_dump(labels_total)
         smi_json = safe_json_dump(smi_desplazados_para_grafico)
-        # La línea de precios reales ya no se usa directamente, sino OHLC y data_proyectada
         data_proyectada_json = safe_json_dump(data_proyectada)
         
         # **NUEVO:** Serializar los datos OHLC para el gráfico de velas
         ohlc_json = json.dumps(data.get('OHLC_30_DIAS', []))
+        
+        # **NUEVO:** Serializar el historial de precios de cierre para la capa de robustez
+        precios_reales_grafico_completo_json = safe_json_dump(precios_reales_grafico_completo)
         # ---- FIN DE LA CORRECCIÓN ----
         
         # Reemplazo para la sección de análisis detallado del gráfico
@@ -831,7 +832,7 @@ def construir_prompt_formateado(data):
         <p style="text-align: center; color: #aaaaaa; margin-top: 15px;">{estado_actual}</p>
         """
 
-        # --- INICIO MODIFICACIÓN DEL GRÁFICO (VELAS JAPONESAS) ---
+        # --- INICIO MODIFICACIÓN DEL GRÁFICO (VELAS JAPONESAS) Y ROBUSTEZ ---
         chart_html = f"""
         <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px; border: 2px solid #4a4a5e;">
             <canvas id="smiPrecioChart"></canvas>
@@ -844,7 +845,8 @@ def construir_prompt_formateado(data):
             function getCandleColor(context) {{
                 var data = context.dataset.data[context.dataIndex];
                 if (!data) return 'rgba(128, 128, 128, 0.5)';
-                return data.c > data.o ? '#4CAF50' : '#F44336'; // Verde si cierre > apertura, Rojo si no
+                // Si la vela es alcista (cierre > apertura) es verde (#4CAF50), si es bajista es rojo (#F44336)
+                return data.c > data.o ? '#4CAF50' : '#F44336'; 
             }}
             
             // Función para determinar el color del borde de la vela
@@ -862,16 +864,28 @@ def construir_prompt_formateado(data):
                     labels: {labels_json},
                     datasets: [
                         {{
-                            // Dataset de Velas Japonesas
-                            label: 'Precio OHLC',
-                            data: {ohlc_json}, // <--- **USAMOS OHLC AQUÍ**
+                            // Dataset de Velas Japonesas (Prioridad)
+                            label: 'Velas Japonesas (OHLC)',
+                            data: {ohlc_json}, 
                             borderColor: getCandleBorderColor,
                             backgroundColor: getCandleColor,
                             yAxisID: 'y',
-                            type: 'candlestick', // <--- **TIPO CANDLESTICK**
+                            type: 'candlestick', 
                             borderWidth: 1,
                             pointRadius: 0,
                             tension: 0
+                        }},
+                        {{
+                            // Dataset de Precio Cierre Histórico (ROBUSTEZ Y REFERENCIA)
+                            label: 'Cierre Histórico (Referencia)',
+                            data: {precios_reales_grafico_completo_json},
+                            borderColor: 'rgba(255, 255, 255, 0.3)', // Color blanco muy tenue
+                            backgroundColor: 'transparent',
+                            yAxisID: 'y',
+                            pointRadius: 0,
+                            borderWidth: 1,
+                            tension: 0.1,
+                            type: 'line'
                         }},
                         {{
                             // Dataset de SMI
@@ -988,7 +1002,7 @@ def construir_prompt_formateado(data):
                                 color: '#e0e0e0'
                             }},
                             grid: {{
-                                color: 'rgba(255, 255, 255, 0.2)'
+                                color: 'rgba(255, 255, 255, 0.4)' // Más contraste para la cuadrícula
                             }}
                         }},
                         y: {{
@@ -1004,8 +1018,8 @@ def construir_prompt_formateado(data):
                                 color: '#e0e0e0'
                             }},
                             grid: {{
-                                color: 'rgba(255, 255, 255, 0.2)',
-                                drawOnChartArea: true // Ahora el precio está en el área principal
+                                color: 'rgba(255, 255, 255, 0.4)', // Más contraste para la cuadrícula
+                                drawOnChartArea: true 
                             }}
                         }},
                         y1: {{
@@ -1032,7 +1046,7 @@ def construir_prompt_formateado(data):
             }});
         </script>
         """
-        # --- FIN MODIFICACIÓN DEL GRÁFICO (VELAS JAPONESAS) ---
+        # --- FIN MODIFICACIÓN DEL GRÁFICO (VELAS JAPONESAS) Y ROBUSTEZ ---
 
     
     # MODIFICACIÓN: Incluir SMI Semanal en la tabla de resumen
