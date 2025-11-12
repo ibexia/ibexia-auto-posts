@@ -24,6 +24,7 @@ def safe_json_dump(data_list):
     """
     # json.dumps convierte None a 'null' y los floats a formato JavaScript (con punto decimal)
     # Se asegura de que la lista solo contenga valores o None, para que json.dumps funcione.
+    # CORRECCIÓN DE SYNTAX ERROR EN ESTA LÍNEA (LÍNEA 25)
     return json.dumps([val if val is not None else None for val in data_list])
 
 
@@ -234,6 +235,10 @@ def obtener_datos_yfinance(ticker):
         # Ampliar periodo para el SMI, soportes/resistencias y simulación
         hist_extended = stock.history(period="90d", interval="1d")
         hist_extended = calculate_smi_tv(hist_extended)
+
+        # Usar un historial más corto (30d) solo si es necesario, pero nos enfocaremos en hist_extended
+        # hist = stock.history(period="30d", interval="1d") # Ya no es necesario cargar dos veces
+        # hist = calculate_smi_tv(hist)
 
         # Obtener datos históricos para el volumen del día anterior completo
         hist_recent = stock.history(period="5d", interval="1d") 
@@ -477,20 +482,44 @@ def obtener_datos_yfinance(ticker):
             else:
                 tendencia_ibexia = "cambio de tendencia"
 
+        # --- INICIO NUEVA LÓGICA CANDLESTICK ---
+        hist_for_ohlc = hist_extended.tail(30)
         
-        # --- INICIO: ADICIÓN DE DATOS OHLC PARA VELAS JAPONESAS ---
-        # Extraer y formatear los datos OHLC de los últimos 30 días para Chart.js
-        ohlc_df_30d = hist_extended.tail(30)
-        ohlc_datos_30d = []
-        if not ohlc_df_30d.empty:
-            for index, row in ohlc_df_30d.iterrows():
-                ohlc_datos_30d.append({
-                    'o': round(row['Open'], 3),
-                    'h': round(row['High'], 3),
-                    'l': round(row['Low'], 3),
-                    'c': round(row['Close'], 3)
-                })
-        # --- FIN: ADICIÓN DE DATOS OHLC PARA VELAS JAPONESAS ---
+        ohlc_data_raw = [] # Para el JS callback
+        ohlc_lineas = [] # Para Dataset 1 (Sombras High-Low)
+        ohlc_cuerpos = [] # Para Dataset 2 (Cuerpos Open-Close)
+        
+        for index, row in hist_for_ohlc.iterrows():
+            # Raw OHLC data for JS callback
+            ohlc_data_raw.append({
+                'o': round(row['Open'], 3),
+                'h': round(row['High'], 3),
+                'l': round(row['Low'], 3),
+                'c': round(row['Close'], 3)
+            })
+            
+            # Data for lineas (Shadows) - y: mean of high/low, base: low, high: high
+            ohlc_lineas.append({
+                'y': round((row['Low'] + row['High']) / 2, 3), # Bar center
+                'base': round(row['Low'], 3),
+                'y_max': round(row['High'], 3) # Max point for the bar
+            })
+            
+            # Data for cuerpos (Bodies) - y: mean of open/close, base: min(o,c), high: max(o,c)
+            o = round(row['Open'], 3)
+            c = round(row['Close'], 3)
+            ohlc_cuerpos.append({
+                'y': round((o + c) / 2, 3), # Bar center
+                'base': round(min(o, c), 3),
+                'y_max': round(max(o, c), 3) # Max point for the bar
+            })
+
+        # Para el área de proyección (5 días): Añadir 'None' a los arrays de datos
+        for _ in range(PROYECCION_FUTURA_DIAS):
+            ohlc_data_raw.append(None)
+            ohlc_lineas.append(None)
+            ohlc_cuerpos.append(None)
+        # --- FIN NUEVA LÓGICA CANDLESTICK ---
 
 
         datos = {
@@ -524,7 +553,10 @@ def obtener_datos_yfinance(ticker):
             'SMI_PARA_SIMULACION': smi_historico_para_simulacion,
             'FECHAS_PARA_SIMULACION': fechas_para_simulacion,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS,
-            "OHLC_30_DIAS": ohlc_datos_30d # NUEVO DATO PARA EL GRÁFICO DE VELAS
+            # DATOS CANDLESTICK
+            "OHLC_30_DIAS": ohlc_data_raw,      
+            "OHLC_LINEAS": ohlc_lineas,        
+            "OHLC_CUERPOS": ohlc_cuerpos,      
         }
         
         # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO Y RIESGO SEMANAL ---
@@ -603,6 +635,11 @@ def construir_prompt_formateado(data):
     cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
     OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 0) # Corregido a 0 para el nuevo manejo
     PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
+    
+    # NUEVOS DATOS PARA CANDLESTICK
+    ohlc_data_raw = data.get('OHLC_30_DIAS', [])
+    ohlc_lineas = data.get('OHLC_LINEAS', [])
+    ohlc_cuerpos = data.get('OHLC_CUERPOS', [])
 
 
     # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
@@ -676,12 +713,9 @@ def construir_prompt_formateado(data):
     labels_total = labels_historial + labels_proyeccion
     num_labels_hist = len(labels_historial)
     num_labels_total = len(labels_total)
-    
-    # Recuperar datos OHLC
-    ohlc_datos = data.get('OHLC_30_DIAS', [])
 
-    if not smi_historico_para_grafico or not cierres_para_grafico_total or num_labels_total == 0 or not ohlc_datos: # Se añade la verificación de OHLC_30_DIAS
-        chart_html = "<p>No hay suficientes datos válidos para generar el gráfico (OHLC/SMI/Proyección).</p>"
+    if not smi_historico_para_grafico or num_labels_total == 0:
+        chart_html = "<p>No hay suficientes datos válidos para generar el gráfico.</p>"
     else:
         # Asegurar que SMI tenga el mismo número de puntos que las etiquetas totales (rellenando con null)
         smi_desplazados_para_grafico = smi_historico_para_grafico + [None] * PROYECCION_FUTURA_DIAS
@@ -719,26 +753,17 @@ def construir_prompt_formateado(data):
         precios_reales_grafico_completo = precios_reales_grafico_completo[:max_len]
 
         
-        # ---- INICIO: SERIALIZACIÓN JSON Y PREPARACIÓN DE OHLC ----
+        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON (incluyendo OHLC) ----
         # Serializar todos los arrays para garantizar que None se convierte a 'null'
         labels_json = safe_json_dump(labels_total)
         smi_json = safe_json_dump(smi_desplazados_para_grafico)
-        # precios_reales_json ya no se usa, solo para la línea de Proyección
         data_proyectada_json = safe_json_dump(data_proyectada)
         
-        # Adaptar los datos OHLC para la simulación de velas con el tipo 'bar'
-        # Usamos el formato [Low, High] para dibujar la línea (sombra) y un color
-        ohlc_lineas = [{'x': i, 'y': [d['l'], d['h']]} for i, d in enumerate(ohlc_datos)]
-        # También necesitamos los cuerpos (Open/Close). Min/Max para que la barra se dibuje correctamente.
-        ohlc_cuerpos = [{'x': i, 'y': [min(d['o'], d['c']), max(d['o'], d['c'])]} for i, d in enumerate(ohlc_datos)]
-
-        # Rellenar con null la parte de proyección para ambos
-        ohlc_lineas.extend([None] * (num_labels_total - len(ohlc_lineas)))
-        ohlc_cuerpos.extend([None] * (num_labels_total - len(ohlc_cuerpos)))
-        
+        # NUEVOS ARRAYS PARA CANDLESTICK
+        ohlc_data_raw_json = json.dumps(ohlc_data_raw) # Raw data is dumped without safe_json_dump on top layer
         ohlc_lineas_json = safe_json_dump(ohlc_lineas)
         ohlc_cuerpos_json = safe_json_dump(ohlc_cuerpos)
-        # ---- FIN: SERIALIZACIÓN JSON Y PREPARACIÓN DE OHLC ----
+        # ---- FIN DE LA CORRECCIÓN ----
         
         # Reemplazo para la sección de análisis detallado del gráfico
         analisis_grafico_html = f"""
@@ -852,18 +877,21 @@ def construir_prompt_formateado(data):
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
         <script>
             // Función para determinar el color de la barra (cuerpo de la vela)
-            // REFORZADA PARA EVITAR FALLOS EN EL ÁREA DE PROYECCIÓN (DATOS NULOS)
+            // REFORZADA para EVITAR FALLOS en el ÁREA DE PROYECCIÓN (DATOS NULOS)
             function getBarColor(context) {{
                 // Acceder a los datos originales de OHLC (deserializado)
-                var ohlc_data = {json.dumps(data.get('OHLC_30_DIAS', []))};
+                var ohlc_data = {ohlc_data_raw_json};
                 var dataIndex = context.dataIndex;
-
-                // CRITICAL ROBUSTNESS CHECK: 
-                // 1. Si el punto de datos en el dataset es null (ej: zona de proyección)
-                // 2. O si estamos fuera del rango de datos OHLC reales
-                if (context.dataset.data[dataIndex] === null || dataIndex >= ohlc_data.length) return 'transparent';
                 
+                // Si el índice está fuera del rango de datos OHLC reales, devuelve transparente.
+                if (dataIndex >= ohlc_data.length) return 'transparent'; 
+
                 var ohlc_point = ohlc_data[dataIndex];
+                
+                // Comprobación de seguridad EXTREMA: si el punto de datos es undefined/null, devuelve transparente.
+                // Esto es CRÍTICO para el área de proyección y para datos faltantes.
+                if (!ohlc_point) return 'transparent';
+
                 // Si la vela es alcista (cierre > apertura) es verde (#4CAF50), si es bajista es rojo (#F44336)
                 return ohlc_point.c > ohlc_point.o ? '#4CAF50' : '#F44336'; 
             }}
@@ -879,12 +907,12 @@ def construir_prompt_formateado(data):
                             // Dataset 1: Líneas de Sombra (High-Low)
                             label: 'Rango High-Low (Velas)',
                             data: {ohlc_lineas_json},
-                            borderColor: getBarColor, // Color de la sombra (igual al cuerpo)
+                            borderColor: '#ffffff', // Color fijo para la sombra (blanco/gris claro)
                             backgroundColor: 'transparent',
                             yAxisID: 'y',
-                            type: 'bar', // Usamos 'bar' para dibujar barras verticales [low, high]
-                            barThickness: 1, // Grosor muy fino para la sombra
-                            borderWidth: 1.5,
+                            type: 'bar', 
+                            barThickness: 1, 
+                            borderWidth: 1,
                             borderRadius: 0,
                             skipNull: true,
                             pointRadius: 0,
@@ -896,11 +924,11 @@ def construir_prompt_formateado(data):
                             // Dataset 2: Cuerpos de Vela (Open-Close)
                             label: 'Cuerpo Open-Close (Velas)',
                             data: {ohlc_cuerpos_json}, 
-                            borderColor: getBarColor, // Color del borde del cuerpo
-                            backgroundColor: getBarColor, // Color de relleno del cuerpo
+                            borderColor: getBarColor, 
+                            backgroundColor: getBarColor, 
                             yAxisID: 'y',
-                            type: 'bar', // Usamos 'bar' para dibujar barras verticales [min(O,C), max(O,C)]
-                            barThickness: 5, // Grosor del cuerpo de la vela
+                            type: 'bar', 
+                            barThickness: 5, 
                             borderWidth: 1,
                             borderRadius: 0,
                             skipNull: true,
@@ -918,7 +946,7 @@ def construir_prompt_formateado(data):
                             borderWidth: 2,
                             tension: 0.1,
                             type: 'line',
-                            order: -1 // Líneas encima de las barras
+                            order: -1 
                         }},
                         {{
                             // Dataset de Precio Proyectado (Línea)
@@ -932,7 +960,7 @@ def construir_prompt_formateado(data):
                             borderWidth: 2,
                             tension: 0.1,
                             type: 'line',
-                            order: -1 // Líneas encima de las barras
+                            order: -1 
                         }}
                     ]
                 }},
@@ -967,13 +995,13 @@ def construir_prompt_formateado(data):
                                     let label = context.dataset.label || '';
                                     
                                     if (context.datasetIndex === 1) {{ // Para el cuerpo de la vela (índice 1)
-                                         var ohlc_data = {json.dumps(data.get('OHLC_30_DIAS', []))};
+                                         var ohlc_data = {ohlc_data_raw_json};
                                          var dataIndex = context.dataIndex;
                                          
-                                         // CRITICAL ROBUSTNESS CHECK: Si estamos fuera del rango de datos OHLC reales, omitir el detalle de la vela
-                                         if (dataIndex >= ohlc_data.length) return 'Cuerpo Open-Close (Proyección)'; 
-
+                                         // Comprobación de seguridad EXTREMA: Si estamos fuera del rango de datos OHLC reales, o el punto es nulo, retornar un mensaje simple.
                                          var ohlc_point = ohlc_data[dataIndex];
+                                         if (dataIndex >= ohlc_data.length || !ohlc_point) return 'Cuerpo Open-Close (Proyección)'; 
+
                                          return [
                                             'Apertura: ' + ohlc_point.o.toFixed(3) + '€',
                                             'Cierre: ' + ohlc_point.c.toFixed(3) + '€',
@@ -1044,7 +1072,7 @@ def construir_prompt_formateado(data):
                                 color: '#e0e0e0'
                             }},
                             grid: {{
-                                color: 'rgba(255, 255, 255, 0.4)' // Más contraste para la cuadrícula
+                                color: 'rgba(255, 255, 255, 0.4)' 
                             }}
                         }},
                         y: {{
@@ -1060,7 +1088,7 @@ def construir_prompt_formateado(data):
                                 color: '#e0e0e0'
                             }},
                             grid: {{
-                                color: 'rgba(255, 255, 255, 0.4)', // Más contraste para la cuadrícula
+                                color: 'rgba(255, 255, 255, 0.4)', 
                                 drawOnChartArea: true 
                             }}
                         }},
@@ -1250,15 +1278,15 @@ def enviar_email(texto_generado, asunto_email, nombre_archivo):
         
     # 4. Conexión al servidor Brevo SMTP
     try:
-        # print(f"🌐 Intentando conectar a Brevo SMTP: {servidor_smtp}:{puerto_smtp}")
+        print(f"🌐 Intentando conectar a Brevo SMTP: {servidor_smtp}:{puerto_smtp}")
         servidor = smtplib.SMTP(servidor_smtp, puerto_smtp)
         servidor.starttls() 
         
-        # print(f"🔑 Intentando iniciar sesión con el usuario: {remitente_login}")
+        print(f"🔑 Intentando iniciar sesión con el usuario: {remitente_login}")
         # Usa el login y la clave de Brevo para la autenticación
         servidor.login(remitente_login, password)
         
-        # print(f"✉️ Enviando correo a: {destinatario} desde: {remitente_visible_email}")
+        print(f"✉️ Enviando correo a: {destinatario} desde: {remitente_visible_email}")
         # Usa el email visible como el remitente de la transacción
         servidor.sendmail(remitente_visible_email, destinatario, msg.as_string())
         
