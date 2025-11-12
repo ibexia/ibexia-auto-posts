@@ -236,10 +236,6 @@ def obtener_datos_yfinance(ticker):
         hist_extended = stock.history(period="90d", interval="1d")
         hist_extended = calculate_smi_tv(hist_extended)
 
-        # Usar un historial más corto (30d) solo si es necesario, pero nos enfocaremos en hist_extended
-        # hist = stock.history(period="30d", interval="1d") # Ya no es necesario cargar dos veces
-        # hist = calculate_smi_tv(hist)
-
         # Obtener datos históricos para el volumen del día anterior completo
         hist_recent = stock.history(period="5d", interval="1d") 
         
@@ -381,7 +377,7 @@ def obtener_datos_yfinance(ticker):
             first_smi_val = smi_history_full.iloc[0] if not smi_history_full.empty else 0.0
             smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
 
-        # Precios para el gráfico: 30 días DESPLAZADOS
+        # Precios de CIERRE para el gráfico: 30 días DESPLAZADOS
         precios_reales_para_grafico = []
         # Para un offset de 0 (el SMI de hoy se alinea con el precio de hoy), tomamos los últimos 30 precios
         if len(cierres_history_full) >= 30:
@@ -390,6 +386,21 @@ def obtener_datos_yfinance(ticker):
             # Rellenar con el primer precio disponible o el precio actual
             first_price_val = cierres_history_full.iloc[0] if not cierres_history_full.empty else current_price
             precios_reales_para_grafico = [first_price_val] * (30 - len(cierres_history_full)) + cierres_history_full.tolist()
+
+        # **NUEVO:** Historial OHLC para las velas japonesas (últimos 30 días)
+        ohlc_history_full = hist_extended[['Open', 'High', 'Low', 'Close']].dropna()
+        ohlc_30_dias = []
+        if len(ohlc_history_full) >= 30:
+            # Formato de diccionario para Chart.js
+            ohlc_30_dias = [{'o': round(row['Open'], 3), 'h': round(row['High'], 3), 'l': round(row['Low'], 3), 'c': round(row['Close'], 3)} 
+                            for index, row in ohlc_history_full.tail(30).iterrows()]
+        else:
+             # Si no hay 30 días completos, al menos asegurar el formato para los que sí hay (o usar un marcador)
+            if not ohlc_history_full.empty:
+                ohlc_30_dias = [{'o': round(row['Open'], 3), 'h': round(row['High'], 3), 'l': round(row['Low'], 3), 'c': round(row['Close'], 3)} 
+                                for index, row in ohlc_history_full.iterrows()]
+            # Rellenar con marcadores si es necesario (aunque Chart.js maneja la falta de datos si el array es más corto)
+
         
         # Asegurarse de que las etiquetas de fecha coincidan con los 30 días de datos
         if len(fechas_historial) < 30 and len(cierres_history_full.tail(30)) > 0:
@@ -513,7 +524,8 @@ def obtener_datos_yfinance(ticker):
             'PRECIOS_PARA_SIMULACION': precios_para_simulacion,
             'SMI_PARA_SIMULACION': smi_historico_para_simulacion,
             'FECHAS_PARA_SIMULACION': fechas_para_simulacion,
-            "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
+            "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS,
+            "OHLC_30_DIAS": ohlc_30_dias # <--- **NUEVO DATO CLAVE**
         }
         
         # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO Y RIESGO SEMANAL ---
@@ -585,7 +597,7 @@ def construir_prompt_formateado(data):
 
     # NUEVO FORMATO: "Analisis actualizado el FECHA de NOMBRE DE LA EMPRESA."
     fecha_actual_str = datetime.today().strftime('%d/%m/%Y')
-    titulo_post = f"Análisis actualizado el {fecha_actual_str} de {data['NOMBRE_EMPRESA']}. "
+    titulo_post = f"Análisis actualizado el {fecha_actual_str} de {data['NOMBRE_EMPRESA']}."
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
@@ -709,8 +721,11 @@ def construir_prompt_formateado(data):
         # Serializar todos los arrays para garantizar que None se convierte a 'null'
         labels_json = safe_json_dump(labels_total)
         smi_json = safe_json_dump(smi_desplazados_para_grafico)
-        precios_reales_json = safe_json_dump(precios_reales_grafico_completo)
+        # La línea de precios reales ya no se usa directamente, sino OHLC y data_proyectada
         data_proyectada_json = safe_json_dump(data_proyectada)
+        
+        # **NUEVO:** Serializar los datos OHLC para el gráfico de velas
+        ohlc_json = json.dumps(data.get('OHLC_30_DIAS', []))
         # ---- FIN DE LA CORRECCIÓN ----
         
         # Reemplazo para la sección de análisis detallado del gráfico
@@ -816,18 +831,29 @@ def construir_prompt_formateado(data):
         <p style="text-align: center; color: #aaaaaa; margin-top: 15px;">{estado_actual}</p>
         """
 
-        # El gráfico en sí, que debe ir antes que el análisis
-        # Usamos los arrays de datos corregidos: smi_desplazados_para_grafico, precios_reales_grafico_completo, data_proyectada
-        
-        # --- INICIO DE LA MODIFICACIÓN SOLICITADA ---
+        # --- INICIO MODIFICACIÓN DEL GRÁFICO (VELAS JAPONESAS) ---
         chart_html = f"""
         <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px; border: 2px solid #4a4a5e;">
             <canvas id="smiPrecioChart"></canvas>
         </div>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.0/dist/chartjs-chart-financial.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
         <script>
-        # --- FIN DE LA MODIFICACIÓN SOLICITADA ---
+            // Función para determinar el color de la vela
+            function getCandleColor(context) {{
+                var data = context.dataset.data[context.dataIndex];
+                if (!data) return 'rgba(128, 128, 128, 0.5)';
+                return data.c > data.o ? '#4CAF50' : '#F44336'; // Verde si cierre > apertura, Rojo si no
+            }}
+            
+            // Función para determinar el color del borde de la vela
+            function getCandleBorderColor(context) {{
+                var data = context.dataset.data[context.dataIndex];
+                if (!data) return 'rgba(128, 128, 128, 0.5)';
+                return data.c > data.o ? '#4CAF50' : '#F44336';
+            }}
+
             // Configuración del gráfico
             var ctx = document.getElementById('smiPrecioChart').getContext('2d');
             var smiPrecioChart = new Chart(ctx, {{
@@ -836,6 +862,19 @@ def construir_prompt_formateado(data):
                     labels: {labels_json},
                     datasets: [
                         {{
+                            // Dataset de Velas Japonesas
+                            label: 'Precio OHLC',
+                            data: {ohlc_json}, // <--- **USAMOS OHLC AQUÍ**
+                            borderColor: getCandleBorderColor,
+                            backgroundColor: getCandleColor,
+                            yAxisID: 'y',
+                            type: 'candlestick', // <--- **TIPO CANDLESTICK**
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            tension: 0
+                        }},
+                        {{
+                            // Dataset de SMI
                             label: 'Nuestro Algoritmo',
                             data: {smi_json},
                             borderColor: '#00bfa5',
@@ -843,20 +882,12 @@ def construir_prompt_formateado(data):
                             yAxisID: 'y1',
                             pointRadius: 0,
                             borderWidth: 2,
-                            tension: 0.1
+                            tension: 0.1,
+                            type: 'line'
                         }},
                         {{
-                            label: 'Precio Real',
-                            data: {precios_reales_json},
-                            borderColor: '#2979ff',
-                            backgroundColor: 'rgba(41, 121, 255, 0.2)',
-                            yAxisID: 'y',
-                            pointRadius: 0,
-                            borderWidth: 2,
-                            tension: 0.1
-                        }},
-                        {{
-                            label: 'Precio Proyectado',
+                            // Dataset de Precio Proyectado (Línea)
+                            label: 'Precio Proyectado (Cierre)',
                             data: {data_proyectada_json},
                             borderColor: '#ffc107',
                             borderDash: [5, 5],
@@ -864,7 +895,8 @@ def construir_prompt_formateado(data):
                             yAxisID: 'y',
                             pointRadius: 0,
                             borderWidth: 2,
-                            tension: 0.1
+                            tension: 0.1,
+                            type: 'line'
                         }}
                     ]
                 }},
@@ -896,7 +928,11 @@ def construir_prompt_formateado(data):
                                     if (label) {{
                                         label += ': ';
                                     }}
-                                    if (context.parsed.y !== null) {{
+                                    // Callback específico para Velas Japonesas
+                                    if (context.dataset.type === 'candlestick' && context.parsed._custom) {{
+                                        const data = context.parsed._custom;
+                                        label = 'O: ' + data.o.toFixed(2) + '€, H: ' + data.h.toFixed(2) + '€, L: ' + data.l.toFixed(2) + '€, C: ' + data.c.toFixed(2) + '€';
+                                    }} else if (context.parsed.y !== null) {{
                                         label += context.parsed.y.toFixed(2) + '€';
                                     }}
                                     return label;
@@ -952,7 +988,7 @@ def construir_prompt_formateado(data):
                                 color: '#e0e0e0'
                             }},
                             grid: {{
-                                color: 'rgba(128, 128, 128, 0.2)'
+                                color: 'rgba(255, 255, 255, 0.2)'
                             }}
                         }},
                         y: {{
@@ -968,8 +1004,8 @@ def construir_prompt_formateado(data):
                                 color: '#e0e0e0'
                             }},
                             grid: {{
-                                color: 'rgba(128, 128, 128, 0.2)',
-                                drawOnChartArea: false
+                                color: 'rgba(255, 255, 255, 0.2)',
+                                drawOnChartArea: true // Ahora el precio está en el área principal
                             }}
                         }},
                         y1: {{
@@ -996,6 +1032,8 @@ def construir_prompt_formateado(data):
             }});
         </script>
         """
+        # --- FIN MODIFICACIÓN DEL GRÁFICO (VELAS JAPONESAS) ---
+
     
     # MODIFICACIÓN: Incluir SMI Semanal en la tabla de resumen
     tabla_resumen = f"""
