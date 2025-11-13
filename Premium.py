@@ -95,6 +95,7 @@ tickers = {
     'Tubos-Reunidos': 'TRG.MC',
     'tubacex': 'TUB.MC',
     'Unicaja': 'UNI.MC',
+    'Vanadi Coffee': 'VANA.MC',
     'Viscofan': 'VIS.MC',
     'Urbas': 'URB.MC',
 }
