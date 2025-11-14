@@ -29,7 +29,7 @@ RANGE_NAME = os.getenv('RANGE_NAME', 'Hoja1!A:A')
 # Mantenemos las variables originales.
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv('GOOGLE_APPLICATION_CREDENTIALS') 
 
-# NUEVA FUNCIÓN AÑADIDA PARA GARANTIZAR LA SERIALIZACIÓN A JSON/NULL
+# FUNCIÓN ORIGINAL: NUEVA FUNCIÓN AÑADIDA PARA GARANTIZAR LA SERIALIZACIÓN A JSON/NULL
 def safe_json_dump(data_list):
     """
     Serializa una lista de Python a una cadena JSON, asegurando que los valores None
@@ -39,19 +39,16 @@ def safe_json_dump(data_list):
     # Se asegura de que la lista solo contenga valores o None, para que json.dumps funcione.
     return json.dumps([val if val is not None else None for val in data_list])
 
+# FUNCIÓN ORIGINAL: leer_google_sheets (MANTENIDA EN SU ESTADO ORIGINAL)
 def leer_google_sheets():
     """Lee la lista de tickers desde Google Sheets."""
-    # NO TOCAR NADA EN ESTA FUNCIÓN para que siga funcionando con la configuración de credenciales existente
-    if not GOOGLE_APPLICATION_CREDENTIALS:
-        # Se asume que si no está definida, es porque el entorno de ejecución la maneja de otra forma
-        # o que el error se gestionará externamente.
-        print("⚠️ Variable GOOGLE_APPLICATION_CREDENTIALS no definida. Intentando continuar...")
-        return [] # Retorna vacío para evitar fallos si el error no es crítico
+    credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    if not credentials_json:
+        # Se mantiene la excepción original
+        raise Exception("No se encontró la variable de entorno GOOGLE_APPLICATION_CREDENTIALS")
 
     try:
-        # La lógica original asume que GOOGLE_APPLICATION_CREDENTIALS contiene la ruta o el JSON.
-        # Aquí cargamos desde la variable de entorno, como en el intento anterior, pero SIN la comprobación extra de 'raise Exception'
-        creds_dict = json.loads(GOOGLE_APPLICATION_CREDENTIALS)
+        creds_dict = json.loads(credentials_json)
         creds = service_account.Credentials.from_service_account_info(
             creds_dict,
             scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
@@ -59,6 +56,7 @@ def leer_google_sheets():
         
         service = build('sheets', 'v4', credentials=creds)
         sheet = service.spreadsheets()
+        # NO TOCAR: Se mantiene la dependencia de SHEET_ID, cuyo error es externo.
         result = sheet.values().get(spreadsheetId=SHEET_ID, range=RANGE_NAME).execute()
         values = result.get('values', [])
         
@@ -70,12 +68,11 @@ def leer_google_sheets():
         return tickers
 
     except Exception as e:
-        # Importante: El error original era 'Missing required parameter "spreadsheetId"'.
-        # Esto indica que SHEET_ID está vacío, no las credenciales.
-        # Mantener la gestión de errores original para no cambiar la lógica.
+        # Mantenemos la gestión de errores original.
         print(f"❌ Error al acceder a Google Sheets: {e}")
         return []
 
+# FUNCIÓN ORIGINAL: enviar_email (MANTENIDA EN SU ESTADO ORIGINAL)
 def enviar_email(subject, body, attachment_path=None):
     """Envía un correo electrónico con el contenido generado y un gráfico adjunto."""
     if not SENDER_EMAIL or not SENDER_PASSWORD or not RECIPIENT_EMAIL:
@@ -115,6 +112,7 @@ def enviar_email(subject, body, attachment_path=None):
     except Exception as e:
         print(f"❌ Error al enviar el email: {e}")
 
+# FUNCIÓN MODIFICADA: generar_grafico_candlestick (SOLO SE APLICAN LAS 4 CORRECCIONES)
 def generar_grafico_candlestick(df, ticker, projected_col_name='Precio_Proyectado'):
     """
     Genera un gráfico de velas (candlestick) profesional con las correcciones solicitadas:
@@ -129,8 +127,8 @@ def generar_grafico_candlestick(df, ticker, projected_col_name='Precio_Proyectad
     # Usamos inherit para un look más limpio y bordes menos pronunciados.
     mc = mpf.make_marketcolors(
         up='g', down='r', 
-        edge='inherit',      # Bordes más delgados
-        wick='inherit',      # Mechas más delgadas
+        edge='inherit',      # Bordes más delgados (Menos en negrita)
+        wick='inherit',      # Mechas más delgadas (Menos en negrita)
         volume='inherit'
     )
     
@@ -150,12 +148,10 @@ def generar_grafico_candlestick(df, ticker, projected_col_name='Precio_Proyectad
     s['rc'] = {'lines.linewidth': 0.5} 
 
     # Aseguramos que la columna de proyección exista, si no, la creamos como PLACEHOLDER
-    # Mantenemos esta lógica porque el código original no mostraba cómo se calcula esta columna.
     if projected_col_name not in df.columns:
         df[projected_col_name] = df['Close'].rolling(window=10).mean()
 
-    # CRÍTICO 3: Solo añadimos la línea proyectada. La línea de "cierre real" se quita
-    # simplemente no añadiéndola aquí. Las velas siguen visibles por 'type='candle''.
+    # CRÍTICO 3: Solo añadimos la línea proyectada. La línea de "cierre real" se quita.
     apds = []
     if projected_col_name in df.columns and not df[projected_col_name].isnull().all():
         addplot_projection = mpf.make_addplot(
@@ -187,6 +183,7 @@ def generar_grafico_candlestick(df, ticker, projected_col_name='Precio_Proyectad
     return plot_filepath
 
 
+# FUNCIÓN ORIGINAL: generar_contenido_con_gemini (MANTENIDA EN SU ESTADO ORIGINAL)
 def generar_contenido_con_gemini(tickers):
     """
     Procesa cada ticker, obtiene datos, genera el gráfico y llama a Gemini.
@@ -277,6 +274,7 @@ def generar_contenido_con_gemini(tickers):
         time.sleep(180)
 
 
+# FUNCIÓN ORIGINAL: main (MANTENIDA EN SU ESTADO ORIGINAL)
 def main():
     """Función principal para coordinar la lectura de hojas y el procesamiento diario."""
     try:
