@@ -942,6 +942,10 @@ def construir_prompt_formateado(data):
                 foreColor: '#e0e0e0',
                 stacked: false
             }},
+            // AÑADE ESTO: stroke.width controla el grosor de la línea del borde de la vela.
+            stroke: {{
+                width: 0.5 // Puedes usar 1 o 0.5 para una línea muy fina.
+            }},
             title: {{
                 text: 'Gráfico Candlestick y Proyección',
                 align: 'left',
