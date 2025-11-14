@@ -883,7 +883,7 @@ def construir_prompt_formateado(data):
         // Convertir las fechas ISO a strings para el eje de tipo 'category'
         // Esto elimina los huecos de fines de semana (SEGUNDO REQUISITO)
         // Ya que el eje X es 'category', los datos de las series deben usar el string de la fecha
-        // La conversión de ohlcData ya está correcta en Python: {x: 'date', y: [O, H, L, C]}
+        // La conversión de ohlcData ya está correcta en Python: {{x: 'date', y: [O, H, L, C]}} // CORRECCIÓN: LLAVES ESCAPADAS
         
         // --- Gráfico Principal (Candlestick, Proyección, y SMI) ---
         var optionsCandlestickSMI = {{
