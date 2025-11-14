@@ -236,10 +236,6 @@ def obtener_datos_yfinance(ticker):
         hist_extended = stock.history(period="90d", interval="1d")
         hist_extended = calculate_smi_tv(hist_extended)
 
-        # Usar un historial más corto (30d) solo si es necesario, pero nos enfocaremos en hist_extended
-        # hist = stock.history(period="30d", interval="1d") # Ya no es necesario cargar dos veces
-        # hist = calculate_smi_tv(hist)
-
         # Obtener datos históricos para el volumen del día anterior completo
         hist_recent = stock.history(period="5d", interval="1d") 
         
@@ -365,55 +361,56 @@ def obtener_datos_yfinance(ticker):
         # Calcula el volumen promedio de los últimos 30 días usando hist_extended
         volumen_promedio_30d = hist_extended['Volume'].tail(30).mean()
 
-
-        # Fechas reales de cotización para los últimos 30 días
-        fechas_historial = cierres_history_full.tail(30).index.strftime("%d/%m").tolist()
-        ultima_fecha_historial = cierres_history_full.index[-1] if not cierres_history_full.empty else datetime.today()
-        fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
+        # --- MANEJO ROBUSTO DE LOS 30 DÍAS DE DATOS PARA EL GRÁFICO (APEXCHARTS) ---
         
-        # --- MANEJO ROBUSTO DE LOS 30 DÍAS DE DATOS PARA EL GRÁFICO ---
-        # SMI para los 30 días del gráfico
-        smi_historico_para_grafico = []
-        if len(smi_history_full) >= 30:
-            smi_historico_para_grafico = smi_history_full.tail(30).tolist()
-        else:
-            # Rellenar con el primer valor SMI disponible o 0.0 si no hay ninguno
-            first_smi_val = smi_history_full.iloc[0] if not smi_history_full.empty else 0.0
-            smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
-
-        # Precios para el gráfico: 30 días DESPLAZADOS
-        precios_reales_para_grafico = []
-        # Para un offset de 0 (el SMI de hoy se alinea con el precio de hoy), tomamos los últimos 30 precios
-        if len(cierres_history_full) >= 30:
-            precios_reales_para_grafico = cierres_history_full.tail(30).tolist()
-        else:
-            # Rellenar con el primer precio disponible o el precio actual
-            first_price_val = cierres_history_full.iloc[0] if not cierres_history_full.empty else current_price
-            precios_reales_para_grafico = [first_price_val] * (30 - len(cierres_history_full)) + cierres_history_full.tolist()
+        # 1. Datos OHLC y SMI para el gráfico (últimos 30 días con datos)
+        # Usamos solo las filas donde tenemos todos los datos necesarios (OHLC y SMI)
+        ohlc_smi_df_hist = hist_extended[['Open', 'High', 'Low', 'Close', 'SMI']].dropna().tail(30)
         
-        # Asegurarse de que las etiquetas de fecha coincidan con los 30 días de datos
-        if len(fechas_historial) < 30 and len(cierres_history_full.tail(30)) > 0:
-            # Crear etiquetas de relleno si los datos históricos son menos de 30
-            num_fill = 30 - len(fechas_historial)
-            fecha_temp = cierres_history_full.index[0] if not cierres_history_full.empty else datetime.today()
-            fechas_relleno = [(fecha_temp - timedelta(days=i)).strftime("%d/%m (ant.)") for i in range(num_fill, 0, -1)]
-            fechas_historial = fechas_relleno + fechas_historial
+        ohlc_para_grafico = [] # Formato: [{x: timestamp_ms, y: [O, H, L, C]}, ...]
+        smi_historico_para_grafico_formato_linea = [] # Formato: [[timestamp_ms, SMI_value], ...]
+        precios_linea_para_grafico = [] # Formato: [[timestamp_ms, Close_value], ...]
+        fechas_etiquetas_grafico = []
 
-        # Validar la longitud final para evitar problemas en Chart.js
-        if len(smi_historico_para_grafico) != 30 or len(precios_reales_para_grafico) != 30 or len(fechas_historial) != 30:
-             # Si después de todo no coinciden, es mejor abortar la generación del gráfico
-             print(f"❌ Error crítico de longitud de arrays. SMI: {len(smi_historico_para_grafico)}, Precios: {len(precios_reales_para_grafico)}, Fechas: {len(fechas_historial)}")
-             # Usaremos un historial vacío para forzar un mensaje de error en el HTML
-             smi_historico_para_grafico = []
-             precios_reales_para_grafico = []
-             fechas_historial = []
+        if ohlc_smi_df_hist.empty:
+            print(f"❌ Error: No hay suficientes datos OHLC/SMI para generar el gráfico.")
+            # Continuamos con arrays vacíos
+            ultimo_precio_conocido = current_price
+            ultimo_timestamp_conocido_ms = int(datetime.today().timestamp() * 1000)
+            
+        else:
+            for index, row in ohlc_smi_df_hist.iterrows():
+                # Convertir timestamp a milisegundos Unix (requerido por ApexCharts)
+                timestamp_ms = int(index.timestamp() * 1000)
+                
+                # Datos de la vela (OHLC)
+                ohlc_para_grafico.append({
+                    'x': timestamp_ms,
+                    'y': [round(row['Open'], 3), round(row['High'], 3), round(row['Low'], 3), round(row['Close'], 3)]
+                })
+                
+                # Datos de la línea de precio (Close)
+                precios_linea_para_grafico.append([timestamp_ms, round(row['Close'], 3)])
+                
+                # Datos del SMI
+                smi_historico_para_grafico_formato_linea.append([timestamp_ms, round(row['SMI'], 3)])
+                
+                # Etiquetas de fecha para la simulación
+                fechas_etiquetas_grafico.append(index.strftime("%d/%m"))
+            
+            ultimo_precio_conocido = precios_linea_para_grafico[-1][1]
+            ultimo_timestamp_conocido_ms = precios_linea_para_grafico[-1][0]
 
+        
+        # 2. Datos de Simulación de Ganancias (los últimos 30 días CON SMI válido)
+        # Usamos los datos limpios de ohlc_smi_df_hist
+        precios_para_simulacion = ohlc_smi_df_hist['Close'].apply(lambda x: round(x, 3)).tolist()
+        smi_historico_para_simulacion = ohlc_smi_df_hist['SMI'].apply(lambda x: round(x, 3)).tolist()
+        fechas_para_simulacion = ohlc_smi_df_hist.index.strftime("%d/%m/%Y").tolist() 
 
-        # --- NUEVA Lógica: Proyección lineal SIN soportes/resistencias (solo SMI) ---
-        precios_proyectados = []
-        ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
-
-        # Determinar la dirección de la tendencia y el movimiento diario constante
+        # 3. Lógica de Proyección Lineal
+        # (La lógica de pendiente/movimiento diario es la misma)
+        # ... (Determinación de movimiento_diario - no modificado) ...
         smi_history_full_for_slope = hist_extended['SMI'].dropna()
         smi_ultimos_5_for_slope = smi_history_full_for_slope.tail(5).dropna()
 
@@ -423,47 +420,51 @@ def obtener_datos_yfinance(ticker):
             y = smi_ultimos_5_for_slope.values
             pendiente_smi, _ = np.polyfit(x, y, 1)
 
-        # Definir un movimiento diario constante (usaremos +/- 1% o +/- 0.5%)
         movimiento_diario = 0.0
-
-        # Prioridad 1: Sobrecompra / Sobreventa Extrema (Fuerza de Reversión)
         if smi_actual > 40:
-            # En sobrecompra: proyectamos caída (reversión)
             movimiento_diario = -0.01 
         elif smi_actual < -40:
-            # En sobreventa: proyectamos subida (reversión)
             movimiento_diario = 0.01
-        
-        # Prioridad 2: Tendencia en Zona Media (SMI entre -40 y 40)
-        # Se evalúa SÓLO si no se cumplió ninguna de las condiciones de extremos anteriores.
         elif -40 <= smi_actual <= 40:
             if pendiente_smi > 0.1:
-                # Subiendo en zona media: proyectamos subida
-                movimiento_diario = 0.005 # Subida moderada
+                movimiento_diario = 0.005 
             elif pendiente_smi < -0.1:
-                # Bajando en zona media: proyectamos caída
-                movimiento_diario = -0.005 # Caída moderada
+                movimiento_diario = -0.005
             else:
-                # Aplanado en zona media: proyectamos lateral
                 movimiento_diario = 0.0
+        # ... (Fin determinación de movimiento_diario) ...
+
+
+        precios_proyectados_linea = []
+        fechas_proyeccion = []
+        # El último índice conocido (que debería ser un día de trading)
+        ultima_fecha_historial = ohlc_smi_df_hist.index[-1].to_pydatetime() if not ohlc_smi_df_hist.empty else datetime.today()
+        current_date_for_projection = ultima_fecha_historial + timedelta(days=1)
 
         for _ in range(PROYECCION_FUTURA_DIAS):
+            # Encontrar el siguiente día de la semana (saltar Sáb/Dom)
+            while current_date_for_projection.weekday() >= 5: # 5 es Sábado, 6 es Domingo
+                 current_date_for_projection += timedelta(days=1)
+            
             siguiente_precio = ultimo_precio_conocido * (1 + movimiento_diario)
             siguiente_precio = round(siguiente_precio, 3)
-            precios_proyectados.append(siguiente_precio)
+            
+            # Formato de línea [Timestamp (ms), Value]
+            timestamp_ms = int(current_date_for_projection.timestamp() * 1000)
+            precios_proyectados_linea.append([timestamp_ms, siguiente_precio])
+            
+            # Actualizar
             ultimo_precio_conocido = siguiente_precio
+            current_date_for_projection += timedelta(days=1) # Avanzar un día
+            
+            # Etiqueta para el gráfico
+            fechas_proyeccion.append(current_date_for_projection.strftime("%d/%m (fut.)"))
 
-        # --- Fin de la NUEVA lógica lineal ---
 
-        # Unir precios reales y proyectados
-        cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
-        precio_proyectado_dia_5 = cierres_para_grafico_total[-1] if cierres_para_grafico_total else current_price # Último precio proyectado a 5 días
+        # Unir precios reales y proyectados para la línea de tendencia
+        cierres_para_grafico_total_linea = precios_linea_para_grafico + precios_proyectados_linea
+        precio_proyectado_dia_5 = cierres_para_grafico_total_linea[-1][1] if cierres_para_grafico_total_linea else current_price # Último precio proyectado a 5 días
 
-        # Guarda los datos para la simulación
-        smi_historico_para_simulacion = [round(s, 3) for s in smi_history_full.tail(30).tolist()]
-        precios_para_simulacion = precios_reales_para_grafico
-        fechas_para_simulacion = hist_extended.tail(30).index.strftime("%d/%m/%Y").tolist() # CORREGIDO: ahora se aplica .tail() al DataFrame
-        
         # Lógica de tendencia para la nota
         tendencia_ibexia = "No disponible"
         slope = 0.0
@@ -481,6 +482,12 @@ def obtener_datos_yfinance(ticker):
                 tendencia_ibexia = "empeorando (bajista)"
             else:
                 tendencia_ibexia = "cambio de tendencia"
+        
+        # --- JSON Serialization (NEW) ---
+        # Asegurarse de que se usa json.dumps en los arrays de datos para ApexCharts
+        ohlc_data_json = json.dumps(ohlc_para_grafico)
+        smi_data_json = json.dumps(smi_historico_para_grafico_formato_linea)
+        proyeccion_data_json = json.dumps(cierres_para_grafico_total_linea)
 
 
         datos = {
@@ -499,16 +506,15 @@ def obtener_datos_yfinance(ticker):
             "SMI_SEMANAL": smi_semanal, # NUEVA ADICIÓN
             "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
             "tendencia_ibexia": tendencia_ibexia, # Renombrado de TENDENCIA_NOTA
-            "CIERRES_30_DIAS": precios_reales_para_grafico, # Usar los 30 días ya limpios y completos
-            "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico, # Renombrado
-            "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total,
-            "OFFSET_DIAS_GRAFICO": OFFSET_DIAS,
+            "OHLC_PARA_GRAFICO_JSON": ohlc_data_json, # NUEVO
+            "SMI_HISTORICO_PARA_GRAFICO_JSON": smi_data_json, # NUEVO
+            "CIERRES_PARA_GRAFICO_TOTAL_LINEA_JSON": proyeccion_data_json, # NUEVO
             "RESISTENCIA_1": resistencia_1,
             "RESISTENCIA_2": resistencia_2,
             "RESISTENCIA_3": resistencia_3,
             "PRECIO_OBJETIVO": precio_objetivo,
-            "FECHAS_HISTORIAL": fechas_historial,
-            "FECHAS_PROYECCION": fechas_proyeccion,
+            "FECHAS_HISTORIAL": fechas_etiquetas_grafico, # Etiquetas de los 30 días de historia
+            "FECHAS_PROYECCION": fechas_proyeccion, # Etiquetas de los 5 días futuros
             "PRECIO_PROYECTADO_5DIAS": precio_proyectado_dia_5,
             'PRECIOS_PARA_SIMULACION': precios_para_simulacion,
             'SMI_PARA_SIMULACION': smi_historico_para_simulacion,
@@ -587,11 +593,10 @@ def construir_prompt_formateado(data):
     fecha_actual_str = datetime.today().strftime('%d/%m/%Y')
     titulo_post = f"Análisis actualizado el {fecha_actual_str} de {data['NOMBRE_EMPRESA']}. "
 
-    # Datos para el gráfico principal de SMI y Precios
-    smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
-    cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
-    OFFSET_DIAS = data.get('OFFSET_DIAS_GRAFICO', 0) # Corregido a 0 para el nuevo manejo
-    PROYECCION_FUTURA_DIAS = data.get('PROYECCION_FUTURA_DIAS_GRAFICO', 5)
+    # --- DATOS PARA APEXCHARTS ---
+    ohlc_data_json = data.get('OHLC_PARA_GRAFICO_JSON', '[]')
+    smi_data_json = data.get('SMI_HISTORICO_PARA_GRAFICO_JSON', '[]')
+    proyeccion_data_json = data.get('CIERRES_PARA_GRAFICO_TOTAL_LINEA_JSON', '[]')
 
 
     # NUEVA SECCIÓN DE ANÁLISIS DE GANANCIAS SIMULADAS
@@ -644,611 +649,365 @@ def construir_prompt_formateado(data):
     alerta_riesgo_html = ""
     if "ALTO RIESGO" in data['RECOMENDACION']:
          alerta_riesgo_html = f"""
-        <div style="background-color: #fce4e4; color: #c62828; padding: 15px; margin: 20px 0; text-align: center; border-radius: 8px; border: 2px solid #e57373;">
-            <p style="font-size: 1.2em; margin: 0; font-weight: bold;">
-                ⚠️ ALERTA DE ALTO RIESGO (SMI Semanal en Sobrecompra):
-            </p>
-            <p style="margin: 5px 0 0 0;">
-                El SMI semanal de <strong>{data['NOMBRE_EMPRESA']}</strong> está en <strong>{formatear_numero(data['SMI_SEMANAL'])}</strong>. A pesar de la señal de compra diaria, la sobrecompra en el marco temporal semanal sugiere que la subida podría ser débil o que una corrección está cerca. <br/> **Se recomienda actuar con extrema cautela y considerar la posibilidad de una caída a pesar de la proyección alcista.**
-            </p>
+        <div style="background-color: #fce4e4; color: #c62828; padding: 15px; margin: 20px 0; text-align: center; border-radius: 8px; border: 1px solid #c62828; font-weight: bold;">
+            ⚠️ {data['RECOMENDACION']} - {data['motivo_analisis']}
         </div>
         """
+    
 
-
-    # Nuevo HTML del gráfico (incluyendo el análisis detallado)
-    analisis_grafico_html = ""
-    chart_html = ""
-
-    # REVISIÓN CRÍTICA DE DATOS ANTES DE GENERAR EL GRÁFICO
-    labels_historial = data.get("FECHAS_HISTORIAL", [])
-    labels_proyeccion = data.get("FECHAS_PROYECCION", [])
-    labels_total = labels_historial + labels_proyeccion
-    num_labels_hist = len(labels_historial)
-    num_labels_total = len(labels_total)
-
-    if not smi_historico_para_grafico or not cierres_para_grafico_total or num_labels_total == 0:
-        chart_html = "<p>No hay suficientes datos válidos para generar el gráfico.</p>"
-    else:
-        # Asegurar que SMI tenga el mismo número de puntos que las etiquetas totales (rellenando con null)
-        smi_desplazados_para_grafico = smi_historico_para_grafico + [None] * PROYECCION_FUTURA_DIAS
+    # --- INICIO DE LA CONSTRUCCIÓN DEL PROMPT HTML ---
+    html_prompt = f"""
+    <div style="background-color: #f4f4f4; padding: 20px; border-radius: 10px; font-family: Arial, sans-serif;">
         
-        # El dataset de precio proyectado debe ser:
-        # [null] * (días_historial - 1) + [último precio real] + [precios_proyectados]
-        # Esto asegura que la línea proyectada comience exactamente en el último punto del precio real
-        precios_reales_grafico = data.get('CIERRES_30_DIAS', [])
-        precios_proyectados = cierres_para_grafico_total[num_labels_hist:]
+        <h1 style="color: #333; border-bottom: 2px solid #DB6927; padding-bottom: 10px; margin-bottom: 20px; text-align: center;">
+            {titulo_post}
+        </h1>
         
-        data_proyectada = []
-        if num_labels_hist > 0 and precios_reales_grafico:
-            # Rellenar con null antes del último punto de precio real
-            data_proyectada = [None] * (num_labels_hist - 1)
-            # Agregar el último precio real (el punto de conexión)
-            data_proyectada.append(precios_reales_grafico[-1])
-            # Agregar la proyección
-            data_proyectada.extend(precios_proyectados)
-        else:
-             data_proyectada = [None] * num_labels_total # Si no hay historial, no hay proyección
-        
-        # Si el precio real tiene menos de 30 puntos (por la lógica de rellenado en yfinance),
-        # también debemos asegurarnos de que el array de precios reales tenga la longitud de las etiquetas históricas.
-        if len(precios_reales_grafico) < num_labels_hist:
-             # Esto debería estar resuelto por el manejo en yfinance, pero lo forzamos a null si hay un desajuste
-             precios_reales_grafico.extend([None] * (num_labels_hist - len(precios_reales_grafico)))
+        {alerta_riesgo_html}
 
-        # Aseguramos que todos los datasets tengan la misma longitud que labels_total
-        max_len = num_labels_total
-        smi_desplazados_para_grafico = smi_desplazados_para_grafico[:max_len]
-        data_proyectada = data_proyectada[:max_len]
-        
-        # Rellenar el array de precios reales con 'null' para el área de proyección
-        precios_reales_grafico_completo = precios_reales_grafico[:num_labels_hist] + [None] * PROYECCION_FUTURA_DIAS
-        precios_reales_grafico_completo = precios_reales_grafico_completo[:max_len]
-
-        
-        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON ----
-        # Serializar todos los arrays para garantizar que None se convierte a 'null'
-        labels_json = safe_json_dump(labels_total)
-        smi_json = safe_json_dump(smi_desplazados_para_grafico)
-        precios_reales_json = safe_json_dump(precios_reales_grafico_completo)
-        data_proyectada_json = safe_json_dump(data_proyectada)
-        # ---- FIN DE LA CORRECCIÓN ----
-        
-        # Reemplazo para la sección de análisis detallado del gráfico
-        analisis_grafico_html = f"""
-        <h2 style="color: #333333; background-color: #e9e9e9; padding: 10px; border-radius: 5px; text-align: center;">Análisis Detallado del Gráfico</h2>
-        <div style="background-color: #fafafa; padding: 15px; border-radius: 8px; border: 1px solid #dddddd;">
-            <table style="width: 100%; border-collapse: collapse; color: #333333; font-family: Arial, sans-serif;">
-                <thead>
-                    <tr style="background-color: #dcdcdc; border-bottom: 2px solid #aaaaaa;">
-                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Período</th>
-                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Movimiento del Algoritmo</th>
-                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Evolución del Precio</th>
-                        <th style="padding: 12px; text-align: left; font-size: 14px; font-weight: bold;">Decisión / Estado</th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        
-        precios = data['PRECIOS_PARA_SIMULACION']
-        smis = data['SMI_PARA_SIMULACION']
-        fechas = data['FECHAS_PARA_SIMULACION']
-        
-        def get_trend(smi_val, prev_smi_val):
-            # Analiza la pendiente
-            if smi_val - prev_smi_val > 0.1:
-                return "alcista"
-            elif smi_val - prev_smi_val < -0.1:
-                return "bajista"
-            else:
-                return "consolidación"
-
-        def get_event_action(start_date, end_date):
-            compra = next((c for c in data.get('COMPRAS_SIMULADAS', []) if c['fecha'] >= start_date and c['fecha'] <= end_date), None)
-            venta = next((v for v in data.get('VENTAS_SIMULADAS', []) if v['fecha'] >= start_date and v['fecha'] <= end_date), None)
-            
-            if compra:
-                return f"<strong>✅ Compra</strong> en {formatear_numero(compra['precio'])}€"
-            elif venta:
-                return f"<strong>❌ Venta</strong> en {formatear_numero(venta['precio'])}€"
-            return "Sin operación"
-            
-        i = 1
-        while i < len(smis):
-            start_index = i - 1
-            tendencia_actual = get_trend(smis[i], smis[i-1])
-            
-            while i < len(smis) and get_trend(smis[i], smis[i-1]) == tendencia_actual:
-                i += 1
-            
-            end_index = i - 1
-            
-            fecha_inicio = fechas[start_index]
-            fecha_fin = fechas[end_index]
-            precio_inicio = formatear_numero(precios[start_index])
-            precio_final = formatear_numero(precios[end_index])
-            
-            movimiento_algoritmo = ""
-            evolucion_precio = f"De <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
-            decision_inversion = get_event_action(fecha_inicio, fecha_fin)
-
-            if tendencia_actual == "alcista":
-                movimiento_algoritmo = "Tendencia alcista"
-                evolucion_precio = f"<span style='color: #4CAF50;'>Subida</span> de <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
-            elif tendencia_actual == "bajista":
-                movimiento_algoritmo = "Tendencia bajista"
-                evolucion_precio = f"<span style='color: #F44336;'>Bajada</span> de <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
-            elif tendencia_actual == "consolidación":
-                movimiento_algoritmo = "Fase de consolidación"
-                evolucion_precio = f"<span style='color: #FFC107;'>Lateral</span> de <strong>{precio_inicio}€</strong> a <strong>{precio_final}€</strong>"
-
-            analisis_grafico_html += f"""
-                    <tr style="border-bottom: 1px solid #333333;">
-                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{fecha_inicio} a {fecha_fin}</td>
-                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{movimiento_algoritmo}</td>
-                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{evolucion_precio}</td>
-                        <td style="padding: 12px; vertical-align: top; font-size: 12px;">{decision_inversion}</td>
-                    </tr>
-            """
-        
-        # Última fila para el estado actual
-        ultima_tendencia = "sin datos" 
-        if len(smis) > 1:
-             ultima_tendencia_smi = get_trend(smis[-1], smis[-2])
-             if ultima_tendencia_smi == "alcista":
-                ultima_tendencia = "alcista"
-             elif ultima_tendencia_smi == "bajista":
-                ultima_tendencia = "bajista"
-             elif ultima_tendencia_smi == "consolidación":
-                 ultima_tendencia = "consolidación"
-
-        estado_actual = ""
-        if ultima_tendencia == "alcista":
-            estado_actual = "Actualmente, el Algoritmo muestra una **tendencia alcista**."
-        elif ultima_tendencia == "bajista":
-            estado_actual = "En estos momentos, el Algoritmo tiene una **tendencia bajista**."
-        elif ultima_tendencia == "consolidación":
-            estado_actual = "El Algoritmo se encuentra en una fase de **consolidación**, moviéndose de forma lateral."
-
-        analisis_grafico_html += f"""
-                </tbody>
-            </table>
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-around; background-color: #ffffff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="margin: 10px; padding: 10px; border-left: 3px solid #007bff;">
+                <p style="margin: 0; font-size: 1.2em; font-weight: bold; color: #333;">Precio Actual:</p>
+                <p style="margin: 0; font-size: 1.5em; color: #28a745;">{formatear_numero(data['PRECIO_ACTUAL'])}€</p>
+            </div>
+            <div style="margin: 10px; padding: 10px; border-left: 3px solid #DB6927;">
+                <p style="margin: 0; font-size: 1.2em; font-weight: bold; color: #333;">Recomendación IBEXIA:</p>
+                <p style="margin: 0; font-size: 1.5em; color: {'#c62828' if 'Vender' in data['RECOMENDACION'] else '#28a745' if 'Comprar' in data['RECOMENDACION'] else '#007bff'};">{data['RECOMENDACION']}</p>
+            </div>
+            <div style="margin: 10px; padding: 10px; border-left: 3px solid #ffc107;">
+                <p style="margin: 0; font-size: 1.2em; font-weight: bold; color: #333;">Proyección 5 Días:</p>
+                <p style="margin: 0; font-size: 1.5em; color: #17a2b8;">{formatear_numero(data['PRECIO_PROYECTADO_5DIAS'])}€</p>
+            </div>
         </div>
-        <p style="text-align: center; color: #aaaaaa; margin-top: 15px;">{estado_actual}</p>
-        """
 
-        # El gráfico en sí, que debe ir antes que el análisis
-        # Usamos los arrays de datos corregidos: smi_desplazados_para_grafico, precios_reales_grafico_completo, data_proyectada
-        chart_html = f"""
-        <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
-            <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
+        <h2 style="color: #333; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Análisis de Nuestro Algoritmo (SMI)</h2>
+        
+        <p style="line-height: 1.6;">
+            Nuestro algoritmo de inversión ha determinado que el valor de **{data['NOMBRE_EMPRESA']} ({data['TICKER']})** está en una fase de <strong>{data['tendencia_ibexia']}</strong>.
+            Actualmente, el indicador **SMI** (Stochastic Momentum Index) se sitúa en <strong>{data['SMI']:.3f}</strong>, y el SMI Semanal en <strong>{data['SMI_SEMANAL']:.3f}</strong>.
+            Esto nos lleva a la siguiente conclusión:
+        </p>
+
+        <p style="background-color: #e9ecef; padding: 15px; border-left: 4px solid #DB6927; font-style: italic;">
+            **Motivo del Análisis:** {data['motivo_analisis']}
+        </p>
+        
+        {anuncio_html}
+
+        <h2 style="color: #333; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Resistencias, Soportes y Volumen</h2>
+        
+        <p style="line-height: 1.6;">
+            La resistencia más cercana se encuentra en <strong>{formatear_numero(data['RESISTENCIA_1'])}€</strong>. Superar este nivel podría confirmar la tendencia alcista. Por otro lado, la cotización de la acción presenta {soportes_texto}
+        </p>
+        <p style="line-height: 1.6;">
+            {volumen_analisis_text}
+        </p>
+
+        <h2 style="color: #333; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Historial de Operaciones Simuladas por Nuestro Algoritmo</h2>
+        <div style="background-color: #ffffff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            {ganancias_html}
         </div>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
+
+        <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+        <div style="margin-top: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">
+            <h3 style="text-align: center; color: #333; margin-bottom: 15px;">Gráfico de Velas, SMI y Proyección (Últimos 30 Días + 5 Días de Proyección)</h3>
+            <div id="apexchart-candlestick" style="width: 100%; height: 500px;"></div>
+        </div>
+
         <script>
-            // Configuración del gráfico
-            var ctx = document.getElementById('smiPrecioChart').getContext('2d');
-            var smiPrecioChart = new Chart(ctx, {{
-                type: 'line',
-                data: {{
-                    labels: {labels_json},
-                    datasets: [
-                        {{
-                            label: 'Nuestro Algoritmo',
-                            data: {smi_json},
-                            borderColor: '#00bfa5',
-                            backgroundColor: 'rgba(0, 191, 165, 0.2)',
-                            yAxisID: 'y1',
-                            pointRadius: 0,
-                            borderWidth: 2,
-                            tension: 0.1
-                        }},
-                        {{
-                            label: 'Precio Real',
-                            data: {precios_reales_json},
-                            borderColor: '#2979ff',
-                            backgroundColor: 'rgba(41, 121, 255, 0.2)',
-                            yAxisID: 'y',
-                            pointRadius: 0,
-                            borderWidth: 2,
-                            tension: 0.1
-                        }},
-                        {{
-                            label: 'Precio Proyectado',
-                            data: {data_proyectada_json},
-                            borderColor: '#ffc107',
-                            borderDash: [5, 5],
-                            backgroundColor: 'rgba(255, 193, 7, 0.2)',
-                            yAxisID: 'y',
-                            pointRadius: 0,
-                            borderWidth: 2,
-                            tension: 0.1
-                        }}
-                    ]
-                }},
-                options: {{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {{
-                        mode: 'index',
-                        intersect: false,
+            // --- DATOS DEL GRÁFICO ---
+            const ohlcData = {ohlc_data_json};
+            const smiData = {smi_data_json};
+            const proyeccionData = {proyeccion_data_json};
+            
+            // Función para formatear el timestamp Unix a fecha legible
+            function formatDate(timestamp) {{
+                const date = new Date(timestamp);
+                const day = date.getDate().toString().padStart(2, '0');
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                return `${{day}}/{{month}}`;
+            }}
+
+            // Colores base
+            const colorAlcista = '#00e396'; // Verde para velas y tendencias alcistas
+            const colorBajista = '#ff4560'; // Rojo para velas y tendencias bajistas
+            const colorNeutro = '#008ffb'; // Azul para el SMI
+
+            // --- CONFIGURACIÓN DE APEXCHARTS ---
+            var options = {{
+                series: [
+                    {{
+                        name: 'Velas (OHLC)',
+                        type: 'candlestick',
+                        data: ohlcData,
                     }},
-                    plugins: {{
-                        legend: {{
-                            display: true,
-                            labels: {{
-                                color: '#e0e0e0'
+                    {{
+                        name: 'SMI (Algoritmo)',
+                        type: 'line',
+                        data: smiData,
+                    }},
+                    {{
+                        name: 'Precio y Proyección 5D',
+                        type: 'line',
+                        data: proyeccionData,
+                    }}
+                ],
+                chart: {{
+                    height: 500,
+                    type: 'line',
+                    toolbar: {{
+                        show: true,
+                        tools: {{
+                            download: true,
+                            selection: false,
+                            zoom: true,
+                            zoomin: true,
+                            zoomout: true,
+                            pan: true,
+                            reset: true | '<img src="/static/icons/reset.png" width="20">'
+                        }},
+                    }}
+                }},
+                title: {{
+                    text: 'Gráfico de Velas y Tendencia',
+                    align: 'left',
+                    style: {{
+                        fontSize: '16px'
+                    }}
+                }},
+                xaxis: {{
+                    type: 'datetime',
+                    labels: {{
+                        formatter: function(val) {{
+                            return formatDate(val); // Mostrar DD/MM
+                        }},
+                        style: {{
+                             fontSize: '12px'
+                        }}
+                    }},
+                    tooltip: {{
+                        enabled: true,
+                        formatter: function(val) {{
+                            return formatDate(val);
+                        }}
+                    }}
+                }},
+                yaxis: [
+                    {{
+                        seriesName: 'Velas (OHLC)',
+                        axisTicks: {{
+                            show: true
+                        }},
+                        axisBorder: {{
+                            show: true,
+                            color: colorAlcista
+                        }},
+                        labels: {{
+                            style: {{
+                                colors: colorAlcista,
+                            }},
+                            formatter: function(val) {{
+                                return val.toFixed(3) + '€';
+                            }}
+                        }},
+                        title: {{
+                            text: "Precio (€)",
+                            style: {{
+                                color: colorAlcista
                             }}
                         }},
                         tooltip: {{
-                            mode: 'index',
-                            intersect: false,
-                            backgroundColor: 'rgba(26, 26, 46, 0.8)',
-                            titleColor: '#e0e0e0',
-                            bodyColor: '#e0e0e0',
-                            borderColor: '#4a4a5e',
-                            borderWidth: 1,
-                            callbacks: {{
-                                label: function(context) {{
-                                    let label = context.dataset.label || '';
-                                    if (label) {{
-                                        label += ': ';
-                                    }}
-                                    if (context.parsed.y !== null) {{
-                                        label += context.parsed.y.toFixed(2) + '€';
-                                    }}
-                                    return label;
-                                }}
+                            enabled: true
+                        }},
+                        min: Math.min(...ohlcData.map(d => d.y[2])) * 0.98,
+                        max: Math.max(...ohlcData.map(d => d.y[1])) * 1.02,
+                    }},
+                    {{
+                        seriesName: 'SMI (Algoritmo)',
+                        opposite: true,
+                        axisTicks: {{
+                            show: true
+                        }},
+                        axisBorder: {{
+                            show: true,
+                            color: colorNeutro
+                        }},
+                        labels: {{
+                            style: {{
+                                colors: colorNeutro,
+                            }},
+                            formatter: function(val) {{
+                                return val.toFixed(2);
                             }}
                         }},
-                        annotation: {{
-                            annotations: {{
-                                sobrecompra: {{
-                                    type: 'line',
-                                    mode: 'horizontal',
-                                    scaleID: 'y1',
-                                    value: 40,
-                                    borderColor: '#d32f2f',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Sobrecompra (+40)',
-                                        enabled: true,
-                                        position: 'start',
-                                        color: '#e0e0e0',
-                                        backgroundColor: 'rgba(211, 47, 47, 0.6)',
-                                        font: {{
-                                            size: 10
-                                        }}
-                                    }}
-                                }},
-                                sobreventa: {{
-                                    type: 'line',
-                                    mode: 'horizontal',
-                                    scaleID: 'y1',
-                                    value: -40,
-                                    borderColor: '#388e3c',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Sobreventa (-40)',
-                                        enabled: true,
-                                        position: 'start',
-                                        color: '#e0e0e0',
-                                        backgroundColor: 'rgba(56, 142, 60, 0.6)',
-                                        font: {{
-                                            size: 10
-                                        }}
-                                    }}
-                                }}
+                        title: {{
+                            text: "SMI",
+                            style: {{
+                                color: colorNeutro
                             }}
+                        }},
+                        min: -100,
+                        max: 100
+                    }}
+                ],
+                tooltip: {{
+                    x: {{
+                        formatter: function(val) {{
+                            return formatDate(val);
                         }}
                     }},
-                    scales: {{
-                        x: {{
-                            ticks: {{
-                                color: '#e0e0e0'
-                            }},
-                            grid: {{
-                                color: 'rgba(128, 128, 128, 0.2)'
+                    y: {{
+                        formatter: function (val, opts) {{
+                            if (opts.seriesIndex === 0) {{
+                                // Candlestick tooltip (OHLC)
+                                 const dataPoint = opts.w.config.series[0].data[opts.dataPointIndex].y;
+                                 return `A: ${{(dataPoint[0]).toFixed(3)}}€<br>M: ${{(dataPoint[1]).toFixed(3)}}€<br>m: ${{(dataPoint[2]).toFixed(3)}}€<br>C: ${{(dataPoint[3]).toFixed(3)}}€`;
+                            }} else if (opts.seriesIndex === 1) {{
+                                // SMI
+                                return `${{val.toFixed(3)}}`;
+                            }} else if (opts.seriesIndex === 2) {{
+                                // Proyección
+                                return `${{val.toFixed(3)}}€`;
                             }}
-                        }},
-                        y: {{
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {{
-                                display: true,
-                                text: 'Precio (EUR)',
-                                color: '#e0e0e0'
-                            }},
-                            ticks: {{
-                                color: '#e0e0e0'
-                            }},
-                            grid: {{
-                                color: 'rgba(128, 128, 128, 0.2)',
-                                drawOnChartArea: false
-                            }}
-                        }},
-                        y1: {{
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {{
-                                display: true,
-                                text: 'Nuestro Algoritmo',
-                                color: '#e0e0e0'
-                            }},
-                            grid: {{
-                                drawOnChartArea: false,
-                            }},
-                            min: -100,
-                            max: 100,
-                            ticks: {{
-                                stepSize: 25,
-                                color: '#e0e0e0'
-                            }}
+                            return val;
                         }}
                     }}
+                }},
+                stroke: {{
+                    width: [1, 2, 2] // Grosor de las series (Velas, SMI, Proyección)
+                }},
+                colors: [colorAlcista, colorNeutro, colorBajista], // Velas (se ignora), SMI (Azul), Proyección (Rojo)
+                plotOptions: {{
+                    candlestick: {{
+                        colors: {{
+                            up: colorAlcista, // Verde
+                            down: colorBajista  // Rojo
+                        }}
+                    }}
+                }},
+                markers: {{
+                    size: [0, 0, 4] // Sin marcadores para Velas y SMI, 4px para Proyección
+                }},
+                legend: {{
+                     tooltipHoverFormatter: function(val, opts) {{
+                        return val + ' - ' + opts.w.globals.series[opts.seriesIndex][opts.dataPointIndex] + ''
+                    }}
+                }},
+                grid: {{
+                    row: {{
+                        colors: ['#f3f3f3', 'transparent'], // Fondo
+                        opacity: 0.5
+                    }},
                 }}
-            }});
+            }};
+
+            // Inicialización de la gráfica: Nos aseguramos de que haya datos
+            if (ohlcData.length > 0) {{
+                var chart = new ApexCharts(document.querySelector("#apexchart-candlestick"), options);
+                chart.render();
+            }} else {{
+                document.querySelector("#apexchart-candlestick").innerHTML = '<p style="text-align: center; color: #c62828;">No hay suficientes datos históricos (OHLC/SMI) para generar el gráfico de velas.</p>';
+            }}
         </script>
-        """
-    
-    # MODIFICACIÓN: Incluir SMI Semanal en la tabla de resumen
-    tabla_resumen = f"""
-<h2>Resumen de Puntos Clave</h2>
-<table border="1" style="width:100%; border-collapse: collapse;">
-    <tr>
-        <th style="padding: 8px; text-align: left; background-color: #f3f3f2;">Métrica</th>
-        <th style="padding: 8px; text-align: left; background-color: #f3f3f2;">Valor</th>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Precio Actual</td>
-        <td style="padding: 8px;"><strong>{formatear_numero(data['PRECIO_ACTUAL'])}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Volumen</td>
-        <td style="padding: 8px;"><strong>{data['VOLUMEN']:,} acciones</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Soporte Clave</td>
-        <td style="padding: 8px;"><strong>{formatear_numero(soportes_unicos[0])}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Resistencia Clave</td>
-        <td style="padding: 8px;"><strong>{formatear_numero(data['RESISTENCIA'])}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">Precio Objetivo de Compra</td>
-        <td style="padding: 8px;"><strong>{formatear_numero(data['PRECIO_OBJETIVO_COMPRA'])}€</strong></td>
-    </tr>
-    <tr>
-        <td style="padding: 8px;">SMI Semanal</td>
-        <td style="padding: 8px;"><strong>{formatear_numero(data['SMI_SEMANAL'])}</strong></td>
-    </tr>
-</table>
-<br/>
-"""
-
-    
-    prompt = f"""
-Actúa como un generador de contenido estricto. Tu única tarea es completar las secciones HTML solicitadas a continuación, utilizando EXACTAMENTE el formato proporcionado. NO agregues ni elimines secciones, párrafos, ni introduzcas opiniones o análisis personales más allá del texto que ya se encuentra definido en las plantillas. Genera el análisis completo en **formato HTML**, ideal para publicaciones web. Utiliza etiquetas `<h2>` para los títulos de sección y `<p>` para cada párrafo de texto. Redacta en primera persona, con total confianza en tu criterio.
-
-Destaca los datos importantes como precios, cifras financieras y el nombre de la empresa utilizando la etiqueta `<strong>`. Asegúrate de que no haya asteriscos u otros símbolos de marcado en el texto final, solo HTML válido. Asegurate que todo este escrito en español independientemente del idioma de donde saques los datos.
-
-Genera un análisis técnico completo sobre la empresa {data['NOMBRE_EMPRESA']}, utilizando los siguientes datos reales extraídos de Yahoo Finance. Presta especial atención (pero no lo menciones) al **valor actual del SMI ({data['SMI']})** y al **SMI Semanal ({data['SMI_SEMANAL']})**.
-
-¡ATENCIÓN URGENTE! Para CADA EMPRESA analizada, debes generar el CÓDIGO HTML Y JAVASCRIPT COMPLETO y Único para TODOS sus gráficos solicitados. Bajo ninguna circunstancia debes omitir ningún script, resumir bloques de código o utilizar frases como 'código JavaScript idéntico al ejemplo anterior'. Cada gráfico, para cada empresa, debe tener su script completamente incrustado, funcional e independiente de otros. Asegúrate de que los datos de cada gráfico corresponden SIEMPRE a la empresa que se está analizando en ese momento
-
-**Datos clave:**
-- Precio actual: {formatear_numero(data['PRECIO_ACTUAL'])}
-- Volumen del último día completo: {data['VOLUMEN']}
-- Soporte 1: {formatear_numero(data['SOPORTE_1'])}
-- Soporte 2: {formatear_numero(data['SOPORTE_2'])}
-- Soporte 3: {formatear_numero(data['SOPORTE_3'])}
-- Resistencia clave: {formatear_numero(data['RESISTENCIA'])}
-- Recomendación general: {data['RECOMENDACION']}
-- SMI actual: {data['SMI']}
-- SMI semanal: {data['SMI_SEMANAL']}
-- Precio objetivo de compra: {formatear_numero(data['PRECIO_OBJETIVO_COMPRA'])}€
-- Tendencia del SMI: {data['tendencia_ibexia']}
-
-
-Importante: si algún dato no está disponible ("N/A", "No disponibles", "No disponible"), no lo menciones ni digas que falta. No expliques que la recomendación proviene de un indicador o dato específico.
-
----
-<h1>{titulo_post}</h1>
-<p style="font-size: 0.8em; color: #FF9800; font-weight: bold; text-align: center;">
-    El análisis redactado a continuación se actualiza una vez por semana. La ficha superior SI se actualiza varias veces al día donde puedes ver nuestra posición en tiempo real y análisis resumido.
-</p>
-
-<h2>Análisis Inicial</h2>
-<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{formatear_numero(data['PRECIO_ACTUAL'])}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
-
-<h2>Historial de Operaciones</h2>
-{ganancias_html}
-
-{alerta_riesgo_html}
-
-{anuncio_html}
-
-{chart_html}
-{analisis_grafico_html}
-
-<h2>La Clave: El Algoritmo como tu "Guía de Compra"</h2>
-<p>Nuestro sistema se basa en un <strong>Algoritmo</strong> que funciona como una brújula que te dice si es un buen momento para comprar o no. La clave está en cómo se mueve:</p>
-<ul>
-    <li>
-        <strong>Si el Algoritmo está en sobreventa (muy abajo):</strong> La acción podría estar "demasiado barata". Es probable que el Algoritmo gire hacia arriba, lo que sería una <strong>señal de compra</strong>.
-    </li>
-    <li>
-        <strong>Si el Algoritmo está en sobrecompra (muy arriba):</strong> La acción podría estar "demasiado cara". El Algoritmo podría girar a la baja, lo que sería una <strong>señal para no comprar</strong>.
-    </li>
-</ul>
-<p>Más allá de la sobrecompra o sobreventa, la señal de compra más clara es cuando el Algoritmo <strong>gira hacia arriba</strong>. Si ves que sube, es un buen momento para comprar (siempre y cuando no esté en una zona extrema de sobrecompra). Si gira a la baja, es mejor esperar.</p>
-
-{tabla_resumen}
-
-**FIN DEL ANÁLISIS. NO AÑADAS NINGÚN TEXTO O SECCIÓN ADICIONAL DESPUÉS DEL RESUMEN DE PUNTOS CLAVE.**
-"""
-    return prompt, titulo_post
-
-def enviar_email(texto_generado, asunto_email, nombre_archivo):
+        <p style="text-align: center; font-size: 0.8em; color: #6c757d; margin-top: 30px;">
+            Este análisis es generado automáticamente por el Algoritmo de IBEXIA.
+        </p>
+    </div>
     """
-    Envía un correo electrónico a través de Brevo (Sendinblue) con un archivo HTML adjunto,
-    utilizando la configuración SMTP hardcodeada.
-    """
-    # 1. CONFIGURACIÓN HARDCODEADA DE BREVO Y DESTINATARIO
-    servidor_smtp = 'smtp-relay.brevo.com'
-    puerto_smtp = 587
-    remitente_header = "IBEXIA.es <info@ibexia.es>" # Usado en el campo 'From'
-    remitente_login = "9853a2001@smtp-brevo.com"    # Usuario SMTP para login
-    password = "PRHTU5GN1ygZ9XVC"                   # Contraseña SMTP para login
-    destinatario = "XUMKOX@GMAIL.COM"               # ¡DESTINATARIO HARCODEADO!
-    
-    # Extraer la dirección de correo visible (info@ibexia.es) del header completo
-    match_remitente_email = re.search(r'<(.*?)>', remitente_header)
-    # Esta dirección se usará como remitente en la transacción SMTP
-    remitente_visible_email = match_remitente_email.group(1) if match_remitente_email else remitente_login
-    
-    ruta_archivo = f"{nombre_archivo}.html"
-    
-    # 2. Guardar el contenido generado en un archivo local temporal
-    try:
-        with open(ruta_archivo, "w", encoding="utf-8") as f:
-            f.write(texto_generado)
-    except Exception as e:
-        print(f"❌ Error al escribir el archivo {ruta_archivo}: {e}")
-        return
+    return html_prompt
 
-    # 3. Construcción del mensaje MIME
-    msg = MIMEMultipart()
-    msg['From'] = remitente_header # Ej: "IBEXIA.es <info@ibexia.es>"
-    msg['To'] = destinatario
-    msg['Subject'] = asunto_email
-    
-    # Cuerpo del email
-    msg.attach(MIMEText("Adjunto el análisis en formato HTML.", 'plain'))
 
-    # Adjuntar el archivo HTML
+def enviar_email(html_prompt, ticker, email_list, subject_prefix="Análisis de"):
     try:
-        with open(ruta_archivo, "rb") as attachment:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment.read())
+        sender_email = os.getenv('SENDER_EMAIL')
+        sender_password = os.getenv('SENDER_PASSWORD')
+        smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('SMTP_PORT', 587))
         
-        # Codificación y cabeceras para el adjunto
-        encoders.encode_base64(part)
-        part.add_header(
-            "Content-Disposition",
-            f"attachment; filename= {ruta_archivo}",
-        )
+        if not sender_email or not sender_password:
+             print("❌ Error: Variables de entorno SENDER_EMAIL o SENDER_PASSWORD no configuradas.")
+             return
+
+        msg = MIMEMultipart("alternative")
+        msg['Subject'] = f"{subject_prefix} {ticker} - IBEXIA Algoritmo"
+        msg['From'] = sender_email
+        
+        # Unir todos los destinatarios para el campo To (aunque se envía individualmente)
+        msg['To'] = ", ".join(email_list)
+        
+        part = MIMEText(html_prompt, "html")
         msg.attach(part)
-    except Exception as e:
-        print(f"❌ Error al adjuntar el archivo {ruta_archivo}: {e}")
-        # Asegurarse de que el archivo temporal se borre incluso si falla el adjunto
-        try:
-            os.remove(ruta_archivo)
-        except OSError:
-            pass
-        return
         
-    # 4. Conexión al servidor Brevo SMTP
+        # Conectar y enviar el correo
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            
+            # Enviar a cada destinatario individualmente (BCC implícito)
+            for recipient in email_list:
+                try:
+                    server.sendmail(sender_email, recipient, msg.as_string())
+                    print(f"✅ Email enviado con éxito a {recipient} para {ticker}.")
+                except Exception as e:
+                    print(f"❌ Error al enviar email a {recipient}: {e}")
+
+    except Exception as e:
+        print(f"❌ Error general en la función enviar_email: {e}")
+        
+
+def generar_contenido_con_gemini(tickers_for_today):
     try:
-        print(f"🌐 Intentando conectar a Brevo SMTP: {servidor_smtp}:{puerto_smtp}")
-        servidor = smtplib.SMTP(servidor_smtp, puerto_smtp)
-        servidor.starttls() 
+        gemini_api_key = os.getenv('GEMINI_API_KEY')
+        if not gemini_api_key:
+            raise ValueError("La variable de entorno GEMINI_API_KEY no está configurada.")
         
-        print(f"🔑 Intentando iniciar sesión con el usuario: {remitente_login}")
-        # Usa el login y la clave de Brevo para la autenticación
-        servidor.login(remitente_login, password)
+        genai.configure(api_key=gemini_api_key)
+        client = genai.Client()
         
-        print(f"✉️ Enviando correo a: {destinatario} desde: {remitente_visible_email}")
-        # Usa el email visible como el remitente de la transacción
-        servidor.sendmail(remitente_visible_email, destinatario, msg.as_string())
-        
-        servidor.quit()
-        print("✅ Correo enviado exitosamente a Brevo.")
-
-    except smtplib.SMTPAuthenticationError:
-        print(f"❌ ERROR de Autenticación SMTP. Verifica el login y la clave SMTP de Brevo: {remitente_login}")
     except Exception as e:
-        print(f"❌ Ocurrió un error al enviar el correo vía Brevo: {e}")
-    finally:
-        # 5. Limpieza (Borrar el archivo temporal)
+        print(f"❌ Error al configurar Gemini: {e}")
+        return
+
+    # Usar emails de prueba si la lista de la hoja de cálculo está vacía o si solo hay un elemento (el encabezado)
+    email_list_raw = leer_google_sheets()
+    if len(email_list_raw) <= 1:
+        email_list = ["test@example.com", "otro@test.com"] # Lista de prueba si no hay emails reales
+        print("⚠️ Advertencia: Usando lista de emails de prueba.")
+    else:
+        # Asumiendo que el primer elemento es un encabezado y los siguientes son los emails
+        email_list = email_list_raw[1:]
+        print(f"Usando lista de emails leída: {email_list}")
+
+    for ticker in tickers_for_today:
+        print(f"\n--- Procesando Ticker: {ticker} ---")
+        
         try:
-            os.remove(ruta_archivo)
-        except OSError as e:
-            print(f"⚠️ Error al intentar borrar el archivo temporal {ruta_archivo}: {e}")
+            data = obtener_datos_yfinance(ticker)
+            if data is None:
+                continue
 
+            # Construir el prompt para la simulación de ganancias (antes del prompt a Gemini)
+            # Esto pobla el diccionario 'data' con el HTML de ganancias y las operaciones
+            ganancias_html, compras_simuladas, ventas_simuladas = calcular_ganancias_simuladas(
+                precios=data['PRECIOS_PARA_SIMULACION'],
+                smis=data['SMI_PARA_SIMULACION'],
+                fechas=data['FECHAS_PARA_SIMULACION']
+            )
+            # Actualizar el diccionario data con los resultados de la simulación
+            data['COMPRAS_SIMULADAS'] = compras_simuladas
+            data['VENTAS_SIMULADAS'] = ventas_simuladas
 
-def generar_contenido_con_gemini(tickers):
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key:
-        raise Exception("No se encontró la variable de entorno GEMINI_API_KEY")
+            # Generar el HTML final con el gráfico ApexCharts integrado
+            html_prompt_completo = construir_prompt_formateado(data)
 
-    model = genai.GenerativeModel(model_name="gemini-2.5-flash")  
+            # Enviar el email con el HTML generado
+            enviar_email(html_prompt_completo, ticker, email_list, subject_prefix=f"Análisis Técnico {ticker}")
 
-    for ticker in tickers:
-        print(f"\n📊 Procesando ticker: {ticker}")
-        data = obtener_datos_yfinance(ticker)
-        if not data:
-            print(f"⏩ Saltando {ticker} debido a un error al obtener datos.")
-            continue
-        
-        # ACCESO A LAS VARIABLES DESDE EL DICCIONARIO 'data'
-        cierres_para_grafico_total = data.get('CIERRES_PARA_GRAFICO_TOTAL', [])
-        smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
-
-
-        
-
-        prompt, titulo_post = construir_prompt_formateado(data)
-
-        max_retries = 1
-        initial_delay = 10  
-        retries = 0
-        delay = initial_delay
-
-        while retries < max_retries:
-            try:
-                response = model.generate_content(prompt)
-                print(f"\n🧠 Contenido generado para {ticker}:\n")
-                print(response.text)
-                asunto_email = f"Análisis: {data['NOMBRE_EMPRESA']} ({data['TICKER']}) - {data['RECOMENDACION']}"
-                nombre_archivo = f"analisis_{ticker}_{datetime.today().strftime('%Y%m%d')}"
-                enviar_email(response.text, asunto_email, nombre_archivo)
-
-                break  
-            except Exception as e:
-                if "429 You exceeded your current quota" in str(e):
-                    server_suggested_delay = 0 
-                    try:
-                        match = re.search(r"retry_delay \{\s*seconds: (\d+)", str(e))
-                        if match:
-                            server_suggested_delay = int(match.group(1))
-                    except:
-                        pass
-
-                    current_delay = max(initial_delay * (2 ** retries), server_suggested_delay + 1)
-
-                    jitter = random.uniform(0.5, 1.5)
-                    delay_with_jitter = current_delay * jitter
-
-                    print(f"❌ Cuota de Gemini excedida al generar contenido. Reintentando en {delay_with_jitter:.3f} segundos... (Intento {retries + 1}/{max_retries})")
-                    time.sleep(delay_with_jitter)
-                    retries += 1
-                else:
-                    print(f"❌ Error al generar contenido con Gemini (no de cuota): {e}")
-                    break
-        else:  
-            print(f"❌ Falló la generación de contenido para {ticker} después de {max_retries} reintentos.")
+        except Exception as e:
+            print(f"❌ Error general al procesar {ticker}: {e}")
             
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180)
-
-
-
-
 
 
 def main():
@@ -1281,9 +1040,7 @@ def main():
         print(f"Procesando tickers para el día {datetime.today().strftime('%A')}: {tickers_for_today}")
         generar_contenido_con_gemini(tickers_for_today)
     else:
-        print(f"No hay tickers disponibles para el día {datetime.today().strftime('%A')} en el rango calculado. "
-              f"start_index: {start_index}, end_index: {end_index}, total_tickers: {total_tickers_in_sheet}")
+        print(f"No hay tickers para procesar hoy.")
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
