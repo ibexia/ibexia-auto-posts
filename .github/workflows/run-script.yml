@@ -17,12 +17,23 @@ jobs:
 
       - name: Instalar Python y dependencias
         run: |
+          # Actualizar pip
           python -m pip install --upgrade pip
-          pip install --upgrade google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client google-generativeai
-          pip install --upgrade google-genai 
-          pip install yfinance pandas
-          pip install yfinance pandas feedparser
-
+          
+          # Instalar todas las librerías necesarias (Google, Yahoo Finance, Pandas, NumPy, Gráficos)
+          pip install --upgrade \
+            google-auth \
+            google-auth-oauthlib \
+            google-auth-httplib2 \
+            google-api-python-client \
+            google-generativeai \
+            google-genai \
+            yfinance \
+            pandas \
+            numpy \
+            matplotlib \
+            mplfinance 
+          
       - name: Ejecutar script para leer Google Sheets y generar contenido con Gemini
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
