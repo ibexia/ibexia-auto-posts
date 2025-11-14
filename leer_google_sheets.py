@@ -882,19 +882,9 @@ def construir_prompt_formateado(data):
 
         // Convertir las fechas ISO a strings para el eje de tipo 'category'
         // Esto elimina los huecos de fines de semana (SEGUNDO REQUISITO)
-        ohlcData = ohlcData.map(d => ({{
-            x: d.x, // Mantener como string (YYYY-MM-DD)
-            y: d.y
-        }}));
-        smiData = smiData.map(d => ({{
-            x: d.x, // Mantener como string (YYYY-MM-DD)
-            y: d.y
-        }}));
-        projData = projData.map(d => ({{
-            x: d.x, // Mantener como string (YYYY-MM-DD)
-            y: d.y
-        }}));
-
+        // Ya que el eje X es 'category', los datos de las series deben usar el string de la fecha
+        // La conversión de ohlcData ya está correcta en Python: {x: 'date', y: [O, H, L, C]}
+        
         // --- Gráfico Principal (Candlestick, Proyección, y SMI) ---
         var optionsCandlestickSMI = {{
             series: [
@@ -907,7 +897,8 @@ def construir_prompt_formateado(data):
                 }},
                 {{
                     name: 'Precio Real',
-                    type: 'candlestick',
+                    // CRUCIAL: Mantener el tipo 'candlestick' aquí
+                    type: 'candlestick', 
                     data: ohlcData,
                     yAxisId: 'priceAxis', // Asignar al eje de Precio
                 }},
@@ -929,7 +920,7 @@ def construir_prompt_formateado(data):
             chart: {{
                 id: 'mainChart',
                 height: 400, // Aumentar altura para alojar ambos
-                type: 'line',
+                type: 'line', // El tipo principal puede ser 'line' al tener más series de este tipo
                 toolbar: {{
                     autoSelected: 'pan',
                     show: true
