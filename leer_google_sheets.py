@@ -232,15 +232,24 @@ def obtener_datos_yfinance(ticker):
         stock = yf.Ticker(ticker)
         info = stock.info
         
+        current_price = info.get("currentPrice")
+        if current_price is None:
+             raise ValueError("No se pudo obtener el precio actual del ticker de 'info'.")
+        current_price = round(current_price, 3) # Este sigue siendo el precio actual
+
         # Ampliar periodo para el SMI, soportes/resistencias y simulación
         hist_extended = stock.history(period="90d", interval="1d")
+        
+        # --- FIX CRÍTICO: Comprobar si hay datos históricos ---
+        if hist_extended.empty:
+             raise ValueError("No se encontraron datos históricos de OHLC para el ticker en el período especificado (yfinance devolvió un DataFrame vacío).")
+        # --- FIN FIX CRÍTICO ---
+
         hist_extended = calculate_smi_tv(hist_extended)
 
         # Obtener datos históricos para el volumen del día anterior completo
         hist_recent = stock.history(period="5d", interval="1d") 
         
-        current_price = round(info["currentPrice"], 3) # Este sigue siendo el precio actual
-
         current_volume = "N/A" # Inicializamos a N/A
         if not hist_recent.empty:
             if len(hist_recent) >= 2:
@@ -423,7 +432,7 @@ def obtener_datos_yfinance(ticker):
 
 
         # Precios de Cierre para la Simulación (usados también para calcular la proyección)
-        precios_reales_para_simulacion = [data['Close'] for data in ohlc_reales_para_grafico] # Usar los 30 cierres finales
+        precios_reales_para_simulacion = [data['y'][3] for data in ohlc_reales_para_grafico] # Usar los 30 cierres finales
 
         # Asegurarse de que las etiquetas de fecha coincidan con los 30 días de datos
         if len(fechas_historial) != 30:
@@ -1028,6 +1037,7 @@ def construir_prompt_formateado(data):
                     formatter: function(val) {{
                         return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: 'short'}});
                     }}
+                }}
                 }},
                 tooltip: {{
                     enabled: false
