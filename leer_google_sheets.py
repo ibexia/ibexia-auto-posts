@@ -879,26 +879,10 @@ def construir_prompt_formateado(data):
         var projData = {proj_json};
         var cierresRealesData = {cierres_reales_json};
 
-        // Convertir las fechas ISO a milisegundos para ApexCharts (necesario para el eje X de tipo datetime)
-        ohlcData = ohlcData.map(d => ({{
-            x: new Date(d.x).getTime(),
-            y: d.y
-        }}));
-        smiData = smiData.map(d => ({{
-            x: new Date(d.x).getTime(),
-            y: d.y
-        }}));
-        projData = projData.map(d => ({{
-            x: new Date(d.x).getTime(),
-            y: d.y
-        }}));
-        cierresRealesData = cierresRealesData.map(d => ({{
-            x: new Date(d.x).getTime(),
-            y: d.y
-        }}));
-        
-        // El SMI se graficará en un segundo gráfico, apilado (stacked)
-        // La proyección se graficará como una línea sobre el Candlestick.
+        // **************** INICIO DE MODIFICACIÓN CRÍTICA ****************
+        // SE ELIMINA LA CONVERSIÓN A TIMESTAMP PARA USAR EL EJE 'category'
+        // Esto evita los huecos en los días sin cotización.
+        // ****************************************************************
 
         // --- Gráfico Principal (Candlestick y Proyección) ---
         var optionsCandlestick = {{
@@ -953,14 +937,20 @@ def construir_prompt_formateado(data):
                     color: '#e0e0e0'
                 }}
             }},
+            // **************** MODIFICACIÓN CRÍTICA ****************
             xaxis: {{
-                type: 'category',
+                type: 'category', // CAMBIO DE 'datetime' A 'category'
                 tooltip: {{
                     enabled: true
                 }},
                 labels: {{
                     formatter: function(val) {{
-                        return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: 'short'}});
+                        // Simplemente muestra el mes y el día del string 'YYYY-MM-DD'
+                        if (val) {{
+                           const parts = val.split('-');
+                           return parts[2] + '/' + parts[1];
+                        }}
+                        return '';
                     }}
                 }},
                 axisBorder: {{
@@ -970,6 +960,7 @@ def construir_prompt_formateado(data):
                     color: '#4a4a5e'
                 }}
             }},
+            // ******************************************************
             yaxis: {{
                 title: {{
                     text: 'Precio (EUR)',
@@ -998,7 +989,10 @@ def construir_prompt_formateado(data):
             tooltip: {{
                 theme: 'dark',
                 x: {{
-                    format: 'dd MMM yyyy'
+                    // Muestra el string de fecha directamente
+                    formatter: function(val) {{
+                         return val;
+                    }}
                 }}
             }},
             grid: {{
@@ -1034,14 +1028,15 @@ def construir_prompt_formateado(data):
             stroke: {{
                 width: [2]
             }},
+            // **************** MODIFICACIÓN CRÍTICA ****************
             xaxis: {{
-                type: 'datetime',
+                type: 'category', // CAMBIO DE 'datetime' A 'category'
                 labels: {{
                     show: true,
+                    // Dejar el formatter simple
                     formatter: function(val) {{
-                        return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: 'short'}});
+                        return val;
                     }}
-                }}
                 }},
                 tooltip: {{
                     enabled: false
@@ -1053,6 +1048,7 @@ def construir_prompt_formateado(data):
                     color: '#4a4a5e'
                 }}
             }},
+            // ******************************************************
             yaxis: {{
                 min: -100,
                 max: 100,
@@ -1105,8 +1101,9 @@ def construir_prompt_formateado(data):
                 theme: 'dark',
                 shared: true,
                 x: {{
+                    // Muestra el string de fecha directamente
                     formatter: function(val) {{
-                        return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: '2-digit', year: 'numeric'}});
+                        return val;
                     }}
                 }}
             }}
