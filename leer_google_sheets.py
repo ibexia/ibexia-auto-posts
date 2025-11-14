@@ -954,7 +954,7 @@ def construir_prompt_formateado(data):
                 }}
             }},
             xaxis: {{
-                type: 'datetime',
+                type: 'category',
                 tooltip: {{
                     enabled: true
                 }},
