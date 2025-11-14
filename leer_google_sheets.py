@@ -39,7 +39,7 @@ def safe_json_dump(data_list):
     # Se asegura de que la lista solo contenga valores o None, para que json.dumps funcione.
     return json.dumps([val if val is not None else None for val in data_list])
 
-# FUNCIÓN ORIGINAL: leer_google_sheets (MANTENIDA EN SU ESTADO ORIGINAL)
+# FUNCIÓN ORIGINAL: leer_google_sheets (RESTAURADA A SU ESTADO EXACTO ORIGINAL)
 def leer_google_sheets():
     """Lee la lista de tickers desde Google Sheets."""
     credentials_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
@@ -112,7 +112,7 @@ def enviar_email(subject, body, attachment_path=None):
     except Exception as e:
         print(f"❌ Error al enviar el email: {e}")
 
-# FUNCIÓN MODIFICADA: generar_grafico_candlestick (SOLO SE APLICAN LAS 4 CORRECCIONES)
+# FUNCIÓN MODIFICADA: generar_grafico_candlestick (SOLO SE APLICAN LAS 4 CORRECCIONES GRÁFICAS)
 def generar_grafico_candlestick(df, ticker, projected_col_name='Precio_Proyectado'):
     """
     Genera un gráfico de velas (candlestick) profesional con las correcciones solicitadas:
@@ -274,7 +274,7 @@ def generar_contenido_con_gemini(tickers):
         time.sleep(180)
 
 
-# FUNCIÓN ORIGINAL: main (MANTENIDA EN SU ESTADO ORIGINAL)
+# FUNCIÓN ORIGINAL: main (RESTAURADA A SU ESTADO EXACTO ORIGINAL)
 def main():
     """Función principal para coordinar la lectura de hojas y el procesamiento diario."""
     try:
@@ -282,6 +282,7 @@ def main():
         # El código original usaba [1:] para saltar la cabecera. Lo mantengo.
         all_tickers = all_tickers[1:] 
     except Exception as e:
+        # Aquí se capturará el error "Missing required parameter 'spreadsheetId'" si SHEET_ID no está configurado.
         print(f"❌ Error al leer Google Sheets: {e}. Asegúrate de que las variables de entorno están configuradas correctamente y el archivo JSON de credenciales es válido.")
         return
     
