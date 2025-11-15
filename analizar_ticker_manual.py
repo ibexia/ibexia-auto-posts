@@ -929,6 +929,39 @@ def construir_prompt_formateado(data):
                     color: '#333333'
                 }}
             }},
+            # ⭐ INSERTA ESTE BLOQUE EN LAS OPCIONES DE TU GRÁFICO DE INDICADOR ⭐
+            annotations: {{
+                yaxis: [
+                    // 1. ANOTACIÓN PARA SOBRECOMPRA (ARRIBA DE 70)
+                    {{
+                        y: 70, // Comienza en el nivel 70
+                        y2: 100, // Termina en el máximo del eje Y
+                        borderColor: '#ff000000', // Borde transparente
+                        fillColor: '#ef535040', // Color Rojo (Sobrecompra) con 40% de opacidad
+                        label: {{
+                            text: 'SOBRECOMPRA',
+                            style: {{
+                                color: '#fff',
+                                background: '#ef5350',
+                            }}
+                        }}
+                    }},
+                    // 2. ANOTACIÓN PARA SOBREVENTA (ABAJO DE 30)
+                    {{
+                        y: 0, // Comienza en el mínimo del eje Y
+                        y2: 30, // Termina en el nivel 30
+                        borderColor: '#ff000000', // Borde transparente
+                        fillColor: '#00bfa540', // Color Verde (Sobreventa) con 40% de opacidad
+                        label: {{
+                            text: 'SOBREVENTA',
+                            style: {{
+                                color: '#fff',
+                                background: '#00bfa5',
+                            }}
+                        }}
+                    }}
+                ]
+            }},
             xaxis: {{
                 type: 'category',
                 tooltip: {{
