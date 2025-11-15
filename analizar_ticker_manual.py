@@ -1010,24 +1010,25 @@ def construir_prompt_formateado(data):
             ],
             plotOptions: {{
                 candlestick: {{
-                    borderWidth: 1,
-                    // ⭐ CAMBIO CLAVE PARA ELIMINAR RELLENO ⭐
+                    // ⭐ CAMBIO CLAVE: Establecido a 0 para quitar el grosor del borde
+                    borderWidth: 0, 
+                    // Necesario para que el cuerpo sea hueco (usa el color del fondo)
                     fillToStroke: true, 
                     colors: {{
-                        // Color del borde de la vela (se mantiene el color original de la lógica)
+                        // El color del borde ya no se verá, pero se usa como referencia para el wick
                         stroke: {{ 
-                            up: '#00bfa5', 
-                            down: '#ef5350' 
+                            up: '#00bfa5', // Verde
+                            down: '#ef5350' // Rojo
                         }},
-                        // Color del relleno de la vela (se establece en blanco para ser 'hueco' sobre fondo blanco)
+                        // Relleno de las velas establecido a blanco para ser "hueco" sobre fondo blanco
                         fill: {{ 
                             up: '#ffffff', 
                             down: '#ffffff' 
                         }}
                     }},
-                    // El color del wick (mecha) seguirá el color del stroke gracias a useFillColor
                     wick: {{
-                        useFillColor: true
+                        // Usa el color del stroke (borde) para las mechas
+                        useFillColor: true 
                     }}
                 }}
             }},
