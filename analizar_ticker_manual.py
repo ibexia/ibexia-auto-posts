@@ -807,7 +807,7 @@ def construir_prompt_formateado(data):
             start_index = i - 1
             tendencia_actual = get_trend(smis[i], smis[i-1])
             
-            while i < len(smis) and get_trend(smis[i], smis[i-1]) == tendencia_actual:
+            while i < len(smis) and get_trend(smis[i], smis[smi_data] - 1]) == tendencia_actual:
                 i += 1
             
             end_index = i - 1
@@ -879,27 +879,11 @@ def construir_prompt_formateado(data):
         var projData = {proj_json};
         var cierresRealesData = {cierres_reales_json};
 
-        // Convertir las fechas ISO a milisegundos para ApexCharts (necesario para el eje X de tipo datetime)
-        ohlcData = ohlcData.map(d => ({{
-            x: new Date(d.x).getTime(),
-            y: d.y
-        }}));
-        smiData = smiData.map(d => ({{
-            x: new Date(d.x).getTime(),
-            y: d.y
-        }}));
-        projData = projData.map(d => ({{
-            x: new Date(d.x).getTime(),
-            y: d.y
-        }}));
-        cierresRealesData = cierresRealesData.map(d => ({{
-            x: new Date(d.x).getTime(),
-            y: d.y
-        }}));
+        // --- BLOQUE ELIMINADO PARA QUITAR LOS GAPS ---
+        // Se utilizan las fechas en formato de cadena ISO ('YYYY-MM-DD') en el eje X para asegurar 
+        // que cada punto de datos se trata como una categoría igualmente espaciada, eliminando los huecos.
+        // Se mantiene el formateador de etiquetas para mostrar la fecha de forma legible.
         
-        // El SMI se graficará en un segundo gráfico, apilado (stacked)
-        // La proyección se graficará como una línea sobre el Candlestick.
-
         // --- Gráfico Principal (Candlestick y Proyección) ---
         var optionsCandlestick = {{
             series: [
@@ -912,7 +896,10 @@ def construir_prompt_formateado(data):
                     name: 'Cierre Real',
                     type: 'line',
                     data: cierresRealesData,
-                    color: '#2979ff'
+                    color: '#2979ff',
+                    stroke: {{ // Añadido para dar grosor a la línea de cierre real
+                        width: 1 
+                    }}
                 }},
                 {{
                     name: 'Precio Proyectado',
@@ -920,6 +907,7 @@ def construir_prompt_formateado(data):
                     data: projData,
                     color: '#ffc107',
                     stroke: {{
+                        width: 3, // MODIFICADO: Mayor grosor para la línea proyectada
                         dashArray: 5
                     }},
                     marker: {{
@@ -929,7 +917,7 @@ def construir_prompt_formateado(data):
             ],
             chart: {{
                 id: 'mainChart',
-                height: 350,
+                height: 700, // MODIFICADO: Doble de altura
                 type: 'line',
                 toolbar: {{
                     autoSelected: 'pan',
@@ -960,6 +948,7 @@ def construir_prompt_formateado(data):
                 }},
                 labels: {{
                     formatter: function(val) {{
+                        // Val es una cadena de fecha ('YYYY-MM-DD')
                         return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: 'short'}});
                     }}
                 }},
@@ -1018,7 +1007,7 @@ def construir_prompt_formateado(data):
             ],
             chart: {{
                 id: 'smiChart',
-                height: 150,
+                height: 250, // MODIFICADO: Mayor altura para el gráfico del algoritmo
                 type: 'line',
                 toolbar: {{
                     autoSelected: 'pan',
@@ -1035,10 +1024,11 @@ def construir_prompt_formateado(data):
                 width: [2]
             }},
             xaxis: {{
-                type: 'datetime',
+                type: 'category', // MODIFICADO: Cambiado de 'datetime' a 'category' para evitar huecos
                 labels: {{
                     show: true,
                     formatter: function(val) {{
+                        // Val es una cadena de fecha ('YYYY-MM-DD')
                         return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: 'short'}});
                     }}
                 }},
