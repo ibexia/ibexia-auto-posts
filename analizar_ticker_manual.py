@@ -893,9 +893,7 @@ def construir_prompt_formateado(data):
                     name: 'Precio Real',
                     type: 'candlestick',
                     data: ohlcData
-                    stroke: {{
-                        width: 0.1 // O prueba con 0.5. Si pones 0, desaparece el borde.
-                    }}
+
                 }},
                 {{
                     name: 'Cierre Real',
@@ -977,12 +975,10 @@ def construir_prompt_formateado(data):
             }},
             plotOptions: {{
                 candlestick: {{
-                    // AÑADIR ESTE BLOQUE
                     stroke: {{
                         width: 1, // Cambia este valor para aumentar o disminuir el grosor
                         colors: ['#333333'] // Opcional: define el color del borde
                     }},
-                    // FIN DEL BLOQUE A AÑADIR
                     colors: {{
                         up: '#00bfa5', // Verde para vela alcista (Open < Close)
                         down: '#ef5350' // Rojo para vela bajista (Open > Close)
