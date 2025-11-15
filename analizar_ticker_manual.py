@@ -886,13 +886,13 @@ def construir_prompt_formateado(data):
                 }},
                 {{
                     name: 'Precio Proyectado',
-                    type: 'line', // ⭐ CAMBIO 1: Cambiado de 'scatter' a 'line'
+                    type: 'line', 
                     data: projData,
-                    color: '#FF0000', // ⭐ CAMBIO 2: Color rojo intenso
-                    stroke: {
-                        width: 3, // Grosor de línea
-                        dashArray: 5 // ⭐ CAMBIO 3: Estilo de trazos (5 es un buen valor para discontinuo)
-                    },
+                    color: '#FF0000', 
+                    stroke: {{ // <-- ABRIR OBJETO STROKE
+                        width: 3, 
+                        dashArray: 5 
+                    }}, // <-- CERRAR OBJETO STROKE
                     // Se asigna al primer eje Y (el de precio)
                     yaxisIndex: 0
                 }},
