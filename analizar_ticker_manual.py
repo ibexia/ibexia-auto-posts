@@ -894,25 +894,28 @@ def construir_prompt_formateado(data):
                     type: 'line',
                     data: cierresRealesData,
                     color: '#2979ff',
-                    stroke: {{ // Añadido para dar grosor a la línea de cierre real
+                    stroke: {{ 
                         width: 1 
                     }}
                 }},
                 {{
                     name: 'Precio Proyectado',
-                    // ⭐ MODIFICADO: Cambiado de 'line' a 'scatter' para mostrar solo puntos
-                    type: 'scatter', 
+                    // ⭐ CORRECCIÓN: Usamos 'line' con ancho 0 para forzar la visibilidad del marcador.
+                    type: 'line', 
                     data: projData,
                     color: '#ffc107',
-                    // ELIMINADO: No se necesita 'stroke' para scatter
+                    stroke: {{ 
+                        // ¡CLAVE! Ancho de línea a 0 para ocultarla
+                        width: 0 
+                    }},
                     marker: {{
-                        // ⭐ MODIFICADO: Tamaño del punto a 6 (aprox. 3mm)
+                        // Tamaño del punto (6 es el equivalente a ~3mm en el gráfico)
                         size: 6, 
                         strokeWidth: 0 // Sin borde para el punto
                     }}
                 }}
             ],
-            chart: {{
+            chart: {{ 
                 id: 'mainChart',
                 height: 500, // MODIFICADO: Doble de altura
                 type: 'line', // El tipo principal sigue siendo 'line' para combinar 'candlestick' y 'line'
