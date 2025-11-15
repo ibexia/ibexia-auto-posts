@@ -918,6 +918,10 @@ def construir_prompt_formateado(data):
                 stacked: false
 
             }},
+            stroke: {{
+                width: 0.5,
+                curve: 'straight'
+            }},
             title: {{
                 text: 'Gráfico Candlestick, Proyección y Algoritmo',
                 align: 'left',
@@ -1011,7 +1015,7 @@ def construir_prompt_formateado(data):
             plotOptions: {{
                 candlestick: {{
                     // ⭐ CAMBIO CLAVE: Establecido a 0 para quitar el grosor del borde
-                    borderWidth: 0, 
+                    borderWidth: 0.5, 
                     // Necesario para que el cuerpo sea hueco (usa el color del fondo)
                     fillToStroke: true, 
                     colors: {{
