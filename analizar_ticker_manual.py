@@ -753,13 +753,7 @@ def construir_prompt_formateado(data):
              proj_series.append({"x": date_str, "y": proj_data[i] if i < len(proj_data) else None})
         proj_json = json.dumps(proj_series)
 
-        # 4. Datos de Cierre Reales (Línea)
-        # Formato: [{x: 'date', y: Precio}, ...] - Los precios proyectados deben ser None/null
-        cierres_reales_series = []
-        for i, date_str in enumerate(fechas_completo):
-             # Solo incluir el cierre real para el histórico, y None para la proyección
-             cierres_reales_series.append({"x": date_str, "y": cierres_reales_linea[i] if i < num_labels_hist and i < len(cierres_reales_linea) else None})
-        cierres_reales_json = json.dumps(cierres_reales_series)
+
         
         # ---- FIN DE LA PREPARACIÓN ----
 
@@ -892,17 +886,6 @@ def construir_prompt_formateado(data):
                     yaxisIndex: 0
                 }},
                 {{
-                    name: 'Cierre Real',
-                    type: 'line',
-                    data: cierresRealesData,
-                    color: '#2979ff',
-                    stroke: {{ 
-                        width: 1 
-                    }},
-                    // Se asigna al primer eje Y (el de precio)
-                    yaxisIndex: 0
-                }},
-                {{
                     name: 'Precio Proyectado',
                     type: 'scatter', 
                     data: projData,
@@ -928,7 +911,7 @@ def construir_prompt_formateado(data):
             ],
             chart: {{
                 id: 'mainChart',
-                height: 500, 
+                height: 650, 
                 type: 'line', 
                 toolbar: {{
                     autoSelected: 'pan',
