@@ -886,7 +886,9 @@ def construir_prompt_formateado(data):
         <script>
         // Los datos se pasan como JSON de Python
         var ohlcData = {ohlc_json};
-        var smiData = {smi_json};
+        var smiLineData = {smi_line_json}; // Renombrado
+        var smiOverboughtData = {smi_overbought_json}; // Nuevo
+        var smiOversoldData = {smi_oversold_json}; // Nuevo
         var projData = {proj_json};
 
         // --- Gráfico Unificado (Candlestick, Proyección y SMI) ---
@@ -896,7 +898,6 @@ def construir_prompt_formateado(data):
                     name: 'Precio Real',
                     type: 'candlestick',
                     data: ohlcData,
-                    // Se asigna al primer eje Y (el de precio)
                     yaxisIndex: 0
                 }},
                 {{
@@ -905,16 +906,51 @@ def construir_prompt_formateado(data):
                     data: projData,
                     yaxisIndex: 0
                 }},
+                // ⭐ SERIE SMI PRINCIPAL (SOLO LÍNEA) ⭐
                 {{
-                    name: 'Nuestro Algoritmo (SMI)',
+                    name: 'Algoritmo (Línea)',
                     type: 'line',
-                    data: smiData,
+                    data: smiLineData, // Usamos la nueva variable
                     color: '#00bfa5',
-                    stroke: {{
-                        width: 4 // Grosor de línea para el SMI
-                    }},
-                    // ⭐ CAMBIO CLAVE: Asignado al segundo eje Y (el de SMI)
-                    yaxisIndex: 1 
+                    stroke: {{ width: 2 }},
+                    yaxisIndex: 1,
+                    fill: {{ opacity: 0 }} // SIN RELLENO para la línea base
+                }},
+                // ⭐ SERIE DE SOBRECOMPRA (ÁREA) ⭐
+                {{
+                    name: 'Sobrecompra',
+                    type: 'area', // Tipo de gráfico de área
+                    data: smiOverboughtData,
+                    color: '#ef5350', // Color rojo para sobrecompra
+                    yaxisIndex: 1,
+                    fill: {{
+                        type: 'gradient',
+                        gradient: {{
+                            shadeIntensity: 1,
+                            opacityFrom: 0.6, // Sombreado visible
+                            opacityTo: 0.0, // Se desvanece en el punto de corte
+                            stops: [0, 100]
+                        }}
+                    }}
+                    // SIN STROKE para que sea solo área.
+                }},
+                // ⭐ SERIE DE SOBREVENTA (ÁREA) ⭐
+                {{
+                    name: 'Sobreventa',
+                    type: 'area', // Tipo de gráfico de área
+                    data: smiOversoldData,
+                    color: '#00bfa5', // Color verde para sobreventa
+                    yaxisIndex: 1,
+                    fill: {{
+                        type: 'gradient',
+                        gradient: {{
+                            shadeIntensity: 1,
+                            opacityFrom: 0.6, // Sombreado visible
+                            opacityTo: 0.0,
+                            stops: [0, 100]
+                        }}
+                    }}
+                    // SIN STROKE para que sea solo área.
                 }}
             ],
             chart: {{
@@ -1029,34 +1065,6 @@ def construir_prompt_formateado(data):
                         }}
                     }},
                     opposite: true, // Eje a la derecha
-                    // ⭐ ANOTACIONES: Añadidas al eje SMI (el segundo eje Y)
-                    annotations: {{ 
-                        yaxis: [
-                            {{
-                                y: 40,
-                                borderColor: '#d32f2f',
-                                label: {{
-                                    borderColor: '#d32f2f',
-                                    style: {{
-                                        color: '#fff',
-                                        background: '#d32f2f'
-                                    }},
-                                    text: 'Sobrecompra (+40)'
-                                }}
-                            }},
-                            {{
-                                y: -40,
-                                borderColor: '#388e3c',
-                                label: {{
-                                    borderColor: '#388e3c',
-                                    style: {{
-                                        color: '#fff',
-                                        background: '#388e3c'
-                                    }},
-                                    text: 'Sobreventa (-40)'
-                                }}
-                            }}
-                        ]
                     }}
                 }}
             ],
