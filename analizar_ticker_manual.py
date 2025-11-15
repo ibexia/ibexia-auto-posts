@@ -920,7 +920,7 @@ def construir_prompt_formateado(data):
                     data: smiData,
                     color: '#00bfa5',
                     stroke: {{
-                        width: 2 // Grosor de línea para el SMI
+                        width: 4 // Grosor de línea para el SMI
                     }},
                     // ⭐ CAMBIO CLAVE: Asignado al segundo eje Y (el de SMI)
                     yaxisIndex: 1 
@@ -992,7 +992,7 @@ def construir_prompt_formateado(data):
                     max: 100,
                     tickAmount: 8,
                     title: {{
-                        text: 'Algoritmo (SMI)',
+                        text: 'Algoritmo IbexiaES',
                         style: {{
                             color: '#00bfa5' // Color para asociar con la línea SMI
                         }}
