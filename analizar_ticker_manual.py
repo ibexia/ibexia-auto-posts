@@ -929,39 +929,6 @@ def construir_prompt_formateado(data):
                     color: '#333333'
                 }}
             }},
-            # ⭐ INSERTA ESTE BLOQUE EN LAS OPCIONES DE TU GRÁFICO DE INDICADOR ⭐
-            annotations: {{
-                yaxis: [
-                    // 1. ANOTACIÓN PARA SOBRECOMPRA (ARRIBA DE 70)
-                    {{
-                        y: 70, // Comienza en el nivel 70
-                        y2: 100, // Termina en el máximo del eje Y
-                        borderColor: '#ff000000', // Borde transparente
-                        fillColor: '#ef535040', // Color Rojo (Sobrecompra) con 40% de opacidad
-                        label: {{
-                            text: 'SOBRECOMPRA',
-                            style: {{
-                                color: '#fff',
-                                background: '#ef5350',
-                            }}
-                        }}
-                    }},
-                    // 2. ANOTACIÓN PARA SOBREVENTA (ABAJO DE 30)
-                    {{
-                        y: 0, // Comienza en el mínimo del eje Y
-                        y2: 30, // Termina en el nivel 30
-                        borderColor: '#ff000000', // Borde transparente
-                        fillColor: '#00bfa540', // Color Verde (Sobreventa) con 40% de opacidad
-                        label: {{
-                            text: 'SOBREVENTA',
-                            style: {{
-                                color: '#fff',
-                                background: '#00bfa5',
-                            }}
-                        }}
-                    }}
-                ]
-            }},
             xaxis: {{
                 type: 'category',
                 tooltip: {{
@@ -980,7 +947,7 @@ def construir_prompt_formateado(data):
                     color: '#aaaaaa'
                 }}
             }},
-            // ⭐ CAMBIO CLAVE: Definición de dos ejes Y
+            # ⭐ INICIO DEL BLOQUE CRÍTICO: DOBLE LLAVE GARANTIZADA ⭐
             yaxis: [
                 {{
                     // Eje Y principal (0): Precio
@@ -1014,37 +981,42 @@ def construir_prompt_formateado(data):
                         }}
                     }},
                     opposite: true, // Eje a la derecha
-                    // ⭐ ANOTACIONES: Añadidas al eje SMI (el segundo eje Y)
+                    # 💡 MODIFICACIÓN CLAVE: ANOTACIONES DE SOMBREADO (Sobrecompra/Sobreventa)
                     annotations: {{ 
                         yaxis: [
+                            // 1. SOBRECOMPRA: Sombreado de +40 a +100 (con doble llave)
                             {{
-                                y: 40,
-                                borderColor: '#d32f2f',
+                                y: 40, // Comienza en el umbral inferior de sobrecompra
+                                y2: 100, // Termina en el máximo del eje (100)
+                                borderColor: '#ff000000', // Borde transparente
+                                fillColor: '#FFC10740', // Color Amarillo (FFC107) con 40% de opacidad
                                 label: {{
-                                    borderColor: '#d32f2f',
+                                    text: 'SOBRECOMPRA (+40)',
                                     style: {{
-                                        color: '#fff',
-                                        background: '#d32f2f'
-                                    }},
-                                    text: 'Sobrecompra (+40)'
+                                        color: '#000',
+                                        background: '#FFC107',
+                                    }}
                                 }}
                             }},
+                            // 2. SOBREVENTA: Sombreado de -100 a -40 (con doble llave)
                             {{
-                                y: -40,
-                                borderColor: '#388e3c',
+                                y: -100, // Comienza en el mínimo del eje (-100)
+                                y2: -40, // Termina en el umbral superior de sobreventa
+                                borderColor: '#ff000000', // Borde transparente
+                                fillColor: '#FFC10740', // Color Amarillo (FFC107) con 40% de opacidad
                                 label: {{
-                                    borderColor: '#388e3c',
+                                    text: 'SOBREVENTA (-40)',
                                     style: {{
-                                        color: '#fff',
-                                        background: '#388e3c'
-                                    }},
-                                    text: 'Sobreventa (-40)'
+                                        color: '#000',
+                                        background: '#FFC107',
+                                    }}
                                 }}
                             }}
                         ]
                     }}
                 }}
             ],
+            # ⭐ FIN DEL BLOQUE CRÍTICO ⭐
             plotOptions: {{
                 candlestick: {{
                     // ⭐ CAMBIO CLAVE: Establecido a 0 para quitar el grosor del borde
