@@ -919,7 +919,7 @@ def construir_prompt_formateado(data):
             ],
             chart: {{
                 id: 'mainChart',
-                height: 700, // MODIFICADO: Doble de altura
+                height: 500, // MODIFICADO: Doble de altura
                 type: 'line',
                 toolbar: {{
                     autoSelected: 'pan',
@@ -1009,7 +1009,7 @@ def construir_prompt_formateado(data):
             ],
             chart: {{
                 id: 'smiChart',
-                height: 250, // MODIFICADO: Mayor altura para el gráfico del algoritmo
+                height: 450, // MODIFICADO: Mayor altura para el gráfico del algoritmo
                 type: 'line',
                 toolbar: {{
                     autoSelected: 'pan',
