@@ -735,6 +735,8 @@ def construir_prompt_formateado(data):
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico.</p>"
     else:
         # --- PREPARACIÓN DE DATOS PARA APEXCHARTS ---
+        # ⭐ AÑADE ESTA LÍNEA DE SERIALIZACIÓN ⭐
+        proj_json = safe_json_dump(data.get("PRECIOS_PROYECCION_LINEA", []))
         # 1. Datos Candlestick (OHLC) - Ya están en ohlc_data
         # Debemos serializar los datos OHLC para JS (formato: [{x: 'date', y: [O, H, L, C]}, ...])
         ohlc_json = json.dumps(ohlc_data)
