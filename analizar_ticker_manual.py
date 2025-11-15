@@ -1016,16 +1016,22 @@ def construir_prompt_formateado(data):
             ],
             plotOptions: {{
                 candlestick: {{
-                    borderWidth: 0,
+                    // 1. ELIMINA EL GROSOR DEL BORDE DEL CUERPO
+                    borderWidth: 0, 
                     colors: {{
-                        up: '#00bfa5', 
-                        down: '#ef5350' 
-                        upC: '#00bfa5',     // Contorno (vela alcista)
-                        downC: '#ef5350'    // Contorno (vela bajista)                
+                        up: '#00bfa5',      // Relleno de vela alcista
+                        down: '#ef5350',    // Relleno de vela bajista
+                        
+                        // 2. ⭐ CLAVE: ANULA EL COLOR DEL CONTORNO (el que es azul/grueso)
+                        //    Forzamos que el color del contorno (upC/downC) sea IGUAL al relleno.
+                        //    Esto hace que cualquier trazo residual de 1px sea invisible.
+                        upC: '#00bfa5',     // Contorno Alcista (FUERZA a verde/cian)
+                        downC: '#ef5350'    // Contorno Bajista (FUERZA a rojo)
                     }},
                     wick: {{
-                        useFillColor: false
-                        stroke: '#333333'
+                        // 3. Mechas visibles y finas (Línea simple de 1px)
+                        useFillColor: false, // Impide que la mecha se dibuje como un relleno grueso
+                        stroke: '#333333'    // Mantiene las mechas VISIBLES como líneas finas y oscuras
                     }}
                 }}
             }},
