@@ -900,7 +900,6 @@ def construir_prompt_formateado(data):
                 }},
                 {{
                     name: 'Precio Proyectado',
-                    // ⭐ CORRECCIÓN: Usamos 'line' con ancho 0 para forzar la visibilidad del marcador.
                     type: 'line', 
                     data: projData,
                     color: '#ffc107',
@@ -909,6 +908,7 @@ def construir_prompt_formateado(data):
                         width: 0 
                     }},
                     marker: {{
+                        show: true,
                         // Tamaño del punto (6 es el equivalente a ~3mm en el gráfico)
                         size: 6, 
                         strokeWidth: 0 // Sin borde para el punto
