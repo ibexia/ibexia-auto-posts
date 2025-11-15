@@ -741,17 +741,32 @@ def construir_prompt_formateado(data):
         
         # 2. Datos SMI (Línea)
         # Formato: [{x: 'date', y: SMI}, ...] - SMI puede ser None (null en JSON) en la proyección
-        smi_series = []
-        for i, date_str in enumerate(fechas_completo):
-             smi_series.append({"x": date_str, "y": smi_data[i] if i < len(smi_data) else None})
-        smi_json = json.dumps(smi_series)
+        smi_line_series = [] # NUEVA SERIE PRINCIPAL DE LÍNEA (sin color de área)
+        smi_overbought_series = [] # NUEVA SERIE PARA SOBRECOMPRA
+        smi_oversold_series = [] # NUEVA SERIE PARA SOBREVENTA
         
-        # 3. Datos de Proyección de Precio (Línea)
-        # Formato: [{x: 'date', y: Precio}, ...] - Los precios históricos deben ser None/null
-        proj_series = []
         for i, date_str in enumerate(fechas_completo):
-             proj_series.append({"x": date_str, "y": proj_data[i] if i < len(proj_data) else None})
-        proj_json = json.dumps(proj_series)
+             smi_value = smi_data[i] if i < len(smi_data) else None
+             
+             # Serie de Línea Principal (mostrada siempre, para el trazado continuo)
+             smi_line_series.append({"x": date_str, "y": smi_value})
+             
+             # Serie de Sobrecompra (solo tiene valor si SMI > 40)
+             if smi_value is not None and smi_value > 40:
+                 smi_overbought_series.append({"x": date_str, "y": smi_value})
+             else:
+                 smi_overbought_series.append({"x": date_str, "y": None}) # Debe ser None para no conectar puntos
+             
+             # Serie de Sobreventa (solo tiene valor si SMI < -40)
+             if smi_value is not None and smi_value < -40:
+                 smi_oversold_series.append({"x": date_str, "y": smi_value})
+             else:
+                 smi_oversold_series.append({"x": date_str, "y": None}) # Debe ser None para no conectar puntos
+
+        # Serialización de las 3 nuevas series (debes reemplazar las viejas)
+        smi_line_json = json.dumps(smi_line_series) # Usa un nuevo nombre de variable JSON
+        smi_overbought_json = json.dumps(smi_overbought_series)
+        smi_oversold_json = json.dumps(smi_oversold_series)
 
 
         
