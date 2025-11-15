@@ -873,7 +873,6 @@ def construir_prompt_formateado(data):
         var ohlcData = {ohlc_json};
         var smiData = {smi_json};
         var projData = {proj_json};
-        var cierresRealesData = {cierres_reales_json};
 
         // --- Gráfico Unificado (Candlestick, Proyección y SMI) ---
         var optionsCandlestick = {{
