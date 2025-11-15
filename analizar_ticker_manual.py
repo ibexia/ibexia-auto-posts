@@ -1022,7 +1022,8 @@ def construir_prompt_formateado(data):
                         down: '#ef5350' 
                     }},
                     wick: {{
-                        useFillColor: true
+                        useFillColor: false
+                        stroke: '#333333'
                     }}
                 }}
             }},
