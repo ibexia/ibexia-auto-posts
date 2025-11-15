@@ -232,19 +232,24 @@ def obtener_datos_yfinance(ticker):
         stock = yf.Ticker(ticker)
         info = stock.info
         
+        current_price = info.get("currentPrice")
+        if current_price is None:
+             raise ValueError("No se pudo obtener el precio actual del ticker de 'info'.")
+        current_price = round(current_price, 3) # Este sigue siendo el precio actual
+
         # Ampliar periodo para el SMI, soportes/resistencias y simulación
         hist_extended = stock.history(period="90d", interval="1d")
-        hist_extended = calculate_smi_tv(hist_extended)
+        
+        # --- FIX CRÍTICO: Comprobar si hay datos históricos ---
+        if hist_extended.empty:
+             raise ValueError("No se encontraron datos históricos de OHLC para el ticker en el período especificado (yfinance devolvió un DataFrame vacío).")
+        # --- FIN FIX CRÍTICO ---
 
-        # Usar un historial más corto (30d) solo si es necesario, pero nos enfocaremos en hist_extended
-        # hist = stock.history(period="30d", interval="1d") # Ya no es necesario cargar dos veces
-        # hist = calculate_smi_tv(hist)
+        hist_extended = calculate_smi_tv(hist_extended)
 
         # Obtener datos históricos para el volumen del día anterior completo
         hist_recent = stock.history(period="5d", interval="1d") 
         
-        current_price = round(info["currentPrice"], 3) # Este sigue siendo el precio actual
-
         current_volume = "N/A" # Inicializamos a N/A
         if not hist_recent.empty:
             if len(hist_recent) >= 2:
@@ -361,15 +366,20 @@ def obtener_datos_yfinance(ticker):
         # Aseguramos tener suficientes datos para el historial, el offset y la proyección
         smi_history_full = hist_extended['SMI'].dropna() # Ahora el SMI final está en 'SMI'
         cierres_history_full = hist_extended['Close'].dropna()
+        
+        # OBTENCIÓN DE DATOS ADICIONALES PARA EL GRÁFICO CANDLESTICK (Open, High, Low)
+        ohlc_history_full = hist_extended[['Open', 'High', 'Low', 'Close']].dropna()
+
 
         # Calcula el volumen promedio de los últimos 30 días usando hist_extended
         volumen_promedio_30d = hist_extended['Volume'].tail(30).mean()
 
 
         # Fechas reales de cotización para los últimos 30 días
-        fechas_historial = cierres_history_full.tail(30).index.strftime("%d/%m").tolist()
-        ultima_fecha_historial = cierres_history_full.index[-1] if not cierres_history_full.empty else datetime.today()
-        fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
+        fechas_historial = ohlc_history_full.tail(30).index.strftime("%Y-%m-%d").tolist() # Formato ISO para ApexCharts
+        ultima_fecha_historial = ohlc_history_full.index[-1] if not ohlc_history_full.empty else datetime.today()
+        # Las fechas de proyección deben ser en un formato que ApexCharts pueda manejar, aunque es solo para relleno
+        fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
         
         # --- MANEJO ROBUSTO DE LOS 30 DÍAS DE DATOS PARA EL GRÁFICO ---
         # SMI para los 30 días del gráfico
@@ -381,37 +391,58 @@ def obtener_datos_yfinance(ticker):
             first_smi_val = smi_history_full.iloc[0] if not smi_history_full.empty else 0.0
             smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
 
-        # Precios para el gráfico: 30 días DESPLAZADOS
-        precios_reales_para_grafico = []
-        # Para un offset de 0 (el SMI de hoy se alinea con el precio de hoy), tomamos los últimos 30 precios
-        if len(cierres_history_full) >= 30:
-            precios_reales_para_grafico = cierres_history_full.tail(30).tolist()
+        # Datos OHLC para el gráfico (Candlestick)
+        ohlc_reales_para_grafico = []
+        if len(ohlc_history_full) >= 30:
+            ohlc_history_for_chart = ohlc_history_full.tail(30)
+            for idx, row in ohlc_history_for_chart.iterrows():
+                # Formato de datos para ApexCharts: [timestamp, [Open, High, Low, Close]]
+                # Usaremos la fecha en formato ISO y luego la convertiremos a timestamp en JS
+                date_str = idx.strftime("%Y-%m-%d")
+                ohlc_reales_para_grafico.append({
+                    "x": date_str,
+                    "y": [round(row['Open'], 3), round(row['High'], 3), round(row['Low'], 3), round(row['Close'], 3)]
+                })
         else:
-            # Rellenar con el primer precio disponible o el precio actual
-            first_price_val = cierres_history_full.iloc[0] if not cierres_history_full.empty else current_price
-            precios_reales_para_grafico = [first_price_val] * (30 - len(cierres_history_full)) + cierres_history_full.tolist()
-        
-        # Asegurarse de que las etiquetas de fecha coincidan con los 30 días de datos
-        if len(fechas_historial) < 30 and len(cierres_history_full.tail(30)) > 0:
-            # Crear etiquetas de relleno si los datos históricos son menos de 30
-            num_fill = 30 - len(fechas_historial)
-            fecha_temp = cierres_history_full.index[0] if not cierres_history_full.empty else datetime.today()
-            fechas_relleno = [(fecha_temp - timedelta(days=i)).strftime("%d/%m (ant.)") for i in range(num_fill, 0, -1)]
-            fechas_historial = fechas_relleno + fechas_historial
+            # Si no hay 30 días, rellenar con el primer día conocido o el precio actual
+            num_fill = 30 - len(ohlc_history_full)
+            if not ohlc_history_full.empty:
+                 first_row = ohlc_history_full.iloc[0]
+                 default_ohlc = [round(first_row['Open'], 3), round(first_row['High'], 3), round(first_row['Low'], 3), round(first_row['Close'], 3)]
+            else:
+                 default_ohlc = [current_price] * 4 # Si no hay ningún dato
 
-        # Validar la longitud final para evitar problemas en Chart.js
-        if len(smi_historico_para_grafico) != 30 or len(precios_reales_para_grafico) != 30 or len(fechas_historial) != 30:
-             # Si después de todo no coinciden, es mejor abortar la generación del gráfico
-             print(f"❌ Error crítico de longitud de arrays. SMI: {len(smi_historico_para_grafico)}, Precios: {len(precios_reales_para_grafico)}, Fechas: {len(fechas_historial)}")
-             # Usaremos un historial vacío para forzar un mensaje de error en el HTML
-             smi_historico_para_grafico = []
-             precios_reales_para_grafico = []
-             fechas_historial = []
+            # Rellenar fechas de forma inversa para que el rellenado vaya al inicio
+            fecha_temp = ohlc_history_full.index[0] if not ohlc_history_full.empty else datetime.today()
+            fechas_relleno = [(fecha_temp - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(num_fill, 0, -1)]
+            
+            # Crear datos de relleno
+            for date_str in fechas_relleno:
+                 ohlc_reales_para_grafico.append({"x": date_str, "y": default_ohlc})
+            
+            # Agregar los datos reales disponibles
+            for idx, row in ohlc_history_full.iterrows():
+                date_str = idx.strftime("%Y-%m-%d")
+                ohlc_reales_para_grafico.append({
+                    "x": date_str,
+                    "y": [round(row['Open'], 3), round(row['High'], 3), round(row['Low'], 3), round(row['Close'], 3)]
+                })
+            
+            fechas_historial = fechas_relleno + [idx.strftime("%Y-%m-%d") for idx in ohlc_history_full.index]
+
+
+        # Precios de Cierre para la Simulación (usados también para calcular la proyección)
+        precios_reales_para_simulacion = [data['y'][3] for data in ohlc_reales_para_grafico] # Usar los 30 cierres finales
+
+        # Asegurarse de que las etiquetas de fecha coincidan con los 30 días de datos
+        if len(fechas_historial) != 30:
+             print(f"❌ Error crítico de longitud de fechas históricas. Fechas: {len(fechas_historial)}")
+             fechas_historial = [] # Abortar el gráfico
 
 
         # --- NUEVA Lógica: Proyección lineal SIN soportes/resistencias (solo SMI) ---
         precios_proyectados = []
-        ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
+        ultimo_precio_conocido = precios_reales_para_simulacion[-1] if precios_reales_para_simulacion else current_price
 
         # Determinar la dirección de la tendencia y el movimiento diario constante
         smi_history_full_for_slope = hist_extended['SMI'].dropna()
@@ -455,14 +486,14 @@ def obtener_datos_yfinance(ticker):
 
         # --- Fin de la NUEVA lógica lineal ---
 
-        # Unir precios reales y proyectados
-        cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
-        precio_proyectado_dia_5 = cierres_para_grafico_total[-1] if cierres_para_grafico_total else current_price # Último precio proyectado a 5 días
+        # Unir precios reales y proyectados (Solo para el cálculo de la simulación de ganancias)
+        cierres_para_simulacion_total = precios_reales_para_simulacion + precios_proyectados
+        precio_proyectado_dia_5 = cierres_para_simulacion_total[-1] if cierres_para_simulacion_total else current_price # Último precio proyectado a 5 días
 
-        # Guarda los datos para la simulación
+        # SMI para simulación (solo los 30 días de historial)
         smi_historico_para_simulacion = [round(s, 3) for s in smi_history_full.tail(30).tolist()]
-        precios_para_simulacion = precios_reales_para_grafico
-        fechas_para_simulacion = hist_extended.tail(30).index.strftime("%d/%m/%Y").tolist() # CORREGIDO: ahora se aplica .tail() al DataFrame
+        # Fechas para simulación (formato DD/MM/AAAA para la simulación)
+        fechas_para_simulacion = hist_extended.tail(30).index.strftime("%d/%m/%Y").tolist() 
         
         # Lógica de tendencia para la nota
         tendencia_ibexia = "No disponible"
@@ -483,6 +514,31 @@ def obtener_datos_yfinance(ticker):
                 tendencia_ibexia = "cambio de tendencia"
 
 
+        # --- NUEVOS DATOS PARA EL GRÁFICO APEXCHARTS ---
+        # 1. Datos OHLC (Candlestick)
+        # Los datos ya están en ohlc_reales_para_grafico
+        
+        # 2. SMI (Línea) y Fechas (Fechas históricas + proyección)
+        smi_para_grafico_completo = smi_historico_para_grafico + [None] * PROYECCION_FUTURA_DIAS
+        fechas_grafico_completo = fechas_historial + fechas_proyeccion
+
+        # 3. Datos de Proyección de Precio (Línea)
+        # Se necesita crear la serie de precios para la línea de proyección
+        # [null] * 30 + [precios_proyectados]
+        # Nota: ApexCharts manejará los 'null' sin conectar la línea
+        precios_proyeccion_linea = [None] * len(fechas_historial) + precios_proyectados
+        # Si no hay datos históricos (es un caso borde que debería estar cubierto por el rellenado)
+        if not precios_reales_para_simulacion and precios_proyectados:
+            # Si no hay historial, pero sí proyección (sólo debería ocurrir con el rellenado)
+            # Creamos un punto de conexión en el precio actual
+             punto_conexion = [current_price]
+             precios_proyeccion_linea = [None] * (len(fechas_historial) - 1) + punto_conexion + precios_proyectados
+        
+        # 4. Datos de Cierre para el gráfico de línea (para mostrar el cierre real)
+        # [Cierres reales] + [null] * 5
+        cierres_reales_linea = precios_reales_para_simulacion + [None] * PROYECCION_FUTURA_DIAS
+
+
         datos = {
             "TICKER": ticker,
             "NOMBRE_EMPRESA": info.get("longName", ticker),
@@ -499,9 +555,16 @@ def obtener_datos_yfinance(ticker):
             "SMI_SEMANAL": smi_semanal, # NUEVA ADICIÓN
             "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
             "tendencia_ibexia": tendencia_ibexia, # Renombrado de TENDENCIA_NOTA
-            "CIERRES_30_DIAS": precios_reales_para_grafico, # Usar los 30 días ya limpios y completos
-            "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico, # Renombrado
-            "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total,
+            # DATOS PARA EL GRÁFICO APEXCHARTS
+            "OHLC_REALE_PARA_GRAFICO": ohlc_reales_para_grafico, # Nuevo: Datos Candlestick
+            "SMI_PARA_GRAFICO_COMPLETO": smi_para_grafico_completo, # Nuevo: Datos SMI Linea
+            "PRECIOS_PROYECCION_LINEA": precios_proyeccion_linea, # Nuevo: Datos Proyección Linea
+            "CIERRES_REALES_LINEA": cierres_reales_linea, # Nuevo: Cierres Reales Linea (para overlay)
+            "FECHAS_GRAFICO_COMPLETO": fechas_grafico_completo, # Nuevo: Etiquetas de Eje X
+            # DATOS ANTIGUOS QUE AUN SE USAN EN SIMULACIÓN/PROYECCIÓN
+            "CIERRES_30_DIAS": precios_reales_para_simulacion, # Cierres para la simulación
+            "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_simulacion, # SMI para la simulación
+            "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_simulacion_total, # Usado para el cálculo del precio proyectado día 5
             "OFFSET_DIAS_GRAFICO": OFFSET_DIAS,
             "RESISTENCIA_1": resistencia_1,
             "RESISTENCIA_2": resistencia_2,
@@ -510,7 +573,7 @@ def obtener_datos_yfinance(ticker):
             "FECHAS_HISTORIAL": fechas_historial,
             "FECHAS_PROYECCION": fechas_proyeccion,
             "PRECIO_PROYECTADO_5DIAS": precio_proyectado_dia_5,
-            'PRECIOS_PARA_SIMULACION': precios_para_simulacion,
+            'PRECIOS_PARA_SIMULACION': precios_reales_para_simulacion,
             'SMI_PARA_SIMULACION': smi_historico_para_simulacion,
             'FECHAS_PARA_SIMULACION': fechas_para_simulacion,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS
@@ -583,7 +646,9 @@ def construir_prompt_formateado(data):
     else:
         volumen_analisis_text = "El volumen de negociación no está disponible en este momento."
 
-    titulo_post = f"{data['NOMBRE_EMPRESA']} ({data['TICKER']}) - Precio futuro previsto en 5 días: {formatear_numero(data['PRECIO_PROYECTADO_5DIAS'])}€"
+    # NUEVO FORMATO: "Analisis actualizado el FECHA de NOMBRE DE LA EMPRESA."
+    fecha_actual_str = datetime.today().strftime('%d/%m/%Y')
+    titulo_post = f"Análisis actualizado el {fecha_actual_str} de {data['NOMBRE_EMPRESA']}. "
 
     # Datos para el gráfico principal de SMI y Precios
     smi_historico_para_grafico = data.get('SMI_HISTORICO_PARA_GRAFICO', [])
@@ -631,9 +696,9 @@ def construir_prompt_formateado(data):
     # Bloque de código a insertar en construir_prompt_formateado
     # Va después del 'Historial de Operaciones' y antes del 'Gráfico'
     anuncio_html = """
-    <div style="background-color: #f0f8ff; color: #333333; padding: 15px; margin: 20px 0; text-align: center; border-radius: 8px; border: 1px solid #cceeff;">
+    <div style="background-color: #DB6927; color: #FFFFFF; padding: 15px; margin: 20px 0; text-align: center; border-radius: 8px; border: 1px solid #cceeff;">
         <p style="font-size: 1.1em; margin: 0; font-weight: bold;">
-            Estamos desarrollando un nuevo sistema de **ALERTAS PREMIUM** actualmente gratuito. Con este servicio, no tendrás que esperar al análisis diario. En su lugar, verás un análisis detallado de todas las empresas que actualizamos tres veces al día. <a href="https://ibexia.es/contenido-premium/" style="color: #007bff; font-weight: bold; text-decoration: underline;">**ENTRA.**</a>
+            Este analísis detallado lo hacemos 1 vez por semana para cada empresa, si no quieres esperar en la pagina principal consulta tu empresa en el buscador, el análisis lo actualizamos tres veces al día. <a href="https://ibexia.es/" style="color: #007bff; font-weight: bold; text-decoration: underline;">**ENTRA.**</a>
         </p>
     </div>
     """
@@ -658,59 +723,46 @@ def construir_prompt_formateado(data):
     chart_html = ""
 
     # REVISIÓN CRÍTICA DE DATOS ANTES DE GENERAR EL GRÁFICO
-    labels_historial = data.get("FECHAS_HISTORIAL", [])
-    labels_proyeccion = data.get("FECHAS_PROYECCION", [])
-    labels_total = labels_historial + labels_proyeccion
-    num_labels_hist = len(labels_historial)
-    num_labels_total = len(labels_total)
+    ohlc_data = data.get("OHLC_REALE_PARA_GRAFICO", [])
+    smi_data = data.get("SMI_PARA_GRAFICO_COMPLETO", [])
+    proj_data = data.get("PRECIOS_PROYECCION_LINEA", [])
+    cierres_reales_linea = data.get("CIERRES_REALES_LINEA", [])
+    fechas_completo = data.get("FECHAS_GRAFICO_COMPLETO", [])
+    num_labels_hist = len(data.get("FECHAS_HISTORIAL", []))
+    num_labels_total = len(fechas_completo)
 
-    if not smi_historico_para_grafico or not cierres_para_grafico_total or num_labels_total == 0:
+    if not ohlc_data or not smi_data or num_labels_total == 0:
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico.</p>"
     else:
-        # Asegurar que SMI tenga el mismo número de puntos que las etiquetas totales (rellenando con null)
-        smi_desplazados_para_grafico = smi_historico_para_grafico + [None] * PROYECCION_FUTURA_DIAS
+        # --- PREPARACIÓN DE DATOS PARA APEXCHARTS ---
+        # 1. Datos Candlestick (OHLC) - Ya están en ohlc_data
+        # Debemos serializar los datos OHLC para JS (formato: [{x: 'date', y: [O, H, L, C]}, ...])
+        ohlc_json = json.dumps(ohlc_data)
         
-        # El dataset de precio proyectado debe ser:
-        # [null] * (días_historial - 1) + [último precio real] + [precios_proyectados]
-        # Esto asegura que la línea proyectada comience exactamente en el último punto del precio real
-        precios_reales_grafico = data.get('CIERRES_30_DIAS', [])
-        precios_proyectados = cierres_para_grafico_total[num_labels_hist:]
+        # 2. Datos SMI (Línea)
+        # Formato: [{x: 'date', y: SMI}, ...] - SMI puede ser None (null en JSON) en la proyección
+        smi_series = []
+        for i, date_str in enumerate(fechas_completo):
+             smi_series.append({"x": date_str, "y": smi_data[i] if i < len(smi_data) else None})
+        smi_json = json.dumps(smi_series)
         
-        data_proyectada = []
-        if num_labels_hist > 0 and precios_reales_grafico:
-            # Rellenar con null antes del último punto de precio real
-            data_proyectada = [None] * (num_labels_hist - 1)
-            # Agregar el último precio real (el punto de conexión)
-            data_proyectada.append(precios_reales_grafico[-1])
-            # Agregar la proyección
-            data_proyectada.extend(precios_proyectados)
-        else:
-             data_proyectada = [None] * num_labels_total # Si no hay historial, no hay proyección
-        
-        # Si el precio real tiene menos de 30 puntos (por la lógica de rellenado en yfinance),
-        # también debemos asegurarnos de que el array de precios reales tenga la longitud de las etiquetas históricas.
-        if len(precios_reales_grafico) < num_labels_hist:
-             # Esto debería estar resuelto por el manejo en yfinance, pero lo forzamos a null si hay un desajuste
-             precios_reales_grafico.extend([None] * (num_labels_hist - len(precios_reales_grafico)))
+        # 3. Datos de Proyección de Precio (Línea)
+        # Formato: [{x: 'date', y: Precio}, ...] - Los precios históricos deben ser None/null
+        proj_series = []
+        for i, date_str in enumerate(fechas_completo):
+             proj_series.append({"x": date_str, "y": proj_data[i] if i < len(proj_data) else None})
+        proj_json = json.dumps(proj_series)
 
-        # Aseguramos que todos los datasets tengan la misma longitud que labels_total
-        max_len = num_labels_total
-        smi_desplazados_para_grafico = smi_desplazados_para_grafico[:max_len]
-        data_proyectada = data_proyectada[:max_len]
+        # 4. Datos de Cierre Reales (Línea)
+        # Formato: [{x: 'date', y: Precio}, ...] - Los precios proyectados deben ser None/null
+        cierres_reales_series = []
+        for i, date_str in enumerate(fechas_completo):
+             # Solo incluir el cierre real para el histórico, y None para la proyección
+             cierres_reales_series.append({"x": date_str, "y": cierres_reales_linea[i] if i < num_labels_hist and i < len(cierres_reales_linea) else None})
+        cierres_reales_json = json.dumps(cierres_reales_series)
         
-        # Rellenar el array de precios reales con 'null' para el área de proyección
-        precios_reales_grafico_completo = precios_reales_grafico[:num_labels_hist] + [None] * PROYECCION_FUTURA_DIAS
-        precios_reales_grafico_completo = precios_reales_grafico_completo[:max_len]
+        # ---- FIN DE LA PREPARACIÓN ----
 
-        
-        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON ----
-        # Serializar todos los arrays para garantizar que None se convierte a 'null'
-        labels_json = safe_json_dump(labels_total)
-        smi_json = safe_json_dump(smi_desplazados_para_grafico)
-        precios_reales_json = safe_json_dump(precios_reales_grafico_completo)
-        data_proyectada_json = safe_json_dump(data_proyectada)
-        # ---- FIN DE LA CORRECCIÓN ----
-        
         # Reemplazo para la sección de análisis detallado del gráfico
         analisis_grafico_html = f"""
         <h2 style="color: #333333; background-color: #e9e9e9; padding: 10px; border-radius: 5px; text-align: center;">Análisis Detallado del Gráfico</h2>
@@ -815,180 +867,264 @@ def construir_prompt_formateado(data):
         """
 
         # El gráfico en sí, que debe ir antes que el análisis
-        # Usamos los arrays de datos corregidos: smi_desplazados_para_grafico, precios_reales_grafico_completo, data_proyectada
+        # --- APEXCHARTS: CANDLESTICK CON LÍNEA SMI Y PROYECCIÓN ---
         chart_html = f"""
-        <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
-            <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
-        </div>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
+        <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+        <div id="chartCandlestick" style="width: 100%; max-width: 800px; margin: auto; background-color: #1a1a2e; padding: 20px; border-radius: 10px;"></div>
+
         <script>
-            // Configuración del gráfico
-            var ctx = document.getElementById('smiPrecioChart').getContext('2d');
-            var smiPrecioChart = new Chart(ctx, {{
-                type: 'line',
-                data: {{
-                    labels: {labels_json},
-                    datasets: [
-                        {{
-                            label: 'Nuestro Algoritmo',
-                            data: {smi_json},
-                            borderColor: '#00bfa5',
-                            backgroundColor: 'rgba(0, 191, 165, 0.2)',
-                            yAxisID: 'y1',
-                            pointRadius: 0,
-                            borderWidth: 2,
-                            tension: 0.1
-                        }},
-                        {{
-                            label: 'Precio Real',
-                            data: {precios_reales_json},
-                            borderColor: '#2979ff',
-                            backgroundColor: 'rgba(41, 121, 255, 0.2)',
-                            yAxisID: 'y',
-                            pointRadius: 0,
-                            borderWidth: 2,
-                            tension: 0.1
-                        }},
-                        {{
-                            label: 'Precio Proyectado',
-                            data: {data_proyectada_json},
-                            borderColor: '#ffc107',
-                            borderDash: [5, 5],
-                            backgroundColor: 'rgba(255, 193, 7, 0.2)',
-                            yAxisID: 'y',
-                            pointRadius: 0,
-                            borderWidth: 2,
-                            tension: 0.1
-                        }}
-                    ]
+        // Los datos se pasan como JSON de Python
+        var ohlcData = {ohlc_json};
+        var smiData = {smi_json};
+        var projData = {proj_json};
+        var cierresRealesData = {cierres_reales_json};
+
+        // Convertir las fechas ISO a milisegundos para ApexCharts (necesario para el eje X de tipo datetime)
+        ohlcData = ohlcData.map(d => ({{
+            x: new Date(d.x).getTime(),
+            y: d.y
+        }}));
+        smiData = smiData.map(d => ({{
+            x: new Date(d.x).getTime(),
+            y: d.y
+        }}));
+        projData = projData.map(d => ({{
+            x: new Date(d.x).getTime(),
+            y: d.y
+        }}));
+        cierresRealesData = cierresRealesData.map(d => ({{
+            x: new Date(d.x).getTime(),
+            y: d.y
+        }}));
+        
+        // El SMI se graficará en un segundo gráfico, apilado (stacked)
+        // La proyección se graficará como una línea sobre el Candlestick.
+
+        // --- Gráfico Principal (Candlestick y Proyección) ---
+        var optionsCandlestick = {{
+            series: [
+                {{
+                    name: 'Precio Real',
+                    type: 'candlestick',
+                    data: ohlcData
                 }},
-                options: {{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {{
-                        mode: 'index',
-                        intersect: false,
+                {{
+                    name: 'Cierre Real',
+                    type: 'line',
+                    data: cierresRealesData,
+                    color: '#2979ff'
+                }},
+                {{
+                    name: 'Precio Proyectado',
+                    type: 'line',
+                    data: projData,
+                    color: '#ffc107',
+                    stroke: {{
+                        dashArray: 5
                     }},
-                    plugins: {{
-                        legend: {{
-                            display: true,
-                            labels: {{
-                                color: '#e0e0e0'
-                            }}
-                        }},
-                        tooltip: {{
-                            mode: 'index',
-                            intersect: false,
-                            backgroundColor: 'rgba(26, 26, 46, 0.8)',
-                            titleColor: '#e0e0e0',
-                            bodyColor: '#e0e0e0',
-                            borderColor: '#4a4a5e',
-                            borderWidth: 1,
-                            callbacks: {{
-                                label: function(context) {{
-                                    let label = context.dataset.label || '';
-                                    if (label) {{
-                                        label += ': ';
-                                    }}
-                                    if (context.parsed.y !== null) {{
-                                        label += context.parsed.y.toFixed(2) + '€';
-                                    }}
-                                    return label;
-                                }}
-                            }}
-                        }},
-                        annotation: {{
-                            annotations: {{
-                                sobrecompra: {{
-                                    type: 'line',
-                                    mode: 'horizontal',
-                                    scaleID: 'y1',
-                                    value: 40,
-                                    borderColor: '#d32f2f',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Sobrecompra (+40)',
-                                        enabled: true,
-                                        position: 'start',
-                                        color: '#e0e0e0',
-                                        backgroundColor: 'rgba(211, 47, 47, 0.6)',
-                                        font: {{
-                                            size: 10
-                                        }}
-                                    }}
-                                }},
-                                sobreventa: {{
-                                    type: 'line',
-                                    mode: 'horizontal',
-                                    scaleID: 'y1',
-                                    value: -40,
-                                    borderColor: '#388e3c',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {{
-                                        content: 'Sobreventa (-40)',
-                                        enabled: true,
-                                        position: 'start',
-                                        color: '#e0e0e0',
-                                        backgroundColor: 'rgba(56, 142, 60, 0.6)',
-                                        font: {{
-                                            size: 10
-                                        }}
-                                    }}
-                                }}
-                            }}
-                        }}
-                    }},
-                    scales: {{
-                        x: {{
-                            ticks: {{
-                                color: '#e0e0e0'
-                            }},
-                            grid: {{
-                                color: 'rgba(128, 128, 128, 0.2)'
-                            }}
-                        }},
-                        y: {{
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {{
-                                display: true,
-                                text: 'Precio (EUR)',
-                                color: '#e0e0e0'
-                            }},
-                            ticks: {{
-                                color: '#e0e0e0'
-                            }},
-                            grid: {{
-                                color: 'rgba(128, 128, 128, 0.2)',
-                                drawOnChartArea: false
-                            }}
-                        }},
-                        y1: {{
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {{
-                                display: true,
-                                text: 'Nuestro Algoritmo',
-                                color: '#e0e0e0'
-                            }},
-                            grid: {{
-                                drawOnChartArea: false,
-                            }},
-                            min: -100,
-                            max: 100,
-                            ticks: {{
-                                stepSize: 25,
-                                color: '#e0e0e0'
-                            }}
-                        }}
+                    marker: {{
+                        size: 0
                     }}
                 }}
-            }});
+            ],
+            chart: {{
+                id: 'mainChart',
+                height: 350,
+                type: 'line',
+                toolbar: {{
+                    autoSelected: 'pan',
+                    show: true
+                }},
+                animations: {{
+                    enabled: false
+                }},
+                background: '#1a1a2e',
+                foreColor: '#e0e0e0',
+                stacked: false
+            }},
+            // AÑADE ESTO: stroke.width controla el grosor de la línea del borde de la vela.
+            stroke: {{
+                width: 0.5 // Puedes usar 1 o 0.5 para una línea muy fina.
+            }},
+            title: {{
+                text: 'Gráfico Candlestick y Proyección',
+                align: 'left',
+                style: {{
+                    color: '#e0e0e0'
+                }}
+            }},
+            xaxis: {{
+                type: 'category',
+                tooltip: {{
+                    enabled: true
+                }},
+                labels: {{
+                    formatter: function(val) {{
+                        return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: 'short'}});
+                    }}
+                }},
+                axisBorder: {{
+                    color: '#4a4a5e'
+                }},
+                axisTicks: {{
+                    color: '#4a4a5e'
+                }}
+            }},
+            yaxis: {{
+                title: {{
+                    text: 'Precio (EUR)',
+                    style: {{
+                        color: '#e0e0e0'
+                    }}
+                }},
+                labels: {{
+                    formatter: function(val) {{
+                        return val.toFixed(2) + '€';
+                    }}
+                }},
+                opposite: true
+            }},
+            plotOptions: {{
+                candlestick: {{
+                    colors: {{
+                        up: '#00bfa5', // Verde para vela alcista (Open < Close)
+                        down: '#ef5350' // Rojo para vela bajista (Open > Close)
+                    }},
+                    wick: {{
+                        useFillColor: true
+                    }}
+                }}
+            }},
+            tooltip: {{
+                theme: 'dark',
+                x: {{
+                    format: 'dd MMM yyyy'
+                }}
+            }},
+            grid: {{
+                borderColor: '#4a4a5e'
+            }}
+        }};
+
+        // --- Gráfico Secundario (SMI) ---
+        var optionsSMI = {{
+            series: [
+                {{
+                    name: 'Nuestro Algoritmo (SMI)',
+                    type: 'line',
+                    data: smiData,
+                    color: '#00bfa5'
+                }}
+            ],
+            chart: {{
+                id: 'smiChart',
+                height: 150,
+                type: 'line',
+                toolbar: {{
+                    autoSelected: 'pan',
+                    show: false
+                }},
+                animations: {{
+                    enabled: false
+                }},
+                background: '#1a1a2e',
+                foreColor: '#e0e0e0',
+                stacked: false
+            }},
+            stroke: {{
+                width: [2]
+            }},
+            xaxis: {{
+                type: 'datetime',
+                labels: {{
+                    show: true,
+                    formatter: function(val) {{
+                        return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: 'short'}});
+                    }}
+                }}
+                }},
+                tooltip: {{
+                    enabled: false
+                }},
+                axisBorder: {{
+                    color: '#4a4a5e'
+                }},
+                axisTicks: {{
+                    color: '#4a4a5e'
+                }}
+            }},
+            yaxis: {{
+                min: -100,
+                max: 100,
+                tickAmount: 8,
+                title: {{
+                    text: 'Algoritmo',
+                    style: {{
+                        color: '#e0e0e0'
+                    }}
+                }},
+                labels: {{
+                    formatter: function(val) {{
+                        return val.toFixed(1);
+                    }}
+                }},
+                opposite: false
+            }},
+            grid: {{
+                borderColor: '#4a4a5e'
+            }},
+            annotations: {{
+                yaxis: [
+                    {{
+                        y: 40,
+                        borderColor: '#d32f2f',
+                        label: {{
+                            borderColor: '#d32f2f',
+                            style: {{
+                                color: '#fff',
+                                background: '#d32f2f'
+                            }},
+                            text: 'Sobrecompra (+40)'
+                        }}
+                    }},
+                    {{
+                        y: -40,
+                        borderColor: '#388e3c',
+                        label: {{
+                            borderColor: '#388e3c',
+                            style: {{
+                                color: '#fff',
+                                background: '#388e3c'
+                            }},
+                            text: 'Sobreventa (-40)'
+                        }}
+                    }}
+                ]
+            }},
+            tooltip: {{
+                theme: 'dark',
+                shared: true,
+                x: {{
+                    formatter: function(val) {{
+                        return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: '2-digit', year: 'numeric'}});
+                    }}
+                }}
+            }}
+        }};
+
+        var chartCandlestick = new ApexCharts(document.querySelector("#chartCandlestick"), optionsCandlestick);
+        chartCandlestick.render();
+        
+        // Crear un contenedor para el gráfico SMI debajo del Candlestick
+        var smiContainer = document.createElement('div');
+        smiContainer.id = 'chartSMI';
+        smiContainer.style.width = '100%';
+        smiContainer.style.maxWidth = '800px';
+        smiContainer.style.margin = 'auto';
+        document.getElementById('chartCandlestick').parentNode.insertBefore(smiContainer, document.getElementById('chartCandlestick').nextSibling);
+
+        var chartSMI = new ApexCharts(document.querySelector("#chartSMI"), optionsSMI);
+        chartSMI.render();
         </script>
         """
     
@@ -1056,6 +1192,9 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 
 ---
 <h1>{titulo_post}</h1>
+<p style="font-size: 0.8em; color: #FF9800; font-weight: bold; text-align: center;">
+    El análisis redactado a continuación se actualiza una vez por semana. La ficha superior SI se actualiza varias veces al día donde puedes ver nuestra posición en tiempo real y análisis resumido.
+</p>
 
 <h2>Análisis Inicial</h2>
 <p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{formatear_numero(data['PRECIO_ACTUAL'])}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
@@ -1240,10 +1379,6 @@ def generar_contenido_con_gemini(tickers):
             
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180)
-
-
-
-
 
 
 
