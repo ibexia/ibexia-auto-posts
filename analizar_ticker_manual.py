@@ -870,7 +870,7 @@ def construir_prompt_formateado(data):
         # --- APEXCHARTS: CANDLESTICK CON LÍNEA SMI Y PROYECCIÓN ---
         chart_html = f"""
         <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-        <div id="chartCandlestick" style="width: 100%; max-width: 800px; margin: auto; background-color: #1a1a2e; padding: 20px; border-radius: 10px;"></div>
+        <div id="chartCandlestick" style="width: 100%; max-width: 800px; margin: auto;"></div>
 
         <script>
         // Los datos se pasan como JSON de Python
@@ -938,8 +938,8 @@ def construir_prompt_formateado(data):
                 animations: {{
                     enabled: false
                 }},
-                background: '#1a1a2e',
-                foreColor: '#e0e0e0',
+                background: '#ffffff', // Fondo claro para visibilidad
+                foreColor: '#333333', // Texto oscuro para contraste
                 stacked: false
             }},
             // AÑADE ESTO: stroke.width controla el grosor de la línea del borde de la vela.
@@ -950,7 +950,7 @@ def construir_prompt_formateado(data):
                 text: 'Gráfico Candlestick y Proyección',
                 align: 'left',
                 style: {{
-                    color: '#e0e0e0'
+                    color: '#333333'
                 }}
             }},
             xaxis: {{
@@ -964,17 +964,17 @@ def construir_prompt_formateado(data):
                     }}
                 }},
                 axisBorder: {{
-                    color: '#4a4a5e'
+                    color: '#aaaaaa'
                 }},
                 axisTicks: {{
-                    color: '#4a4a5e'
+                    color: '#aaaaaa'
                 }}
             }},
             yaxis: {{
                 title: {{
                     text: 'Precio (EUR)',
                     style: {{
-                        color: '#e0e0e0'
+                        color: '#333333'
                     }}
                 }},
                 labels: {{
@@ -996,13 +996,13 @@ def construir_prompt_formateado(data):
                 }}
             }},
             tooltip: {{
-                theme: 'dark',
+                theme: 'light', // Tema de tooltip claro
                 x: {{
                     format: 'dd MMM yyyy'
                 }}
             }},
             grid: {{
-                borderColor: '#4a4a5e'
+                borderColor: '#e0e0e0'
             }}
         }};
 
@@ -1027,8 +1027,8 @@ def construir_prompt_formateado(data):
                 animations: {{
                     enabled: false
                 }},
-                background: '#1a1a2e',
-                foreColor: '#e0e0e0',
+                background: '#ffffff', // Fondo claro para visibilidad
+                foreColor: '#333333', // Texto oscuro para contraste
                 stacked: false
             }},
             stroke: {{
@@ -1041,16 +1041,15 @@ def construir_prompt_formateado(data):
                     formatter: function(val) {{
                         return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: 'short'}});
                     }}
-                }}
                 }},
                 tooltip: {{
                     enabled: false
                 }},
                 axisBorder: {{
-                    color: '#4a4a5e'
+                    color: '#aaaaaa'
                 }},
                 axisTicks: {{
-                    color: '#4a4a5e'
+                    color: '#aaaaaa'
                 }}
             }},
             yaxis: {{
@@ -1060,7 +1059,7 @@ def construir_prompt_formateado(data):
                 title: {{
                     text: 'Algoritmo',
                     style: {{
-                        color: '#e0e0e0'
+                        color: '#333333'
                     }}
                 }},
                 labels: {{
@@ -1071,7 +1070,7 @@ def construir_prompt_formateado(data):
                 opposite: false
             }},
             grid: {{
-                borderColor: '#4a4a5e'
+                borderColor: '#e0e0e0'
             }},
             annotations: {{
                 yaxis: [
@@ -1102,7 +1101,7 @@ def construir_prompt_formateado(data):
                 ]
             }},
             tooltip: {{
-                theme: 'dark',
+                theme: 'light', // Tema de tooltip claro
                 shared: true,
                 x: {{
                     formatter: function(val) {{
@@ -1121,6 +1120,7 @@ def construir_prompt_formateado(data):
         smiContainer.style.width = '100%';
         smiContainer.style.maxWidth = '800px';
         smiContainer.style.margin = 'auto';
+        // Insertar el contenedor SMI justo después del contenedor Candlestick
         document.getElementById('chartCandlestick').parentNode.insertBefore(smiContainer, document.getElementById('chartCandlestick').nextSibling);
 
         var chartSMI = new ApexCharts(document.querySelector("#chartSMI"), optionsSMI);
