@@ -922,9 +922,7 @@ def construir_prompt_formateado(data):
                 background: '#ffffff', 
                 foreColor: '#333333', 
                 stacked: false
-            }},
-            stroke: {{
-                width: 0.5 
+
             }},
             title: {{
                 text: 'Gráfico Candlestick, Proyección y Algoritmo',
@@ -1018,6 +1016,7 @@ def construir_prompt_formateado(data):
             ],
             plotOptions: {{
                 candlestick: {{
+                    borderWidth: 1,
                     colors: {{
                         up: '#00bfa5', 
                         down: '#ef5350' 
