@@ -894,13 +894,6 @@ def construir_prompt_formateado(data):
         var smiData = {smi_json};
         var projData = {proj_json}; // Incluye los datos 'null' para el periodo histórico
 
-        // Función auxiliar para obtener el color del SMI
-        function getSMIColor(val) {{
-            if (val > 40) return '#FF9800'; // Sobrecompra (Naranja/Ámbar)
-            if (val < -40) return '#388e3c'; // Sobreventa (Verde Oscuro)
-            return '#00bfa5'; // Zona neutral (Turquesa)
-        }}
-
         // --- Gráfico Unificado (Candlestick, Proyección y SMI) ---
         var optionsCandlestick = {{
             series: [
@@ -909,10 +902,25 @@ def construir_prompt_formateado(data):
                     type: 'candlestick',
                     data: ohlcData,
                     yaxisIndex: 0,
-                    // Colorear las mechas del precio real (rojo/verde)
-                    color: '#000000', // Color temporal
-                    stroke: {{
-                        width: 1
+                    // ⭐ CORRECCIÓN CLAVE 1: Aplicar plotOptions por serie
+                    plotOptions: {{
+                        candlestick: {{
+                            borderWidth: 0.5, 
+                            fillToStroke: true, 
+                            colors: {{
+                                stroke: {{ 
+                                    up: '#00bfa5', // Verde
+                                    down: '#ef5350' // Rojo
+                                }},
+                                fill: {{ 
+                                    up: '#ffffff', 
+                                    down: '#ffffff' 
+                                }}
+                            }},
+                            wick: {{
+                                useFillColor: true 
+                            }}
+                        }}
                     }}
                 }},
                 {{
@@ -920,17 +928,21 @@ def construir_prompt_formateado(data):
                     type: 'candlestick', 
                     data: projData,
                     yaxisIndex: 0,
-                    // Se usan colores diferentes para diferenciar la proyección
-                    // Usaremos un color sólido más claro para el cuerpo.
+                    // ⭐ CORRECCIÓN CLAVE 1: Aplicar plotOptions por serie para AISLAR colores de proyección
                     plotOptions: {{
                         candlestick: {{
+                            borderWidth: 0.5, 
+                            fillToStroke: true, 
                             colors: {{
-                                up: '#e0f7fa', // Azul claro para proyección alcista
-                                down: '#ffcdd2', // Rojo claro para proyección bajista
+                                up: '#e0f7fa', // Azul claro para proyección alcista (FILL)
+                                down: '#ffcdd2', // Rojo claro para proyección bajista (FILL)
                                 stroke: {{
                                     up: '#00838f', // Borde azul oscuro para up
                                     down: '#c62828' // Borde rojo oscuro para down
                                 }}
+                            }},
+                            wick: {{
+                                useFillColor: false 
                             }}
                         }}
                     }}
@@ -939,12 +951,11 @@ def construir_prompt_formateado(data):
                     name: 'Nuestro Algoritmo (SMI)',
                     type: 'line',
                     data: smiData,
-                    color: '#00bfa5', // Color base del SMI
+                    color: '#00bfa5', 
                     stroke: {{
-                        width: 3 // Grosor de línea para el SMI
+                        width: 3 
                     }},
-                    yaxisIndex: 1, // Eje SMI
-                    // Renderiza la línea de SMI sobre las demás series
+                    yaxisIndex: 1, 
                     zIndex: 10 
                 }}
             ],
@@ -974,7 +985,6 @@ def construir_prompt_formateado(data):
                     color: '#333333'
                 }}
             }},
-            // ⭐ ELIMINAR ANOTACIONES DE ÁREA DE AQUÍ. Se MUEVEN al YAXIS DEL SMI (EJE 1)
             
             xaxis: {{
                 type: 'category',
@@ -983,6 +993,7 @@ def construir_prompt_formateado(data):
                 }},
                 labels: {{
                     formatter: function(val) {{
+                        // Se asume que val ya es la fecha ISO string
                         return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: 'short'}});
                     }}
                 }},
@@ -993,7 +1004,6 @@ def construir_prompt_formateado(data):
                     color: '#aaaaaa'
                 }}
             }},
-            // ⭐ CAMBIO CLAVE: Definición de dos ejes Y
             yaxis: [
                 {{
                     // Eje Y principal (0): Precio
@@ -1008,17 +1018,17 @@ def construir_prompt_formateado(data):
                             return val ? val.toFixed(2) + '€' : '';
                         }}
                     }},
-                    opposite: false // Eje a la izquierda
+                    opposite: false 
                 }},
                 {{
                     // Eje Y secundario (1): SMI
-                    min: -100, // Escala fija para SMI
+                    min: -100, 
                     max: 100,
                     tickAmount: 8,
                     title: {{
                         text: 'Algoritmo IbexiaES',
                         style: {{
-                            color: '#00bfa5' // Color para asociar con la línea SMI
+                            color: '#00bfa5' 
                         }}
                     }},
                     labels: {{
@@ -1026,16 +1036,16 @@ def construir_prompt_formateado(data):
                             return val.toFixed(0);
                         }}
                     }},
-                    opposite: true, // Eje a la derecha
-                    // ⭐ ANOTACIONES DE ÁREA PARA SOBRECOMPRA/SOBREVENTA - SOLUCIÓN AL PROBLEMA DEL COLOR
+                    opposite: true, 
+                    // ⭐ CORRECCIÓN CLAVE 2: Aumentar la opacidad para asegurar visibilidad
                     annotations: {{ 
                         yaxis: [
                             // 1. ANOTACIÓN DE ÁREA PARA SOBRECOMPRA
                             {{
-                                y: 40, // Comienza en el nivel 40
-                                y2: 100, // Termina en el máximo del eje Y
-                                borderColor: '#ff000000', // Borde transparente
-                                fillColor: '#ef535040', // Color Rojo (Sobrecompra) con 40% de opacidad
+                                y: 40, 
+                                y2: 100, 
+                                borderColor: '#ff000000', 
+                                fillColor: '#ef535080', // Opacidad aumentada
                                 label: {{
                                     text: 'SOBRECOMPRA',
                                     style: {{
@@ -1046,10 +1056,10 @@ def construir_prompt_formateado(data):
                             }},
                             // 2. ANOTACIÓN DE ÁREA PARA SOBREVENTA
                             {{
-                                y: -100, // Comienza en el mínimo del eje Y
-                                y2: -40, // Termina en el nivel -40
-                                borderColor: '#ff000000', // Borde transparente
-                                fillColor: '#00bfa540', // Color Verde (Sobreventa) con 40% de opacidad
+                                y: -100, 
+                                y2: -40, 
+                                borderColor: '#ff000000', 
+                                fillColor: '#00bfa580', // Opacidad aumentada
                                 label: {{
                                     text: 'SOBREVENTA',
                                     style: {{
@@ -1058,7 +1068,6 @@ def construir_prompt_formateado(data):
                                     }}
                                 }}
                             }},
-                            // 3. ANOTACIÓN DE LÍNEA PARA SOBRECOMPRA (+40)
                             {{
                                 y: 40,
                                 borderColor: '#d32f2f',
@@ -1071,7 +1080,6 @@ def construir_prompt_formateado(data):
                                     text: 'Sobrecompra (+40)'
                                 }}
                             }},
-                            // 4. ANOTACIÓN DE LÍNEA PARA SOBREVENTA (-40)
                             {{
                                 y: -40,
                                 borderColor: '#388e3c',
@@ -1088,26 +1096,8 @@ def construir_prompt_formateado(data):
                     }}
                 }}
             ],
-            plotOptions: {{
-                candlestick: {{
-                    // Aplicado a las velas REALES (primera serie candlestick)
-                    borderWidth: 0.5, 
-                    fillToStroke: true, 
-                    colors: {{
-                        stroke: {{ 
-                            up: '#00bfa5', // Verde
-                            down: '#ef5350' // Rojo
-                        }},
-                        fill: {{ 
-                            up: '#ffffff', 
-                            down: '#ffffff' 
-                        }}
-                    }},
-                    wick: {{
-                        useFillColor: true 
-                    }}
-                }}
-            }},
+            // ⭐ IMPORTANTE: Se ha quitado el plotOptions global
+            
             tooltip: {{
                 theme: 'light', 
                 x: {{
