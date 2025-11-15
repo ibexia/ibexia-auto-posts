@@ -1020,6 +1020,8 @@ def construir_prompt_formateado(data):
                     colors: {{
                         up: '#00bfa5', 
                         down: '#ef5350' 
+                        upC: '#00bfa5',     // Contorno (vela alcista)
+                        downC: '#ef5350'    // Contorno (vela bajista)                
                     }},
                     wick: {{
                         useFillColor: false
