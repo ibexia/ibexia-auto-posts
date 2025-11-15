@@ -893,6 +893,9 @@ def construir_prompt_formateado(data):
                     name: 'Precio Real',
                     type: 'candlestick',
                     data: ohlcData
+                    stroke: {{
+                        width: 0.1 // O prueba con 0.5. Si pones 0, desaparece el borde.
+                    }}
                 }},
                 {{
                     name: 'Cierre Real',
