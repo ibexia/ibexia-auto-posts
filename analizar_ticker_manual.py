@@ -974,6 +974,12 @@ def construir_prompt_formateado(data):
             }},
             plotOptions: {{
                 candlestick: {{
+                    // AÑADIR ESTE BLOQUE
+                    stroke: {{
+                        width: 1, // Cambia este valor para aumentar o disminuir el grosor
+                        colors: ['#333333'] // Opcional: define el color del borde
+                    }},
+                    // FIN DEL BLOQUE A AÑADIR
                     colors: {{
                         up: '#00bfa5', // Verde para vela alcista (Open < Close)
                         down: '#ef5350' // Rojo para vela bajista (Open > Close)
