@@ -440,8 +440,8 @@ def obtener_datos_yfinance(ticker):
              fechas_historial = [] # Abortar el gráfico
 
 
-        # --- NUEVA Lógica: Proyección lineal SIN soportes/resistencias (solo SMI) ---
-        precios_proyectados = []
+        # --- Lógica: Proyección OHLC con Volatilidad Fija para Velas (OHLC Proyectado) ---
+        ohlc_proyectados = []
         ultimo_precio_conocido = precios_reales_para_simulacion[-1] if precios_reales_para_simulacion else current_price
 
         # Determinar la dirección de la tendencia y el movimiento diario constante
@@ -456,6 +456,7 @@ def obtener_datos_yfinance(ticker):
 
         # Definir un movimiento diario constante (usaremos +/- 1% o +/- 0.5%)
         movimiento_diario = 0.0
+        VOLATILIDAD_PCT = 0.01 # Volatilidad fija del 1% para la vela
 
         # Prioridad 1: Sobrecompra / Sobreventa Extrema (Fuerza de Reversión)
         if smi_actual > 40:
@@ -479,12 +480,31 @@ def obtener_datos_yfinance(ticker):
                 movimiento_diario = 0.0
 
         for _ in range(PROYECCION_FUTURA_DIAS):
-            siguiente_precio = ultimo_precio_conocido * (1 + movimiento_diario)
-            siguiente_precio = round(siguiente_precio, 3)
-            precios_proyectados.append(siguiente_precio)
-            ultimo_precio_conocido = siguiente_precio
+            # El Open es el precio de cierre del día anterior
+            open_p = round(ultimo_precio_conocido, 3) 
+            
+            # El Cierre (el precio proyectado)
+            siguiente_precio_base = ultimo_precio_conocido * (1 + movimiento_diario)
+            close_p = round(siguiente_precio_base, 3)
+            
+            # High/Low: Centrado en el precio base +/- 1% de volatilidad
+            high_p_base = max(open_p, close_p)
+            low_p_base = min(open_p, close_p)
+            
+            # Aplicar la volatilidad del 1%
+            high_p = round(high_p_base * (1 + VOLATILIDAD_PCT), 3)
+            low_p = round(low_p_base * (1 - VOLATILIDAD_PCT), 3)
+            
+            # Asegurarse de que High >= max(Open, Close) y Low <= min(Open, Close)
+            high_p = max(high_p, open_p, close_p)
+            low_p = min(low_p, open_p, close_p)
+            
+            ohlc_proyectados.append([open_p, high_p, low_p, close_p])
+            ultimo_precio_conocido = close_p # Para el siguiente día, el Open será este Close
 
-        # --- Fin de la NUEVA lógica lineal ---
+        # Obtener los precios de cierre proyectados de la lista OHLC para la simulación
+        precios_proyectados = [ohlc[3] for ohlc in ohlc_proyectados]
+        # --- Fin de la Lógica OHLC con Volatilidad Fija ---
 
         # Unir precios reales y proyectados (Solo para el cálculo de la simulación de ganancias)
         cierres_para_simulacion_total = precios_reales_para_simulacion + precios_proyectados
@@ -522,17 +542,19 @@ def obtener_datos_yfinance(ticker):
         smi_para_grafico_completo = smi_historico_para_grafico + [None] * PROYECCION_FUTURA_DIAS
         fechas_grafico_completo = fechas_historial + fechas_proyeccion
 
-        # 3. Datos de Proyección de Precio (Línea)
-        # Se necesita crear la serie de precios para la línea de proyección
-        # [null] * 30 + [precios_proyectados]
-        # Nota: ApexCharts manejará los 'null' sin conectar la línea
-        precios_proyeccion_linea = [None] * len(fechas_historial) + precios_proyectados
-        # Si no hay datos históricos (es un caso borde que debería estar cubierto por el rellenado)
-        if not precios_reales_para_simulacion and precios_proyectados:
-            # Si no hay historial, pero sí proyección (sólo debería ocurrir con el rellenado)
-            # Creamos un punto de conexión en el precio actual
-             punto_conexion = [current_price]
-             precios_proyeccion_linea = [None] * (len(fechas_historial) - 1) + punto_conexion + precios_proyectados
+        # 3. Datos de Proyección de Precio (OHLC Candlestick)
+        # Se necesita crear la serie de velas para la proyección
+        ohlc_proyeccion_para_grafico = []
+        for i, date_str in enumerate(fechas_proyeccion):
+            # i es el índice 0 a 4 de los 5 días de proyección
+            ohlc_proyeccion_para_grafico.append({
+                "x": date_str,
+                "y": ohlc_proyectados[i] # [Open, High, Low, Close]
+            })
+            
+        # Los datos históricos DEBEN ser None para esta serie (Velas de proyección)
+        ohlc_proyeccion_para_grafico_final = ([{"x": d, "y": None} for d in fechas_historial] + 
+                                              ohlc_proyeccion_para_grafico)
         
         # 4. Datos de Cierre para el gráfico de línea (para mostrar el cierre real)
         # [Cierres reales] + [null] * 5
@@ -558,7 +580,7 @@ def obtener_datos_yfinance(ticker):
             # DATOS PARA EL GRÁFICO APEXCHARTS
             "OHLC_REALE_PARA_GRAFICO": ohlc_reales_para_grafico, # Nuevo: Datos Candlestick
             "SMI_PARA_GRAFICO_COMPLETO": smi_para_grafico_completo, # Nuevo: Datos SMI Linea
-            "PRECIOS_PROYECCION_LINEA": precios_proyeccion_linea, # Nuevo: Datos Proyección Linea
+            "OHLC_PROYECCION_PARA_GRAFICO_FINAL": ohlc_proyeccion_para_grafico_final, # Nuevo: Datos Proyección OHLC
             "CIERRES_REALES_LINEA": cierres_reales_linea, # Nuevo: Cierres Reales Linea (para overlay)
             "FECHAS_GRAFICO_COMPLETO": fechas_grafico_completo, # Nuevo: Etiquetas de Eje X
             # DATOS ANTIGUOS QUE AUN SE USAN EN SIMULACIÓN/PROYECCIÓN
@@ -725,7 +747,7 @@ def construir_prompt_formateado(data):
     # REVISIÓN CRÍTICA DE DATOS ANTES DE GENERAR EL GRÁFICO
     ohlc_data = data.get("OHLC_REALE_PARA_GRAFICO", [])
     smi_data = data.get("SMI_PARA_GRAFICO_COMPLETO", [])
-    proj_data = data.get("PRECIOS_PROYECCION_LINEA", [])
+    proj_data_ohlc = data.get("OHLC_PROYECCION_PARA_GRAFICO_FINAL", [])
     cierres_reales_linea = data.get("CIERRES_REALES_LINEA", [])
     fechas_completo = data.get("FECHAS_GRAFICO_COMPLETO", [])
     num_labels_hist = len(data.get("FECHAS_HISTORIAL", []))
@@ -746,12 +768,10 @@ def construir_prompt_formateado(data):
              smi_series.append({"x": date_str, "y": smi_data[i] if i < len(smi_data) else None})
         smi_json = json.dumps(smi_series)
         
-        # 3. Datos de Proyección de Precio (Línea)
-        # Formato: [{x: 'date', y: Precio}, ...] - Los precios históricos deben ser None/null
-        proj_series = []
-        for i, date_str in enumerate(fechas_completo):
-             proj_series.append({"x": date_str, "y": proj_data[i] if i < len(proj_data) else None})
-        proj_json = json.dumps(proj_series)
+        # 3. Datos de Proyección de Precio (Candlestick OHLC)
+        # Formato: [{x: 'date', y: [O, H, L, C]}, ...] - Los precios históricos deben ser None/null
+        # Nota: La lista 'proj_data_ohlc' ya está en el formato correcto
+        proj_json = json.dumps(proj_data_ohlc)
 
 
         
@@ -929,6 +949,39 @@ def construir_prompt_formateado(data):
                     color: '#333333'
                 }}
             }},
+            # ⭐ INSERTA ESTE BLOQUE EN LAS OPCIONES DE TU GRÁFICO DE INDICADOR ⭐
+            annotations: {{
+                yaxis: [
+                    // 1. ANOTACIÓN PARA SOBRECOMPRA (ARRIBA DE 70)
+                    {{
+                        y: 70, // Comienza en el nivel 70
+                        y2: 100, // Termina en el máximo del eje Y
+                        borderColor: '#ff000000', // Borde transparente
+                        fillColor: '#ef535040', // Color Rojo (Sobrecompra) con 40% de opacidad
+                        label: {{
+                            text: 'SOBRECOMPRA',
+                            style: {{
+                                color: '#fff',
+                                background: '#ef5350',
+                            }}
+                        }}
+                    }},
+                    // 2. ANOTACIÓN PARA SOBREVENTA (ABAJO DE 30)
+                    {{
+                        y: 0, // Comienza en el mínimo del eje Y
+                        y2: 30, // Termina en el nivel 30
+                        borderColor: '#ff000000', // Borde transparente
+                        fillColor: '#00bfa540', // Color Verde (Sobreventa) con 40% de opacidad
+                        label: {{
+                            text: 'SOBREVENTA',
+                            style: {{
+                                color: '#fff',
+                                background: '#00bfa5',
+                            }}
+                        }}
+                    }}
+                ]
+            }},
             xaxis: {{
                 type: 'category',
                 tooltip: {{
@@ -947,7 +1000,7 @@ def construir_prompt_formateado(data):
                     color: '#aaaaaa'
                 }}
             }},
-            # ⭐ INICIO DEL BLOQUE CRÍTICO: DOBLE LLAVE GARANTIZADA ⭐
+            // ⭐ CAMBIO CLAVE: Definición de dos ejes Y
             yaxis: [
                 {{
                     // Eje Y principal (0): Precio
@@ -981,42 +1034,37 @@ def construir_prompt_formateado(data):
                         }}
                     }},
                     opposite: true, // Eje a la derecha
-                    # 💡 MODIFICACIÓN CLAVE: ANOTACIONES DE SOMBREADO (Sobrecompra/Sobreventa)
+                    // ⭐ ANOTACIONES: Añadidas al eje SMI (el segundo eje Y)
                     annotations: {{ 
                         yaxis: [
-                            // 1. SOBRECOMPRA: Sombreado de +40 a +100 (con doble llave)
                             {{
-                                y: 40, // Comienza en el umbral inferior de sobrecompra
-                                y2: 100, // Termina en el máximo del eje (100)
-                                borderColor: '#ff000000', // Borde transparente
-                                fillColor: '#FFC10740', // Color Amarillo (FFC107) con 40% de opacidad
+                                y: 40,
+                                borderColor: '#d32f2f',
                                 label: {{
-                                    text: 'SOBRECOMPRA (+40)',
+                                    borderColor: '#d32f2f',
                                     style: {{
-                                        color: '#000',
-                                        background: '#FFC107',
-                                    }}
+                                        color: '#fff',
+                                        background: '#d32f2f'
+                                    }},
+                                    text: 'Sobrecompra (+40)'
                                 }}
                             }},
-                            // 2. SOBREVENTA: Sombreado de -100 a -40 (con doble llave)
                             {{
-                                y: -100, // Comienza en el mínimo del eje (-100)
-                                y2: -40, // Termina en el umbral superior de sobreventa
-                                borderColor: '#ff000000', // Borde transparente
-                                fillColor: '#FFC10740', // Color Amarillo (FFC107) con 40% de opacidad
+                                y: -40,
+                                borderColor: '#388e3c',
                                 label: {{
-                                    text: 'SOBREVENTA (-40)',
+                                    borderColor: '#388e3c',
                                     style: {{
-                                        color: '#000',
-                                        background: '#FFC107',
-                                    }}
+                                        color: '#fff',
+                                        background: '#388e3c'
+                                    }},
+                                    text: 'Sobreventa (-40)'
                                 }}
                             }}
                         ]
                     }}
                 }}
             ],
-            # ⭐ FIN DEL BLOQUE CRÍTICO ⭐
             plotOptions: {{
                 candlestick: {{
                     // ⭐ CAMBIO CLAVE: Establecido a 0 para quitar el grosor del borde
