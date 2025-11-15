@@ -881,11 +881,6 @@ def construir_prompt_formateado(data):
         var projData = {proj_json};
         var cierresRealesData = {cierres_reales_json};
 
-        // --- BLOQUE ELIMINADO PARA QUITAR LOS GAPS ---
-        // Se utilizan las fechas en formato de cadena ISO ('YYYY-MM-DD') en el eje X para asegurar 
-        // que cada punto de datos se trata como una categoría igualmente espaciada, eliminando los huecos.
-        // Se mantiene el formateador de etiquetas para mostrar la fecha de forma legible.
-        
         // --- Gráfico Principal (Candlestick y Proyección) ---
         var optionsCandlestick = {{
             series: [
@@ -905,22 +900,22 @@ def construir_prompt_formateado(data):
                 }},
                 {{
                     name: 'Precio Proyectado',
-                    type: 'line',
+                    // ⭐ MODIFICADO: Cambiado de 'line' a 'scatter' para mostrar solo puntos
+                    type: 'scatter', 
                     data: projData,
                     color: '#ffc107',
-                    stroke: {{
-                        width: 3, // MODIFICADO: Mayor grosor para la línea proyectada
-                        dashArray: 5
-                    }},
+                    // ELIMINADO: No se necesita 'stroke' para scatter
                     marker: {{
-                        size: 0
+                        // ⭐ MODIFICADO: Tamaño del punto a 6 (aprox. 3mm)
+                        size: 6, 
+                        strokeWidth: 0 // Sin borde para el punto
                     }}
                 }}
             ],
             chart: {{
                 id: 'mainChart',
                 height: 500, // MODIFICADO: Doble de altura
-                type: 'line',
+                type: 'line', // El tipo principal sigue siendo 'line' para combinar 'candlestick' y 'line'
                 toolbar: {{
                     autoSelected: 'pan',
                     show: true
