@@ -807,8 +807,10 @@ def construir_prompt_formateado(data):
             start_index = i - 1
             tendencia_actual = get_trend(smis[i], smis[i-1])
             
-            while i < len(smis) and get_trend(smis[i], smis[smi_data] - 1]) == tendencia_actual:
+            # --- LÍNEA CORREGIDA ---
+            while i < len(smis) and get_trend(smis[i], smis[i-1]) == tendencia_actual:
                 i += 1
+            # --- FIN LÍNEA CORREGIDA ---
             
             end_index = i - 1
             
