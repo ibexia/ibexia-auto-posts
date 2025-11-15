@@ -892,7 +892,14 @@ def construir_prompt_formateado(data):
         // Los datos se pasan como JSON de Python
         var ohlcData = {ohlc_json};
         var smiData = {smi_json};
-        var projData = {proj_json};
+        var projData = {proj_json}; // Incluye los datos 'null' para el periodo histórico
+
+        // Función auxiliar para obtener el color del SMI
+        function getSMIColor(val) {{
+            if (val > 40) return '#FF9800'; // Sobrecompra (Naranja/Ámbar)
+            if (val < -40) return '#388e3c'; // Sobreventa (Verde Oscuro)
+            return '#00bfa5'; // Zona neutral (Turquesa)
+        }}
 
         // --- Gráfico Unificado (Candlestick, Proyección y SMI) ---
         var optionsCandlestick = {{
@@ -901,25 +908,44 @@ def construir_prompt_formateado(data):
                     name: 'Precio Real',
                     type: 'candlestick',
                     data: ohlcData,
-                    // Se asigna al primer eje Y (el de precio)
-                    yaxisIndex: 0
+                    yaxisIndex: 0,
+                    // Colorear las mechas del precio real (rojo/verde)
+                    color: '#000000', // Color temporal
+                    stroke: {{
+                        width: 1
+                    }}
                 }},
                 {{
                     name: 'Precio Proyectado',
                     type: 'candlestick', 
                     data: projData,
-                    yaxisIndex: 0
+                    yaxisIndex: 0,
+                    // Se usan colores diferentes para diferenciar la proyección
+                    // Usaremos un color sólido más claro para el cuerpo.
+                    plotOptions: {{
+                        candlestick: {{
+                            colors: {{
+                                up: '#e0f7fa', // Azul claro para proyección alcista
+                                down: '#ffcdd2', // Rojo claro para proyección bajista
+                                stroke: {{
+                                    up: '#00838f', // Borde azul oscuro para up
+                                    down: '#c62828' // Borde rojo oscuro para down
+                                }}
+                            }}
+                        }}
+                    }}
                 }},
                 {{
                     name: 'Nuestro Algoritmo (SMI)',
                     type: 'line',
                     data: smiData,
-                    color: '#00bfa5',
+                    color: '#00bfa5', // Color base del SMI
                     stroke: {{
-                        width: 4 // Grosor de línea para el SMI
+                        width: 3 // Grosor de línea para el SMI
                     }},
-                    // ⭐ CAMBIO CLAVE: Asignado al segundo eje Y (el de SMI)
-                    yaxisIndex: 1 
+                    yaxisIndex: 1, // Eje SMI
+                    // Renderiza la línea de SMI sobre las demás series
+                    zIndex: 10 
                 }}
             ],
             chart: {{
@@ -936,7 +962,6 @@ def construir_prompt_formateado(data):
                 background: '#ffffff', 
                 foreColor: '#333333', 
                 stacked: false
-
             }},
             stroke: {{
                 width: 0.5,
@@ -949,39 +974,8 @@ def construir_prompt_formateado(data):
                     color: '#333333'
                 }}
             }},
-            # ⭐ INSERTA ESTE BLOQUE EN LAS OPCIONES DE TU GRÁFICO DE INDICADOR ⭐
-            annotations: {{
-                yaxis: [
-                    // 1. ANOTACIÓN PARA SOBRECOMPRA (ARRIBA DE 70)
-                    {{
-                        y: 70, // Comienza en el nivel 70
-                        y2: 100, // Termina en el máximo del eje Y
-                        borderColor: '#ff000000', // Borde transparente
-                        fillColor: '#ef535040', // Color Rojo (Sobrecompra) con 40% de opacidad
-                        label: {{
-                            text: 'SOBRECOMPRA',
-                            style: {{
-                                color: '#fff',
-                                background: '#ef5350',
-                            }}
-                        }}
-                    }},
-                    // 2. ANOTACIÓN PARA SOBREVENTA (ABAJO DE 30)
-                    {{
-                        y: 0, // Comienza en el mínimo del eje Y
-                        y2: 30, // Termina en el nivel 30
-                        borderColor: '#ff000000', // Borde transparente
-                        fillColor: '#00bfa540', // Color Verde (Sobreventa) con 40% de opacidad
-                        label: {{
-                            text: 'SOBREVENTA',
-                            style: {{
-                                color: '#fff',
-                                background: '#00bfa5',
-                            }}
-                        }}
-                    }}
-                ]
-            }},
+            // ⭐ ELIMINAR ANOTACIONES DE ÁREA DE AQUÍ. Se MUEVEN al YAXIS DEL SMI (EJE 1)
+            
             xaxis: {{
                 type: 'category',
                 tooltip: {{
@@ -989,7 +983,6 @@ def construir_prompt_formateado(data):
                 }},
                 labels: {{
                     formatter: function(val) {{
-                        // Val es una cadena de fecha ('YYYY-MM-DD')
                         return new Date(val).toLocaleDateString('es-ES', {{day: '2-digit', month: 'short'}});
                     }}
                 }},
@@ -1034,9 +1027,38 @@ def construir_prompt_formateado(data):
                         }}
                     }},
                     opposite: true, // Eje a la derecha
-                    // ⭐ ANOTACIONES: Añadidas al eje SMI (el segundo eje Y)
+                    // ⭐ ANOTACIONES DE ÁREA PARA SOBRECOMPRA/SOBREVENTA - SOLUCIÓN AL PROBLEMA DEL COLOR
                     annotations: {{ 
                         yaxis: [
+                            // 1. ANOTACIÓN DE ÁREA PARA SOBRECOMPRA
+                            {{
+                                y: 40, // Comienza en el nivel 40
+                                y2: 100, // Termina en el máximo del eje Y
+                                borderColor: '#ff000000', // Borde transparente
+                                fillColor: '#ef535040', // Color Rojo (Sobrecompra) con 40% de opacidad
+                                label: {{
+                                    text: 'SOBRECOMPRA',
+                                    style: {{
+                                        color: '#fff',
+                                        background: '#ef5350',
+                                    }}
+                                }}
+                            }},
+                            // 2. ANOTACIÓN DE ÁREA PARA SOBREVENTA
+                            {{
+                                y: -100, // Comienza en el mínimo del eje Y
+                                y2: -40, // Termina en el nivel -40
+                                borderColor: '#ff000000', // Borde transparente
+                                fillColor: '#00bfa540', // Color Verde (Sobreventa) con 40% de opacidad
+                                label: {{
+                                    text: 'SOBREVENTA',
+                                    style: {{
+                                        color: '#fff',
+                                        background: '#00bfa5',
+                                    }}
+                                }}
+                            }},
+                            // 3. ANOTACIÓN DE LÍNEA PARA SOBRECOMPRA (+40)
                             {{
                                 y: 40,
                                 borderColor: '#d32f2f',
@@ -1049,6 +1071,7 @@ def construir_prompt_formateado(data):
                                     text: 'Sobrecompra (+40)'
                                 }}
                             }},
+                            // 4. ANOTACIÓN DE LÍNEA PARA SOBREVENTA (-40)
                             {{
                                 y: -40,
                                 borderColor: '#388e3c',
@@ -1067,24 +1090,20 @@ def construir_prompt_formateado(data):
             ],
             plotOptions: {{
                 candlestick: {{
-                    // ⭐ CAMBIO CLAVE: Establecido a 0 para quitar el grosor del borde
+                    // Aplicado a las velas REALES (primera serie candlestick)
                     borderWidth: 0.5, 
-                    // Necesario para que el cuerpo sea hueco (usa el color del fondo)
                     fillToStroke: true, 
                     colors: {{
-                        // El color del borde ya no se verá, pero se usa como referencia para el wick
                         stroke: {{ 
                             up: '#00bfa5', // Verde
                             down: '#ef5350' // Rojo
                         }},
-                        // Relleno de las velas establecido a blanco para ser "hueco" sobre fondo blanco
                         fill: {{ 
                             up: '#ffffff', 
                             down: '#ffffff' 
                         }}
                     }},
                     wick: {{
-                        // Usa el color del stroke (borde) para las mechas
                         useFillColor: true 
                     }}
                 }}
@@ -1094,7 +1113,6 @@ def construir_prompt_formateado(data):
                 x: {{
                     format: 'dd MMM yyyy'
                 }},
-                // ⭐ Configuración del tooltip para mostrar ambos valores
                 shared: true, 
                 intersect: false 
             }},
@@ -1103,13 +1121,8 @@ def construir_prompt_formateado(data):
             }}
         }};
 
-        // ⭐ ELIMINACIÓN DEL GRÁFICO SECUNDARIO
-
         var chartCandlestick = new ApexCharts(document.querySelector("#chartCandlestick"), optionsCandlestick);
         chartCandlestick.render();
-        
-        // ⭐ ELIMINACIÓN DE LA CREACIÓN E INSERCIÓN DEL CONTENEDOR SMI
-
         </script>
         """
     
