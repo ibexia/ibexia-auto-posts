@@ -881,6 +881,8 @@ def construir_prompt_formateado(data):
                     name: 'Precio Real',
                     type: 'candlestick',
                     data: ohlcData,
+                    stroke: {{ 
+                        width: 0.1 // Forzamos un grosor mínimo (casi invisible)
                     // Se asigna al primer eje Y (el de precio)
                     yaxisIndex: 0
                 }},
