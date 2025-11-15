@@ -893,7 +893,6 @@ def construir_prompt_formateado(data):
                     name: 'Precio Real',
                     type: 'candlestick',
                     data: ohlcData
-
                 }},
                 {{
                     name: 'Cierre Real',
@@ -933,7 +932,10 @@ def construir_prompt_formateado(data):
                 foreColor: '#333333', // Texto oscuro para contraste
                 stacked: false
             }},
-
+            // AÑADE ESTO: stroke.width controla el grosor de la línea del borde de la vela.
+            stroke: {{
+                width: 0.5 // Puedes usar 1 o 0.5 para una línea muy fina.
+            }},
             title: {{
                 text: 'Gráfico Candlestick y Proyección',
                 align: 'left',
@@ -975,10 +977,6 @@ def construir_prompt_formateado(data):
             }},
             plotOptions: {{
                 candlestick: {{
-                    stroke: {{
-                        width: 1, // Cambia este valor para aumentar o disminuir el grosor
-                        colors: ['#333333'] // Opcional: define el color del borde
-                    }},
                     colors: {{
                         up: '#00bfa5', // Verde para vela alcista (Open < Close)
                         down: '#ef5350' // Rojo para vela bajista (Open > Close)
