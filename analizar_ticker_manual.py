@@ -1016,7 +1016,7 @@ def construir_prompt_formateado(data):
             ],
             plotOptions: {{
                 candlestick: {{
-                    borderWidth: 1,
+                    borderWidth: 0,
                     colors: {{
                         up: '#00bfa5', 
                         down: '#ef5350' 
