@@ -852,7 +852,7 @@ def construir_prompt_formateado(data):
                     // MODIFICACIÓN: Título corregido.
                     text: 'Análisis K-Line y SMI de {data['NOMBRE_EMPRESA']}', 
                     left: 'center',
-                    textStyle: {{ color: '#e0e0e0' }} // Color de texto fijo
+                    textStyle: {{ color: '#000000' }} // Color de texto fijo
                 }},
                 // 2. ELEMENTO GRÁFICO FIJO Y CENTRADO
                 graphic: [
@@ -895,7 +895,7 @@ def construir_prompt_formateado(data):
                 ],
                 legend: {{
                     data: ['Vela Japonesa', 'Nuestro Algoritmo', 'Proyección de Precio'],
-                    textStyle: {{ color: '#e0e0e0' }},
+                    textStyle: {{ color: '#000000' }},
                     bottom: '10px', 
                 }},
                 tooltip: {{
