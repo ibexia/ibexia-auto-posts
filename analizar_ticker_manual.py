@@ -1047,8 +1047,8 @@ def construir_prompt_formateado(data):
                         data: createLineData(40),
                         xAxisIndex: 1,
                         yAxisIndex: 1,
-                        lineStyle: {{ color: '#FF0000', type: 'dotted' }},
-                        areaStyle: {{ color: {{ type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [ {{ offset: 0, color: 'rgba(255, 0, 0, 0.4)' }}, {{ offset: 1, color: 'rgba(255, 0, 0, 0.0)' }} ] }} }},
+                        lineStyle: {{ color: 'rgba(0,0,0,0.0)', type: 'dotted' }}, # Hacemos la línea invisible, solo pintamos el área
+                        areaStyle: {{ color: '#FF0000', origin: 'end', opacity: 0.35 }}, # 'end' pinta el área desde la línea hacia el borde superior
                         symbol: 'none',
                         connectNulls: true,
                     }},
@@ -1059,8 +1059,8 @@ def construir_prompt_formateado(data):
                         data: createLineData(-40),
                         xAxisIndex: 1,
                         yAxisIndex: 1,
-                        lineStyle: {{ color: '#00AA00', type: 'dotted' }},
-                        areaStyle: {{ color: {{ type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [ {{ offset: 0, color: 'rgba(0, 255, 0, 0.4)' }}, {{ offset: 1, color: 'rgba(0, 255, 0, 0.0)' }} ] }} }},
+                        lineStyle: {{ color: 'rgba(0,0,0,0.0)', type: 'dotted' }}, # Hacemos la línea invisible
+                        areaStyle: {{ color: '#00AA00', origin: 'start', opacity: 0.35 }}, # 'start' pinta el área desde la línea hacia el borde inferior
                         symbol: 'none',
                         connectNulls: true,
                     }}
