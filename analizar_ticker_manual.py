@@ -934,20 +934,12 @@ def construir_prompt_formateado(data):
                 dataZoom: [
                     {{ // DataZoom para el gráfico de velas
                         type: 'inside',
-                        xAxisIndex: [0, 1],
-                        start: 50,
+                        xAxisIndex: [0],
+                        start: 0,
                         end: 100,
                         moveOnMouseMove: true,
                         zoomOnMouseWheel: true
                     }},
-                    {{ // DataZoom para el gráfico de SMI
-                        show: true,
-                        xAxisIndex: [0, 1],
-                        type: 'slider',
-                        top: '87%',
-                        start: 50,
-                        end: 100
-                    }}
                 ],
                 series: [
                     {{ // Serie de Velas Japonesas (K-Line)
