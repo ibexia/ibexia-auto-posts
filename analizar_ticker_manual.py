@@ -366,11 +366,34 @@ def obtener_datos_yfinance(ticker):
         volumen_promedio_30d = hist_extended['Volume'].tail(30).mean()
 
 
-        # Fechas reales de cotización para los últimos 30 días
+        # Fechas reales de cotización para los últimos 30 días (solo para etiquetas que ya no se usan, pero se mantienen por si acaso)
         fechas_historial = cierres_history_full.tail(30).index.strftime("%d/%m").tolist()
         ultima_fecha_historial = cierres_history_full.index[-1] if not cierres_history_full.empty else datetime.today()
-        fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
         
+        # Obtener los timestamps de los 30 días de historial (en milisegundos)
+        timestamps_historial_ms = [ts.value // 10**6 for ts in cierres_history_full.tail(30).index]
+        
+        # Calcular timestamps para los 5 días de proyección (basado en el último día de historial)
+        # Usamos el último timestamp real + días de delta
+        ultima_fecha_historial_dt = cierres_history_full.index[-1].to_pydatetime() if not cierres_history_full.empty else datetime.today()
+        timestamps_proyeccion_ms = [(ultima_fecha_historial_dt + timedelta(days=i)).value // 10**6 for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
+
+        # --- NUEVA SECCIÓN DE EXTRACCIÓN DE DATOS OHLC PARA CANDLESTICKS ---
+        hist_for_chart_ohlc = hist_extended.tail(30).dropna(subset=['Open', 'High', 'Low', 'Close'])
+        ohlc_data_for_chart = []
+        for index, row in hist_for_chart_ohlc.iterrows():
+            # El formato del plugin es {t: timestamp en milisegundos, o: open, h: high, l: low, c: close}
+            ohlc_data_for_chart.append({
+                't': index.value // 10**6,  # Convierte el timestamp de Pandas a milisegundos
+                'o': round(row['Open'], 3),
+                'h': round(row['High'], 3),
+                'l': round(row['Low'], 3),
+                'c': round(row['Close'], 3)
+            })
+        ohlc_json_data = json.dumps(ohlc_data_for_chart) # Usar json.dumps simple
+        # --- FIN NUEVA SECCIÓN ---
+
+
         # --- MANEJO ROBUSTO DE LOS 30 DÍAS DE DATOS PARA EL GRÁFICO ---
         # SMI para los 30 días del gráfico
         smi_historico_para_grafico = []
@@ -455,9 +478,23 @@ def obtener_datos_yfinance(ticker):
 
         # --- Fin de la NUEVA lógica lineal ---
 
-        # Unir precios reales y proyectados
+        # --- Lógica de Conversión de Líneas a Objetos {x: timestamp, y: valor} ---
+        precios_reales_obj = [{ 'x': timestamps_historial_ms[i], 'y': precios_reales_para_grafico[i] } for i in range(len(precios_reales_para_grafico))]
+        smi_historico_obj = [{ 'x': timestamps_historial_ms[i], 'y': smi_historico_para_grafico[i] } for i in range(len(smi_historico_para_grafico))]
+        
+        # El precio proyectado debe ser una línea que empiece en el último precio real y siga con los proyectados
+        precios_proyectados_obj = []
+        if precios_reales_obj:
+            # Empieza la línea en el último punto real
+            precios_proyectados_obj.append(precios_reales_obj[-1])
+        for i in range(len(precios_proyectados)):
+            precios_proyectados_obj.append({ 'x': timestamps_proyeccion_ms[i], 'y': precios_proyectados[i] })
+            
+        precio_proyectado_dia_5 = precios_proyectados_obj[-1]['y'] if precios_proyectados_obj else current_price # Último precio proyectado a 5 días
+        
+        # Unir precios reales y proyectados (Mantenido para compatibilidad)
         cierres_para_grafico_total = precios_reales_para_grafico + precios_proyectados
-        precio_proyectado_dia_5 = cierres_para_grafico_total[-1] if cierres_para_grafico_total else current_price # Último precio proyectado a 5 días
+
 
         # Guarda los datos para la simulación
         smi_historico_para_simulacion = [round(s, 3) for s in smi_history_full.tail(30).tolist()]
@@ -499,9 +536,15 @@ def obtener_datos_yfinance(ticker):
             "SMI_SEMANAL": smi_semanal, # NUEVA ADICIÓN
             "PRECIO_OBJETIVO_COMPRA": precio_objetivo_compra,
             "tendencia_ibexia": tendencia_ibexia, # Renombrado de TENDENCIA_NOTA
+            # --- NUEVOS CAMPOS PARA EL GRÁFICO CANDLESTICK ---
+            "OHLC_DATA_JSON": ohlc_json_data, 
+            "PRECIOS_REALES_OBJ": precios_reales_obj,
+            "SMI_HISTORICO_OBJ": smi_historico_obj,
+            "PRECIOS_PROYECTADOS_OBJ": precios_proyectados_obj,
+            # --- CAMPOS ANTIGUOS MANTENIDOS POR COMPATIBILIDAD CON OTRAS FUNCIONES ---
             "CIERRES_30_DIAS": precios_reales_para_grafico, # Usar los 30 días ya limpios y completos
-            "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico, # Renombrado
-            "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total,
+            "SMI_HISTORICO_PARA_GRAFICO": smi_historico_para_grafico, # Se mantiene para simulación
+            "CIERRES_PARA_GRAFICO_TOTAL": cierres_para_grafico_total, # Mantenido para compatibilidad
             "OFFSET_DIAS_GRAFICO": OFFSET_DIAS,
             "RESISTENCIA_1": resistencia_1,
             "RESISTENCIA_2": resistencia_2,
@@ -662,56 +705,24 @@ def construir_prompt_formateado(data):
     # REVISIÓN CRÍTICA DE DATOS ANTES DE GENERAR EL GRÁFICO
     labels_historial = data.get("FECHAS_HISTORIAL", [])
     labels_proyeccion = data.get("FECHAS_PROYECCION", [])
-    labels_total = labels_historial + labels_proyeccion
+    labels_total = labels_historial + labels_proyeccion # Se mantiene labels_total, pero ya no se usa como eje X
     num_labels_hist = len(labels_historial)
     num_labels_total = len(labels_total)
+    
+    # NUEVOS ARRAYS DE DATOS EN FORMATO OBJETO {x: timestamp, y: valor} o {t: timestamp, ...}
+    ohlc_json = data.get("OHLC_DATA_JSON", "[]") # Obtener el JSON pre-serializado
+    smi_historico_obj = data.get('SMI_HISTORICO_OBJ', [])
+    precios_proyectados_obj = data.get('PRECIOS_PROYECTADOS_OBJ', [])
 
-    if not smi_historico_para_grafico or not cierres_para_grafico_total or num_labels_total == 0:
-        chart_html = "<p>No hay suficientes datos válidos para generar el gráfico.</p>"
+    if not ohlc_json or num_labels_total == 0:
+        chart_html = "<p>No hay suficientes datos válidos para generar el gráfico (OHLC).</p>"
     else:
-        # Asegurar que SMI tenga el mismo número de puntos que las etiquetas totales (rellenando con null)
-        smi_desplazados_para_grafico = smi_historico_para_grafico + [None] * PROYECCION_FUTURA_DIAS
-        
-        # El dataset de precio proyectado debe ser:
-        # [null] * (días_historial - 1) + [último precio real] + [precios_proyectados]
-        # Esto asegura que la línea proyectada comience exactamente en el último punto del precio real
-        precios_reales_grafico = data.get('CIERRES_30_DIAS', [])
-        precios_proyectados = cierres_para_grafico_total[num_labels_hist:]
-        
-        data_proyectada = []
-        if num_labels_hist > 0 and precios_reales_grafico:
-            # Rellenar con null antes del último punto de precio real
-            data_proyectada = [None] * (num_labels_hist - 1)
-            # Agregar el último precio real (el punto de conexión)
-            data_proyectada.append(precios_reales_grafico[-1])
-            # Agregar la proyección
-            data_proyectada.extend(precios_proyectados)
-        else:
-             data_proyectada = [None] * num_labels_total # Si no hay historial, no hay proyección
-        
-        # Si el precio real tiene menos de 30 puntos (por la lógica de rellenado en yfinance),
-        # también debemos asegurarnos de que el array de precios reales tenga la longitud de las etiquetas históricas.
-        if len(precios_reales_grafico) < num_labels_hist:
-             # Esto debería estar resuelto por el manejo en yfinance, pero lo forzamos a null si hay un desajuste
-             precios_reales_grafico.extend([None] * (num_labels_hist - len(precios_reales_grafico)))
-
-        # Aseguramos que todos los datasets tengan la misma longitud que labels_total
-        max_len = num_labels_total
-        smi_desplazados_para_grafico = smi_desplazados_para_grafico[:max_len]
-        data_proyectada = data_proyectada[:max_len]
-        
-        # Rellenar el array de precios reales con 'null' para el área de proyección
-        precios_reales_grafico_completo = precios_reales_grafico[:num_labels_hist] + [None] * PROYECCION_FUTURA_DIAS
-        precios_reales_grafico_completo = precios_reales_grafico_completo[:max_len]
-
-        
-        # ---- INICIO DE LA CORRECCIÓN: SERIALIZACIÓN JSON ----
-        # Serializar todos los arrays para garantizar que None se convierte a 'null'
-        labels_json = safe_json_dump(labels_total)
-        smi_json = safe_json_dump(smi_desplazados_para_grafico)
-        precios_reales_json = safe_json_dump(precios_reales_grafico_completo)
-        data_proyectada_json = safe_json_dump(data_proyectada)
-        # ---- FIN DE LA CORRECCIÓN ----
+        # ---- SERIALIZACIÓN JSON ----
+        # Serializar los arrays de objetos que no vienen pre-serializados (SMI y Proyección)
+        labels_json = safe_json_dump(labels_total) # Se mantiene para compatibilidad con el SMI
+        smi_json = safe_json_dump(smi_historico_obj) # Contiene objetos {x: t, y: v}
+        data_proyectada_json = safe_json_dump(precios_proyectados_obj) # Contiene objetos {x: t, y: v}
+        # ohlc_json ya viene como string JSON: data.get("OHLC_DATA_JSON", "[]")
         
         # Reemplazo para la sección de análisis detallado del gráfico
         analisis_grafico_html = f"""
@@ -817,51 +828,52 @@ def construir_prompt_formateado(data):
         """
 
         # El gráfico en sí, que debe ir antes que el análisis
-        # Usamos los arrays de datos corregidos: smi_desplazados_para_grafico, precios_reales_grafico_completo, data_proyectada
+        # Usamos los arrays de datos corregidos: smi_historico_obj, ohlc_json, precios_proyectados_obj
         chart_html = f"""
         <div style="width: 100%; max-width: 800px; margin: auto; height: 500px; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
             <canvas id="smiPrecioChart" style="height: 600px;"></canvas>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.min.js"></script>
         <script>
             // Configuración del gráfico
             var ctx = document.getElementById('smiPrecioChart').getContext('2d');
             var smiPrecioChart = new Chart(ctx, {{
-                type: 'line',
+                type: 'line', // Mantenemos 'line' como tipo base
                 data: {{
-                    labels: {labels_json},
+                    labels: {labels_json}, // Se mantiene, pero el eje X usará 'time'
                     datasets: [
                         {{
                             label: 'Nuestro Algoritmo',
-                            data: {smi_json},
+                            data: {smi_json}, // Ahora contiene objetos {{x: t, y: v}}
                             borderColor: '#00bfa5',
                             backgroundColor: 'rgba(0, 191, 165, 0.2)',
                             yAxisID: 'y1',
                             pointRadius: 0,
                             borderWidth: 2,
-                            tension: 0.1
+                            tension: 0.1,
+                            type: 'line' 
                         }},
                         {{
-                            label: 'Precio Real',
-                            data: {precios_reales_json},
-                            borderColor: '#2979ff',
-                            backgroundColor: 'rgba(41, 121, 255, 0.2)',
+                            label: 'Precio (Velas Japonesas)',
+                            data: {ohlc_json},
                             yAxisID: 'y',
-                            pointRadius: 0,
-                            borderWidth: 2,
-                            tension: 0.1
+                            // CAMBIAR EL TIPO DEL DATASET A CANDLESTICK
+                            type: 'candlestick', 
+                            borderWidth: 1,
                         }},
                         {{
                             label: 'Precio Proyectado',
-                            data: {data_proyectada_json},
+                            data: {data_proyectada_json}, // Ahora contiene objetos {{x: t, y: v}}
                             borderColor: '#ffc107',
                             borderDash: [5, 5],
                             backgroundColor: 'rgba(255, 193, 7, 0.2)',
                             yAxisID: 'y',
                             pointRadius: 0,
                             borderWidth: 2,
-                            tension: 0.1
+                            tension: 0.1,
+                            type: 'line'
                         }}
                     ]
                 }},
@@ -893,8 +905,28 @@ def construir_prompt_formateado(data):
                                     if (label) {{
                                         label += ': ';
                                     }}
+                                    // Comprobar si es el dataset de candlestick para mostrar el formato OHLC
+                                    if (context.dataset.type === 'candlestick') {{
+                                        const ohlc = context.raw;
+                                        // Verificar si ohlc existe y tiene la estructura esperada
+                                        if (ohlc && typeof ohlc.o === 'number') {{
+                                             return [
+                                                'Apertura: ' + ohlc.o.toFixed(3) + '€',
+                                                'Máximo: ' + ohlc.h.toFixed(3) + '€',
+                                                'Mínimo: ' + ohlc.l.toFixed(3) + '€',
+                                                'Cierre: ' + ohlc.c.toFixed(3) + '€',
+                                            ];
+                                        }} else {{
+                                            // Si no hay datos OHLC válidos, mostrar el valor del eje Y (o solo el label si es null)
+                                             if (context.parsed.y !== null) {{
+                                                 return label + context.parsed.y.toFixed(3) + '€';
+                                             }}
+                                             return label; 
+                                        }}
+                                    }}
+                                    // Para datasets de línea
                                     if (context.parsed.y !== null) {{
-                                        label += context.parsed.y.toFixed(2) + '€';
+                                        label += context.parsed.y.toFixed(3) + '€';
                                     }}
                                     return label;
                                 }}
@@ -945,6 +977,14 @@ def construir_prompt_formateado(data):
                     }},
                     scales: {{
                         x: {{
+                            # CAMBIAR EL TIPO DE EJE X A 'TIME'
+                            type: 'time',
+                            time: {{
+                                unit: 'day',
+                                displayFormats: {{
+                                    day: 'dd/MM/yy'
+                                }}
+                            }},
                             ticks: {{
                                 color: '#e0e0e0'
                             }},
@@ -1245,9 +1285,6 @@ def generar_contenido_con_gemini(tickers):
             
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180)
-
-
-
 
 
 def main():
