@@ -926,7 +926,7 @@ def construir_prompt_formateado(data):
                         gridIndex: 1,
                         min: -100,
                         max: 100,
-                        axisLabel: {{ color: '#e0e0e0', formatter: '{value}' }},
+                        axisLabel: {{ color: '#e0e0e0', formatter: '{{value}}' }}, 
                         splitLine: {{ lineStyle: {{ color: 'rgba(128, 128, 128, 0.2)' }} }},
                         position: 'left'
                     }}
