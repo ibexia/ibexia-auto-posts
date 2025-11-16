@@ -812,6 +812,8 @@ def construir_prompt_formateado(data):
 
 
 
+# ... código anterior ...
+
     # --- INICIO DEL NUEVO BLOQUE DE GRÁFICO CON ECHARTS ---
     if not ohlc_data or not smi_values:
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico de velas japonesas.</p>"
@@ -844,14 +846,14 @@ def construir_prompt_formateado(data):
             
             const option = {{
                 title: {{
-                    text: 'Evolución del Precio y Algoritmo ibexiaES',
+                    text: 'Nuevo Título del Gráfico Aquí', // <<--- CAMBIA ESTO PARA EL TÍTULO
                     left: 'center',
                     textStyle: {{ color: '#e0e0e0' }}
                 }},
                 legend: {{
                     data: ['Vela Japonesa', 'Nuestro Algoritmo', 'Proyección de Precio'],
                     textStyle: {{ color: '#e0e0e0' }},
-                    bottom: 0,
+                    bottom: '10px', // <<--- CORRECCIÓN 1: MOVER LEYENDA ARRIBA
                 }},
                 tooltip: {{
                     trigger: 'axis',
@@ -883,7 +885,7 @@ def construir_prompt_formateado(data):
                 }},
                 grid: [
                     {{ left: '10%', right: '8%', height: '50%', top: '10%', zlevel: 1 }}, // Gráfico de Velas (50% de alto)
-                    {{ left: '10%', right: '8%', height: '30%', top: '65%' }}  // Gráfico de SMI (Aumentado a 30% de alto, subido a 65%)
+                    {{ left: '10%', right: '8%', height: '25%', top: '65%' }}  // <<--- CORRECCIÓN 1: REDUCIR ALTO DEL GRÁFICO SMI
                 ],
                 xAxis: [
                     {{
@@ -897,7 +899,6 @@ def construir_prompt_formateado(data):
                         max: 'dataMax',
                         axisLabel: {{
                             show: false, // Ocultar etiquetas X en el gráfico superior
-                            formatter: function(value) {{ return value.substring(5); }}, 
                             color: '#e0e0e0'
                         }},
                         gridIndex: 0
@@ -913,7 +914,14 @@ def construir_prompt_formateado(data):
                         min: 'dataMin',
                         max: 'dataMax',
                         axisLabel: {{
-                            formatter: function(value) {{ return value.substring(5); }},
+                            // <<--- CORRECCIÓN 2: CAMBIAR FORMATO DE FECHA A DD/MM
+                            formatter: function(value) {{ 
+                                // value es 'YYYY-MM-DD'
+                                if (value.length >= 10) {{
+                                    return value.substring(8, 10) + '/' + value.substring(5, 7); 
+                                }}
+                                return value;
+                            }},
                             color: '#e0e0e0'
                         }},
                         position: 'bottom'
@@ -969,27 +977,28 @@ def construir_prompt_formateado(data):
                         itemStyle: {{ color: '#ffc107' }},
                         lineStyle: {{ type: 'dashed', width: 2 }},
                         symbol: 'none',
-                        connectNulls: true, 
+                        connectNulls: true,
+                        // CONFIGURACIÓN DE LA ETIQUETA FIJA (CORREGIDA Y MÁS CENTRADA)
                         markLine: {{
-                            silent: true, // No interactuable
-                            symbol: ['none', 'none'], // Ocultar símbolos de flecha
+                            silent: true,
+                            symbol: ['none', 'none'], 
                             label: {{
                                 show: true,
-                                position: 'left', // Posición al final de la línea
+                                position: 'left', // Pone el texto hacia adentro, evitando que se salga
                                 formatter: function(params) {{
-                                    // params.value es el valor Y (precio)
                                     return 'Precio Final: ' + params.value.toFixed(2) + '€';
                                 }},
                                 fontSize: 14,
-                                color: '#1a1a2e', // Color del texto (oscuro)
-                                backgroundColor: '#ffc107', // Fondo (amarillo de la línea)
+                                color: '#1a1a2e', 
+                                backgroundColor: '#ffc107', 
                                 padding: [4, 6],
                                 borderRadius: 3
                             }},
                             data: [
                                 {{
-                                    xAxis: totalDates[totalDates.length - 1], // Última fecha del eje X
-                                    yAxis: projectionLineData[projectionLineData.length - 1], // Último precio proyectado
+                                    // Última fecha del eje X y Último precio proyectado
+                                    xAxis: totalDates[totalDates.length - 1], 
+                                    yAxis: projectionLineData[projectionLineData.length - 1], 
                                     name: 'Precio Final Proyectado'
                                 }}
                             ]
@@ -1004,7 +1013,7 @@ def construir_prompt_formateado(data):
                         itemStyle: {{ color: '#00bfa5' }},
                         symbol: 'none',
                     }},
-                    // NUEVA SERIE: Área de Sobrecompra (> +40)
+                    // ÁREA DE SOBRECOMPRA (> +40)
                     {{
                         name: 'Area Sobrecompra',
                         type: 'line',
@@ -1013,34 +1022,17 @@ def construir_prompt_formateado(data):
                         yAxisIndex: 1,
                         lineStyle: {{ width: 0 }},
                         symbol: 'none',
-                        areaStyle: {{
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                {{ // Punto superior (valor real de SMI)
-                                    offset: 0, color: 'rgba(255, 0, 0, 0.5)' 
-                                }},
-                                {{ // Punto inferior (línea +40)
-                                    offset: 1, color: 'rgba(255, 0, 0, 0.0)' 
-                                }}
-                            ]),
-                            // Clip para rellenar solo el área por encima de +40
-                            clip: true,
-                            // Aplicar un valor base para el relleno (la línea +40)
-                            // Esto asegura que el relleno comience en +40 y vaya hasta el valor de SMI
-                            origin: 'start' // 'start' rellena hasta el valor de yAxis.min. Si queremos rellenar SOLO desde 40, usamos la técnica de la serie de sobrecompra/sobreventa
-                        }},
-                        // Usamos la propiedad clip: true y establecemos la línea base a 40 para simular el relleno.
-                        // El valor maximo del eje Y es 100, y queremos rellenar de 40 a 100.
                         markArea: {{
                             silent: true,
                             itemStyle: {{
-                                color: 'rgba(255, 0, 0, 0.3)' 
+                                color: 'rgba(255, 0, 0, 0.3)' // Rojo semi-transparente
                             }},
                             data: [
                                 [{{ yAxis: 40, itemStyle: {{ color: 'transparent' }} }}, {{ yAxis: 100 }}]
                             ]
                         }}
                     }},
-                    // NUEVA SERIE: Área de Sobreventa (< -40)
+                    // ÁREA DE SOBREVENTA (< -40)
                     {{
                         name: 'Area Sobreventa',
                         type: 'line',
@@ -1049,22 +1041,10 @@ def construir_prompt_formateado(data):
                         yAxisIndex: 1,
                         lineStyle: {{ width: 0 }},
                         symbol: 'none',
-                        areaStyle: {{
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                {{ // Punto superior (línea -40)
-                                    offset: 0, color: 'rgba(0, 255, 0, 0.0)' 
-                                }},
-                                {{ // Punto inferior (valor real de SMI)
-                                    offset: 1, color: 'rgba(0, 255, 0, 0.5)' 
-                                }}
-                            ]),
-                            clip: true,
-                            origin: 'end' // 'end' rellena desde yAxis.max.
-                        }},
                         markArea: {{
                             silent: true,
                             itemStyle: {{
-                                color: 'rgba(0, 255, 0, 0.3)' 
+                                color: 'rgba(0, 255, 0, 0.3)' // Verde semi-transparente
                             }},
                             data: [
                                 [{{ yAxis: -100, itemStyle: {{ color: 'transparent' }} }}, {{ yAxis: -40 }}]
@@ -1105,6 +1085,7 @@ def construir_prompt_formateado(data):
         </script>
         """
     
+# ... resto del código ...
 
     
     # --- FIN DEL NUEVO BLOQUE DE GRÁFICO CON ECHARTS ---
