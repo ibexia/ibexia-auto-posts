@@ -407,6 +407,11 @@ def obtener_datos_yfinance(ticker):
         # 3. ECHARTS_SMI_VALUES (Valores SMI)
         # CRÍTICO: Usa la lista de SMI generada de forma consistente
         smi_values_for_echarts = [round(s, 3) for s in smi_historico_para_grafico]
+
+        # AÑADE ESTE BLOQUE: Alinear SMI con el total de fechas del eje X (30 + 5)
+        PROYECCION_FUTURA_DIAS = 5 # Valor definido previamente en tu código
+        smi_values_for_echarts.extend([None] * PROYECCION_FUTURA_DIAS) # <--- CORRECCIÓN CRÍTICA
+        # smi_values_for_echarts ahora tiene 35 elementos, igual que el eje X.
         
         # 1. ECHARTS_FECHAS_OHLC (Solo fechas históricas - YYYY-MM-DD para ECharts K-Line)
         ohlc_dates = hist_extended.tail(30).index.strftime("%Y-%m-%d").tolist()
