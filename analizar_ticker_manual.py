@@ -844,7 +844,7 @@ def construir_prompt_formateado(data):
             
             const option = {{
                 title: {{
-                    text: 'Precio y Nuestro Algoritmo',
+                    text: 'Evolución del Precio y Algoritmo ibexiaES',
                     left: 'center',
                     textStyle: {{ color: '#e0e0e0' }}
                 }},
