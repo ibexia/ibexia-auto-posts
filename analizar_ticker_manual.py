@@ -975,7 +975,7 @@ def construir_prompt_formateado(data):
                             symbol: ['none', 'none'], // Ocultar símbolos de flecha
                             label: {{
                                 show: true,
-                                position: 'end', // Posición al final de la línea
+                                position: 'left', // Posición al final de la línea
                                 formatter: function(params) {{
                                     // params.value es el valor Y (precio)
                                     return 'Precio Final: ' + params.value.toFixed(2) + '€';
@@ -988,8 +988,8 @@ def construir_prompt_formateado(data):
                             }},
                             data: [
                                 {{
-                                    // 'end' busca el último punto válido en los datos de la serie
-                                    type: 'max', 
+                                    xAxis: totalDates[totalDates.length - 1], // Última fecha del eje X
+                                    yAxis: projectionLineData[projectionLineData.length - 1], // Último precio proyectado
                                     name: 'Precio Final Proyectado'
                                 }}
                             ]
