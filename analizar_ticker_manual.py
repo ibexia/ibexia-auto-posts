@@ -811,9 +811,7 @@ def construir_prompt_formateado(data):
     """
 
 
-# ... código anterior ...
-
-    # --- INICIO DEL NUEVO BLOQUE DE GRÁFICO CON ECHARTS ---
+# --- INICIO DEL NUEVO BLOQUE DE GRÁFICO CON ECHARTS ---
     if not ohlc_data or not smi_values:
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico de velas japonesas.</p>"
     else:
@@ -828,6 +826,8 @@ def construir_prompt_formateado(data):
             const smiData = {smi_values_json};
             const projectionLineData = {proyeccion_line_json};
             const totalDates = {echarts_x_dates_total_json};
+            const totalDataPoints = totalDates.length;
+            const initialZoomPoints = 35; // Queremos mostrar los últimos 35 puntos (30 históricos + 5 proyectados)
 
             // 1. Obtener el valor final proyectado
             const finalPriceData = projectionLineData.filter(v => v !== null && v !== undefined).pop();
@@ -835,50 +835,51 @@ def construir_prompt_formateado(data):
 
             // Función para crear la línea de Sobrecompra/Sobreventa
             const createLineData = (value) => {{
-                // Creamos un array con el valor repetido para cada punto de SMI
                 return smiData.map(d => value);
             }};
 
             // Configuración de ECharts
             const chartDom = document.getElementById('echarts-kline-container');
+            // MODIFICACIÓN: Inicialización con tema nulo, pero con fondo oscuro explícito.
             const myChart = echarts.init(chartDom, null, {{
                 renderer: 'canvas',
                 useDirtyRect: false,
-                backgroundColor: '#1a1a2e' // Fondo oscuro
+                backgroundColor: '#1a1a2e' // Fondo oscuro fijo
             }});
             
             const option = {{
                 title: {{
-                    text: 'Nuevo Título del Gráfico Aquí', 
+                    // MODIFICACIÓN: Título corregido.
+                    text: 'Análisis K-Line y SMI de {data['NOMBRE_EMPRESA']}', 
                     left: 'center',
-                    textStyle: {{ color: '#e0e0e0' }}
+                    textStyle: {{ color: '#e0e0e0' }} // Color de texto fijo
                 }},
                 // 2. ELEMENTO GRÁFICO FIJO Y CENTRADO
                 graphic: [
                     {{
                         type: 'group',
                         id: 'price-note',
-                        left: 'center', // Centrado horizontal en el gráfico
-                        top: '15%',    // Posicionado alto en el gráfico de precios (gridIndex 0)
-                        z: 100,        // Asegurarse de que esté por encima de todo
+                        left: 'center',
+                        top: '15%',
+                        z: 100,
                         children: [
                             {{
-                                type: 'rect', // Fondo
+                                type: 'rect',
                                 shape: {{
-                                    x: -120, // Desplazamiento para centrar el rect sobre el texto
+                                    x: -120,
                                     y: 0,
                                     width: 240,
                                     height: 30,
                                     r: 5
                                 }},
                                 style: {{
-                                    fill: '#ffc107', // Fondo amarillo
+                                    fill: '#ffc107',
                                     shadowBlur: 5,
                                     shadowColor: 'rgba(0, 0, 0, 0.5)'
                                 }}
                             }},
                             {{
-                                type: 'text', // Texto
+                                type: 'text',
                                 style: {{
                                     text: 'PROYECCIÓN FINAL: ' + finalPrice + '€',
                                     x: 0,
@@ -886,7 +887,7 @@ def construir_prompt_formateado(data):
                                     textAlign: 'center',
                                     textVerticalAlign: 'middle',
                                     font: 'bold 16px sans-serif',
-                                    fill: '#1a1a2e' // Texto oscuro
+                                    fill: '#1a1a2e'
                                 }}
                             }}
                         ]
@@ -897,11 +898,128 @@ def construir_prompt_formateado(data):
                     textStyle: {{ color: '#e0e0e0' }},
                     bottom: '10px', 
                 }},
-                // ... (El resto de la configuración de tooltip, axisPointer, yAxis se mantiene)
-                // ...
+                tooltip: {{
+                    trigger: 'axis',
+                    axisPointer: {{
+                        type: 'cross',
+                        lineStyle: {{
+                            color: '#e0e0e0', // Color del puntero fijo
+                            width: 1,
+                            type: 'solid'
+                        }}
+                    }},
+                    backgroundColor: 'rgba(50, 50, 50, 0.7)', // Fondo del tooltip oscuro
+                    textStyle: {{ color: '#e0e0e0' }} // Texto del tooltip claro
+                }},
+                axisPointer: {{
+                    link: [{{ xAxisIndex: 'all' }}],
+                    label: {{
+                        backgroundColor: '#777'
+                    }}
+                }},
+                grid: [
+                    {{
+                        left: '10%',
+                        right: '8%',
+                        height: '50%', // Gráfico de precios
+                        bottom: '40%'
+                    }},
+                    {{
+                        left: '10%',
+                        right: '8%',
+                        top: '68%',
+                        height: '20%' // Gráfico de SMI
+                    }}
+                ],
+                // MODIFICACIÓN CRÍTICA 1: Configuración de DataZoom para zoom fijo inicial
+                dataZoom: [
+                    {{
+                        type: 'inside', // Zoom y movimiento interactivo
+                        xAxisIndex: [0, 1],
+                        filterMode: 'none',
+                        // Controla si se pueden hacer zoom con la rueda
+                        zoomOnMouseWheel: true 
+                    }},
+                    {{
+                        show: true,    // Mostrar la barra de DataZoom inferior
+                        xAxisIndex: [0, 1],
+                        type: 'slider',
+                        height: 20,
+                        bottom: 30,
+                        textStyle: {{ color: '#e0e0e0' }},
+                        // MODIFICACIÓN CRÍTICA 2: Establecer un zoom fijo inicial
+                        // Muestra los últimos 'initialZoomPoints' puntos de datos
+                        // Si totalDataPoints > 0, calcula el inicio
+                        startValue: totalDataPoints > initialZoomPoints ? totalDates[totalDataPoints - initialZoomPoints] : totalDates[0],
+                        endValue: totalDates[totalDataPoints - 1] // Mostrar hasta el último punto
+                    }}
+                ],
+                // Ejes X
+                xAxis: [
+                    {{ // Eje X principal (para K-Line y Proyección - grid 0)
+                        type: 'category',
+                        data: totalDates,
+                        boundaryGap: true,
+                        axisLine: {{ lineStyle: {{ color: '#555' }} }},
+                        axisLabel: {{ color: '#ccc' }},
+                        axisTick: {{ show: false }},
+                        splitLine: {{ show: false }},
+                        min: 'dataMin',
+                        max: 'dataMax'
+                    }},
+                    {{ // Eje X para SMI (grid 1)
+                        type: 'category',
+                        gridIndex: 1,
+                        data: totalDates,
+                        boundaryGap: true,
+                        axisLine: {{ lineStyle: {{ color: '#555' }} }},
+                        axisLabel: {{ color: '#ccc' }},
+                        axisTick: {{ show: false }},
+                        splitLine: {{ show: false }},
+                        min: 'dataMin',
+                        max: 'dataMax'
+                    }}
+                ],
+                // Ejes Y
+                yAxis: [
+                    {{ // Eje Y para K-Line (grid 0)
+                        scale: true,
+                        splitArea: {{ show: true, areaStyle: {{ color: ['#2e2e42', '#1a1a2e'] }} }},
+                        axisLine: {{ lineStyle: {{ color: '#555' }} }},
+                        axisLabel: {{ color: '#ccc' }},
+                        splitLine: {{ lineStyle: {{ color: '#333' }} }}
+                    }},
+                    {{ // Eje Y para SMI (grid 1)
+                        gridIndex: 1,
+                        splitNumber: 2,
+                        scale: true,
+                        min: -100,
+                        max: 100,
+                        axisLine: {{ lineStyle: {{ color: '#555' }} }},
+                        axisLabel: {{ color: '#ccc' }},
+                        splitLine: {{ lineStyle: {{ color: '#333' }} }},
+                        z: 10,
+                    }}
+                ],
                 series: [
                     {{ // Serie de Velas Japonesas (K-Line)
-                        // ...
+                        name: 'Vela Japonesa',
+                        type: 'candlestick',
+                        data: ohlcData,
+                        xAxisIndex: 0,
+                        yAxisIndex: 0,
+                        itemStyle: {{
+                            color: '#4CAF50', // Color para subir
+                            color0: '#F44336', // Color para bajar
+                            borderColor: '#4CAF50',
+                            borderColor0: '#F44336'
+                        }},
+                        markPoint: {{
+                            data: [
+                                {{ name: 'Max', type: 'max', valueDim: 'highest' }},
+                                {{ name: 'Min', type: 'min', valueDim: 'lowest' }}
+                            ]
+                        }}
                     }},
                     {{ // Serie de Proyección de Precio (Línea)
                         name: 'Proyección de Precio',
@@ -909,18 +1027,45 @@ def construir_prompt_formateado(data):
                         data: projectionLineData,
                         xAxisIndex: 0,
                         yAxisIndex: 0,
-                        itemStyle: {{ color: '#ffc107' }},
+                        itemStyle: {{ color: '#ffc107' }}, // Color amarillo fijo
                         lineStyle: {{ type: 'dashed', width: 2 }},
                         symbol: 'none',
-                        connectNulls: true,
-                        // 3. markLine ELIMINADO para usar el elemento gráfico
+                        connectNulls: true, // MANTENER: conecta el último punto real con la proyección
                     }},
                     {{ // Serie de Nuestro Algoritmo (SMI)
-                        // ...
+                        name: 'Nuestro Algoritmo',
+                        type: 'line',
+                        data: smiData,
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        lineStyle: {{ width: 2, color: '#007bff' }}, // Color azul fijo
+                        smooth: true,
+                        symbol: 'none'
                     }},
                     // ÁREA DE SOBRECOMPRA (> +40)
-                    // ... (Se mantiene la configuración de sobrecompra y sobreventa)
-                    // ...
+                    {{
+                        name: 'Sobrecompra',
+                        type: 'line',
+                        data: createLineData(40),
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        lineStyle: {{ color: '#F44336', type: 'dotted' }},
+                        areaStyle: {{ color: 'rgba(244, 67, 54, 0.2)' }},
+                        symbol: 'none',
+                        connectNulls: true,
+                    }},
+                    // ÁREA DE SOBREVENTA (< -40)
+                    {{
+                        name: 'Sobreventa',
+                        type: 'line',
+                        data: createLineData(-40),
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        lineStyle: {{ color: '#4CAF50', type: 'dotted' }},
+                        areaStyle: {{ color: 'rgba(76, 175, 80, 0.2)' }},
+                        symbol: 'none',
+                        connectNulls: true,
+                    }}
                 ]
             }};
 
@@ -932,8 +1077,8 @@ def construir_prompt_formateado(data):
             }});
         </script>
         """
-    
-# ... resto del código ...
+    # --- FIN DEL NUEVO BLOQUE DE GRÁFICO CON ECHARTS ---
+
 
     
     # --- FIN DEL NUEVO BLOQUE DE GRÁFICO CON ECHARTS ---
