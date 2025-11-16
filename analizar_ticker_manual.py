@@ -903,7 +903,7 @@ def construir_prompt_formateado(data):
                     }},
                     {{
                         type: 'category',
-                        data: totalDates.slice(0, smiData.length), // Solo fechas históricas para el SMI
+                        data: totalDates,
                         gridIndex: 1,
                         scale: true,
                         boundaryGap: false,
@@ -938,7 +938,7 @@ def construir_prompt_formateado(data):
                 dataZoom: [
                     {{ // DataZoom para el gráfico de velas
                         type: 'inside',
-                        xAxisIndex: [0],
+                        xAxisIndex: [0, 1],
                         start: 0,
                         end: 100,
                         moveOnMouseMove: true,
