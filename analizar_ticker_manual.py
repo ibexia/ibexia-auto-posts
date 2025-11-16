@@ -810,31 +810,11 @@ def construir_prompt_formateado(data):
     <p style="text-align: center; color: #aaaaaa; margin-top: 15px;">{estado_actual}</p>
     """
 
+
 # --- INICIO DEL NUEVO BLOQUE DE GRÁFICO CON ECHARTS ---
     if not ohlc_data or not smi_values:
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico de velas japonesas.</p>"
     else:
-        # Recuperamos los valores para los marcadores de Soporte/Resistencia
-        resistencia_1 = data.get('RESISTENCIA_1')
-        soporte_1 = data.get('SOPORTE_1')
-        
-        # Soportes y resistencias para markLine (Se deben usar SOLO los que tengan un valor válido)
-        mark_lines = []
-        if isinstance(resistencia_1, (int, float)) and resistencia_1 > 0:
-            mark_lines.append({
-                'name': 'Resistencia 1', 
-                'yAxis': resistencia_1, 
-                'lineStyle': {'color': '#FF9800', 'type': 'solid', 'width': 2},
-                'label': {'formatter': 'R1: {c}', 'position': 'end', 'color': '#FF9800'}
-            })
-        if isinstance(soporte_1, (int, float)) and soporte_1 > 0:
-            mark_lines.append({
-                'name': 'Soporte 1', 
-                'yAxis': soporte_1, 
-                'lineStyle': {'color': '#FF9800', 'type': 'solid', 'width': 2},
-                'label': {'formatter': 'S1: {c}', 'position': 'end', 'color': '#FF9800'}
-            })
-
         chart_html = f"""
         <div style="width: 100%; max-width: 800px; margin: auto;">
             <div id="echarts-kline-container" style="width: 100%; height: 750px;"></div>
@@ -846,9 +826,8 @@ def construir_prompt_formateado(data):
             const smiData = {smi_values_json};
             const projectionLineData = {proyeccion_line_json};
             const totalDates = {echarts_x_dates_total_json};
-            const markLinesData = {json.dumps(mark_lines)}; // **NUEVA LÍNEA: Inyección de datos de markLine**
             const totalDataPoints = totalDates.length;
-            const initialZoomPoints = 35; 
+            const initialZoomPoints = 35; // Queremos mostrar los últimos 35 puntos (30 históricos + 5 proyectados)
 
             // 1. Obtener el valor final proyectado
             const finalPriceData = projectionLineData.filter(v => v !== null && v !== undefined).pop();
@@ -861,18 +840,21 @@ def construir_prompt_formateado(data):
 
             // Configuración de ECharts
             const chartDom = document.getElementById('echarts-kline-container');
+            // MODIFICACIÓN: Inicialización con tema nulo, pero con fondo oscuro explícito.
             const myChart = echarts.init(chartDom, null, {{
                 renderer: 'canvas',
                 useDirtyRect: false,
-                backgroundColor: '#1a1a2e'
+                backgroundColor: '#1a1a2e' // Fondo oscuro fijo
             }});
             
             const option = {{
                 title: {{
+                    // MODIFICACIÓN: Título corregido.
                     text: 'Análisis K-Line y SMI de {data['NOMBRE_EMPRESA']}', 
                     left: 'center',
-                    textStyle: {{ color: '#e0e0e0' }}
+                    textStyle: {{ color: '#e0e0e0' }} // Color de texto fijo
                 }},
+                // 2. ELEMENTO GRÁFICO FIJO Y CENTRADO
                 graphic: [
                     {{
                         type: 'group',
@@ -921,13 +903,13 @@ def construir_prompt_formateado(data):
                     axisPointer: {{
                         type: 'cross',
                         lineStyle: {{
-                            color: '#e0e0e0',
+                            color: '#e0e0e0', // Color del puntero fijo
                             width: 1,
                             type: 'solid'
                         }}
                     }},
-                    backgroundColor: 'rgba(50, 50, 50, 0.7)',
-                    textStyle: {{ color: '#e0e0e0' }}
+                    backgroundColor: 'rgba(50, 50, 50, 0.7)', // Fondo del tooltip oscuro
+                    textStyle: {{ color: '#e0e0e0' }} // Texto del tooltip claro
                 }},
                 axisPointer: {{
                     link: [{{ xAxisIndex: 'all' }}],
@@ -939,32 +921,37 @@ def construir_prompt_formateado(data):
                     {{
                         left: '10%',
                         right: '8%',
-                        height: '50%', // ALTURA DEL GRÁFICO SUPERIOR REDUCIDA
+                        height: '50%', // Gráfico de precios
                         bottom: '40%'
                     }},
                     {{
                         left: '10%',
                         right: '8%',
-                        top: '65%', // POSICIÓN DEL GRÁFICO INFERIOR AJUSTADA
-                        height: '20%' // ALTURA DEL GRÁFICO INFERIOR AUMENTADA
+                        top: '68%',
+                        height: '20%' // Gráfico de SMI
                     }}
                 ],
+                // MODIFICACIÓN CRÍTICA 1: Configuración de DataZoom para zoom fijo inicial
                 dataZoom: [
                     {{
-                        type: 'inside',
+                        type: 'inside', // Zoom y movimiento interactivo
                         xAxisIndex: [0, 1],
                         filterMode: 'none',
+                        // Controla si se pueden hacer zoom con la rueda
                         zoomOnMouseWheel: true 
                     }},
                     {{
-                        show: true,
+                        show: true,    // Mostrar la barra de DataZoom inferior
                         xAxisIndex: [0, 1],
                         type: 'slider',
                         height: 20,
                         bottom: 30,
                         textStyle: {{ color: '#e0e0e0' }},
+                        // MODIFICACIÓN CRÍTICA 2: Establecer un zoom fijo inicial
+                        // Muestra los últimos 'initialZoomPoints' puntos de datos
+                        // Si totalDataPoints > 0, calcula el inicio
                         startValue: totalDataPoints > initialZoomPoints ? totalDates[totalDataPoints - initialZoomPoints] : totalDates[0],
-                        endValue: totalDates[totalDataPoints - 1]
+                        endValue: totalDates[totalDataPoints - 1] // Mostrar hasta el último punto
                     }}
                 ],
                 // Ejes X
@@ -976,7 +963,7 @@ def construir_prompt_formateado(data):
                         axisLine: {{ lineStyle: {{ color: '#555' }} }},
                         axisLabel: {{ color: '#ccc' }},
                         axisTick: {{ show: false }},
-                        splitLine: {{ show: true, lineStyle: {{ color: '#333', type: 'dashed' }} }}, // **LÍNEAS VERTICALES DE GUÍA AÑADIDAS**
+                        splitLine: {{ show: false }},
                         min: 'dataMin',
                         max: 'dataMax'
                     }},
@@ -988,7 +975,7 @@ def construir_prompt_formateado(data):
                         axisLine: {{ lineStyle: {{ color: '#555' }} }},
                         axisLabel: {{ color: '#ccc' }},
                         axisTick: {{ show: false }},
-                        splitLine: {{ show: true, lineStyle: {{ color: '#333', type: 'dashed' }} }}, // **LÍNEAS VERTICALES DE GUÍA AÑADIDAS**
+                        splitLine: {{ show: false }},
                         min: 'dataMin',
                         max: 'dataMax'
                     }}
@@ -1022,8 +1009,8 @@ def construir_prompt_formateado(data):
                         xAxisIndex: 0,
                         yAxisIndex: 0,
                         itemStyle: {{
-                            color: '#4CAF50',
-                            color0: '#F44336',
+                            color: '#4CAF50', // Color para subir
+                            color0: '#F44336', // Color para bajar
                             borderColor: '#4CAF50',
                             borderColor0: '#F44336'
                         }},
@@ -1032,10 +1019,6 @@ def construir_prompt_formateado(data):
                                 {{ name: 'Max', type: 'max', valueDim: 'highest' }},
                                 {{ name: 'Min', type: 'min', valueDim: 'lowest' }}
                             ]
-                        }},
-                        markLine: {{ // **LÍNEAS DE SOPORTE/RESISTENCIA AÑADIDAS**
-                            symbol: ['none', 'none'], // Sin flechas
-                            data: markLinesData
                         }}
                     }},
                     {{ // Serie de Proyección de Precio (Línea)
@@ -1044,10 +1027,10 @@ def construir_prompt_formateado(data):
                         data: projectionLineData,
                         xAxisIndex: 0,
                         yAxisIndex: 0,
-                        itemStyle: {{ color: '#ffc107' }},
+                        itemStyle: {{ color: '#ffc107' }}, // Color amarillo fijo
                         lineStyle: {{ type: 'dashed', width: 2 }},
                         symbol: 'none',
-                        connectNulls: true,
+                        connectNulls: true, // MANTENER: conecta el último punto real con la proyección
                     }},
                     {{ // Serie de Nuestro Algoritmo (SMI)
                         name: 'Nuestro Algoritmo',
@@ -1055,7 +1038,7 @@ def construir_prompt_formateado(data):
                         data: smiData,
                         xAxisIndex: 1,
                         yAxisIndex: 1,
-                        lineStyle: {{ width: 2, color: '#007bff' }},
+                        lineStyle: {{ width: 2, color: '#007bff' }}, // Color azul fijo
                         smooth: true,
                         symbol: 'none'
                     }},
@@ -1094,6 +1077,7 @@ def construir_prompt_formateado(data):
             }});
         </script>
         """
+    # --- FIN DEL NUEVO BLOQUE DE GRÁFICO CON ECHARTS ---
 
 
     
