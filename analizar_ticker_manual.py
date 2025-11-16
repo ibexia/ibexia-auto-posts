@@ -810,6 +810,8 @@ def construir_prompt_formateado(data):
     <p style="text-align: center; color: #aaaaaa; margin-top: 15px;">{estado_actual}</p>
     """
 
+
+
     # --- INICIO DEL NUEVO BLOQUE DE GRÁFICO CON ECHARTS ---
     if not ohlc_data or not smi_values:
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico de velas japonesas.</p>"
@@ -877,12 +879,11 @@ def construir_prompt_formateado(data):
                 }},
                 axisPointer: {{ 
                     link: {{ xAxisIndex: 'all' }},
-                    // AÑADE ESTA LÍNEA AQUÍ
                     triggerOn: 'mousemove' 
                 }},
                 grid: [
-                    {{ left: '10%', right: '8%', height: '40%', top: '5%', zlevel: 1 }}, // Gráfico de Velas (50% de alto)
-                    {{ left: '10%', right: '8%', height: '40%', top: '50%' }}  // Gráfico de SMI (Aumentado a 30% de alto, subido a 65%)
+                    {{ left: '10%', right: '8%', height: '50%', top: '10%', zlevel: 1 }}, // Gráfico de Velas (50% de alto)
+                    {{ left: '10%', right: '8%', height: '30%', top: '65%' }}  // Gráfico de SMI (Aumentado a 30% de alto, subido a 65%)
                 ],
                 xAxis: [
                     {{
@@ -903,7 +904,7 @@ def construir_prompt_formateado(data):
                     }},
                     {{
                         type: 'category',
-                        data: totalDates,
+                        data: totalDates, // Fechas Históricas + Proyección para el eje inferior
                         gridIndex: 1,
                         scale: true,
                         boundaryGap: false,
@@ -938,7 +939,7 @@ def construir_prompt_formateado(data):
                 dataZoom: [
                     {{ // DataZoom para el gráfico de velas
                         type: 'inside',
-                        xAxisIndex: [0, 1],
+                        xAxisIndex: [0, 1], // Aplica a ambos gráficos
                         start: 0,
                         end: 100,
                         moveOnMouseMove: true,
@@ -979,6 +980,73 @@ def construir_prompt_formateado(data):
                         itemStyle: {{ color: '#00bfa5' }},
                         symbol: 'none',
                     }},
+                    // NUEVA SERIE: Área de Sobrecompra (> +40)
+                    {{
+                        name: 'Area Sobrecompra',
+                        type: 'line',
+                        data: smiData,
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        lineStyle: {{ width: 0 }},
+                        symbol: 'none',
+                        areaStyle: {{
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                {{ // Punto superior (valor real de SMI)
+                                    offset: 0, color: 'rgba(255, 0, 0, 0.5)' 
+                                }},
+                                {{ // Punto inferior (línea +40)
+                                    offset: 1, color: 'rgba(255, 0, 0, 0.0)' 
+                                }}
+                            ]),
+                            // Clip para rellenar solo el área por encima de +40
+                            clip: true,
+                            // Aplicar un valor base para el relleno (la línea +40)
+                            // Esto asegura que el relleno comience en +40 y vaya hasta el valor de SMI
+                            origin: 'start' // 'start' rellena hasta el valor de yAxis.min. Si queremos rellenar SOLO desde 40, usamos la técnica de la serie de sobrecompra/sobreventa
+                        }},
+                        // Usamos la propiedad clip: true y establecemos la línea base a 40 para simular el relleno.
+                        // El valor maximo del eje Y es 100, y queremos rellenar de 40 a 100.
+                        markArea: {{
+                            silent: true,
+                            itemStyle: {{
+                                color: 'rgba(255, 0, 0, 0.3)' 
+                            }},
+                            data: [
+                                [{{ yAxis: 40, itemStyle: {{ color: 'transparent' }} }}, {{ yAxis: 100 }}]
+                            ]
+                        }}
+                    }},
+                    // NUEVA SERIE: Área de Sobreventa (< -40)
+                    {{
+                        name: 'Area Sobreventa',
+                        type: 'line',
+                        data: smiData,
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        lineStyle: {{ width: 0 }},
+                        symbol: 'none',
+                        areaStyle: {{
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                {{ // Punto superior (línea -40)
+                                    offset: 0, color: 'rgba(0, 255, 0, 0.0)' 
+                                }},
+                                {{ // Punto inferior (valor real de SMI)
+                                    offset: 1, color: 'rgba(0, 255, 0, 0.5)' 
+                                }}
+                            ]),
+                            clip: true,
+                            origin: 'end' // 'end' rellena desde yAxis.max.
+                        }},
+                        markArea: {{
+                            silent: true,
+                            itemStyle: {{
+                                color: 'rgba(0, 255, 0, 0.3)' 
+                            }},
+                            data: [
+                                [{{ yAxis: -100, itemStyle: {{ color: 'transparent' }} }}, {{ yAxis: -40 }}]
+                            ]
+                        }}
+                    }},
                     // Línea de Sobrecompra (+40)
                     {{
                         name: 'Sobrecompra (+40)',
@@ -1012,6 +1080,8 @@ def construir_prompt_formateado(data):
             }});
         </script>
         """
+    
+
     
     # --- FIN DEL NUEVO BLOQUE DE GRÁFICO CON ECHARTS ---
     
