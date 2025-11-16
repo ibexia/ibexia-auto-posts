@@ -810,7 +810,6 @@ def construir_prompt_formateado(data):
     <p style="text-align: center; color: #aaaaaa; margin-top: 15px;">{estado_actual}</p>
     """
 
-
 # ... código anterior ...
 
     # --- INICIO DEL NUEVO BLOQUE DE GRÁFICO CON ECHARTS ---
@@ -830,8 +829,9 @@ def construir_prompt_formateado(data):
             const totalDates = {echarts_x_dates_total_json};
 
             // 1. Obtener el valor final proyectado
-            const finalPriceData = projectionLineData.filter(v => v !== null && v !== undefined).pop();
-            const finalPrice = finalPriceData ? finalPriceData.toFixed(2) : 'N/A';
+            const validProjectionData = projectionLineData.filter(v => v !== null && v !== undefined);
+            const finalPriceData = validProjectionData.length > 0 ? validProjectionData[validProjectionData.length - 1] : null;
+            const finalPrice = finalPriceData !== null ? finalPriceData.toFixed(2) : 'N/A';
 
             // Función para crear la línea de Sobrecompra/Sobreventa
             const createLineData = (value) => {{
@@ -849,23 +849,23 @@ def construir_prompt_formateado(data):
             
             const option = {{
                 title: {{
-                    text: 'Nuevo Título del Gráfico Aquí', 
+                    text: 'Nuevo Título del Gráfico Aquí', // 📝 Título Editable
                     left: 'center',
                     textStyle: {{ color: '#e0e0e0' }}
                 }},
-                // 2. ELEMENTO GRÁFICO FIJO Y CENTRADO
+                // 2. ELEMENTO GRÁFICO FIJO Y CENTRADO (NOTA DE PRECIO FINAL)
                 graphic: [
                     {{
                         type: 'group',
                         id: 'price-note',
-                        left: 'center', // Centrado horizontal en el gráfico
-                        top: '15%',    // Posicionado alto en el gráfico de precios (gridIndex 0)
-                        z: 100,        // Asegurarse de que esté por encima de todo
+                        left: 'center', // Centrado horizontal
+                        top: '15%',    // Posicionado alto en el gráfico de precios
+                        z: 100,
                         children: [
                             {{
                                 type: 'rect', // Fondo
                                 shape: {{
-                                    x: -120, // Desplazamiento para centrar el rect sobre el texto
+                                    x: -120, 
                                     y: 0,
                                     width: 240,
                                     height: 30,
@@ -895,13 +895,119 @@ def construir_prompt_formateado(data):
                 legend: {{
                     data: ['Vela Japonesa', 'Nuestro Algoritmo', 'Proyección de Precio'],
                     textStyle: {{ color: '#e0e0e0' }},
-                    bottom: '10px', 
+                    bottom: '10px', // ✅ CORRECCIÓN: Separado de las fechas
                 }},
-                // ... (El resto de la configuración de tooltip, axisPointer, yAxis se mantiene)
-                // ...
+                tooltip: {{
+                    trigger: 'axis',
+                    axisPointer: {{ type: 'line' }},
+                    backgroundColor: 'rgba(26, 26, 46, 0.8)',
+                    borderColor: '#4a4a5e',
+                    borderWidth: 1,
+                    textStyle: {{ color: '#e0e0e0' }},
+                    formatter: function(params) {{
+                        let res = 'Fecha: ' + params[0].name + '<br/>';
+                        params.forEach(function (item) {{
+                            if (item.seriesName === 'Vela Japonesa') {{
+                                res += 'Open: ' + item.data[0] + '€<br/>';
+                                res += 'Close: ' + item.data[1] + '€<br/>';
+                                res += 'Low: ' + item.data[2] + '€<br/>';
+                                res += 'High: ' + item.data[3] + '€<br/>';
+                            }} else if (item.seriesName === 'Nuestro Algoritmo') {{
+                                res += 'Algoritmo: ' + item.value.toFixed(2) + '<br/>';
+                            }} else if (item.seriesName === 'Proyección de Precio' && item.value !== null) {{
+                                res += 'Proyección: ' + item.value.toFixed(2) + '€<br/>';
+                            }}
+                        }});
+                        return res;
+                    }}
+                }},
+                axisPointer: {{ 
+                    link: {{ xAxisIndex: 'all' }},
+                    triggerOn: 'mousemove' 
+                }},
+                grid: [
+                    {{ left: '10%', right: '8%', height: '50%', top: '10%', zlevel: 1 }}, 
+                    {{ left: '10%', right: '8%', height: '25%', top: '65%' }}  // ✅ CORRECCIÓN: Menos altura para el SMI
+                ],
+                xAxis: [
+                    {{
+                        type: 'category',
+                        data: totalDates, 
+                        scale: true,
+                        boundaryGap: false,
+                        axisLine: {{ onZero: false, lineStyle: {{ color: '#e0e0e0' }} }},
+                        splitLine: {{ show: false }},
+                        min: 'dataMin',
+                        max: 'dataMax',
+                        axisLabel: {{
+                            show: false, // Ocultar etiquetas X en el gráfico superior
+                            color: '#e0e0e0'
+                        }},
+                        gridIndex: 0
+                    }},
+                    {{
+                        type: 'category',
+                        data: totalDates, 
+                        gridIndex: 1,
+                        scale: true,
+                        boundaryGap: false,
+                        axisLine: {{ onZero: false, lineStyle: {{ color: '#e0e0e0' }} }},
+                        splitLine: {{ show: false }},
+                        min: 'dataMin',
+                        max: 'dataMax',
+                        axisLabel: {{
+                            // ✅ CORRECCIÓN: Formato de fecha DD/MM
+                            formatter: function(value) {{ 
+                                if (value.length >= 10) {{
+                                    return value.substring(8, 10) + '/' + value.substring(5, 7); 
+                                }}
+                                return value;
+                            }},
+                            color: '#e0e0e0'
+                        }},
+                        position: 'bottom'
+                    }}
+                ],
+                yAxis: [
+                    {{ // Eje Y para Velas y Proyección
+                        scale: true,
+                        axisLabel: {{ color: '#e0e0e0' }},
+                        splitLine: {{ lineStyle: {{ color: 'rgba(128, 128, 128, 0.2)' }} }},
+                        gridIndex: 0
+                    }},
+                    {{ // Eje Y para SMI
+                        scale: true,
+                        gridIndex: 1,
+                        min: -100,
+                        max: 100,
+                        axisLabel: {{ color: '#e0e0e0', formatter: '{{value}}' }}, 
+                        splitLine: {{ lineStyle: {{ color: 'rgba(128, 128, 128, 0.2)' }} }},
+                        position: 'left'
+                    }}
+                ],
+                dataZoom: [
+                    {{ 
+                        type: 'inside',
+                        xAxisIndex: [0, 1], 
+                        start: 0,
+                        end: 100,
+                        moveOnMouseMove: true,
+                        zoomOnMouseWheel: true
+                    }},
+                ],
                 series: [
                     {{ // Serie de Velas Japonesas (K-Line)
-                        // ...
+                        name: 'Vela Japonesa',
+                        type: 'candlestick',
+                        data: ohlcData,
+                        xAxisIndex: 0,
+                        yAxisIndex: 0,
+                        itemStyle: {{
+                            color: '#4CAF50', 
+                            color0: '#EF5350', 
+                            borderColor: '#4CAF50',
+                            borderColor0: '#EF5350'
+                        }},
                     }},
                     {{ // Serie de Proyección de Precio (Línea)
                         name: 'Proyección de Precio',
@@ -913,14 +1019,77 @@ def construir_prompt_formateado(data):
                         lineStyle: {{ type: 'dashed', width: 2 }},
                         symbol: 'none',
                         connectNulls: true,
-                        // 3. markLine ELIMINADO para usar el elemento gráfico
+                        // markLine ELIMINADO
                     }},
                     {{ // Serie de Nuestro Algoritmo (SMI)
-                        // ...
+                        name: 'Nuestro Algoritmo',
+                        type: 'line',
+                        data: smiData,
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        itemStyle: {{ color: '#00bfa5' }},
+                        symbol: 'none',
                     }},
-                    // ÁREA DE SOBRECOMPRA (> +40)
-                    // ... (Se mantiene la configuración de sobrecompra y sobreventa)
-                    // ...
+                    // ✅ ÁREA DE SOBRECOMPRA (> +40) - SOLICITUD DE COLORACIÓN
+                    {{
+                        name: 'Area Sobrecompra',
+                        type: 'line',
+                        data: createLineData(40), // Usamos la línea 40 como base
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        lineStyle: {{ width: 0 }},
+                        symbol: 'none',
+                        markArea: {{
+                            silent: true,
+                            itemStyle: {{
+                                color: 'rgba(255, 0, 0, 0.3)' // Rojo semi-transparente
+                            }},
+                            data: [
+                                [{{ yAxis: 40, itemStyle: {{ color: 'transparent' }} }}, {{ yAxis: 100 }}]
+                            ]
+                        }}
+                    }},
+                    // ✅ ÁREA DE SOBREVENTA (< -40) - SOLICITUD DE COLORACIÓN
+                    {{
+                        name: 'Area Sobreventa',
+                        type: 'line',
+                        data: createLineData(-40), // Usamos la línea -40 como base
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        lineStyle: {{ width: 0 }},
+                        symbol: 'none',
+                        markArea: {{
+                            silent: true,
+                            itemStyle: {{
+                                color: 'rgba(0, 255, 0, 0.3)' // Verde semi-transparente
+                            }},
+                            data: [
+                                [{{ yAxis: -100, itemStyle: {{ color: 'transparent' }} }}, {{ yAxis: -40 }}]
+                            ]
+                        }}
+                    }},
+                    // Línea de Sobrecompra (+40)
+                    {{
+                        name: 'Sobrecompra (+40)',
+                        type: 'line',
+                        data: createLineData(40),
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        lineStyle: {{ color: '#d32f2f', type: 'dotted', width: 1 }},
+                        symbolSize: 0,
+                        silent: true
+                    }},
+                    // Línea de Sobreventa (-40)
+                    {{
+                        name: 'Sobreventa (-40)',
+                        type: 'line',
+                        data: createLineData(-40),
+                        xAxisIndex: 1,
+                        yAxisIndex: 1,
+                        lineStyle: {{ color: '#388e3c', type: 'dotted', width: 1 }},
+                        symbolSize: 0,
+                        silent: true
+                    }}
                 ]
             }};
 
