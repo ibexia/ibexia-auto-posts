@@ -844,7 +844,7 @@ def construir_prompt_formateado(data):
             const myChart = echarts.init(chartDom, null, {{
                 renderer: 'canvas',
                 useDirtyRect: false,
-                backgroundColor: '#1a1a2e' // Fondo oscuro fijo
+                backgroundColor: '#ffffff' // Fondo oscuro fijo
             }});
             
             const option = {{
@@ -852,7 +852,7 @@ def construir_prompt_formateado(data):
                     // MODIFICACIÓN: Título corregido.
                     text: 'Análisis K-Line y SMI de {data['NOMBRE_EMPRESA']}', 
                     left: 'center',
-                    textStyle: {{ color: '#000000' }} // Color de texto fijo
+                    textStyle: {{ color: '#333333' }} // Color de texto fijo
                 }},
                 // 2. ELEMENTO GRÁFICO FIJO Y CENTRADO
                 graphic: [
@@ -895,7 +895,7 @@ def construir_prompt_formateado(data):
                 ],
                 legend: {{
                     data: ['Vela Japonesa', 'Nuestro Algoritmo', 'Proyección de Precio'],
-                    textStyle: {{ color: '#000000' }},
+                    textStyle: {{ color: '#333333' }},
                     bottom: '10px', 
                 }},
                 tooltip: {{
@@ -903,13 +903,13 @@ def construir_prompt_formateado(data):
                     axisPointer: {{
                         type: 'cross',
                         lineStyle: {{
-                            color: '#e0e0e0', // Color del puntero fijo
+                            color: '#333333', // Color del puntero fijo
                             width: 1,
                             type: 'solid'
                         }}
                     }},
-                    backgroundColor: 'rgba(50, 50, 50, 0.7)', // Fondo del tooltip oscuro
-                    textStyle: {{ color: '#e0e0e0' }} // Texto del tooltip claro
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Fondo del tooltip oscuro
+                    textStyle: {{ color: '#333333' }} // Texto del tooltip claro
                 }},
                 axisPointer: {{
                     link: [{{ xAxisIndex: 'all' }}],
@@ -963,7 +963,7 @@ def construir_prompt_formateado(data):
                         axisLine: {{ lineStyle: {{ color: '#555' }} }},
                         axisLabel: {{ color: '#ccc' }},
                         axisTick: {{ show: false }},
-                        splitLine: {{ show: false }},
+                        splitLine: {{ show: true, lineStyle: {{ color: '#e0e0e0', type: 'solid' }} }},
                         min: 'dataMin',
                         max: 'dataMax'
                     }},
@@ -975,7 +975,7 @@ def construir_prompt_formateado(data):
                         axisLine: {{ lineStyle: {{ color: '#555' }} }},
                         axisLabel: {{ color: '#ccc' }},
                         axisTick: {{ show: false }},
-                        splitLine: {{ show: false }},
+                        splitLine: {{ show: true, lineStyle: {{ color: '#e0e0e0', type: 'solid' }} }},
                         min: 'dataMin',
                         max: 'dataMax'
                     }}
@@ -984,10 +984,10 @@ def construir_prompt_formateado(data):
                 yAxis: [
                     {{ // Eje Y para K-Line (grid 0)
                         scale: true,
-                        splitArea: {{ show: true, areaStyle: {{ color: ['#2e2e42', '#1a1a2e'] }} }},
-                        axisLine: {{ lineStyle: {{ color: '#555' }} }},
-                        axisLabel: {{ color: '#ccc' }},
-                        splitLine: {{ lineStyle: {{ color: '#333' }} }}
+                        splitArea: {{ show: true, areaStyle: {{ color: ['#f5f5f5', '#ffffff'] }} }},
+                        axisLine: {{ lineStyle: {{ color: '#333' }} }},
+                        axisLabel: {{ color: '#333' }},
+                        splitLine: {{ lineStyle: {{ color: '#e0e0e0' }} }}
                     }},
                     {{ // Eje Y para SMI (grid 1)
                         gridIndex: 1,
@@ -995,9 +995,9 @@ def construir_prompt_formateado(data):
                         scale: true,
                         min: -100,
                         max: 100,
-                        axisLine: {{ lineStyle: {{ color: '#555' }} }},
-                        axisLabel: {{ color: '#ccc' }},
-                        splitLine: {{ lineStyle: {{ color: '#333' }} }},
+                        axisLine: {{ lineStyle: {{ color: '#333' }} }},
+                        axisLabel: {{ color: '#333' }},
+                        splitLine: {{ lineStyle: {{ color: '#e0e0e0' }} }},
                         z: 10,
                     }}
                 ],
