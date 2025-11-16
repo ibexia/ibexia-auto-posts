@@ -814,7 +814,7 @@ def construir_prompt_formateado(data):
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico de velas japonesas.</p>"
     else:
         chart_html = f"""
-        <div style="width: 100%; max-width: 800px; margin: auto;">
+        <div style="width: 100%; max-width: 900px; margin: auto;">
             <div id="echarts-kline-container" style="width: 100%; height: 950px;"></div>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
