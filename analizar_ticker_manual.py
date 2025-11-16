@@ -819,7 +819,7 @@ def construir_prompt_formateado(data):
     else:
         chart_html = f"""
         <div style="width: 100%; max-width: 800px; margin: auto;">
-            <div id="echarts-kline-container" style="width: 100%; height: 750px;"></div>
+            <div id="echarts-kline-container" style="width: 100%; height: 500px;"></div>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
         <script>
