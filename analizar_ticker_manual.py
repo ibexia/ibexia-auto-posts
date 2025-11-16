@@ -817,7 +817,7 @@ def construir_prompt_formateado(data):
     else:
         chart_html = f"""
         <div style="width: 100%; max-width: 800px; margin: auto;">
-            <div id="echarts-kline-container" style="width: 100%; height: 750px;"></div>
+            <div id="echarts-kline-container" style="width: 100%; height: 950px;"></div>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
         <script>
@@ -850,7 +850,7 @@ def construir_prompt_formateado(data):
             const option = {{
                 title: {{
                     // MODIFICACIÓN: Título corregido.
-                    text: 'Análisis K-Line y SMI de {data['NOMBRE_EMPRESA']}', 
+                    text: 'Análisis de {data['NOMBRE_EMPRESA']}', 
                     left: 'center',
                     textStyle: {{ color: '#333333' }} // Color de texto fijo
                 }},
@@ -927,8 +927,8 @@ def construir_prompt_formateado(data):
                     {{
                         left: '10%',
                         right: '8%',
-                        top: '68%',
-                        height: '20%' // Gráfico de SMI
+                        top: '60%',
+                        height: '40%' // Gráfico de SMI
                     }}
                 ],
                 // MODIFICACIÓN CRÍTICA 1: Configuración de DataZoom para zoom fijo inicial
