@@ -513,7 +513,7 @@ def obtener_datos_yfinance(ticker):
             'SMI_PARA_SIMULACION': smi_historico_para_simulacion,
             'FECHAS_PARA_SIMULACION': fechas_para_simulacion,
             "PROYECCION_FUTURA_DIAS_GRAFICO": PROYECCION_FUTURA_DIAS,
-            "HIST_EXTENDED": hist_extended.to_dict() # ADICIÓN: Para pasar los datos High/Low/Open al prompt
+            "HIST_EXTENDED": hist_extended.tail(30).reset_index().to_dict(orient='list') # Ahora solo los últimos 30 días y en formato lista para acceder fácil por índice
         }
         
         # --- NUEVA LÓGICA DE RECOMENDACIÓN BASADA EN PROYECCIÓN DE PRECIO Y RIESGO SEMANAL ---
@@ -666,10 +666,16 @@ def construir_prompt_formateado(data):
     num_labels_hist = len(labels_historial)
     num_labels_total = len(labels_total)
     
+    # Bloque de código a sustituir (desde la línea ~602 hasta la ~667)
+    
     # NUEVAS VARIABLES PARA VELAS
     aperturas_30_dias = data.get('APERTURAS_30_DIAS', [])
     precios_reales_grafico = data.get('CIERRES_30_DIAS', []) # Estos son los precios de cierre
+    
+    # ⚠️ CORRECCIÓN: Ahora accedemos a los valores de High/Low del diccionario simplificado de 30 días
     hist_extended_dict = data.get('HIST_EXTENDED', {})
+    high_values = hist_extended_dict.get('High', [])
+    low_values = hist_extended_dict.get('Low', [])
 
     if not smi_historico_para_grafico or not cierres_para_grafico_total or num_labels_total == 0 or not aperturas_30_dias:
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico de velas.</p>"
@@ -682,10 +688,7 @@ def construir_prompt_formateado(data):
         # La lista de fechas históricas (DD/MM/YYYY)
         fechas_historicas = data.get('FECHAS_PARA_SIMULACION', [])
 
-        # Para acceder a High y Low
-        high_values = list(hist_extended_dict.get('High', {}).values())
-        low_values = list(hist_extended_dict.get('Low', {}).values())
-
+        # El número de puntos es la longitud de los datos históricos de 30 días
         num_puntos = len(fechas_historicas)
         
         # 1. Crear el array de velas y el array de SMI (histórico)
@@ -694,12 +697,12 @@ def construir_prompt_formateado(data):
             fecha_obj = datetime.strptime(fechas_historicas[i], "%d/%m/%Y")
             timestamp = fecha_obj.strftime("%Y-%m-%d")
 
-            # Velas (OHLC)
+            # Velas (OHLC) - Usando los índices 0..29 de las listas de 30 días
             ohlc_data.append({
                 'time': timestamp,
                 'open': round(aperturas_30_dias[i], 3),
-                'high': round(high_values[-num_puntos + i], 3), # Usa los valores High/Low correspondientes al .tail(30)
-                'low': round(low_values[-num_puntos + i], 3),   
+                'high': round(high_values[i], 3), # CORREGIDO: Acceso directo al índice i
+                'low': round(low_values[i], 3),   # CORREGIDO: Acceso directo al índice i
                 'close': round(precios_reales_grafico[i], 3)
             })
             
@@ -711,40 +714,40 @@ def construir_prompt_formateado(data):
 
         # 2. Proyección de Precio (Línea)
         precios_proyectados = cierres_para_grafico_total[num_puntos:]
-        fechas_proyeccion_obj = [datetime.strptime(f.split(' ')[0], "%d/%m") for f in data.get("FECHAS_PROYECCION", [])]
-        
+        labels_proyeccion = data.get("FECHAS_PROYECCION", []) # Etiquetas DD/MM (fut.)
+
         # El punto de inicio de la proyección es el último cierre real
         if precios_reales_grafico:
              last_real_time = ohlc_data[-1]['time']
              projection_line_data.append({'time': last_real_time, 'value': precios_reales_grafico[-1]})
         
+        # ⚠️ CORRECCIÓN: Lógica para obtener las fechas futuras correctas (YYYY-MM-DD)
+        fecha_ultima_real = datetime.strptime(last_real_time, "%Y-%m-%d")
+        
         for i in range(len(precios_proyectados)):
-            # Asumiendo que las etiquetas de proyección tienen el formato DD/MM (fut.)
-            next_day_obj = datetime.strptime(labels_proyeccion[i].split(' ')[0], "%d/%m")
-            # Usar la fecha del día del análisis para determinar el año
-            fecha_actual = datetime.today()
-            # Si el mes de la proyección es anterior al mes actual, asumir el año siguiente.
-            if next_day_obj.month < fecha_actual.month:
-                 next_day_obj = next_day_obj.replace(year=fecha_actual.year + 1)
-            else:
-                 next_day_obj = next_day_obj.replace(year=fecha_actual.year)
-                 
-            timestamp = next_day_obj.strftime("%Y-%m-%d")
+            # Calculamos la fecha real sumando días, ignorando fines de semana o festivos si queremos ser más precisos.
+            # Aquí, solo sumamos 1 día a la vez al punto anterior.
+            
+            # Buscamos el siguiente día hábil (simplificado a solo +1 día)
+            fecha_futura = fecha_ultima_real + timedelta(days=i + 1)
+            
+            # Ajuste simplificado de la fecha para Lightweight Charts (YYYY-MM-DD)
+            timestamp = fecha_futura.strftime("%Y-%m-%d")
             
             projection_line_data.append({
                 'time': timestamp,
                 'value': round(precios_proyectados[i], 3)
             })
-            
-        # Serializar los arrays usando json.dumps (no safe_json_dump, ya que LightCharts usa 'null' nativo)
+        
+        # Serializar los arrays usando json.dumps
         ohlc_data_json = json.dumps(ohlc_data)
         smi_data_json = json.dumps(smi_data)
         projection_line_data_json = json.dumps(projection_line_data)
         
         # El HTML y el JS para Lightweight Charts
         chart_html = f"""
-        <div style="width: 100%; max-width: 800px; margin: auto; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
-            <div id="chart-container" style="height: 500px;"></div>
+        <div style="width: 100%; max-width: 800px; min-height: 500px; margin: auto; background-color: #1a1a2e; padding: 20px; border-radius: 10px;">
+            <div id="chart-container" style="width: 100%; height: 500px;"></div>
         </div>
         
         <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.umd.js"></script>
@@ -832,6 +835,8 @@ def construir_prompt_formateado(data):
             }}).observe(chartContainer);
         </script>
         """
+        
+        # El resto del código de análisis_grafico_html y tabla_resumen sigue sin cambios.
         
         # Reemplazo para la sección de análisis detallado del gráfico
         analisis_grafico_html = f"""
