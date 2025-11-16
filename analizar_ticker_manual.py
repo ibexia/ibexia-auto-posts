@@ -787,13 +787,13 @@ def construir_prompt_formateado(data):
     # Última fila para el estado actual
     ultima_tendencia = "sin datos" 
     if len(smis) > 1:
-            ultima_tendencia_smi = get_trend(smis[-1], smis[-2])
-            if ultima_tendencia_smi == "alcista":
+        ultima_tendencia_smi = get_trend(smis[-1], smis[-2])
+        if ultima_tendencia_smi == "alcista":
             ultima_tendencia = "alcista"
-            elif ultima_tendencia_smi == "bajista":
+        elif ultima_tendencia_smi == "bajista":
             ultima_tendencia = "bajista"
-            elif ultima_tendencia_smi == "consolidación":
-                ultima_tendencia = "consolidación"
+        elif ultima_tendencia_smi == "consolidación":
+            ultima_tendencia = "consolidación"
 
     estado_actual = ""
     if ultima_tendencia == "alcista":
