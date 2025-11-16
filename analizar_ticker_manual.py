@@ -936,7 +936,9 @@ def construir_prompt_formateado(data):
                         type: 'inside',
                         xAxisIndex: [0, 1],
                         start: 50,
-                        end: 100
+                        end: 100,
+                        moveOnMouseMove: true,
+                        zoomOnMouseWheel: true
                     }},
                     {{ // DataZoom para el gráfico de SMI
                         show: true,
