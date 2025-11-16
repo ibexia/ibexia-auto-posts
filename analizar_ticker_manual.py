@@ -927,8 +927,8 @@ def construir_prompt_formateado(data):
                     {{
                         left: '10%',
                         right: '8%',
-                        top: '68%',
-                        height: '20%' // Gráfico de SMI
+                        top: '63%',
+                        height: '30%' // Gráfico de SMI
                     }}
                 ],
                 // MODIFICACIÓN CRÍTICA 1: Configuración de DataZoom para zoom fijo inicial
@@ -1020,6 +1020,26 @@ def construir_prompt_formateado(data):
                                 {{ name: 'Min', type: 'min', valueDim: 'lowest' }}
                             ]
                         }}
+                        markLine: {
+                            symbol: ['none', 'none'], // No mostrar flechas en los extremos
+                            lineStyle: {
+                                type: 'solid',
+                                color: '#00bcd4', // Color azul cian para S/R
+                                width: 1.5,
+                            },
+                            data: [
+                                // Línea de Soporte Clave
+                                {
+                                    name: 'Soporte Clave',
+                                    yAxis: {data['SOPORTE_1']} 
+                                },
+                                // Línea de Resistencia Clave
+                                {
+                                    name: 'Resistencia Clave',
+                                    yAxis: {data['RESISTENCIA']}
+                                }
+                            ]
+                        }
                     }},
                     {{ // Serie de Proyección de Precio (Línea)
                         name: 'Proyección de Precio',
