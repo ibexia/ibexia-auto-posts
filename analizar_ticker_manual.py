@@ -16,15 +16,13 @@ import time
 import re
 import random
 
-# NUEVA FUNCIÓN AÑADIDA PARA GARANTIZAR LA SERIALIZACIÓN A JSON/NULL
+# FUNCIÓN AÑADIDA PARA GARANTIZAR LA SERIALIZACIÓN A JSON/NULL
 def safe_json_dump(data_list):
     """
     Serializa una lista de Python a una cadena JSON, asegurando que los valores None
     se conviertan a la palabra clave 'null' de JavaScript.
     """
     # json.dumps convierte None a 'null' y los floats a formato JavaScript (con punto decimal)
-    # Se asegura de que la lista solo contenga valores o None, para que json.dumps funcione.
-    # CORRECCIÓN DE SYNTAX ERROR EN ESTA LÍNEA (LÍNEA 25)
     return json.dumps([val if val is not None else None for val in data_list])
 
 
@@ -109,7 +107,7 @@ def calculate_smi_tv(df):
     df['SMI'] = smi_smoothed # Asignamos directamente la señal SMI suavizada al DataFrame
     return df
 
-# NUEVA FUNCIÓN: Obtener SMI Semanal
+# FUNCIÓN: Obtener SMI Semanal
 def obtener_smi_semanal(ticker):
     try:
         stock = yf.Ticker(ticker)
@@ -341,7 +339,6 @@ def obtener_datos_yfinance(ticker):
 
         precio_objetivo = round(precio_objetivo, 3)
         # --- FIN NUEVA LÓGICA ---
-        # --- FIN DE LA LÓGICA MEJORADA PARA EL PRECIO OBJETIVO ---
 
         # Precio objetivo de compra (ejemplo simple, puedes refinarlo)
         # Este 'precio_objetivo_compra' es diferente al 'precio_objetivo' general
@@ -371,12 +368,17 @@ def obtener_datos_yfinance(ticker):
         ultima_fecha_historial = cierres_history_full.index[-1] if not cierres_history_full.empty else datetime.today()
         
         # Obtener los timestamps de los 30 días de historial (en milisegundos)
+        # Usamos .value // 10**6 porque son Timestamps de Pandas
         timestamps_historial_ms = [ts.value // 10**6 for ts in cierres_history_full.tail(30).index]
         
         # Calcular timestamps para los 5 días de proyección (basado en el último día de historial)
         # Usamos el último timestamp real + días de delta
         ultima_fecha_historial_dt = cierres_history_full.index[-1].to_pydatetime() if not cierres_history_full.empty else datetime.today()
-        timestamps_proyeccion_ms = [(ultima_fecha_historial_dt + timedelta(days=i)).value // 10**6 for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
+        
+        # --- CORRECCIÓN DEL ERROR 'datetime.datetime' object has no attribute 'value' ---
+        # Usamos .timestamp() * 1000 y conversión a entero, que funciona en Python nativo 'datetime'
+        timestamps_proyeccion_ms = [int((ultima_fecha_historial_dt + timedelta(days=i)).timestamp() * 1000) for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
+        # --- FIN DE LA CORRECCIÓN ---
 
         # --- NUEVA SECCIÓN DE EXTRACCIÓN DE DATOS OHLC PARA CANDLESTICKS ---
         hist_for_chart_ohlc = hist_extended.tail(30).dropna(subset=['Open', 'High', 'Low', 'Close'])
@@ -432,7 +434,7 @@ def obtener_datos_yfinance(ticker):
              fechas_historial = []
 
 
-        # --- NUEVA Lógica: Proyección lineal SIN soportes/resistencias (solo SMI) ---
+        # --- Lógica: Proyección lineal SIN soportes/resistencias (solo SMI) ---
         precios_proyectados = []
         ultimo_precio_conocido = precios_reales_para_grafico[-1] if precios_reales_para_grafico else current_price
 
