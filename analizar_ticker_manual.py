@@ -957,7 +957,7 @@ def construir_prompt_formateado(data):
                     {{ // Eje X principal (para K-Line y Proyección - grid 0)
                         type: 'category',
                         data: totalDates,
-                        boundaryGap: true,
+                        boundaryGap: false,
                         axisLine: {{ lineStyle: {{ color: '#555' }} }},
                         axisLabel: {{ color: '#ccc' }},
                         axisTick: {{ show: false }},
@@ -969,7 +969,7 @@ def construir_prompt_formateado(data):
                         type: 'category',
                         gridIndex: 1,
                         data: totalDates,
-                        boundaryGap: true,
+                        boundaryGap: false,
                         axisLine: {{ lineStyle: {{ color: '#555' }} }},
                         axisLabel: {{ color: '#ccc' }},
                         axisTick: {{ show: false }},
