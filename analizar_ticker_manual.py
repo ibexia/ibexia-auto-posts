@@ -1048,7 +1048,7 @@ def construir_prompt_formateado(data):
                         xAxisIndex: 1,
                         yAxisIndex: 1,
                         lineStyle: {{ color: '#FF0000', type: 'dotted' }},
-                        areaStyle: {{ color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [ {{ offset: 0, color: 'rgba(255, 0, 0, 0.4)' }}, {{ offset: 1, color: 'rgba(255, 0, 0, 0.0)' }} ] } }},
+                        areaStyle: {{ color: {{ type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [ {{ offset: 0, color: 'rgba(255, 0, 0, 0.4)' }}, {{ offset: 1, color: 'rgba(255, 0, 0, 0.0)' }} ] }} }},
                         symbol: 'none',
                         connectNulls: true,
                     }},
@@ -1060,7 +1060,7 @@ def construir_prompt_formateado(data):
                         xAxisIndex: 1,
                         yAxisIndex: 1,
                         lineStyle: {{ color: '#00AA00', type: 'dotted' }},
-                        areaStyle: {{ color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [ {{ offset: 0, color: 'rgba(0, 170, 0, 0.0)' }}, {{ offset: 1, color: 'rgba(0, 170, 0, 0.4)' }} ] } }},
+                        areaStyle: {{ color: {{ type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [ {{ offset: 0, color: 'rgba(0, 255, 0, 0.4)' }}, {{ offset: 1, color: 'rgba(0, 255, 0, 0.0)' }} ] }} }},
                         symbol: 'none',
                         connectNulls: true,
                     }}
