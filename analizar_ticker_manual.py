@@ -366,49 +366,47 @@ def obtener_datos_yfinance(ticker):
         volumen_promedio_30d = hist_extended['Volume'].tail(30).mean()
 
 
+        
         # Fechas reales de cotización para los últimos 30 días
-        fechas_historial = cierres_history_full.tail(30).index.strftime("%d/%m").tolist()
-        ultima_fecha_historial = cierres_history_full.index[-1] if not cierres_history_full.empty else datetime.today()
+        # CRÍTICO: Usamos el mismo slice tail(30) para todos los datos históricos
+        hist_30d_slice = hist_extended.tail(30)
+
+        # Si el SMI tiene valores NaN dentro del slice (muy improbable con 90d), los rellenamos con 0.0 para ECharts
+        smi_historico_para_grafico = hist_30d_slice['SMI'].fillna(0.0).tolist()
+        precios_reales_para_grafico = hist_30d_slice['Close'].tolist()
+        
+        # Las fechas deben venir del slice limpio
+        fechas_historial = hist_30d_slice.index.strftime("%d/%m").tolist()
+        ultima_fecha_historial = hist_30d_slice.index[-1] if not hist_30d_slice.empty else datetime.today()
         fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
         
-        # --- MANEJO ROBUSTO DE LOS 30 DÍAS DE DATOS PARA EL GRÁFICO (Chart.js compatibility) ---
-        # SMI para los 30 días del gráfico
-        smi_historico_para_grafico = []
-        if len(smi_history_full) >= 30:
-            smi_historico_para_grafico = smi_history_full.tail(30).tolist()
-        else:
-            # Rellenar con el primer valor SMI disponible o 0.0 si no hay ninguno
-            first_smi_val = smi_history_full.iloc[0] if not smi_history_full.empty else 0.0
-            smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
-
-        # Precios para el gráfico: 30 días DESPLAZADOS
-        precios_reales_para_grafico = []
-        # Para un offset de 0 (el SMI de hoy se alinea con el precio de hoy), tomamos los últimos 30 precios
-        if len(cierres_history_full) >= 30:
-            precios_reales_para_grafico = cierres_history_full.tail(30).tolist()
-        else:
-            # Rellenar con el primer precio disponible o el precio actual
-            first_price_val = cierres_history_full.iloc[0] if not cierres_history_full.empty else current_price
-            precios_reales_para_grafico = [first_price_val] * (30 - len(cierres_history_full)) + cierres_history_full.tolist()
-        
-        # Asegurarse de que las etiquetas de fecha coincidan con los 30 días de datos
-        if len(fechas_historial) < 30 and len(cierres_history_full.tail(30)) > 0:
-            # Crear etiquetas de relleno si los datos históricos son menos de 30
-            num_fill = 30 - len(fechas_historial)
-            fecha_temp = cierres_history_full.index[0] if not cierres_history_full.empty else datetime.today()
-            fechas_relleno = [(fecha_temp - timedelta(days=i)).strftime("%d/%m (ant.)") for i in range(num_fill, 0, -1)]
-            fechas_historial = fechas_relleno + fechas_historial
-
-        # Validar la longitud final para evitar problemas en Chart.js
-        if len(smi_historico_para_grafico) != 30 or len(precios_reales_para_grafico) != 30 or len(fechas_historial) != 30:
-             # Si después de todo no coinciden, es mejor abortar la generación del gráfico
-             print(f"❌ Error crítico de longitud de arrays. SMI: {len(smi_historico_para_grafico)}, Precios: {len(precios_reales_para_grafico)}, Fechas: {len(fechas_historial)}")
-             # Usaremos un historial vacío para forzar un mensaje de error en el HTML
+        # Validar la longitud final
+        num_dias_reales = len(hist_30d_slice)
+        if num_dias_reales < 30:
+             print(f"⚠️ Advertencia: Solo se encontraron {num_dias_reales} días de cotización. SMI/Precios: {len(smi_historico_para_grafico)}, Fechas: {len(fechas_historial)}")
+             # Dejamos que ECharts maneje el eje X con los datos que hay
+        elif len(smi_historico_para_grafico) != num_dias_reales:
+             print(f"❌ Error crítico de longitud de arrays. SMI ({len(smi_historico_para_grafico)}) != Días ({num_dias_reales}).")
+             # En este caso extremo, forzamos listas vacías para mostrar un error en el HTML
              smi_historico_para_grafico = []
              precios_reales_para_grafico = []
              fechas_historial = []
 
+        # --- FIN DE MANEJO ROBUSTO ---
+
         # --- INICIO DE LA NUEVA LÓGICA DE DATOS PARA ECHARTS ---
+        
+        # 1. ECHARTS_FECHAS_OHLC (Solo fechas históricas - YYYY-MM-DD para ECharts K-Line)
+        ohlc_dates = hist_30d_slice.index.strftime("%Y-%m-%d").tolist()
+
+        # 2. ECHARTS_OHLC_DATA (30 días de [Open, Close, Low, High])
+        # Aseguramos que solo usamos los últimos N días con datos completos
+        ohlc_data_raw = hist_30d_slice[['Open', 'Close', 'Low', 'High']].values.tolist()
+        ohlc_data_rounded = [[round(val, 3) for val in row] for row in ohlc_data_raw]
+
+        # 3. ECHARTS_SMI_VALUES (Valores SMI)
+        # CRÍTICO: Usa la lista de SMI generada de forma consistente
+        smi_values_for_echarts = [round(s, 3) for s in smi_historico_para_grafico]
         
         # 1. ECHARTS_FECHAS_OHLC (Solo fechas históricas - YYYY-MM-DD para ECharts K-Line)
         ohlc_dates = hist_extended.tail(30).index.strftime("%Y-%m-%d").tolist()
