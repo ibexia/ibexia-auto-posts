@@ -853,7 +853,7 @@ def construir_prompt_formateado(data):
                 }},
                 tooltip: {{
                     trigger: 'axis',
-                    axisPointer: {{ type: 'cross' }},
+                    axisPointer: {{ type: 'line' }},
                     backgroundColor: 'rgba(26, 26, 46, 0.8)',
                     borderColor: '#4a4a5e',
                     borderWidth: 1,
@@ -875,7 +875,11 @@ def construir_prompt_formateado(data):
                         return res;
                     }}
                 }},
-                axisPointer: {{ link: {{ xAxisIndex: 'all' }} }},
+                axisPointer: {{ 
+                    link: {{ xAxisIndex: 'all' }},
+                    // AÑADE ESTA LÍNEA AQUÍ
+                    triggerOn: 'mousemove' 
+                }},
                 grid: [
                     {{ left: '10%', right: '8%', height: '50%', top: '10%', zlevel: 1 }}, // Gráfico de Velas
                     {{ left: '10%', right: '8%', height: '15%', top: '70%' }}  // Gráfico de SMI
