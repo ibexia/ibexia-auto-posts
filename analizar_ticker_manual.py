@@ -970,6 +970,30 @@ def construir_prompt_formateado(data):
                         lineStyle: {{ type: 'dashed', width: 2 }},
                         symbol: 'none',
                         connectNulls: true, 
+                        markLine: {{
+                            silent: true, // No interactuable
+                            symbol: ['none', 'none'], // Ocultar símbolos de flecha
+                            label: {{
+                                show: true,
+                                position: 'end', // Posición al final de la línea
+                                formatter: function(params) {{
+                                    // params.value es el valor Y (precio)
+                                    return 'Precio Final: ' + params.value.toFixed(2) + '€';
+                                }},
+                                fontSize: 14,
+                                color: '#1a1a2e', // Color del texto (oscuro)
+                                backgroundColor: '#ffc107', // Fondo (amarillo de la línea)
+                                padding: [4, 6],
+                                borderRadius: 3
+                            }},
+                            data: [
+                                {{
+                                    // 'end' busca el último punto válido en los datos de la serie
+                                    type: 'max', 
+                                    name: 'Precio Final Proyectado'
+                                }}
+                            ]
+                        }}
                     }},
                     {{ // Serie de Nuestro Algoritmo (SMI)
                         name: 'Nuestro Algoritmo',
