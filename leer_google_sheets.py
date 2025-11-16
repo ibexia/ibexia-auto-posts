@@ -366,49 +366,52 @@ def obtener_datos_yfinance(ticker):
         volumen_promedio_30d = hist_extended['Volume'].tail(30).mean()
 
 
+        
         # Fechas reales de cotización para los últimos 30 días
-        fechas_historial = cierres_history_full.tail(30).index.strftime("%d/%m").tolist()
-        ultima_fecha_historial = cierres_history_full.index[-1] if not cierres_history_full.empty else datetime.today()
+        # CRÍTICO: Usamos el mismo slice tail(30) para todos los datos históricos
+        hist_30d_slice = hist_extended.tail(30)
+
+        # Si el SMI tiene valores NaN dentro del slice (muy improbable con 90d), los rellenamos con 0.0 para ECharts
+        smi_historico_para_grafico = hist_30d_slice['SMI'].fillna(0.0).tolist()
+        precios_reales_para_grafico = hist_30d_slice['Close'].tolist()
+        
+        # Las fechas deben venir del slice limpio
+        fechas_historial = hist_30d_slice.index.strftime("%d/%m").tolist()
+        ultima_fecha_historial = hist_30d_slice.index[-1] if not hist_30d_slice.empty else datetime.today()
         fechas_proyeccion = [(ultima_fecha_historial + timedelta(days=i)).strftime("%d/%m (fut.)") for i in range(1, PROYECCION_FUTURA_DIAS + 1)]
         
-        # --- MANEJO ROBUSTO DE LOS 30 DÍAS DE DATOS PARA EL GRÁFICO (Chart.js compatibility) ---
-        # SMI para los 30 días del gráfico
-        smi_historico_para_grafico = []
-        if len(smi_history_full) >= 30:
-            smi_historico_para_grafico = smi_history_full.tail(30).tolist()
-        else:
-            # Rellenar con el primer valor SMI disponible o 0.0 si no hay ninguno
-            first_smi_val = smi_history_full.iloc[0] if not smi_history_full.empty else 0.0
-            smi_historico_para_grafico = [first_smi_val] * (30 - len(smi_history_full)) + smi_history_full.tolist()
-
-        # Precios para el gráfico: 30 días DESPLAZADOS
-        precios_reales_para_grafico = []
-        # Para un offset de 0 (el SMI de hoy se alinea con el precio de hoy), tomamos los últimos 30 precios
-        if len(cierres_history_full) >= 30:
-            precios_reales_para_grafico = cierres_history_full.tail(30).tolist()
-        else:
-            # Rellenar con el primer precio disponible o el precio actual
-            first_price_val = cierres_history_full.iloc[0] if not cierres_history_full.empty else current_price
-            precios_reales_para_grafico = [first_price_val] * (30 - len(cierres_history_full)) + cierres_history_full.tolist()
-        
-        # Asegurarse de que las etiquetas de fecha coincidan con los 30 días de datos
-        if len(fechas_historial) < 30 and len(cierres_history_full.tail(30)) > 0:
-            # Crear etiquetas de relleno si los datos históricos son menos de 30
-            num_fill = 30 - len(fechas_historial)
-            fecha_temp = cierres_history_full.index[0] if not cierres_history_full.empty else datetime.today()
-            fechas_relleno = [(fecha_temp - timedelta(days=i)).strftime("%d/%m (ant.)") for i in range(num_fill, 0, -1)]
-            fechas_historial = fechas_relleno + fechas_historial
-
-        # Validar la longitud final para evitar problemas en Chart.js
-        if len(smi_historico_para_grafico) != 30 or len(precios_reales_para_grafico) != 30 or len(fechas_historial) != 30:
-             # Si después de todo no coinciden, es mejor abortar la generación del gráfico
-             print(f"❌ Error crítico de longitud de arrays. SMI: {len(smi_historico_para_grafico)}, Precios: {len(precios_reales_para_grafico)}, Fechas: {len(fechas_historial)}")
-             # Usaremos un historial vacío para forzar un mensaje de error en el HTML
+        # Validar la longitud final
+        num_dias_reales = len(hist_30d_slice)
+        if num_dias_reales < 30:
+             print(f"⚠️ Advertencia: Solo se encontraron {num_dias_reales} días de cotización. SMI/Precios: {len(smi_historico_para_grafico)}, Fechas: {len(fechas_historial)}")
+             # Dejamos que ECharts maneje el eje X con los datos que hay
+        elif len(smi_historico_para_grafico) != num_dias_reales:
+             print(f"❌ Error crítico de longitud de arrays. SMI ({len(smi_historico_para_grafico)}) != Días ({num_dias_reales}).")
+             # En este caso extremo, forzamos listas vacías para mostrar un error en el HTML
              smi_historico_para_grafico = []
              precios_reales_para_grafico = []
              fechas_historial = []
 
+        # --- FIN DE MANEJO ROBUSTO ---
+
         # --- INICIO DE LA NUEVA LÓGICA DE DATOS PARA ECHARTS ---
+        
+        # 1. ECHARTS_FECHAS_OHLC (Solo fechas históricas - YYYY-MM-DD para ECharts K-Line)
+        ohlc_dates = hist_30d_slice.index.strftime("%Y-%m-%d").tolist()
+
+        # 2. ECHARTS_OHLC_DATA (30 días de [Open, Close, Low, High])
+        # Aseguramos que solo usamos los últimos N días con datos completos
+        ohlc_data_raw = hist_30d_slice[['Open', 'Close', 'Low', 'High']].values.tolist()
+        ohlc_data_rounded = [[round(val, 3) for val in row] for row in ohlc_data_raw]
+
+        # 3. ECHARTS_SMI_VALUES (Valores SMI)
+        # CRÍTICO: Usa la lista de SMI generada de forma consistente
+        smi_values_for_echarts = [round(s, 3) for s in smi_historico_para_grafico]
+
+        # AÑADE ESTE BLOQUE: Alinear SMI con el total de fechas del eje X (30 + 5)
+        PROYECCION_FUTURA_DIAS = 5 # Valor definido previamente en tu código
+        smi_values_for_echarts.extend([None] * PROYECCION_FUTURA_DIAS) # <--- CORRECCIÓN CRÍTICA
+        # smi_values_for_echarts ahora tiene 35 elementos, igual que el eje X.
         
         # 1. ECHARTS_FECHAS_OHLC (Solo fechas históricas - YYYY-MM-DD para ECharts K-Line)
         ohlc_dates = hist_extended.tail(30).index.strftime("%Y-%m-%d").tolist()
@@ -816,8 +819,8 @@ def construir_prompt_formateado(data):
         chart_html = "<p>No hay suficientes datos válidos para generar el gráfico de velas japonesas.</p>"
     else:
         chart_html = f"""
-        <div style="width: 100%; max-width: 800px; margin: auto;">
-            <div id="echarts-kline-container" style="width: 100%; height: 750px;"></div>
+        <div style="width: 100%; max-width: 900px; margin: auto;">
+            <div id="echarts-kline-container" style="width: 100%; height: 950px;"></div>
         </div>
         <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
         <script>
@@ -844,15 +847,15 @@ def construir_prompt_formateado(data):
             const myChart = echarts.init(chartDom, null, {{
                 renderer: 'canvas',
                 useDirtyRect: false,
-                backgroundColor: '#1a1a2e' // Fondo oscuro fijo
+                backgroundColor: '#ffffff' // Fondo oscuro fijo
             }});
             
             const option = {{
                 title: {{
                     // MODIFICACIÓN: Título corregido.
-                    text: 'Análisis K-Line y SMI de {data['NOMBRE_EMPRESA']}', 
+                    text: 'Análisis de {data['NOMBRE_EMPRESA']}', 
                     left: 'center',
-                    textStyle: {{ color: '#000000' }} // Color de texto fijo
+                    textStyle: {{ color: '#333333' }} // Color de texto fijo
                 }},
                 // 2. ELEMENTO GRÁFICO FIJO Y CENTRADO
                 graphic: [
@@ -895,7 +898,7 @@ def construir_prompt_formateado(data):
                 ],
                 legend: {{
                     data: ['Vela Japonesa', 'Nuestro Algoritmo', 'Proyección de Precio'],
-                    textStyle: {{ color: '#000000' }},
+                    textStyle: {{ color: '#333333' }},
                     bottom: '10px', 
                 }},
                 tooltip: {{
@@ -903,13 +906,13 @@ def construir_prompt_formateado(data):
                     axisPointer: {{
                         type: 'cross',
                         lineStyle: {{
-                            color: '#e0e0e0', // Color del puntero fijo
+                            color: '#333333', // Color del puntero fijo
                             width: 1,
                             type: 'solid'
                         }}
                     }},
-                    backgroundColor: 'rgba(50, 50, 50, 0.7)', // Fondo del tooltip oscuro
-                    textStyle: {{ color: '#e0e0e0' }} // Texto del tooltip claro
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Fondo del tooltip oscuro
+                    textStyle: {{ color: '#333333' }} // Texto del tooltip claro
                 }},
                 axisPointer: {{
                     link: [{{ xAxisIndex: 'all' }}],
@@ -927,8 +930,8 @@ def construir_prompt_formateado(data):
                     {{
                         left: '10%',
                         right: '8%',
-                        top: '68%',
-                        height: '20%' // Gráfico de SMI
+                        top: '60%',
+                        height: '40%' // Gráfico de SMI
                     }}
                 ],
                 // MODIFICACIÓN CRÍTICA 1: Configuración de DataZoom para zoom fijo inicial
@@ -959,11 +962,11 @@ def construir_prompt_formateado(data):
                     {{ // Eje X principal (para K-Line y Proyección - grid 0)
                         type: 'category',
                         data: totalDates,
-                        boundaryGap: true,
+                        boundaryGap: false,
                         axisLine: {{ lineStyle: {{ color: '#555' }} }},
                         axisLabel: {{ color: '#ccc' }},
                         axisTick: {{ show: false }},
-                        splitLine: {{ show: false }},
+                        splitLine: {{ show: true, lineStyle: {{ color: '#e0e0e0', type: 'solid' }} }},
                         min: 'dataMin',
                         max: 'dataMax'
                     }},
@@ -971,11 +974,11 @@ def construir_prompt_formateado(data):
                         type: 'category',
                         gridIndex: 1,
                         data: totalDates,
-                        boundaryGap: true,
+                        boundaryGap: false,
                         axisLine: {{ lineStyle: {{ color: '#555' }} }},
                         axisLabel: {{ color: '#ccc' }},
                         axisTick: {{ show: false }},
-                        splitLine: {{ show: false }},
+                        splitLine: {{ show: true, lineStyle: {{ color: '#e0e0e0', type: 'solid' }} }},
                         min: 'dataMin',
                         max: 'dataMax'
                     }}
@@ -984,10 +987,10 @@ def construir_prompt_formateado(data):
                 yAxis: [
                     {{ // Eje Y para K-Line (grid 0)
                         scale: true,
-                        splitArea: {{ show: true, areaStyle: {{ color: ['#2e2e42', '#1a1a2e'] }} }},
-                        axisLine: {{ lineStyle: {{ color: '#555' }} }},
-                        axisLabel: {{ color: '#ccc' }},
-                        splitLine: {{ lineStyle: {{ color: '#333' }} }}
+                        splitArea: {{ show: true, areaStyle: {{ color: ['#f5f5f5', '#ffffff'] }} }},
+                        axisLine: {{ lineStyle: {{ color: '#333' }} }},
+                        axisLabel: {{ color: '#333' }},
+                        splitLine: {{ lineStyle: {{ color: '#e0e0e0' }} }}
                     }},
                     {{ // Eje Y para SMI (grid 1)
                         gridIndex: 1,
@@ -995,9 +998,9 @@ def construir_prompt_formateado(data):
                         scale: true,
                         min: -100,
                         max: 100,
-                        axisLine: {{ lineStyle: {{ color: '#555' }} }},
-                        axisLabel: {{ color: '#ccc' }},
-                        splitLine: {{ lineStyle: {{ color: '#333' }} }},
+                        axisLine: {{ lineStyle: {{ color: '#333' }} }},
+                        axisLabel: {{ color: '#333' }},
+                        splitLine: {{ lineStyle: {{ color: '#e0e0e0' }} }},
                         z: 10,
                     }}
                 ],
@@ -1049,8 +1052,8 @@ def construir_prompt_formateado(data):
                         data: createLineData(40),
                         xAxisIndex: 1,
                         yAxisIndex: 1,
-                        lineStyle: {{ color: '#F44336', type: 'dotted' }},
-                        areaStyle: {{ color: 'rgba(244, 67, 54, 0.2)' }},
+                        lineStyle: {{ color: 'rgba(0,0,0,0.0)', type: 'dotted' }}, # Hacemos la línea invisible, solo pintamos el área
+                        areaStyle: {{ color: '#FF0000', origin: 'end', opacity: 0.35 }}, # 'end' pinta el área desde la línea hacia el borde superior
                         symbol: 'none',
                         connectNulls: true,
                     }},
@@ -1061,8 +1064,8 @@ def construir_prompt_formateado(data):
                         data: createLineData(-40),
                         xAxisIndex: 1,
                         yAxisIndex: 1,
-                        lineStyle: {{ color: '#4CAF50', type: 'dotted' }},
-                        areaStyle: {{ color: 'rgba(76, 175, 80, 0.2)' }},
+                        lineStyle: {{ color: 'rgba(0,0,0,0.0)', type: 'dotted' }}, # Hacemos la línea invisible
+                        areaStyle: {{ color: '#00AA00', origin: 'start', opacity: 0.35 }}, # 'start' pinta el área desde la línea hacia el borde inferior
                         symbol: 'none',
                         connectNulls: true,
                     }}
@@ -1151,8 +1154,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
     El análisis redactado a continuación se actualiza una vez por semana. La ficha superior SI se actualiza varias veces al día donde puedes ver nuestra posición en tiempo real y análisis resumido.
 </p>
 
-<h2>Análisis Inicial</h2>
-<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{formatear_numero(data['PRECIO_ACTUAL'])}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>. Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
+<p>La cotización actual de <strong>{data['NOMBRE_EMPRESA']} ({data['TICKER']})</strong> se encuentra en <strong>{formatear_numero(data['PRECIO_ACTUAL'])}€</strong>. El volumen de negociación reciente fue de <strong>{data['VOLUMEN']:,} acciones</strong>.</p>
 
 <h2>Historial de Operaciones</h2>
 {ganancias_html}
@@ -1165,7 +1167,7 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 {analisis_grafico_html}
 
 <h2>La Clave: El Algoritmo como tu "Guía de Compra"</h2>
-<p>Nuestro sistema se basa en un <strong>Algoritmo</strong> que funciona como una brújula que te dice si es un buen momento para comprar o no. La clave está en cómo se mueve:</p>
+<p>Nuestro sistema se basa en un <strong>Algoritmo</strong> que funciona como una brújula que te dice si es un buen momento para comprar o no, te lo mostramos justo debajo del gráfico de velas. La clave está en cómo se mueve:</p>
 <ul>
     <li>
         <strong>Si el Algoritmo está en sobreventa (muy abajo):</strong> La acción podría estar "demasiado barata". Es probable que el Algoritmo gire hacia arriba, lo que sería una <strong>señal de compra</strong>.
@@ -1177,6 +1179,8 @@ Importante: si algún dato no está disponible ("N/A", "No disponibles", "No dis
 <p>Más allá de la sobrecompra o sobreventa, la señal de compra más clara es cuando el Algoritmo <strong>gira hacia arriba</strong>. Si ves que sube, es un buen momento para comprar (siempre y cuando no esté en una zona extrema de sobrecompra). Si gira a la baja, es mejor esperar.</p>
 
 {tabla_resumen}
+
+<p>Recuerda que este análisis es solo para fines informativos y no debe ser considerado como asesoramiento financiero. Se recomienda encarecidamente que realices tu propia investigación y consultes a un profesional antes de tomar cualquier decisión de inversión.</p>
 
 **FIN DEL ANÁLISIS. NO AÑADAS NINGÚN TEXTO O SECCIÓN ADICIONAL DESPUÉS DEL RESUMEN DE PUNTOS CLAVE.**
 """
