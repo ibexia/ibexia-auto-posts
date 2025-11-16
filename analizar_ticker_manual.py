@@ -881,8 +881,8 @@ def construir_prompt_formateado(data):
                     triggerOn: 'mousemove' 
                 }},
                 grid: [
-                    {{ left: '10%', right: '8%', height: '50%', top: '10%', zlevel: 1 }}, // Gráfico de Velas (50% de alto)
-                    {{ left: '10%', right: '8%', height: '30%', top: '65%' }}  // Gráfico de SMI (Aumentado a 30% de alto, subido a 65%)
+                    {{ left: '10%', right: '8%', height: '40%', top: '5%', zlevel: 1 }}, // Gráfico de Velas (50% de alto)
+                    {{ left: '10%', right: '8%', height: '40%', top: '50%' }}  // Gráfico de SMI (Aumentado a 30% de alto, subido a 65%)
                 ],
                 xAxis: [
                     {{
