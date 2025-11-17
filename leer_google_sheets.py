@@ -709,6 +709,78 @@ def construir_prompt_formateado(data):
     echarts_x_dates_total_json = safe_json_dump(data.get('ECHARTS_X_DATES_TOTAL', []))
     # ---- FIN: SERIALIZACIÓN DE DATOS PARA ECHARTS ----
 
+
+
+
+
+    # --- NUEVA LÓGICA PARA MARCAR COMPRAS/VENTAS EN ECHARTS (MARKPOINT) ---
+    mark_points_data = []
+
+    # Obtener el mapeo de fecha a índice/posición en el eje X
+    date_to_index = {date_str: i for i, date_str in enumerate(data.get('ECHARTS_X_DATES_TOTAL', []))}
+
+    # Solo marcamos las operaciones CERRADAS (pares compra-venta)
+    num_operaciones_completadas = min(len(compras_simuladas), len(ventas_simuladas))
+    
+    # 1. Marcar Compras Cerradas
+    for i in range(num_operaciones_completadas):
+        compra = compras_simuladas[i]
+        # La fecha de la simulación es DD/MM/AAAA. ECharts usa YYYY-MM-DD para OHLC.
+        fecha_simulacion = datetime.strptime(compra['fecha'], "%d/%m/%Y")
+        fecha_echarts_str = fecha_simulacion.strftime("%Y-%m-%d")
+
+        if fecha_echarts_str in date_to_index:
+            mark_points_data.append({
+                'name': 'Compra',
+                'coord': [date_to_index[fecha_echarts_str], compra['precio']], 
+                'value': f"C: {formatear_numero(compra['precio'])}€",
+                'itemStyle': {'color': '#4CAF50'}, # Verde para compra
+                'symbol': 'pin',
+                'symbolSize': 40,
+                'label': {'show': True, 'formatter': 'Compramos'} # <-- CAMBIO A ETIQUETA LARGA
+            })
+            
+    # 2. Marcar Ventas Cerradas
+    for i in range(num_operaciones_completadas):
+        venta = ventas_simuladas[i]
+        fecha_simulacion = datetime.strptime(venta['fecha'], "%d/%m/%Y")
+        fecha_echarts_str = fecha_simulacion.strftime("%Y-%m-%d")
+
+        if fecha_echarts_str in date_to_index:
+             mark_points_data.append({
+                'name': 'Venta',
+                'coord': [date_to_index[fecha_echarts_str], venta['precio']],
+                'value': f"V: {formatear_numero(venta['precio'])}€",
+                'itemStyle': {'color': '#F44336'}, # Rojo para venta
+                'symbol': 'pin',
+                'symbolSize': 40,
+                'label': {'show': True, 'formatter': 'Vendemos'} # <-- CAMBIO A ETIQUETA LARGA
+            })
+
+    # 3. Marcar la Última Posición ABIERTA (si existe)
+    if compras_simuladas and len(compras_simuladas) > len(ventas_simuladas):
+        ultima_compra = compras_simuladas[-1]
+        fecha_simulacion = datetime.strptime(ultima_compra['fecha'], "%d/%m/%Y")
+        fecha_echarts_str = fecha_simulacion.strftime("%Y-%m-%d")
+
+        if fecha_echarts_str in date_to_index:
+            mark_points_data.append({
+                'name': 'Última Compra (Abierta)',
+                'coord': [date_to_index[fecha_echarts_str], ultima_compra['precio']], 
+                'value': f"C (Abierta): {formatear_numero(ultima_compra['precio'])}€",
+                'itemStyle': {'color': '#FFC107'}, # Amarillo/Naranja para posición abierta
+                'symbol': 'pin',
+                'symbolSize': 40,
+                'label': {'show': True, 'formatter': 'Compramos (Abierta)'} # <-- CAMBIO A ETIQUETA LARGA
+            })
+
+    # 4. Serializar para JS
+    mark_points_data_json = json.dumps(mark_points_data)
+    # --- FIN NUEVA LÓGICA PARA MARCAR COMPRAS/VENTAS EN ECHARTS (MARKPOINT) ---
+    
+    # Nuevo HTML del gráfico (incluyendo el análisis detallado)
+    
+
     # Reemplazo para la sección de análisis detallado del gráfico
     # El contenido de analisis_grafico_html no cambia, se mantiene como estaba antes
     analisis_grafico_html = f"""
@@ -829,6 +901,7 @@ def construir_prompt_formateado(data):
             const smiData = {smi_values_json};
             const projectionLineData = {proyeccion_line_json};
             const totalDates = {echarts_x_dates_total_json};
+            const tradePoints = {mark_points_data_json};
             const totalDataPoints = totalDates.length;
             const initialZoomPoints = 35; // Queremos mostrar los últimos 35 puntos (30 históricos + 5 proyectados)
 
@@ -1018,9 +1091,64 @@ def construir_prompt_formateado(data):
                             borderColor0: '#F44336'
                         }},
                         markPoint: {{
+                            data: tradePoints.concat([
+                                {{ 
+                                    name: "Max", 
+                                    type: "max", 
+                                    valueDim: "highest",
+                                    itemStyle: {{ color: "#000000" }}, 
+                                    symbol: "circle",
+                                    symbolSize: 1 
+                                }},
+                                {{ 
+                                    name: "Min", 
+                                    type: "min", 
+                                    valueDim: "lowest",
+                                    itemStyle: {{ color: "#000000" }},
+                                    symbol: "circle",
+                                    symbolSize: 1 
+                                }}
+                            ]),
+                            // Configuración por defecto para MarkPoints si no está en 'data'
+                            label: {{
+                                show: true,
+                                position: "top", 
+                                // Ajustamos la posición y tamaño para que quepan las etiquetas largas
+                                distance: 15,
+                                fontSize: 10,
+                                formatter: function (params) {{
+                                    // Muestra la etiqueta que se definió en Python (Compramos, Vendemos, etc.)
+                                    if (params.name === 'Compra' || params.name === 'Venta' || params.name === 'Última Compra (Abierta)') {{
+                                        return params.data.label.formatter;
+                                    }}
+                                    // No mostrar etiqueta para Max/Min
+                                    return ''; 
+                                }}
+                            }}
+                        }},
+                        // SECCIÓN RESTAURADA: MARCAS DE SOPORTE Y RESISTENCIA (MARKLINE)
+                        markLine: {{
                             data: [
-                                {{ name: 'Max', type: 'max', valueDim: 'highest' }},
-                                {{ name: 'Min', type: 'min', valueDim: 'lowest' }}
+                                {{ 
+                                    type: 'max', 
+                                    name: 'Resistencia',
+                                    lineStyle: {{ 
+                                        type: 'solid', 
+                                        color: '#F44336' // Rojo 
+                                    }},
+                                    // CORRECCIÓN: Doblamos las llaves para que Python no las interprete
+                                    label: {{ position: 'end', formatter: 'Resistencia: {{c}}' }} 
+                                }},
+                                {{ 
+                                    type: 'min', 
+                                    name: 'Soporte',
+                                    lineStyle: {{ 
+                                        type: 'solid', 
+                                        color: '#4CAF50' // Verde
+                                    }},
+                                    // CORRECCIÓN: Doblamos las llaves para que Python no las interprete
+                                    label: {{ position: 'end', formatter: 'Soporte: {{c}}' }} 
+                                }}
                             ]
                         }}
                     }},
@@ -1338,6 +1466,8 @@ def generar_contenido_con_gemini(tickers):
             
         print(f"⏳ Esperando 180 segundos antes de procesar el siguiente ticker...")
         time.sleep(180)
+
+
 
 
 
