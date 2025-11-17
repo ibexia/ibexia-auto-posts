@@ -1136,7 +1136,8 @@ def construir_prompt_formateado(data):
                                         type: 'solid', 
                                         color: '#F44336' // Rojo 
                                     }},
-                                    label: {{ position: 'end', formatter: 'Resistencia: {c}' }}
+                                    // CORRECCIÓN: Doblamos las llaves para que Python no las interprete
+                                    label: {{ position: 'end', formatter: 'Resistencia: {{c}}' }} 
                                 }},
                                 {{ 
                                     type: 'min', 
@@ -1145,7 +1146,8 @@ def construir_prompt_formateado(data):
                                         type: 'solid', 
                                         color: '#4CAF50' // Verde
                                     }},
-                                    label: {{ position: 'end', formatter: 'Soporte: {c}' }}
+                                    // CORRECCIÓN: Doblamos las llaves para que Python no las interprete
+                                    label: {{ position: 'end', formatter: 'Soporte: {{c}}' }} 
                                 }}
                             ]
                         }}
