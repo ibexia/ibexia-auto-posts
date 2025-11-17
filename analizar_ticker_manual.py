@@ -709,6 +709,82 @@ def construir_prompt_formateado(data):
     echarts_x_dates_total_json = safe_json_dump(data.get('ECHARTS_X_DATES_TOTAL', []))
     # ---- FIN: SERIALIZACIÓN DE DATOS PARA ECHARTS ----
 
+
+
+    # --- NUEVA LÓGICA PARA MARCAR COMPRAS/VENTAS EN ECHARTS (MARKPOINT) ---
+    mark_points_data = []
+
+    # Obtener el mapeo de fecha a índice/posición en el eje X
+    date_to_index = {date_str: i for i, date_str in enumerate(data.get('ECHARTS_X_DATES_TOTAL', []))}
+
+    # Solo marcamos las operaciones CERRADAS (pares compra-venta)
+    num_operaciones_completadas = min(len(compras_simuladas), len(ventas_simuladas))
+    
+    # 1. Marcar Compras Cerradas
+    for i in range(num_operaciones_completadas):
+        compra = compras_simuladas[i]
+        # La fecha de la simulación es DD/MM/AAAA. ECharts usa YYYY-MM-DD para OHLC.
+        # Necesitamos la fecha en formato YYYY-MM-DD para buscar el índice en el eje X.
+        # Primero convertimos DD/MM/YYYY a un objeto datetime
+        fecha_simulacion = datetime.strptime(compra['fecha'], "%d/%m/%Y")
+        # Y luego al formato de ECharts (YYYY-MM-DD)
+        fecha_echarts_str = fecha_simulacion.strftime("%Y-%m-%d")
+
+        # SOLO añadimos la marca si la fecha está en el historial del gráfico (últimos 30 días)
+        if fecha_echarts_str in date_to_index:
+            mark_points_data.append({
+                'name': 'Compra',
+                # 'coord' usa el par [índice_eje_x, valor_eje_y]
+                'coord': [date_to_index[fecha_echarts_str], compra['precio']], 
+                'value': f"C: {formatear_numero(compra['precio'])}€",
+                'itemStyle': {'color': '#4CAF50'}, # Verde para compra
+                'symbol': 'pin',
+                'symbolSize': 40,
+                'label': {'show': True, 'formatter': 'C'}
+            })
+            
+    # 2. Marcar Ventas Cerradas
+    for i in range(num_operaciones_completadas):
+        venta = ventas_simuladas[i]
+        fecha_simulacion = datetime.strptime(venta['fecha'], "%d/%m/%Y")
+        fecha_echarts_str = fecha_simulacion.strftime("%Y-%m-%d")
+
+        if fecha_echarts_str in date_to_index:
+             mark_points_data.append({
+                'name': 'Venta',
+                'coord': [date_to_index[fecha_echarts_str], venta['precio']],
+                'value': f"V: {formatear_numero(venta['precio'])}€",
+                'itemStyle': {'color': '#F44336'}, # Rojo para venta
+                'symbol': 'pin',
+                'symbolSize': 40,
+                'label': {'show': True, 'formatter': 'V'}
+            })
+
+    # 3. Marcar la Última Posición ABIERTA (si existe)
+    if compras_simuladas and len(compras_simuladas) > len(ventas_simuladas):
+        ultima_compra = compras_simuladas[-1]
+        fecha_simulacion = datetime.strptime(ultima_compra['fecha'], "%d/%m/%Y")
+        fecha_echarts_str = fecha_simulacion.strftime("%Y-%m-%d")
+
+        # Marcamos la última compra si está en el historial del gráfico
+        if fecha_echarts_str in date_to_index:
+            mark_points_data.append({
+                'name': 'Última Compra (Abierta)',
+                'coord': [date_to_index[fecha_echarts_str], ultima_compra['precio']], 
+                'value': f"C (Abierta): {formatear_numero(ultima_compra['precio'])}€",
+                'itemStyle': {'color': '#FFC107'}, # Amarillo/Naranja para posición abierta
+                'symbol': 'pin',
+                'symbolSize': 40,
+                'label': {'show': True, 'formatter': 'C!'}
+            })
+
+    # 4. Serializar para JS
+    mark_points_data_json = json.dumps(mark_points_data)
+    # --- FIN NUEVA LÓGICA PARA MARCAR COMPRAS/VENTAS EN ECHARTS (MARKPOINT) ---
+    
+    # Nuevo HTML del gráfico (incluyendo el análisis detallado)
+    
+
     # Reemplazo para la sección de análisis detallado del gráfico
     # El contenido de analisis_grafico_html no cambia, se mantiene como estaba antes
     analisis_grafico_html = f"""
@@ -829,6 +905,7 @@ def construir_prompt_formateado(data):
             const smiData = {smi_values_json};
             const projectionLineData = {proyeccion_line_json};
             const totalDates = {echarts_x_dates_total_json};
+            const tradePoints = {mark_points_data_json};
             const totalDataPoints = totalDates.length;
             const initialZoomPoints = 35; // Queremos mostrar los últimos 35 puntos (30 históricos + 5 proyectados)
 
@@ -1018,10 +1095,37 @@ def construir_prompt_formateado(data):
                             borderColor0: '#F44336'
                         }},
                         markPoint: {{
-                            data: [
-                                {{ name: 'Max', type: 'max', valueDim: 'highest' }},
-                                {{ name: 'Min', type: 'min', valueDim: 'lowest' }}
-                            ]
+                            data: tradePoints.concat([
+                                {{ 
+                                    name: "Max", 
+                                    type: "max", 
+                                    valueDim: "highest",
+                                    itemStyle: {{ color: "#000000" }}, 
+                                    symbol: "circle",
+                                    symbolSize: 1 
+                                }},
+                                {{ 
+                                    name: "Min", 
+                                    type: "min", 
+                                    valueDim: "lowest",
+                                    itemStyle: {{ color: "#000000" }},
+                                    symbol: "circle",
+                                    symbolSize: 1 
+                                }}
+                            ]),
+                            // Configuración por defecto para MarkPoints si no está en 'data'
+                            label: {{
+                                show: true,
+                                position: "top", 
+                                formatter: function (params) {{
+                                    // Muestra la etiqueta solo si es una Compra/Venta
+                                    if (params.name === 'Compra' || params.name === 'Venta' || params.name === 'Última Compra (Abierta)') {{
+                                        return params.data.label.formatter; // Usa 'C', 'V', o 'C!'
+                                    }}
+                                    // No mostrar etiqueta para Max/Min
+                                    return ''; 
+                                }}
+                            }}
                         }}
                     }},
                     {{ // Serie de Proyección de Precio (Línea)
