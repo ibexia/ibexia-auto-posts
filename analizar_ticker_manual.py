@@ -711,6 +711,8 @@ def construir_prompt_formateado(data):
 
 
 
+
+
     # --- NUEVA LÓGICA PARA MARCAR COMPRAS/VENTAS EN ECHARTS (MARKPOINT) ---
     mark_points_data = []
 
@@ -724,23 +726,18 @@ def construir_prompt_formateado(data):
     for i in range(num_operaciones_completadas):
         compra = compras_simuladas[i]
         # La fecha de la simulación es DD/MM/AAAA. ECharts usa YYYY-MM-DD para OHLC.
-        # Necesitamos la fecha en formato YYYY-MM-DD para buscar el índice en el eje X.
-        # Primero convertimos DD/MM/YYYY a un objeto datetime
         fecha_simulacion = datetime.strptime(compra['fecha'], "%d/%m/%Y")
-        # Y luego al formato de ECharts (YYYY-MM-DD)
         fecha_echarts_str = fecha_simulacion.strftime("%Y-%m-%d")
 
-        # SOLO añadimos la marca si la fecha está en el historial del gráfico (últimos 30 días)
         if fecha_echarts_str in date_to_index:
             mark_points_data.append({
                 'name': 'Compra',
-                # 'coord' usa el par [índice_eje_x, valor_eje_y]
                 'coord': [date_to_index[fecha_echarts_str], compra['precio']], 
                 'value': f"C: {formatear_numero(compra['precio'])}€",
                 'itemStyle': {'color': '#4CAF50'}, # Verde para compra
                 'symbol': 'pin',
                 'symbolSize': 40,
-                'label': {'show': True, 'formatter': 'C'}
+                'label': {'show': True, 'formatter': 'Compramos'} # <-- CAMBIO A ETIQUETA LARGA
             })
             
     # 2. Marcar Ventas Cerradas
@@ -757,7 +754,7 @@ def construir_prompt_formateado(data):
                 'itemStyle': {'color': '#F44336'}, # Rojo para venta
                 'symbol': 'pin',
                 'symbolSize': 40,
-                'label': {'show': True, 'formatter': 'V'}
+                'label': {'show': True, 'formatter': 'Vendemos'} # <-- CAMBIO A ETIQUETA LARGA
             })
 
     # 3. Marcar la Última Posición ABIERTA (si existe)
@@ -766,7 +763,6 @@ def construir_prompt_formateado(data):
         fecha_simulacion = datetime.strptime(ultima_compra['fecha'], "%d/%m/%Y")
         fecha_echarts_str = fecha_simulacion.strftime("%Y-%m-%d")
 
-        # Marcamos la última compra si está en el historial del gráfico
         if fecha_echarts_str in date_to_index:
             mark_points_data.append({
                 'name': 'Última Compra (Abierta)',
@@ -775,7 +771,7 @@ def construir_prompt_formateado(data):
                 'itemStyle': {'color': '#FFC107'}, # Amarillo/Naranja para posición abierta
                 'symbol': 'pin',
                 'symbolSize': 40,
-                'label': {'show': True, 'formatter': 'C!'}
+                'label': {'show': True, 'formatter': 'Compramos (Abierta)'} # <-- CAMBIO A ETIQUETA LARGA
             })
 
     # 4. Serializar para JS
@@ -1117,15 +1113,41 @@ def construir_prompt_formateado(data):
                             label: {{
                                 show: true,
                                 position: "top", 
+                                // Ajustamos la posición y tamaño para que quepan las etiquetas largas
+                                distance: 15,
+                                fontSize: 10,
                                 formatter: function (params) {{
-                                    // Muestra la etiqueta solo si es una Compra/Venta
+                                    // Muestra la etiqueta que se definió en Python (Compramos, Vendemos, etc.)
                                     if (params.name === 'Compra' || params.name === 'Venta' || params.name === 'Última Compra (Abierta)') {{
-                                        return params.data.label.formatter; // Usa 'C', 'V', o 'C!'
+                                        return params.data.label.formatter;
                                     }}
                                     // No mostrar etiqueta para Max/Min
                                     return ''; 
                                 }}
                             }}
+                        }},
+                        // SECCIÓN RESTAURADA: MARCAS DE SOPORTE Y RESISTENCIA (MARKLINE)
+                        markLine: {{
+                            data: [
+                                {{ 
+                                    type: 'max', 
+                                    name: 'Resistencia',
+                                    lineStyle: {{ 
+                                        type: 'solid', 
+                                        color: '#F44336' // Rojo 
+                                    }},
+                                    label: {{ position: 'end', formatter: 'Resistencia: {c}' }}
+                                }},
+                                {{ 
+                                    type: 'min', 
+                                    name: 'Soporte',
+                                    lineStyle: {{ 
+                                        type: 'solid', 
+                                        color: '#4CAF50' // Verde
+                                    }},
+                                    label: {{ position: 'end', formatter: 'Soporte: {c}' }}
+                                }}
+                            ]
                         }}
                     }},
                     {{ // Serie de Proyección de Precio (Línea)
