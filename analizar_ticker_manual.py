@@ -1470,7 +1470,7 @@ def generar_contenido_con_gemini(tickers):
 
 def main():
     # Define el ticker que quieres analizar
-    ticker_deseado = "ITX.MC"
+    ticker_deseado = "A3M.MC"
 
     tickers_for_today = [ticker_deseado]
 
